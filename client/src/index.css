@@ -1,3 +1,11 @@
+/*
+ * ARTSWRK HOMEPAGE — Design System
+ * Design Philosophy: Refined Modern "Premium Platform"
+ * Typography: Syne (display, 700/800) + DM Sans (body, 400/500)
+ * Colors: White base, near-black text, orange-coral gradient accent
+ * Brand gradient: #F97316 (coral) → #E91E8C (hot pink/magenta)
+ */
+
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -27,90 +35,35 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
 }
 
 :root {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-600);
-  --sidebar-primary-foreground: var(--color-blue-50);
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
-  --radius: 0.65rem;
+  --radius: 0.75rem;
   --background: oklch(1 0 0);
-  --foreground: oklch(0.235 0.015 65);
+  --foreground: oklch(0.1 0 0);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.235 0.015 65);
+  --card-foreground: oklch(0.1 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.235 0.015 65);
-  --secondary: oklch(0.98 0.001 286.375);
-  --secondary-foreground: oklch(0.4 0.015 65);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.141 0.005 285.823);
+  --popover-foreground: oklch(0.1 0 0);
+  --primary: oklch(0.65 0.22 35);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.96 0.005 0);
+  --secondary-foreground: oklch(0.2 0 0);
+  --muted: oklch(0.96 0.005 0);
+  --muted-foreground: oklch(0.5 0.01 0);
+  --accent: oklch(0.96 0.005 0);
+  --accent-foreground: oklch(0.2 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.623 0.214 259.815);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.235 0.015 65);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.623 0.214 259.815);
-}
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.9 0.005 0);
+  --input: oklch(0.9 0.005 0);
+  --ring: oklch(0.65 0.22 35);
 
-.dark {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-500);
-  --sidebar-primary-foreground: var(--color-blue-50);
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.85 0.005 65);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.85 0.005 65);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.85 0.005 65);
-  --secondary: oklch(0.24 0.006 286.033);
-  --secondary-foreground: oklch(0.7 0.005 65);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground:  oklch(0.92 0.005 65);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.488 0.243 264.376);
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.85 0.005 65);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground:  oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.488 0.243 264.376);
+  /* Brand gradient colors */
+  --brand-coral: #F97316;
+  --brand-pink: #E91E8C;
+  --brand-gradient: linear-gradient(135deg, #F97316, #E91E8C);
+  --brand-gradient-text: linear-gradient(135deg, #F97316, #E91E8C);
 }
 
 @layer base {
@@ -119,40 +72,28 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'DM Sans', sans-serif;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Syne', sans-serif;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
   [type="button"]:not(:disabled),
   [type="submit"]:not(:disabled),
-  [type="reset"]:not(:disabled),
   a[href],
-  select:not(:disabled),
-  input[type="checkbox"]:not(:disabled),
-  input[type="radio"]:not(:disabled) {
+  select:not(:disabled) {
     @apply cursor-pointer;
   }
 }
 
 @layer components {
-  /**
-   * Custom container utility that centers content and adds responsive padding.
-   *
-   * This overrides Tailwind's default container behavior to:
-   * - Auto-center content (mx-auto)
-   * - Add responsive horizontal padding
-   * - Set max-width for large screens
-   *
-   * Usage: <div className="container">...</div>
-   *
-   * For custom widths, use max-w-* utilities directly:
-   * <div className="max-w-6xl mx-auto px-4">...</div>
-   */
   .container {
     width: 100%;
     margin-left: auto;
     margin-right: auto;
-    padding-left: 1rem; /* 16px - mobile padding */
-    padding-right: 1rem;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
   }
 
   .flex {
@@ -162,16 +103,93 @@
 
   @media (min-width: 640px) {
     .container {
-      padding-left: 1.5rem; /* 24px - tablet padding */
-      padding-right: 1.5rem;
+      padding-left: 2rem;
+      padding-right: 2rem;
     }
   }
 
   @media (min-width: 1024px) {
     .container {
-      padding-left: 2rem; /* 32px - desktop padding */
-      padding-right: 2rem;
-      max-width: 1280px; /* Standard content width */
+      padding-left: 3rem;
+      padding-right: 3rem;
+      max-width: 1280px;
     }
+  }
+
+  /* Brand gradient text utility */
+  .gradient-text {
+    background: var(--brand-gradient-text);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Brand gradient background */
+  .gradient-bg {
+    background: var(--brand-gradient);
+  }
+
+  /* Eyebrow label style */
+  .eyebrow {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: var(--brand-gradient-text);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Infinite ticker animation */
+  @keyframes ticker {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  .ticker-track {
+    display: flex;
+    animation: ticker 40s linear infinite;
+    width: max-content;
+  }
+
+  .ticker-track:hover {
+    animation-play-state: paused;
+  }
+
+  /* Fade up animation for scroll reveals */
+  @keyframes fadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .fade-up {
+    animation: fadeUp 0.6s ease forwards;
+  }
+
+  /* Gradient button */
+  .btn-gradient {
+    background: var(--brand-gradient);
+    color: white;
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+
+  .btn-gradient:hover {
+    opacity: 0.92;
+    transform: translateY(-1px);
+  }
+
+  .btn-gradient:active {
+    transform: translateY(0);
   }
 }
