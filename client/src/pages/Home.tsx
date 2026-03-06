@@ -249,15 +249,6 @@ function Hero() {
         </div>
       </div>
 
-      {/* Hero dancer image */}
-      <div className="mt-12 flex justify-center">
-        <img
-          src={ASSETS.heroDancer}
-          alt="Professional dancer"
-          className="w-72 md:w-80 lg:w-96 object-cover rounded-t-3xl"
-          style={{ maxHeight: "480px", objectPosition: "top" }}
-        />
-      </div>
     </section>
   );
 }
