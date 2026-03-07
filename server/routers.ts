@@ -3,7 +3,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId } from "./db";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import { z } from "zod";
@@ -276,6 +276,73 @@ export const appRouter = router({
       .input(z.object({ interestedArtistId: z.number() }))
       .query(async ({ input }) => {
         return getBookingByInterestedArtistId(input.interestedArtistId);
+      }),
+  }),
+
+  // ── Payments ────────────────────────────────────────────────────────────────
+  payments: router({
+    /**
+     * Get all payments for the currently logged-in client.
+     */
+    myPayments: protectedProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(200).default(100),
+        offset: z.number().min(0).default(0),
+      }))
+      .query(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        return getPaymentsByClientId(user.id, input.limit, input.offset);
+      }),
+
+    /**
+     * Get payment stats for the currently logged-in client.
+     */
+    myStats: protectedProcedure
+      .query(async ({ ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) return { total: 0, succeeded: 0, totalAmount: 0, totalFees: 0 };
+        return getPaymentStatsByClientId(user.id);
+      }),
+  }),
+
+  // ── Messages ─────────────────────────────────────────────────────────────────
+  messages: router({
+    /**
+     * Get all conversations for the currently logged-in client.
+     */
+    myConversations: protectedProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(200).default(100),
+        offset: z.number().min(0).default(0),
+      }))
+      .query(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        return getConversationsByClientId(user.id, input.limit, input.offset);
+      }),
+
+    /**
+     * Get all messages for a specific conversation.
+     */
+    byConversation: protectedProcedure
+      .input(z.object({
+        conversationId: z.number(),
+        limit: z.number().min(1).max(500).default(200),
+        offset: z.number().min(0).default(0),
+      }))
+      .query(async ({ input }) => {
+        return getMessagesByConversationId(input.conversationId, input.limit, input.offset);
+      }),
+
+    /**
+     * Get message stats for the currently logged-in client.
+     */
+    myStats: protectedProcedure
+      .query(async ({ ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) return { totalConversations: 0, totalMessages: 0, unreadMessages: 0 };
+        return getMessageStatsByClientId(user.id);
       }),
   }),
 

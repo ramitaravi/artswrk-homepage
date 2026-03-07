@@ -99,3 +99,21 @@
 - [x] Update Bookings page to show real artist names and photos
 - [x] Update Overview sidebar to show real artist names and photos in recent applicants feed
 - [x] 56 vitest tests passing (no new tests needed — artist data flows through existing JOIN queries)
+
+## Messages
+- [x] Inspect Bubble Messages + Conversation table structure via Data API
+- [x] Design conversations + messages schemas (2 tables) and run db:push migration
+- [x] Seed 164 conversations and 486 messages from Bubble
+- [x] Add messages tRPC router (myConversations, byConversation, myStats)
+- [x] Wire dashboard Messages page to real data (conversation list + full thread view with avatars)
+- [x] Add Messages stat card to Overview dashboard
+- [x] 56 vitest tests passing
+
+## Payments
+- [x] Inspect Bubble Payment table structure via Data API
+- [x] Design payments schema (17 columns) and run db:push migration
+- [x] Seed 176 payments from Bubble (linked to bookings + artists)
+- [x] Add payments tRPC router (myPayments, myStats)
+- [x] Wire dashboard Payments page to real data (stats, searchable history, receipt links, cards used)
+- [x] Add Payments stat card to Overview dashboard
+- [x] 56 vitest tests passing

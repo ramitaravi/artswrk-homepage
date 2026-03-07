@@ -276,3 +276,129 @@ export const bookings = mysqlTable("bookings", {
 
 export type Booking = typeof bookings.$inferSelect;
 export type InsertBooking = typeof bookings.$inferInsert;
+
+// ── Payments (Bubble: payment) ────────────────────────────────────────────────
+/**
+ * Stripe payment records — one per booking payment.
+ * Links to a booking and contains full Stripe charge details.
+ */
+export const payments = mysqlTable("payments", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Bubble internal record ID */
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+
+  // ── Relationships ──────────────────────────────────────────────────────────
+  /** FK → bookings.id */
+  bookingId: int("bookingId"),
+  /** Bubble booking ID (for cross-referencing) */
+  bubbleBookingId: varchar("bubbleBookingId", { length: 64 }),
+  /** FK → users.id (the client who paid) */
+  clientUserId: int("clientUserId"),
+
+  // ── Stripe Data ────────────────────────────────────────────────────────────
+  /** Stripe charge ID e.g. ch_3LsIGN... */
+  stripeId: varchar("stripeId", { length: 128 }),
+  /** Stripe charge status e.g. succeeded */
+  stripeStatus: varchar("stripeStatus", { length: 32 }),
+  /** Overall payment status e.g. Success */
+  status: varchar("status", { length: 32 }),
+  /** Amount charged in cents */
+  stripeAmount: int("stripeAmount"),
+  /** Artswrk application fee ID */
+  stripeApplicationFee: varchar("stripeApplicationFee", { length: 128 }),
+  /** Application fee amount in cents */
+  stripeApplicationFeeAmount: int("stripeApplicationFeeAmount"),
+  /** Card brand e.g. Visa, MasterCard */
+  stripeCardBrand: varchar("stripeCardBrand", { length: 32 }),
+  /** Last 4 digits of card */
+  stripeCardLast4: varchar("stripeCardLast4", { length: 4 }),
+  /** Cardholder name */
+  stripeCardName: varchar("stripeCardName", { length: 256 }),
+  /** Description on the charge */
+  stripeDescription: text("stripeDescription"),
+  /** Stripe receipt URL */
+  stripeReceiptUrl: text("stripeReceiptUrl"),
+  /** Stripe refund URL */
+  stripeRefundUrl: text("stripeRefundUrl"),
+  /** Date of payment */
+  paymentDate: timestamp("paymentDate"),
+
+  // ── Timestamps ─────────────────────────────────────────────────────────────
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
+});
+
+export type Payment = typeof payments.$inferSelect;
+export type InsertPayment = typeof payments.$inferInsert;
+
+// ── Conversations (Bubble: conversation) ──────────────────────────────────────
+/**
+ * Messaging threads between a client and an artist.
+ * One conversation per client-artist pair.
+ */
+export const conversations = mysqlTable("conversations", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Bubble internal record ID */
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+
+  // ── Relationships ──────────────────────────────────────────────────────────
+  /** FK → users.id (the client/hirer) */
+  clientUserId: int("clientUserId"),
+  /** Bubble client user ID */
+  bubbleClientId: varchar("bubbleClientId", { length: 64 }),
+  /** FK → users.id (the artist) */
+  artistUserId: int("artistUserId"),
+  /** Bubble artist user ID */
+  bubbleArtistId: varchar("bubbleArtistId", { length: 64 }),
+  /** Bubble ID of the last message */
+  bubbleLastMessageId: varchar("bubbleLastMessageId", { length: 64 }),
+  /** Timestamp of the last message */
+  lastMessageDate: timestamp("lastMessageDate"),
+  /** Count of unread messages */
+  unreadCount: int("unreadCount").default(0),
+
+  // ── Timestamps ─────────────────────────────────────────────────────────────
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
+});
+
+export type Conversation = typeof conversations.$inferSelect;
+export type InsertConversation = typeof conversations.$inferInsert;
+
+// ── Messages (Bubble: message) ────────────────────────────────────────────────
+/**
+ * Individual messages within a conversation thread.
+ */
+export const messages = mysqlTable("messages", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Bubble internal record ID */
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+
+  // ── Relationships ──────────────────────────────────────────────────────────
+  /** FK → conversations.id */
+  conversationId: int("conversationId"),
+  /** Bubble conversation ID */
+  bubbleConversationId: varchar("bubbleConversationId", { length: 64 }),
+  /** FK → users.id (who sent this message) */
+  senderUserId: int("senderUserId"),
+  /** Bubble sender user ID */
+  bubbleSentById: varchar("bubbleSentById", { length: 64 }),
+
+  // ── Content ────────────────────────────────────────────────────────────────
+  content: text("content"),
+  /** Whether this is a system/automated message (booking confirmations etc.) */
+  isSystem: boolean("isSystem").default(false),
+
+  // ── Timestamps ─────────────────────────────────────────────────────────────
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
+});
+
+export type Message = typeof messages.$inferSelect;
+export type InsertMessage = typeof messages.$inferInsert;

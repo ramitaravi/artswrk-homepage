@@ -474,3 +474,199 @@ export async function getBookingByInterestedArtistId(interestedArtistId: number)
     .limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
+
+// ── Payment queries ───────────────────────────────────────────────────────────
+
+import { payments, conversations, messages } from "../drizzle/schema";
+
+/**
+ * Get all payments for a client, joined with booking info.
+ */
+export async function getPaymentsByClientId(
+  clientUserId: number,
+  limit = 100,
+  offset = 0
+) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db
+    .select({
+      id: payments.id,
+      bubbleId: payments.bubbleId,
+      bookingId: payments.bookingId,
+      bubbleBookingId: payments.bubbleBookingId,
+      clientUserId: payments.clientUserId,
+      stripeId: payments.stripeId,
+      stripeStatus: payments.stripeStatus,
+      status: payments.status,
+      stripeAmount: payments.stripeAmount,
+      stripeApplicationFee: payments.stripeApplicationFee,
+      stripeApplicationFeeAmount: payments.stripeApplicationFeeAmount,
+      stripeCardBrand: payments.stripeCardBrand,
+      stripeCardLast4: payments.stripeCardLast4,
+      stripeCardName: payments.stripeCardName,
+      stripeDescription: payments.stripeDescription,
+      stripeReceiptUrl: payments.stripeReceiptUrl,
+      stripeRefundUrl: payments.stripeRefundUrl,
+      paymentDate: payments.paymentDate,
+      createdAt: payments.createdAt,
+      bubbleCreatedAt: payments.bubbleCreatedAt,
+      // Booking fields for context
+      bookingStartDate: bookings.startDate,
+      bookingStatus: bookings.bookingStatus,
+      bookingDescription: bookings.description,
+      // Artist fields
+      artistFirstName: artistUser.firstName,
+      artistLastName: artistUser.lastName,
+      artistName: artistUser.name,
+      artistProfilePicture: artistUser.profilePicture,
+    })
+    .from(payments)
+    .leftJoin(bookings, eq(payments.bookingId, bookings.id))
+    .leftJoin(artistUser, eq(bookings.artistUserId, artistUser.id))
+    .where(eq(payments.clientUserId, clientUserId))
+    .orderBy(desc(payments.paymentDate))
+    .limit(limit)
+    .offset(offset);
+}
+
+/**
+ * Get payment stats for a client.
+ */
+export async function getPaymentStatsByClientId(clientUserId: number) {
+  const db = await getDb();
+  if (!db) return { total: 0, succeeded: 0, totalAmount: 0, totalFees: 0 };
+
+  const result = await db
+    .select({
+      stripeStatus: payments.stripeStatus,
+      count: sql<number>`COUNT(*)`,
+      sumAmount: sql<number>`SUM(COALESCE(stripeAmount, 0))`,
+      sumFees: sql<number>`SUM(COALESCE(stripeApplicationFeeAmount, 0))`,
+    })
+    .from(payments)
+    .where(eq(payments.clientUserId, clientUserId))
+    .groupBy(payments.stripeStatus);
+
+  const stats = { total: 0, succeeded: 0, totalAmount: 0, totalFees: 0 };
+  for (const row of result) {
+    const count = Number(row.count);
+    stats.total += count;
+    if (row.stripeStatus === 'succeeded') {
+      stats.succeeded += count;
+      stats.totalAmount += Number(row.sumAmount ?? 0);
+      stats.totalFees += Number(row.sumFees ?? 0);
+    }
+  }
+  return stats;
+}
+
+// ── Conversation + Message queries ────────────────────────────────────────────
+
+/**
+ * Get all conversations for a client, joined with artist info.
+ * Ordered by last message date descending.
+ */
+export async function getConversationsByClientId(
+  clientUserId: number,
+  limit = 100,
+  offset = 0
+) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db
+    .select({
+      id: conversations.id,
+      bubbleId: conversations.bubbleId,
+      clientUserId: conversations.clientUserId,
+      bubbleClientId: conversations.bubbleClientId,
+      artistUserId: conversations.artistUserId,
+      bubbleArtistId: conversations.bubbleArtistId,
+      lastMessageDate: conversations.lastMessageDate,
+      unreadCount: conversations.unreadCount,
+      createdAt: conversations.createdAt,
+      bubbleCreatedAt: conversations.bubbleCreatedAt,
+      // Artist fields
+      artistFirstName: artistUser.firstName,
+      artistLastName: artistUser.lastName,
+      artistName: artistUser.name,
+      artistProfilePicture: artistUser.profilePicture,
+      artistSlug: artistUser.slug,
+    })
+    .from(conversations)
+    .leftJoin(artistUser, eq(conversations.artistUserId, artistUser.id))
+    .where(eq(conversations.clientUserId, clientUserId))
+    .orderBy(desc(conversations.lastMessageDate))
+    .limit(limit)
+    .offset(offset);
+}
+
+/**
+ * Get all messages for a conversation, ordered chronologically.
+ */
+export async function getMessagesByConversationId(
+  conversationId: number,
+  limit = 200,
+  offset = 0
+) {
+  const db = await getDb();
+  if (!db) return [];
+
+  // Use a separate alias for sender user
+  const senderUser = users;
+
+  return db
+    .select({
+      id: messages.id,
+      bubbleId: messages.bubbleId,
+      conversationId: messages.conversationId,
+      senderUserId: messages.senderUserId,
+      bubbleSentById: messages.bubbleSentById,
+      content: messages.content,
+      isSystem: messages.isSystem,
+      createdAt: messages.createdAt,
+      bubbleCreatedAt: messages.bubbleCreatedAt,
+      // Sender info
+      senderFirstName: senderUser.firstName,
+      senderLastName: senderUser.lastName,
+      senderName: senderUser.name,
+      senderProfilePicture: senderUser.profilePicture,
+      senderUserRole: senderUser.userRole,
+    })
+    .from(messages)
+    .leftJoin(senderUser, eq(messages.senderUserId, senderUser.id))
+    .where(eq(messages.conversationId, conversationId))
+    .orderBy(messages.bubbleCreatedAt)
+    .limit(limit)
+    .offset(offset);
+}
+
+/**
+ * Get message stats for a client.
+ */
+export async function getMessageStatsByClientId(clientUserId: number) {
+  const db = await getDb();
+  if (!db) return { totalConversations: 0, totalMessages: 0, unreadMessages: 0 };
+
+  const convoResult = await db
+    .select({
+      totalConversations: sql<number>`COUNT(*)`,
+      unreadMessages: sql<number>`SUM(COALESCE(unreadCount, 0))`,
+    })
+    .from(conversations)
+    .where(eq(conversations.clientUserId, clientUserId));
+
+  const msgResult = await db
+    .select({ totalMessages: sql<number>`COUNT(*)` })
+    .from(messages)
+    .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+    .where(eq(conversations.clientUserId, clientUserId));
+
+  return {
+    totalConversations: Number(convoResult[0]?.totalConversations ?? 0),
+    totalMessages: Number(msgResult[0]?.totalMessages ?? 0),
+    unreadMessages: Number(convoResult[0]?.unreadMessages ?? 0),
+  };
+}

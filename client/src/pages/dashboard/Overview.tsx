@@ -74,6 +74,10 @@ export default function Overview() {
   // Real booking data
   const { data: bookingStats } = trpc.bookings.myStats.useQuery();
 
+  // Real payment + message data
+  const { data: paymentStats } = trpc.payments.myStats.useQuery();
+  const { data: messageStats } = trpc.messages.myStats.useQuery();
+
   const stats = [
     {
       label: "Active Jobs",
@@ -114,6 +118,22 @@ export default function Overview() {
       icon: <DollarSign size={18} />,
       color: "text-emerald-500",
       bg: "bg-emerald-50",
+    },
+    {
+      label: "Payments",
+      value: paymentStats == null ? "—" : String(paymentStats.succeeded),
+      change: paymentStats == null ? "" : `$${((paymentStats.totalAmount ?? 0) / 100).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} charged`,
+      icon: <DollarSign size={18} />,
+      color: "text-amber-500",
+      bg: "bg-amber-50",
+    },
+    {
+      label: "Messages",
+      value: messageStats == null ? "—" : String(messageStats.totalConversations),
+      change: messageStats == null ? "" : `${messageStats.totalMessages} total messages`,
+      icon: <Users size={18} />,
+      color: "text-indigo-500",
+      bg: "bg-indigo-50",
     },
   ];
 
@@ -343,7 +363,7 @@ export default function Overview() {
                     ? `${aFirstName} ${aLastName}`
                     : aName ?? `Artist #${a.bubbleArtistId?.slice(-6) ?? "—"}`;
                   return (
-                  <div key={a.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer group">
+                    <div key={a.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer group">
                     {aPic ? (
                       <img
                         src={aPic}

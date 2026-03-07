@@ -1,0 +1,61 @@
+CREATE TABLE `conversations` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`bubbleId` varchar(64),
+	`clientUserId` int,
+	`bubbleClientId` varchar(64),
+	`artistUserId` int,
+	`bubbleArtistId` varchar(64),
+	`bubbleLastMessageId` varchar(64),
+	`lastMessageDate` timestamp,
+	`unreadCount` int DEFAULT 0,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	`bubbleCreatedAt` timestamp,
+	`bubbleModifiedAt` timestamp,
+	CONSTRAINT `conversations_id` PRIMARY KEY(`id`),
+	CONSTRAINT `conversations_bubbleId_unique` UNIQUE(`bubbleId`)
+);
+--> statement-breakpoint
+CREATE TABLE `messages` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`bubbleId` varchar(64),
+	`conversationId` int,
+	`bubbleConversationId` varchar(64),
+	`senderUserId` int,
+	`bubbleSentById` varchar(64),
+	`content` text,
+	`isSystem` boolean DEFAULT false,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	`bubbleCreatedAt` timestamp,
+	`bubbleModifiedAt` timestamp,
+	CONSTRAINT `messages_id` PRIMARY KEY(`id`),
+	CONSTRAINT `messages_bubbleId_unique` UNIQUE(`bubbleId`)
+);
+--> statement-breakpoint
+CREATE TABLE `payments` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`bubbleId` varchar(64),
+	`bookingId` int,
+	`bubbleBookingId` varchar(64),
+	`clientUserId` int,
+	`stripeId` varchar(128),
+	`stripeStatus` varchar(32),
+	`status` varchar(32),
+	`stripeAmount` int,
+	`stripeApplicationFee` varchar(128),
+	`stripeApplicationFeeAmount` int,
+	`stripeCardBrand` varchar(32),
+	`stripeCardLast4` varchar(4),
+	`stripeCardName` varchar(256),
+	`stripeDescription` text,
+	`stripeReceiptUrl` text,
+	`stripeRefundUrl` text,
+	`paymentDate` timestamp,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	`bubbleCreatedAt` timestamp,
+	`bubbleModifiedAt` timestamp,
+	CONSTRAINT `payments_id` PRIMARY KEY(`id`),
+	CONSTRAINT `payments_bubbleId_unique` UNIQUE(`bubbleId`)
+);

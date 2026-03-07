@@ -43,6 +43,13 @@
       "when": 1772861605128,
       "tag": "0005_strange_nocturne",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1772903197556,
+      "tag": "0006_rapid_exodus",
+      "breakpoints": true
     }
   ]
 }
