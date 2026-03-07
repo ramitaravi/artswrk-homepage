@@ -3,7 +3,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId } from "./db";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import { z } from "zod";
@@ -217,6 +217,65 @@ export const appRouter = router({
       }))
       .query(async ({ input }) => {
         return getApplicantsByJobId(input.jobId, input.limit, input.offset);
+      }),
+  }),
+
+  // ── Bookings ────────────────────────────────────────────────────────────────
+  bookings: router({
+    /**
+     * Get all bookings for the currently logged-in client.
+     */
+    myBookings: protectedProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(200).default(100),
+        offset: z.number().min(0).default(0),
+        status: z.array(z.string()).optional(),
+      }))
+      .query(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        return getBookingsByClientId(user.id, input.limit, input.offset, input.status);
+      }),
+
+    /**
+     * Get booking stats for the currently logged-in client.
+     */
+    myStats: protectedProcedure
+      .query(async ({ ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) return { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, totalRevenue: 0 };
+        return getBookingStatsByClientId(user.id);
+      }),
+
+    /**
+     * Get bookings for a specific job.
+     */
+    byJob: protectedProcedure
+      .input(z.object({
+        jobId: z.number(),
+        limit: z.number().min(1).max(100).default(50),
+        offset: z.number().min(0).default(0),
+      }))
+      .query(async ({ input }) => {
+        return getBookingsByJobId(input.jobId, input.limit, input.offset);
+      }),
+
+    /**
+     * Get a single booking by local ID.
+     */
+    byId: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return getBookingById(input.id);
+      }),
+
+    /**
+     * Get the booking linked to an interested artist record.
+     */
+    byApplicant: protectedProcedure
+      .input(z.object({ interestedArtistId: z.number() }))
+      .query(async ({ input }) => {
+        return getBookingByInterestedArtistId(input.interestedArtistId);
       }),
   }),
 

@@ -70,6 +70,9 @@ export default function Overview() {
   const { data: applicantStats } = trpc.applicants.myStats.useQuery();
   const { data: recentApplicants, isLoading: applicantsLoading } = trpc.applicants.myApplicants.useQuery({ limit: 6 });
 
+  // Real booking data
+  const { data: bookingStats } = trpc.bookings.myStats.useQuery();
+
   const stats = [
     {
       label: "Active Jobs",
@@ -102,6 +105,14 @@ export default function Overview() {
       icon: <Users size={18} />,
       color: "text-purple-500",
       bg: "bg-purple-50",
+    },
+    {
+      label: "Bookings",
+      value: bookingStats == null ? "—" : String(bookingStats.total),
+      change: bookingStats == null ? "" : `${bookingStats.paid} paid · $${(bookingStats.totalRevenue ?? 0).toLocaleString()}`,
+      icon: <DollarSign size={18} />,
+      color: "text-emerald-500",
+      bg: "bg-emerald-50",
     },
   ];
 

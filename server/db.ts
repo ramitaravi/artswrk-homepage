@@ -282,3 +282,108 @@ export async function getApplicantsByJobId(jobId: number, limit = 50, offset = 0
     .limit(limit)
     .offset(offset);
 }
+
+// ── Booking queries ───────────────────────────────────────────────────────────
+
+import { bookings } from "../drizzle/schema";
+
+/**
+ * Get all bookings for a client, optionally filtered by status.
+ */
+export async function getBookingsByClientId(
+  clientUserId: number,
+  limit = 100,
+  offset = 0,
+  statusFilter?: string[]
+) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [eq(bookings.clientUserId, clientUserId)];
+  if (statusFilter && statusFilter.length > 0) {
+    const statusConds = statusFilter.map(s => eq(bookings.bookingStatus, s));
+    conditions.push(or(...statusConds)!);
+  }
+
+  return db
+    .select()
+    .from(bookings)
+    .where(and(...conditions))
+    .orderBy(desc(bookings.startDate))
+    .limit(limit)
+    .offset(offset);
+}
+
+/**
+ * Get booking stats for a client (counts by status + financial totals).
+ */
+export async function getBookingStatsByClientId(clientUserId: number) {
+  const db = await getDb();
+  if (!db) return { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, totalRevenue: 0 };
+
+  const statusResult = await db
+    .select({
+      bookingStatus: bookings.bookingStatus,
+      paymentStatus: bookings.paymentStatus,
+      count: sql<number>`COUNT(*)`,
+      sumClientRate: sql<number>`SUM(COALESCE(totalClientRate, clientRate, 0))`,
+    })
+    .from(bookings)
+    .where(eq(bookings.clientUserId, clientUserId))
+    .groupBy(bookings.bookingStatus, bookings.paymentStatus);
+
+  const stats = { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, totalRevenue: 0 };
+  for (const row of statusResult) {
+    const count = Number(row.count);
+    stats.total += count;
+    if (row.bookingStatus === 'Confirmed') stats.confirmed += count;
+    if (row.bookingStatus === 'Completed') stats.completed += count;
+    if (row.bookingStatus === 'Cancelled') stats.cancelled += count;
+    if (row.paymentStatus === 'Paid') {
+      stats.paid += count;
+      stats.totalRevenue += Number(row.sumClientRate ?? 0);
+    }
+    if (row.paymentStatus === 'Unpaid') stats.unpaid += count;
+  }
+  return stats;
+}
+
+/**
+ * Get bookings for a specific job.
+ */
+export async function getBookingsByJobId(jobId: number, limit = 50, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db
+    .select()
+    .from(bookings)
+    .where(eq(bookings.jobId, jobId))
+    .orderBy(desc(bookings.startDate))
+    .limit(limit)
+    .offset(offset);
+}
+
+/**
+ * Get a single booking by its local ID.
+ */
+export async function getBookingById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(bookings).where(eq(bookings.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+/**
+ * Get booking linked to an interested artist record.
+ */
+export async function getBookingByInterestedArtistId(interestedArtistId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db
+    .select()
+    .from(bookings)
+    .where(eq(bookings.interestedArtistId, interestedArtistId))
+    .limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}

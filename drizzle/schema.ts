@@ -195,3 +195,84 @@ export const interestedArtists = mysqlTable("interested_artists", {
 
 export type InterestedArtist = typeof interestedArtists.$inferSelect;
 export type InsertInterestedArtist = typeof interestedArtists.$inferInsert;
+
+// ── Bookings (Bubble: booking) ────────────────────────────────────────────────
+/**
+ * Confirmed bookings — the final step in the job → applicant → booking chain.
+ * One row per booking. Links back to a job (Request) and an interested artist record.
+ */
+export const bookings = mysqlTable("bookings", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Bubble internal record ID */
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+
+  // ── Relationships ──────────────────────────────────────────────────────────
+  /** FK → jobs.id */
+  jobId: int("jobId"),
+  /** Bubble Request/job ID */
+  bubbleRequestId: varchar("bubbleRequestId", { length: 64 }),
+  /** FK → interested_artists.id (the applicant that became this booking) */
+  interestedArtistId: int("interestedArtistId"),
+  /** Bubble interested artist record ID */
+  bubbleInterestedArtistId: varchar("bubbleInterestedArtistId", { length: 64 }),
+  /** FK → users.id (the hirer / client) */
+  clientUserId: int("clientUserId"),
+  /** Bubble client user ID */
+  bubbleClientId: varchar("bubbleClientId", { length: 64 }),
+  /** FK → users.id (the artist) — null until artist records are migrated */
+  artistUserId: int("artistUserId"),
+  /** Bubble artist user ID */
+  bubbleArtistId: varchar("bubbleArtistId", { length: 64 }),
+
+  // ── Status ─────────────────────────────────────────────────────────────────
+  /** Confirmed | Completed | Cancelled | Pay Now */
+  bookingStatus: varchar("bookingStatus", { length: 64 }),
+  /** Paid | Unpaid */
+  paymentStatus: varchar("paymentStatus", { length: 64 }),
+
+  // ── Rates & Financials ─────────────────────────────────────────────────────
+  /** What the client pays */
+  clientRate: int("clientRate"),
+  /** What the artist receives */
+  artistRate: int("artistRate"),
+  /** Total client rate including reimbursements */
+  totalClientRate: int("totalClientRate"),
+  /** Total artist rate including reimbursements */
+  totalArtistRate: int("totalArtistRate"),
+  /** Artswrk gross profit (clientRate - artistRate - stripeFee) */
+  grossProfit: int("grossProfit"),
+  /** Stripe processing fee */
+  stripeFee: int("stripeFee"),
+  /** Revenue after Stripe fee */
+  postFeeRevenue: int("postFeeRevenue"),
+  /** Number of hours booked */
+  hours: int("hours"),
+  /** Whether payment was made outside Stripe */
+  externalPayment: boolean("externalPayment").default(false),
+
+  // ── Scheduling ─────────────────────────────────────────────────────────────
+  startDate: timestamp("startDate"),
+  endDate: timestamp("endDate"),
+
+  // ── Location ───────────────────────────────────────────────────────────────
+  locationAddress: text("locationAddress"),
+  locationLat: varchar("locationLat", { length: 32 }),
+  locationLng: varchar("locationLng", { length: 32 }),
+
+  // ── Content ────────────────────────────────────────────────────────────────
+  description: text("description"),
+  stripeCheckoutUrl: text("stripeCheckoutUrl"),
+
+  // ── Flags ──────────────────────────────────────────────────────────────────
+  addedToSpreadsheet: boolean("addedToSpreadsheet").default(false),
+  deleted: boolean("deleted").default(false),
+
+  // ── Timestamps ─────────────────────────────────────────────────────────────
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
+});
+
+export type Booking = typeof bookings.$inferSelect;
+export type InsertBooking = typeof bookings.$inferInsert;

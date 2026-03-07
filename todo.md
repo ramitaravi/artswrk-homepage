@@ -79,3 +79,13 @@
 - [x] Wire dashboard Artists page to real applicant data (filterable table with expand rows)
 - [x] Wire dashboard Overview applicant stats to real data
 - [x] Write vitest tests for interested artists logic (21 tests passing, 35 total)
+
+## Bookings (Full Loop: Job → Applicant → Booking)
+- [x] Inspect Bubble Booking table structure via Data API (389 records found)
+- [x] Design bookings table schema (25 columns) and run db:push migration
+- [x] Seed 224 bookings from Bubble (186 Completed/Paid, 37 Confirmed/Unpaid, 1 Pay Now)
+- [x] Add bookings tRPC router (myBookings, myStats, byJob, byId, byApplicant)
+- [x] Wire dashboard Bookings page to real data (filterable by status, expandable rows with financials)
+- [x] Add Bookings stat card to Overview dashboard
+- [x] Add View Bookings button to job expanded rows in DashJobs
+- [x] Write vitest tests for bookings logic (21 tests, 56 total passing)

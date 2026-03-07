@@ -7,9 +7,10 @@ import { useState } from "react";
 import {
   Plus, Search, Filter, Clock, Users, RefreshCw,
   MoreHorizontal, ChevronDown, MapPin, DollarSign,
-  Eye, Sparkles, Loader2, Briefcase
+  Eye, Sparkles, Loader2, Briefcase, CreditCard
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { Link } from "wouter";
 
 function formatJobDate(dateStr: string | Date | null | undefined) {
   if (!dateStr) return null;
@@ -275,13 +276,20 @@ export default function DashJobs() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 pt-2">
+                      <div className="flex items-center gap-2 pt-2 flex-wrap">
                         <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-100 transition-colors">
                           <Eye size={12} /> View on site
                         </button>
-                        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-100 transition-colors">
-                          <Users size={12} /> View applicants
-                        </button>
+                        <Link href="/dashboard/artists">
+                          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-100 transition-colors">
+                            <Users size={12} /> View applicants
+                          </button>
+                        </Link>
+                        <Link href="/dashboard/bookings">
+                          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-100 transition-colors">
+                            <CreditCard size={12} /> View bookings
+                          </button>
+                        </Link>
                       </div>
                     </div>
                   </div>

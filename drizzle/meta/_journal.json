@@ -36,6 +36,13 @@
       "when": 1772860615288,
       "tag": "0004_white_tyger_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1772861605128,
+      "tag": "0005_strange_nocturne",
+      "breakpoints": true
     }
   ]
 }
