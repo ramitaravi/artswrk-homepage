@@ -68,6 +68,68 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// ── Future tables ──────────────────────────────────────────────────────────────
-// jobs, bookings, payments, artistServices, clientCompanies, messages, etc.
-// will be added here as we port each Bubble data type.
+// ── Jobs (Bubble: Request) ────────────────────────────────────────────────────
+export const jobs = mysqlTable("jobs", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Bubble internal record ID */
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  /** FK → users.id (the hirer who created this job) */
+  clientUserId: int("clientUserId"),
+  /** Bubble client user ID (for cross-referencing during migration) */
+  bubbleClientId: varchar("bubbleClientId", { length: 64 }),
+  /** Bubble client company ID */
+  bubbleClientCompanyId: varchar("bubbleClientCompanyId", { length: 64 }),
+
+  // ── Content ────────────────────────────────────────────────────────────────
+  description: text("description"),
+  slug: varchar("slug", { length: 256 }),
+
+  // ── Status ─────────────────────────────────────────────────────────────────
+  /** e.g. Active, Confirmed, Completed, Deleted by Client, Submissions Paused, Lost - No Revenue */
+  requestStatus: varchar("requestStatus", { length: 64 }),
+  /** e.g. Awaiting Response, Confirmed, etc. */
+  status: varchar("status", { length: 64 }),
+
+  // ── Scheduling ─────────────────────────────────────────────────────────────
+  /** Single Date | Ongoing | Recurring */
+  dateType: varchar("dateType", { length: 32 }),
+  startDate: timestamp("startDate"),
+  endDate: timestamp("endDate"),
+
+  // ── Location ───────────────────────────────────────────────────────────────
+  locationAddress: text("locationAddress"),
+  locationLat: varchar("locationLat", { length: 32 }),
+  locationLng: varchar("locationLng", { length: 32 }),
+
+  // ── Rates ──────────────────────────────────────────────────────────────────
+  isHourly: boolean("isHourly").default(true),
+  openRate: boolean("openRate").default(false),
+  artistHourlyRate: int("artistHourlyRate"),
+  clientHourlyRate: int("clientHourlyRate"),
+
+  // ── Audience ───────────────────────────────────────────────────────────────
+  /** JSON array of age ranges e.g. ["6-10", "11-14"] */
+  ages: text("ages"),
+
+  // ── Flags ──────────────────────────────────────────────────────────────────
+  direct: boolean("direct").default(false),
+  sentToNetwork: boolean("sentToNetwork").default(false),
+  transportation: boolean("transportation").default(false),
+  converted: boolean("converted").default(false),
+
+  // ── Service Type ───────────────────────────────────────────────────────────
+  /** Bubble master_service_type ID — will resolve to name in future */
+  masterServiceTypeId: varchar("masterServiceTypeId", { length: 64 }),
+
+  // ── Client contact ─────────────────────────────────────────────────────────
+  clientEmail: varchar("clientEmail", { length: 320 }),
+
+  // ── Timestamps ─────────────────────────────────────────────────────────────
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
+});
+
+export type Job = typeof jobs.$inferSelect;
+export type InsertJob = typeof jobs.$inferInsert;

@@ -1,46 +1,17 @@
 /*
  * ARTSWRK DASHBOARD — OVERVIEW
- * Stats, quick post job, my jobs list, my applicants
+ * Stats, quick post job, my jobs list (real data from DB)
  */
 
 import { useState } from "react";
 import { Link } from "wouter";
 import {
   Briefcase, Calendar, DollarSign, Users, TrendingUp,
-  Clock, MapPin, ChevronRight, Sparkles, Image, Search, Plus,
-  MoreHorizontal, RefreshCw
+  Clock, ChevronRight, Sparkles, Image, Search, Plus,
+  MoreHorizontal, RefreshCw, MapPin, Loader2, AlertCircle
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
-
-const STATS = [
-  { label: "Active Jobs", value: "7", change: "+2 this week", icon: <Briefcase size={18} />, color: "text-orange-500", bg: "bg-orange-50" },
-  { label: "Pending Bookings", value: "3", change: "2 need response", icon: <Calendar size={18} />, color: "text-blue-500", bg: "bg-blue-50" },
-  { label: "Total Paid Out", value: "$4,820", change: "This season", icon: <DollarSign size={18} />, color: "text-green-500", bg: "bg-green-50" },
-  { label: "Total Applicants", value: "47", change: "+12 this week", icon: <Users size={18} />, color: "text-purple-500", bg: "bg-purple-50" },
-];
-
-const JOBS = [
-  {
-    id: 1, tag: "Recurring Classes", date: "March 6th, 2025 @ 3:30 pm",
-    desc: "Thursday versatile instructor needed. Must be committed through May 15th, 2025. If actively/prioritizing auditions, DO NOT APPLY.",
-    applicants: 4, status: "active",
-  },
-  {
-    id: 2, tag: "Recurring Classes", date: "March 5th, 2025 @ 4:00 pm",
-    desc: "Wed weekly preballet/hip hop instructor needed. 3K & PreK. MUST have experience & enjoy working with young dancers.",
-    applicants: 7, status: "active",
-  },
-  {
-    id: 3, tag: "Recurring Classes", date: "March 5th, 2025 @ 4:00 pm",
-    desc: "Wednesday versatile instructor needed, to work with a variety of ages, styles and levels. Must be committed through May 14th.",
-    applicants: 3, status: "active",
-  },
-  {
-    id: 4, tag: "Recurring Classes", date: "March 4th, 2025 @ 4:00 pm",
-    desc: "Tues instructor needed. Must be available and committed through May 13, 2025. Must have 3+ years teaching experience.",
-    applicants: 2, status: "active",
-  },
-];
+import { trpc } from "@/lib/trpc";
 
 const APPLICANTS = [
   { name: "Sasha K.", times: 9, initials: "SK", color: "bg-purple-500" },
@@ -49,14 +20,78 @@ const APPLICANTS = [
   { name: "gracen n.", times: 3, initials: "GN", color: "bg-green-500" },
   { name: "Jesse B.", times: 3, initials: "JB", color: "bg-orange-500" },
   { name: "Alex M.", times: 3, initials: "AM", color: "bg-teal-500" },
-  { name: "Clarissa J.", times: 2, initials: "CJ", color: "bg-indigo-500" },
-  { name: "Olivia G.", times: 1, initials: "OG", color: "bg-rose-500" },
 ];
+
+function formatJobDate(dateStr: string | Date | null | undefined) {
+  if (!dateStr) return "Flexible";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "Flexible";
+  return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+
+function getJobInitials(desc: string | null | undefined) {
+  if (!desc) return "JB";
+  const words = desc.trim().split(/\s+/).slice(0, 2);
+  return words.map((w) => w[0]?.toUpperCase() ?? "").join("") || "JB";
+}
+
+function getStatusBadge(status: string | null | undefined) {
+  switch (status) {
+    case "Active": return "bg-green-100 text-green-700";
+    case "Confirmed": return "bg-blue-100 text-blue-700";
+    case "Completed": return "bg-gray-100 text-gray-600";
+    case "Submissions Paused": return "bg-yellow-100 text-yellow-700";
+    default: return "bg-orange-50 text-[#F25722]";
+  }
+}
 
 export default function Overview() {
   const { user } = useAuth();
   const [jobText, setJobText] = useState("");
   const [activeTab, setActiveTab] = useState<"jobs" | "artists" | "companies">("jobs");
+  const [jobFilter, setJobFilter] = useState<"active" | "all">("active");
+
+  // Real job data
+  const { data: jobStats, isLoading: statsLoading } = trpc.jobs.myStats.useQuery();
+  const { data: activeJobs, isLoading: jobsLoading } = trpc.jobs.myJobs.useQuery({
+    limit: 10,
+    status: jobFilter === "active" ? ["Active", "Confirmed"] : undefined,
+  });
+
+  const stats = [
+    {
+      label: "Active Jobs",
+      value: statsLoading ? "—" : String(jobStats?.active ?? 0),
+      change: statsLoading ? "" : `${jobStats?.confirmed ?? 0} confirmed`,
+      icon: <Briefcase size={18} />,
+      color: "text-orange-500",
+      bg: "bg-orange-50",
+    },
+    {
+      label: "Total Jobs",
+      value: statsLoading ? "—" : String(jobStats?.total ?? 0),
+      change: "All time",
+      icon: <TrendingUp size={18} />,
+      color: "text-blue-500",
+      bg: "bg-blue-50",
+    },
+    {
+      label: "Completed",
+      value: statsLoading ? "—" : String(jobStats?.completed ?? 0),
+      change: "Successfully filled",
+      icon: <Calendar size={18} />,
+      color: "text-green-500",
+      bg: "bg-green-50",
+    },
+    {
+      label: "Applicants",
+      value: "—",
+      change: "Coming soon",
+      icon: <Users size={18} />,
+      color: "text-purple-500",
+      bg: "bg-purple-50",
+    },
+  ];
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -70,7 +105,7 @@ export default function Overview() {
 
       {/* Stats row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
-        {STATS.map((stat) => (
+        {stats.map((stat) => (
           <div key={stat.label} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <div className={`w-9 h-9 rounded-xl ${stat.bg} ${stat.color} flex items-center justify-center`}>
@@ -136,44 +171,90 @@ export default function Overview() {
             {activeTab === "jobs" && (
               <div>
                 <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
-                  <button className="px-3 py-1 rounded-full text-xs font-semibold bg-[#111] text-white">Active</button>
-                  <button className="px-3 py-1 rounded-full text-xs font-medium text-gray-500 hover:bg-gray-100 transition-colors">Archived</button>
+                  <button
+                    onClick={() => setJobFilter("active")}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                      jobFilter === "active" ? "bg-[#111] text-white" : "text-gray-500 hover:bg-gray-100"
+                    }`}
+                  >
+                    Active
+                  </button>
+                  <button
+                    onClick={() => setJobFilter("all")}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      jobFilter === "all" ? "bg-[#111] text-white" : "text-gray-500 hover:bg-gray-100"
+                    }`}
+                  >
+                    All Jobs
+                  </button>
                 </div>
-                <div className="divide-y divide-gray-100">
-                  {JOBS.map((job) => (
-                    <div key={job.id} className="p-4 hover:bg-gray-50 transition-colors group">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 flex-1 min-w-0">
-                          <div className="w-9 h-9 rounded-xl hirer-grad-bg flex items-center justify-center text-white text-xs font-black flex-shrink-0 mt-0.5">
-                            RC
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-semibold text-[#F25722] bg-orange-50 px-2 py-0.5 rounded-full">
-                                {job.tag}
-                              </span>
-                              <span className="flex items-center gap-1 text-xs text-gray-400">
-                                <Clock size={10} /> {job.date}
-                              </span>
+
+                {jobsLoading ? (
+                  <div className="flex items-center justify-center py-12 text-gray-400">
+                    <Loader2 size={20} className="animate-spin mr-2" />
+                    <span className="text-sm">Loading jobs...</span>
+                  </div>
+                ) : !activeJobs || activeJobs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                    <Briefcase size={32} className="mb-3 opacity-30" />
+                    <p className="text-sm font-medium">No {jobFilter === "active" ? "active " : ""}jobs found</p>
+                    <Link href="/dashboard/jobs">
+                      <button className="mt-3 text-xs font-semibold text-[#F25722] hover:opacity-70 transition-opacity">
+                        Post your first job →
+                      </button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {activeJobs.map((job) => (
+                      <div key={job.id} className="p-4 hover:bg-gray-50 transition-colors group">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <div className="w-9 h-9 rounded-xl hirer-grad-bg flex items-center justify-center text-white text-xs font-black flex-shrink-0 mt-0.5">
+                              {getJobInitials(job.description)}
                             </div>
-                            <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">{job.desc}</p>
-                            <div className="flex items-center gap-3 mt-2">
-                              <span className="text-xs text-gray-400 flex items-center gap-1">
-                                <Users size={11} /> {job.applicants} applicants
-                              </span>
-                              <span className="flex items-center gap-1 text-xs text-green-500 font-medium">
-                                <RefreshCw size={10} /> Recurring
-                              </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getStatusBadge(job.requestStatus)}`}>
+                                  {job.dateType ?? job.requestStatus ?? "Job"}
+                                </span>
+                                {job.bubbleCreatedAt && (
+                                  <span className="flex items-center gap-1 text-xs text-gray-400">
+                                    <Clock size={10} /> {formatJobDate(job.bubbleCreatedAt)}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
+                                {job.description ?? "No description"}
+                              </p>
+                              <div className="flex items-center gap-3 mt-2 flex-wrap">
+                                {job.locationAddress && (
+                                  <span className="text-xs text-gray-400 flex items-center gap-1">
+                                    <MapPin size={10} /> {job.locationAddress.split(",").slice(0, 2).join(",")}
+                                  </span>
+                                )}
+                                {job.artistHourlyRate && (
+                                  <span className="text-xs font-semibold text-green-600">
+                                    ${job.artistHourlyRate}/hr
+                                  </span>
+                                )}
+                                {job.dateType === "Recurring" || job.dateType === "Ongoing" ? (
+                                  <span className="flex items-center gap-1 text-xs text-blue-500 font-medium">
+                                    <RefreshCw size={10} /> {job.dateType}
+                                  </span>
+                                ) : null}
+                              </div>
                             </div>
                           </div>
+                          <button className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100">
+                            <MoreHorizontal size={16} />
+                          </button>
                         </div>
-                        <button className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100">
-                          <MoreHorizontal size={16} />
-                        </button>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
+
                 <div className="p-4 border-t border-gray-100">
                   <Link href="/dashboard/jobs">
                     <button className="w-full text-xs font-semibold text-[#F25722] hover:opacity-70 transition-opacity flex items-center justify-center gap-1">

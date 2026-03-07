@@ -1,87 +1,63 @@
 /*
  * ARTSWRK DASHBOARD — MY JOBS
- * Post job, manage active/archived jobs, view applicants per job
+ * Post job, manage active/archived jobs — real data from DB
  */
 
 import { useState } from "react";
 import {
   Plus, Search, Filter, Clock, Users, RefreshCw,
   MoreHorizontal, ChevronDown, MapPin, DollarSign,
-  CheckCircle, XCircle, Eye, Trash2, Sparkles
+  Eye, Sparkles, Loader2, Briefcase
 } from "lucide-react";
+import { trpc } from "@/lib/trpc";
 
-const JOBS = [
-  {
-    id: 1, tag: "Recurring Classes", status: "active",
-    date: "March 6th, 2025 @ 3:30 pm", location: "Bayside, NY",
-    rate: "$45/hr",
-    desc: "Thursday versatile instructor needed. Must be committed through May 15th, 2025. Thursdays: 3:30-4pm clean tap solo (Age 12), 4-5:15pm ballet/tap/hip hop (1st-3rd), 5:15-5:45pm Mini Jazz Company, 6-7pm Teen-Adult Tap. Total: 3.25 hrs.",
-    applicants: 4, views: 128,
-  },
-  {
-    id: 2, tag: "Recurring Classes", status: "active",
-    date: "March 5th, 2025 @ 4:00 pm", location: "Bayside, NY",
-    rate: "$50/hr",
-    desc: "Wed weekly preballet/hip hop instructor needed. 3K & PreK. MUST have experience & enjoy working with young dancers. Must be committed through May 14th.",
-    applicants: 7, views: 203,
-  },
-  {
-    id: 3, tag: "Recurring Classes", status: "active",
-    date: "March 5th, 2025 @ 4:00 pm", location: "Bayside, NY",
-    rate: "$45/hr",
-    desc: "Wednesday versatile instructor needed, to work with a variety of ages, styles and levels. 4-4:55pm hip hop & basic acro (K-2nd), 5-6pm beginner ballet (7-12), 6-7pm Contemporary & jazz (preteens & teens), 7:10-7:50pm adaptive dance (adults).",
-    applicants: 3, views: 89,
-  },
-  {
-    id: 4, tag: "Recurring Classes", status: "active",
-    date: "March 4th, 2025 @ 4:00 pm", location: "Bayside, NY",
-    rate: "Open rate",
-    desc: "Tues instructor needed. Must be available and committed through May 13, 2025. 4-5pm Jazz/Tap K-2nd grade, 5-6pm Jazz/Lyrical ages 8 to 12. Must have 3+ years teaching experience.",
-    applicants: 2, views: 67,
-  },
-  {
-    id: 5, tag: "Sub", status: "active",
-    date: "March 3rd, 2025 @ 10:00 am", location: "Bayside, NY",
-    rate: "$40/hr",
-    desc: "Saturday sub instructor needed for PreBallet/Hip Hop (ages 3-4) and Mommy & Me (ages 3 & younger). Must be experienced working with ages 4 & younger.",
-    applicants: 6, views: 145,
-  },
-  {
-    id: 6, tag: "Recurring Classes", status: "archived",
-    date: "January 15th, 2025 @ 4:00 pm", location: "Bayside, NY",
-    rate: "$45/hr",
-    desc: "Wed weekly preballet/hip hop instructor needed from 4-4:45pm. 3K & PreK. MUST have experience & enjoy working with young dancers.",
-    applicants: 11, views: 312,
-  },
-];
+function formatJobDate(dateStr: string | Date | null | undefined) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
 
-const APPLICANTS_BY_JOB: Record<number, { name: string; initials: string; color: string; status: "pending" | "accepted" | "declined" }[]> = {
-  1: [
-    { name: "Sasha K.", initials: "SK", color: "bg-purple-500", status: "pending" },
-    { name: "Jesse B.", initials: "JB", color: "bg-orange-500", status: "pending" },
-    { name: "Amie B.", initials: "AB", color: "bg-pink-500", status: "accepted" },
-    { name: "Olivia G.", initials: "OG", color: "bg-rose-500", status: "declined" },
-  ],
-  2: [
-    { name: "Marlon S.", initials: "MS", color: "bg-blue-500", status: "pending" },
-    { name: "gracen n.", initials: "GN", color: "bg-green-500", status: "pending" },
-    { name: "Alex M.", initials: "AM", color: "bg-teal-500", status: "pending" },
-    { name: "Clarissa J.", initials: "CJ", color: "bg-indigo-500", status: "accepted" },
-    { name: "Victoria M.", initials: "VM", color: "bg-violet-500", status: "pending" },
-    { name: "Kayla S.", initials: "KS", color: "bg-yellow-500", status: "declined" },
-    { name: "Jesse B.", initials: "JB", color: "bg-orange-500", status: "pending" },
-  ],
-};
+function getJobInitials(desc: string | null | undefined) {
+  if (!desc) return "JB";
+  const words = desc.trim().split(/\s+/).slice(0, 2);
+  return words.map((w) => w[0]?.toUpperCase() ?? "").join("") || "JB";
+}
+
+function getStatusColor(status: string | null | undefined) {
+  switch (status) {
+    case "Active": return "text-green-600 bg-green-50";
+    case "Confirmed": return "text-blue-600 bg-blue-50";
+    case "Completed": return "text-gray-600 bg-gray-100";
+    case "Submissions Paused": return "text-yellow-700 bg-yellow-50";
+    case "Deleted by Client": return "text-red-500 bg-red-50";
+    default: return "text-[#F25722] bg-orange-50";
+  }
+}
 
 export default function DashJobs() {
-  const [activeTab, setActiveTab] = useState<"active" | "archived">("active");
+  const [activeTab, setActiveTab] = useState<"active" | "all" | "archived">("active");
   const [expandedJob, setExpandedJob] = useState<number | null>(null);
   const [showPostForm, setShowPostForm] = useState(false);
   const [jobText, setJobText] = useState("");
   const [search, setSearch] = useState("");
 
-  const filtered = JOBS.filter(
-    (j) => j.status === activeTab && (search === "" || j.desc.toLowerCase().includes(search.toLowerCase()))
+  // Status filters per tab
+  const statusFilters: Record<string, string[] | undefined> = {
+    active: ["Active", "Confirmed"],
+    archived: ["Completed", "Deleted by Client", "Lost - No Revenue", "Submissions Paused"],
+    all: undefined,
+  };
+
+  const { data: jobs, isLoading } = trpc.jobs.myJobs.useQuery({
+    limit: 100,
+    status: statusFilters[activeTab],
+  });
+
+  const { data: stats } = trpc.jobs.myStats.useQuery();
+
+  const filtered = (jobs ?? []).filter(
+    (j) => search === "" || (j.description ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -90,7 +66,9 @@ export default function DashJobs() {
       <div className="flex items-center justify-between mb-7">
         <div>
           <h1 className="text-2xl font-black text-[#111]">My Jobs</h1>
-          <p className="text-gray-500 text-sm mt-1">{JOBS.filter(j => j.status === "active").length} active · {JOBS.filter(j => j.status === "archived").length} archived</p>
+          <p className="text-gray-500 text-sm mt-1">
+            {stats ? `${stats.active} active · ${stats.completed} completed · ${stats.total} total` : "Loading..."}
+          </p>
         </div>
         <button
           onClick={() => setShowPostForm(!showPostForm)}
@@ -129,7 +107,7 @@ export default function DashJobs() {
       {/* Filters */}
       <div className="flex items-center gap-3 mb-5">
         <div className="flex items-center gap-1 bg-white rounded-xl border border-gray-200 p-1">
-          {(["active", "archived"] as const).map((t) => (
+          {(["active", "all", "archived"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setActiveTab(t)}
@@ -137,7 +115,7 @@ export default function DashJobs() {
                 activeTab === t ? "hirer-grad-bg text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
               }`}
             >
-              {t}
+              {t === "all" ? "All Jobs" : t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
         </div>
@@ -156,112 +134,171 @@ export default function DashJobs() {
       </div>
 
       {/* Job cards */}
-      <div className="space-y-3">
-        {filtered.map((job) => (
-          <div key={job.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div
-              className="p-5 cursor-pointer hover:bg-gray-50/50 transition-colors"
-              onClick={() => setExpandedJob(expandedJob === job.id ? null : job.id)}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4 flex-1 min-w-0">
-                  <div className="w-10 h-10 rounded-xl hirer-grad-bg flex items-center justify-center text-white text-xs font-black flex-shrink-0">
-                    {job.tag === "Recurring Classes" ? "RC" : "SB"}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                      <span className="text-xs font-semibold text-[#F25722] bg-orange-50 px-2 py-0.5 rounded-full">{job.tag}</span>
-                      <span className="flex items-center gap-1 text-xs text-gray-400"><Clock size={10} /> {job.date}</span>
-                      <span className="flex items-center gap-1 text-xs text-gray-400"><MapPin size={10} /> {job.location}</span>
-                      <span className="flex items-center gap-1 text-xs font-semibold text-green-600"><DollarSign size={10} /> {job.rate}</span>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20 text-gray-400">
+          <Loader2 size={24} className="animate-spin mr-3" />
+          <span className="text-sm">Loading jobs...</span>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+          <Briefcase size={40} className="mb-4 opacity-30" />
+          <p className="text-sm font-medium">No {activeTab === "active" ? "active " : ""}jobs found</p>
+          {search && (
+            <button onClick={() => setSearch("")} className="mt-2 text-xs text-[#F25722] hover:opacity-70">
+              Clear search
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((job) => (
+            <div key={job.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div
+                className="p-5 cursor-pointer hover:bg-gray-50/50 transition-colors"
+                onClick={() => setExpandedJob(expandedJob === job.id ? null : job.id)}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4 flex-1 min-w-0">
+                    <div className="w-10 h-10 rounded-xl hirer-grad-bg flex items-center justify-center text-white text-xs font-black flex-shrink-0">
+                      {getJobInitials(job.description)}
                     </div>
-                    <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">{job.desc}</p>
-                    <div className="flex items-center gap-4 mt-2.5">
-                      <span className="flex items-center gap-1 text-xs text-gray-500"><Users size={11} /> {job.applicants} applicants</span>
-                      <span className="flex items-center gap-1 text-xs text-gray-500"><Eye size={11} /> {job.views} views</span>
-                      <span className="flex items-center gap-1 text-xs text-green-500 font-medium"><RefreshCw size={10} /> Recurring</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                        {job.requestStatus && (
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getStatusColor(job.requestStatus)}`}>
+                            {job.requestStatus}
+                          </span>
+                        )}
+                        {job.dateType && (
+                          <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                            {job.dateType}
+                          </span>
+                        )}
+                        {job.bubbleCreatedAt && (
+                          <span className="flex items-center gap-1 text-xs text-gray-400">
+                            <Clock size={10} /> {formatJobDate(job.bubbleCreatedAt)}
+                          </span>
+                        )}
+                        {job.locationAddress && (
+                          <span className="flex items-center gap-1 text-xs text-gray-400">
+                            <MapPin size={10} /> {job.locationAddress.split(",").slice(0, 2).join(",")}
+                          </span>
+                        )}
+                        {job.artistHourlyRate ? (
+                          <span className="flex items-center gap-1 text-xs font-semibold text-green-600">
+                            <DollarSign size={10} /> ${job.artistHourlyRate}/hr
+                          </span>
+                        ) : job.openRate ? (
+                          <span className="text-xs font-semibold text-gray-500">Open rate</span>
+                        ) : null}
+                      </div>
+                      <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
+                        {job.description ?? "No description"}
+                      </p>
+                      <div className="flex items-center gap-4 mt-2.5 flex-wrap">
+                        {(job.dateType === "Recurring" || job.dateType === "Ongoing") && (
+                          <span className="flex items-center gap-1 text-xs text-blue-500 font-medium">
+                            <RefreshCw size={10} /> {job.dateType}
+                          </span>
+                        )}
+                        {job.ages && (() => {
+                          try {
+                            const ages = JSON.parse(job.ages);
+                            if (Array.isArray(ages) && ages.length > 0) {
+                              return (
+                                <span className="text-xs text-gray-400">
+                                  Ages: {ages.join(", ")}
+                                </span>
+                              );
+                            }
+                          } catch { /* ignore */ }
+                          return null;
+                        })()}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <button className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
-                    <MoreHorizontal size={16} />
-                  </button>
-                  <ChevronDown
-                    size={16}
-                    className={`text-gray-400 transition-transform ${expandedJob === job.id ? "rotate-180" : ""}`}
-                  />
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
+                      <MoreHorizontal size={16} />
+                    </button>
+                    <ChevronDown
+                      size={16}
+                      className={`text-gray-400 transition-transform ${expandedJob === job.id ? "rotate-180" : ""}`}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Expanded applicants */}
-            {expandedJob === job.id && (
-              <div className="border-t border-gray-100 p-5 bg-gray-50/50">
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Applicants</h3>
-                {APPLICANTS_BY_JOB[job.id] ? (
-                  <div className="space-y-2">
-                    {APPLICANTS_BY_JOB[job.id].map((a) => (
-                      <div key={a.name} className="flex items-center gap-3 bg-white rounded-xl px-4 py-2.5 border border-gray-100">
-                        <div className={`w-8 h-8 rounded-full ${a.color} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
-                          {a.initials}
-                        </div>
-                        <p className="text-sm font-semibold text-[#111] flex-1">{a.name}</p>
-                        <div className="flex items-center gap-2">
-                          {a.status === "accepted" && (
-                            <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                              <CheckCircle size={10} /> Accepted
-                            </span>
+              {/* Expanded details */}
+              {expandedJob === job.id && (
+                <div className="border-t border-gray-100 p-5 bg-gray-50/50">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Full Description</h3>
+                      <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">
+                        {job.description ?? "No description"}
+                      </p>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Details</h3>
+                        <div className="space-y-1.5 text-sm text-gray-600">
+                          {job.locationAddress && (
+                            <div className="flex items-center gap-2">
+                              <MapPin size={13} className="text-gray-400 flex-shrink-0" />
+                              <span>{job.locationAddress}</span>
+                            </div>
                           )}
-                          {a.status === "declined" && (
-                            <span className="text-xs font-semibold text-red-500 bg-red-50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                              <XCircle size={10} /> Declined
-                            </span>
+                          {job.startDate && (
+                            <div className="flex items-center gap-2">
+                              <Clock size={13} className="text-gray-400 flex-shrink-0" />
+                              <span>Start: {formatJobDate(job.startDate)}</span>
+                            </div>
                           )}
-                          {a.status === "pending" && (
-                            <div className="flex items-center gap-1.5">
-                              <button className="p-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors">
-                                <CheckCircle size={14} />
-                              </button>
-                              <button className="p-1.5 rounded-lg bg-red-50 text-red-400 hover:bg-red-100 transition-colors">
-                                <XCircle size={14} />
-                              </button>
+                          {job.endDate && (
+                            <div className="flex items-center gap-2">
+                              <Clock size={13} className="text-gray-400 flex-shrink-0" />
+                              <span>End: {formatJobDate(job.endDate)}</span>
+                            </div>
+                          )}
+                          {job.artistHourlyRate && (
+                            <div className="flex items-center gap-2">
+                              <DollarSign size={13} className="text-gray-400 flex-shrink-0" />
+                              <span>Artist rate: ${job.artistHourlyRate}/hr</span>
+                            </div>
+                          )}
+                          {job.clientHourlyRate && (
+                            <div className="flex items-center gap-2">
+                              <DollarSign size={13} className="text-gray-400 flex-shrink-0" />
+                              <span>Client rate: ${job.clientHourlyRate}/hr</span>
                             </div>
                           )}
                         </div>
                       </div>
-                    ))}
+                      <div className="flex items-center gap-2 pt-2">
+                        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-100 transition-colors">
+                          <Eye size={12} /> View on site
+                        </button>
+                        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-100 transition-colors">
+                          <Users size={12} /> View applicants
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                ) : (
-                  <p className="text-sm text-gray-400 text-center py-4">No applicants yet for this job.</p>
-                )}
-
-                <div className="flex items-center gap-2 mt-4">
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-white transition-colors">
-                    <Eye size={12} /> View Full Job
-                  </button>
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-red-500 border border-red-100 hover:bg-red-50 transition-colors">
-                    <Trash2 size={12} /> Archive Job
-                  </button>
                 </div>
-              </div>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
-        {filtered.length === 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
-            <Sparkles size={32} className="mx-auto mb-3 text-gray-300" />
-            <p className="text-gray-500 font-medium">No {activeTab} jobs found</p>
-            <button
-              onClick={() => setShowPostForm(true)}
-              className="mt-4 px-5 py-2.5 rounded-full text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity"
-            >
-              Post Your First Job
-            </button>
-          </div>
-        )}
-      </div>
+      {/* Count footer */}
+      {!isLoading && filtered.length > 0 && (
+        <p className="text-center text-xs text-gray-400 mt-6">
+          Showing {filtered.length} job{filtered.length !== 1 ? "s" : ""}
+          {search ? ` matching "${search}"` : ""}
+        </p>
+      )}
     </div>
   );
 }

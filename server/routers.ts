@@ -3,7 +3,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs } from "./db";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import { z } from "zod";
@@ -129,6 +129,46 @@ export const appRouter = router({
           throw new Error("Forbidden: admin only");
         }
         return getUserById(input.id);
+      }),
+  }),
+
+  // ── Jobs ────────────────────────────────────────────────────────────────────────
+  jobs: router({
+    /**
+     * Get jobs for the currently logged-in user (client dashboard).
+     */
+    myJobs: protectedProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(100).default(50),
+        offset: z.number().min(0).default(0),
+        status: z.array(z.string()).optional(),
+      }))
+      .query(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        return getJobsByUserId(user.id, input.limit, input.offset, input.status);
+      }),
+
+    /**
+     * Get job stats for the currently logged-in user.
+     */
+    myStats: protectedProcedure
+      .query(async ({ ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) return { total: 0, active: 0, confirmed: 0, completed: 0 };
+        return getJobStatsByUserId(user.id);
+      }),
+
+    /**
+     * Public job listings for the /jobs page.
+     */
+    publicList: publicProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(100).default(50),
+        offset: z.number().min(0).default(0),
+      }))
+      .query(async ({ input }) => {
+        return getPublicJobs(input.limit, input.offset);
       }),
   }),
 

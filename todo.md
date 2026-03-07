@@ -63,3 +63,10 @@
 - [x] Build /admin page for setting temporary passwords
 - [x] Update login to authenticate against stored password hash
 - [x] Fix AuthProvider error in dashboard pages (replace old AuthContext with tRPC useAuth)
+- [x] Inspect Bubble Request table structure via Data API
+- [x] Design jobs table schema mapping Bubble fields (30 columns)
+- [x] Seed Nick's jobs from Bubble into the database (160 jobs)
+- [x] Wire dashboard My Jobs page to real DB data
+- [x] Wire /jobs page to real DB data
+- [x] Add jobs tRPC router (myJobs, myStats, publicList)
+- [x] Write vitest tests for jobs logic (14 tests passing)

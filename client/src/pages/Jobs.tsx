@@ -4,70 +4,90 @@
  * Font: Poppins
  * Artist gradient: #ec008c → #ff7171
  * Hirer gradient: #FFBC5D → #F25722
+ * Real data from DB via tRPC
  */
 
 import { useState, useMemo } from "react";
-import { Search, MapPin, Clock, ChevronDown, X, Star, SlidersHorizontal } from "lucide-react";
+import { Search, MapPin, Clock, ChevronDown, X, Star, SlidersHorizontal, Loader2 } from "lucide-react";
 import { Link } from "wouter";
+import { trpc } from "@/lib/trpc";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface Job {
+interface DisplayJob {
   id: number;
   title: string;
   location: string;
   postedAgo: string;
   datetime: string;
   rate: string | null;
-  type: string;
-  serviceType: string;
-  isPro?: boolean;
+  dateType: string | null;
+  description: string | null;
+  lat: number | null;
+  lng: number | null;
 }
 
-// ─── Sample Data ──────────────────────────────────────────────────────────────
-const ALL_JOBS: Job[] = [
-  { id: 1, title: "Master Classes", location: "Deer Park, NY", postedAgo: "4 days ago", datetime: "Wed, 8/05/26, 1:00 pm – 3:00 pm", rate: null, type: "Dance Educator", serviceType: "Master Classes" },
-  { id: 2, title: "Recurring Classes", location: "Florham Park, NJ", postedAgo: "2 days ago", datetime: "Mon, 9/07/26, 5:00 pm – 8:00 pm", rate: "$65.00/hr", type: "Dance Educator", serviceType: "Recurring Classes" },
-  { id: 3, title: "Master Classes", location: "Sea Girt, NJ", postedAgo: "5 days ago", datetime: "Sun, 3/15/26, 10:00 am – 1:30 pm", rate: null, type: "Dance Educator", serviceType: "Master Classes" },
-  { id: 4, title: "Substitute Teacher", location: "Union City, NJ", postedAgo: "1 day ago", datetime: "Wed, 2/25/26, 6:30 pm – 7:30 pm", rate: null, type: "Dance Educator", serviceType: "Substitute Teacher" },
-  { id: 5, title: "Recurring Classes", location: "Bethel, CT", postedAgo: "3 days ago", datetime: "Mon, 7/06/26, 2:00 pm – Ongoing", rate: null, type: "Dance Educator", serviceType: "Recurring Classes" },
-  { id: 6, title: "Substitute Teacher", location: "Mount Vernon, NY", postedAgo: "21 hours ago", datetime: "Sat, 3/28/26, 2:30 pm – 3/28", rate: "$45.00/hr", type: "Dance Educator", serviceType: "Substitute Teacher" },
-  { id: 7, title: "Master Classes", location: "Deer Park, NY", postedAgo: "4 days ago", datetime: "Mon, 8/03/26, 10:00 am – 11:00 am", rate: null, type: "Dance Educator", serviceType: "Master Classes" },
-  { id: 8, title: "Substitute Teacher", location: "New York, NY", postedAgo: "6 days ago", datetime: "Sat, 2/07/26, 2:00 pm", rate: "$40.00/hr", type: "Dance Educator", serviceType: "Substitute Teacher" },
-  { id: 9, title: "Substitute Teacher", location: "Queens, NY", postedAgo: "5 days ago", datetime: "Fri, 2/13/26, 4:00 pm – 8:00 pm", rate: "$60.00/hr", type: "Dance Educator", serviceType: "Substitute Teacher" },
-  { id: 10, title: "Master Classes", location: "Sea Girt, NJ", postedAgo: "5 days ago", datetime: "Sat, 3/14/26, 9:00 am – 12:45 pm", rate: null, type: "Dance Educator", serviceType: "Master Classes" },
-  { id: 11, title: "Voice Teacher", location: "Milford, MI", postedAgo: "a day ago", datetime: "Mon, May 4, 2026", rate: "$22.00/hr", type: "Vocal Coach", serviceType: "Private Voice Lessons" },
-  { id: 12, title: "Piano Teacher", location: "Orland Park, IL", postedAgo: "3 days ago", datetime: "Mon, Apr 6, 2026", rate: "$28.00/hr", type: "Music Teacher", serviceType: "Piano Teacher" },
-  { id: 13, title: "Violin Teacher", location: "Naperville, IL", postedAgo: "3 days ago", datetime: "Mon, Apr 6, 2026", rate: "$32.00/hr", type: "Music Teacher", serviceType: "Violin Teacher" },
-  { id: 14, title: "Competition Choreography", location: "Stamford, CT", postedAgo: "2 days ago", datetime: "Sat, 4/12/26, 9:00 am – 5:00 pm", rate: null, type: "Dance Educator", serviceType: "Competition Choreography" },
-  { id: 15, title: "Private Lessons", location: "Hoboken, NJ", postedAgo: "1 day ago", datetime: "Ongoing", rate: "$55.00/hr", type: "Dance Educator", serviceType: "Private Lessons" },
-  { id: 16, title: "Event Photography", location: "Brooklyn, NY", postedAgo: "3 days ago", datetime: "Sat, 3/21/26, 6:00 pm – 10:00 pm", rate: null, type: "Photographer", serviceType: "Event Photography" },
-  { id: 17, title: "Dance Competition Judge", location: "Newark, NJ", postedAgo: "2 days ago", datetime: "Sun, 4/05/26, 8:00 am – 6:00 pm", rate: null, type: "Dance Adjudicator", serviceType: "Dance Competition Judge" },
-  { id: 18, title: "Headshots", location: "Manhattan, NY", postedAgo: "4 days ago", datetime: "Flexible scheduling", rate: null, type: "Photographer", serviceType: "Headshots" },
-  { id: 19, title: "Event Videography", location: "White Plains, NY", postedAgo: "1 day ago", datetime: "Sat, 3/28/26, 2:00 pm – 8:00 pm", rate: null, type: "Videographer", serviceType: "Event Videography" },
-  { id: 20, title: "Recurring Classes", location: "Bethel, CT", postedAgo: "3 days ago", datetime: "Ongoing", rate: null, type: "Dance Educator", serviceType: "Recurring Classes" },
-  { id: 21, title: "Acting Coach", location: "New York, NY", postedAgo: "2 days ago", datetime: "Ongoing", rate: "$75.00/hr", type: "Acting Coach", serviceType: "Acting Coach" },
-  { id: 22, title: "Substitute Teacher", location: "Yonkers, NY", postedAgo: "5 hours ago", datetime: "Fri, 3/13/26, 4:00 pm – 7:00 pm", rate: "$50.00/hr", type: "Dance Educator", serviceType: "Substitute Teacher" },
-  { id: 23, title: "Master Classes", location: "Parsippany, NJ", postedAgo: "6 days ago", datetime: "Sat, 4/18/26, 10:00 am – 1:00 pm", rate: null, type: "Dance Educator", serviceType: "Master Classes" },
-  { id: 24, title: "Guitar Teacher", location: "Chicago, IL", postedAgo: "2 days ago", datetime: "Ongoing", rate: "$35.00/hr", type: "Music Teacher", serviceType: "Guitar" },
-  { id: 25, title: "Yoga Instructor", location: "Hoboken, NJ", postedAgo: "1 day ago", datetime: "Mon/Wed/Fri mornings", rate: "$40.00/hr", type: "Side Jobs", serviceType: "Yoga Instructor" },
-  { id: 26, title: "Social Media Manager", location: "Remote", postedAgo: "3 days ago", datetime: "Ongoing", rate: null, type: "Side Jobs", serviceType: "Social Media Manager" },
-  { id: 27, title: "Event Performers", location: "New York, NY", postedAgo: "1 day ago", datetime: "Sat, 4/25/26, 7:00 pm – 11:00 pm", rate: null, type: "Dance Educator", serviceType: "Event Performers" },
-  { id: 28, title: "Vocal Audition Prep", location: "Brooklyn, NY", postedAgo: "4 days ago", datetime: "Ongoing", rate: "$65.00/hr", type: "Vocal Coach", serviceType: "Vocal Audition Prep" },
-  { id: 29, title: "Percussion Teacher", location: "Montclair, NJ", postedAgo: "2 days ago", datetime: "Ongoing", rate: "$30.00/hr", type: "Music Teacher", serviceType: "Percussion Teacher" },
-  { id: 30, title: "Substitute Teacher", location: "Norwalk, CT", postedAgo: "8 hours ago", datetime: "Thu, 3/12/26, 5:00 pm – 7:00 pm", rate: "$45.00/hr", type: "Dance Educator", serviceType: "Substitute Teacher" },
-  { id: 31, title: "Dance Competition Judge", location: "Trenton, NJ", postedAgo: "5 days ago", datetime: "Sat, 5/02/26, 9:00 am – 5:00 pm", rate: null, type: "Dance Adjudicator", serviceType: "Dance Competition Judge" },
-  { id: 32, title: "Private Lessons", location: "Westchester, NY", postedAgo: "2 days ago", datetime: "Ongoing", rate: "$60.00/hr", type: "Dance Educator", serviceType: "Private Lessons" },
-];
+function timeAgo(date: Date | string | null | undefined): string {
+  if (!date) return "recently";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "recently";
+  const diff = Date.now() - d.getTime();
+  const hours = Math.floor(diff / 3600000);
+  if (hours < 1) return "just now";
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "a day ago";
+  if (days < 7) return `${days} days ago`;
+  const weeks = Math.floor(days / 7);
+  return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
+}
 
-const ARTIST_TYPES = ["Dance Educator", "Photographer", "Dance Adjudicator", "Videographer", "Acting Coach", "Vocal Coach", "Side Jobs", "Music Teacher"];
-const SERVICE_TYPES = [
-  "Competition Choreography", "Substitute Teacher", "Recurring Classes", "Private Lessons",
-  "Master Classes", "Photoshoot", "Videoshoot", "Event Photography", "Headshots",
-  "Event Videography", "Dance Competition Judge", "Video Editing", "Acting Coach",
-  "Private Voice Lessons", "Vocal Audition Prep", "Event Choreography", "Event Performers",
-  "Yoga Instructor", "Social Media Manager", "Guitar", "Percussion Teacher", "Piano Teacher",
-  "Violin Teacher", "Voice Teacher",
-];
+function formatDateRange(start: Date | null | undefined, end: Date | null | undefined, dateType: string | null | undefined): string {
+  if (dateType === "Ongoing") return "Ongoing";
+  if (dateType === "Recurring") return "Recurring";
+  if (start) {
+    const s = new Date(start);
+    if (!isNaN(s.getTime())) {
+      const dateStr = s.toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric", year: "2-digit" });
+      const timeStr = s.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+      return `${dateStr}, ${timeStr}`;
+    }
+  }
+  return dateType ?? "Flexible";
+}
+
+function extractTitle(description: string | null | undefined): string {
+  if (!description) return "Open Position";
+  const firstLine = description.split("\n")[0].trim();
+  if (firstLine.length > 0 && firstLine.length < 80) return firstLine;
+  // Try to extract a job type from the text
+  const patterns: [RegExp, string][] = [
+    [/sub(stitute)?\s+teacher/i, "Substitute Teacher"],
+    [/ballet/i, "Ballet Teacher"],
+    [/hip\s*hop/i, "Hip Hop Instructor"],
+    [/tap/i, "Tap Teacher"],
+    [/jazz/i, "Jazz Teacher"],
+    [/lyrical/i, "Lyrical Teacher"],
+    [/contemporary/i, "Contemporary Teacher"],
+    [/acro/i, "Acro Teacher"],
+    [/piano/i, "Piano Teacher"],
+    [/violin/i, "Violin Teacher"],
+    [/voice|vocal/i, "Vocal Coach"],
+    [/judge|adjudicat/i, "Dance Adjudicator"],
+    [/choreograph/i, "Choreographer"],
+    [/photograph/i, "Photographer"],
+    [/videograph/i, "Videographer"],
+    [/yoga/i, "Yoga Instructor"],
+    [/pilates/i, "Pilates Instructor"],
+    [/recurring|weekly|instructor/i, "Dance Instructor"],
+    [/teacher|coach/i, "Dance Teacher"],
+  ];
+  for (const [re, label] of patterns) {
+    if (re.test(description)) return label;
+  }
+  return "Open Position";
+}
+
+const ARTIST_TYPES = ["Dance Educator", "Photographer", "Dance Adjudicator", "Videographer", "Acting Coach", "Vocal Coach", "Music Teacher"];
 
 // ─── Navbar ───────────────────────────────────────────────────────────────────
 function Navbar() {
@@ -88,8 +108,8 @@ function Navbar() {
           </div>
 
           <div className="flex items-center gap-3">
-            <a href="#" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">Login</a>
-            <a href="#" className="text-sm font-semibold text-white bg-[#111] px-4 py-1.5 rounded-full hover:bg-gray-800 transition-colors">Join</a>
+            <Link href="/login" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">Login</Link>
+            <Link href="/login" className="text-sm font-semibold text-white bg-[#111] px-4 py-1.5 rounded-full hover:bg-gray-800 transition-colors">Join</Link>
           </div>
         </div>
       </div>
@@ -98,7 +118,7 @@ function Navbar() {
 }
 
 // ─── Job Card ─────────────────────────────────────────────────────────────────
-function JobCard({ job, isSelected, onClick }: { job: Job; isSelected: boolean; onClick: () => void }) {
+function JobCard({ job, isSelected, onClick }: { job: DisplayJob; isSelected: boolean; onClick: () => void }) {
   return (
     <div
       onClick={onClick}
@@ -145,7 +165,7 @@ function JobCard({ job, isSelected, onClick }: { job: Job; isSelected: boolean; 
 }
 
 // ─── Map Placeholder ──────────────────────────────────────────────────────────
-function MapPanel({ selectedJob }: { selectedJob: Job | null }) {
+function MapPanel({ selectedJob }: { selectedJob: DisplayJob | null }) {
   return (
     <div className="relative w-full h-full bg-gray-100 overflow-hidden">
       {/* Stylized map background */}
@@ -213,6 +233,9 @@ function MapPanel({ selectedJob }: { selectedJob: Job | null }) {
             <span className="text-gray-500">{selectedJob.datetime}</span>
             <span className="font-bold text-[#111]">{selectedJob.rate ?? "Open rate"}</span>
           </div>
+          {selectedJob.description && (
+            <p className="text-xs text-gray-500 mt-2 line-clamp-2">{selectedJob.description}</p>
+          )}
           <button className="w-full mt-3 py-2 rounded-lg text-xs font-semibold text-white artist-grad-bg hover:opacity-90 transition-opacity">
             Apply Now →
           </button>
@@ -232,21 +255,40 @@ export default function Jobs() {
   const [search, setSearch] = useState("");
   const [location, setLocation] = useState("");
   const [artistType, setArtistType] = useState("");
-  const [serviceType, setServiceType] = useState("");
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [selectedJob, setSelectedJob] = useState<DisplayJob | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const filtered = useMemo(() => {
-    return ALL_JOBS.filter((job) => {
-      const matchSearch = !search || job.title.toLowerCase().includes(search.toLowerCase()) || job.location.toLowerCase().includes(search.toLowerCase());
-      const matchLocation = !location || job.location.toLowerCase().includes(location.toLowerCase());
-      const matchType = !artistType || job.type === artistType;
-      const matchService = !serviceType || job.serviceType === serviceType;
-      return matchSearch && matchLocation && matchType && matchService;
-    });
-  }, [search, location, artistType, serviceType]);
+  // Fetch real jobs from DB
+  const { data: rawJobs, isLoading } = trpc.jobs.publicList.useQuery({ limit: 100 });
 
-  const hasFilters = search || location || artistType || serviceType;
+  // Transform DB jobs to display format
+  const allJobs: DisplayJob[] = useMemo(() => {
+    if (!rawJobs) return [];
+    return rawJobs.map((j) => ({
+      id: j.id,
+      title: extractTitle(j.description),
+      location: j.locationAddress
+        ? j.locationAddress.split(",").slice(0, 2).join(",").trim()
+        : "Location TBD",
+      postedAgo: timeAgo(j.bubbleCreatedAt),
+      datetime: formatDateRange(j.startDate, j.endDate, j.dateType),
+      rate: j.artistHourlyRate ? `$${j.artistHourlyRate}.00/hr` : j.openRate ? "Open rate" : null,
+      dateType: j.dateType,
+      description: j.description,
+      lat: j.locationLat ? parseFloat(j.locationLat) : null,
+      lng: j.locationLng ? parseFloat(j.locationLng) : null,
+    }));
+  }, [rawJobs]);
+
+  const filtered = useMemo(() => {
+    return allJobs.filter((job) => {
+      const matchSearch = !search || job.title.toLowerCase().includes(search.toLowerCase()) || job.location.toLowerCase().includes(search.toLowerCase()) || (job.description ?? "").toLowerCase().includes(search.toLowerCase());
+      const matchLocation = !location || job.location.toLowerCase().includes(location.toLowerCase());
+      return matchSearch && matchLocation;
+    });
+  }, [allJobs, search, location]);
+
+  const hasFilters = search || location || artistType;
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ fontFamily: "Poppins, sans-serif" }}>
@@ -263,7 +305,9 @@ export default function Jobs() {
             <div className="flex items-center justify-between mb-4">
               <h1 className="text-xl font-black text-[#111]">
                 Jobs For You{" "}
-                <span className="text-base font-semibold text-gray-400">({filtered.length})</span>
+                {!isLoading && (
+                  <span className="text-base font-semibold text-gray-400">({filtered.length})</span>
+                )}
               </h1>
               <button
                 onClick={() => setFiltersOpen(!filtersOpen)}
@@ -272,7 +316,7 @@ export default function Jobs() {
                 }`}
               >
                 <SlidersHorizontal size={12} />
-                Filters {hasFilters ? `(${[search, location, artistType, serviceType].filter(Boolean).length})` : ""}
+                Filters {hasFilters ? `(${[search, location, artistType].filter(Boolean).length})` : ""}
               </button>
             </div>
 
@@ -314,21 +358,9 @@ export default function Jobs() {
                 <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
 
-              <div className="relative flex-1 min-w-[120px]">
-                <select
-                  value={serviceType}
-                  onChange={(e) => setServiceType(e.target.value)}
-                  className="w-full appearance-none pl-3 pr-7 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] text-gray-600 cursor-pointer"
-                >
-                  <option value="">Service Type</option>
-                  {SERVICE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
-
               {hasFilters && (
                 <button
-                  onClick={() => { setSearch(""); setLocation(""); setArtistType(""); setServiceType(""); }}
+                  onClick={() => { setSearch(""); setLocation(""); setArtistType(""); }}
                   className="flex items-center gap-1 text-xs font-semibold text-[#F25722] hover:text-[#d44a1a] transition-colors whitespace-nowrap"
                 >
                   <X size={12} /> Reset
@@ -351,7 +383,12 @@ export default function Jobs() {
 
           {/* Job list */}
           <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-            {filtered.length === 0 ? (
+            {isLoading ? (
+              <div className="flex items-center justify-center py-16 text-gray-400">
+                <Loader2 size={20} className="animate-spin mr-2" />
+                <span className="text-sm">Loading jobs...</span>
+              </div>
+            ) : filtered.length === 0 ? (
               <div className="text-center py-16">
                 <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
                   <Search size={20} className="text-gray-300" />

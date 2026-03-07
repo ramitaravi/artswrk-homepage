@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, jobs, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -116,6 +116,82 @@ export async function getUserById(id: number) {
   if (!db) return undefined;
   const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
   return result.length > 0 ? result[0] : undefined;
+}
+
+// ── Job queries ──────────────────────────────────────────────────────────────
+
+/**
+ * Get all jobs for a given local user ID, ordered by most recently created.
+ */
+export async function getJobsByUserId(
+  userId: number,
+  limit = 50,
+  offset = 0,
+  statusFilter?: string[]
+) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [eq(jobs.clientUserId, userId)];
+  if (statusFilter && statusFilter.length > 0) {
+    // Build OR conditions for each status
+    const statusConditions = statusFilter.map(s => eq(jobs.requestStatus, s));
+    conditions.push(or(...statusConditions)!);
+  }
+
+  return db
+    .select()
+    .from(jobs)
+    .where(and(...conditions))
+    .orderBy(desc(jobs.bubbleCreatedAt))
+    .limit(limit)
+    .offset(offset);
+}
+
+/**
+ * Get job stats for a user (counts by status).
+ */
+export async function getJobStatsByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return { total: 0, active: 0, confirmed: 0, completed: 0 };
+
+  const result = await db
+    .select({
+      requestStatus: jobs.requestStatus,
+      count: sql<number>`COUNT(*)`
+    })
+    .from(jobs)
+    .where(eq(jobs.clientUserId, userId))
+    .groupBy(jobs.requestStatus);
+
+  const stats = { total: 0, active: 0, confirmed: 0, completed: 0 };
+  for (const row of result) {
+    const count = Number(row.count);
+    stats.total += count;
+    if (row.requestStatus === 'Active') stats.active += count;
+    if (row.requestStatus === 'Confirmed') stats.confirmed += count;
+    if (row.requestStatus === 'Completed') stats.completed += count;
+  }
+  return stats;
+}
+
+/**
+ * Get all public (active) jobs for the /jobs listing page.
+ */
+export async function getPublicJobs(limit = 50, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db
+    .select()
+    .from(jobs)
+    .where(or(
+      eq(jobs.requestStatus, 'Active'),
+      eq(jobs.requestStatus, 'Confirmed'),
+    ))
+    .orderBy(desc(jobs.bubbleCreatedAt))
+    .limit(limit)
+    .offset(offset);
 }
 
 export async function setUserPassword(

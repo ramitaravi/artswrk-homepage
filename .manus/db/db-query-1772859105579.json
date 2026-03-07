@@ -1,0 +1,81 @@
+{
+  "query": "\nSELECT \n  COUNT(*) as total,\n  SUM(CASE WHEN requestStatus = 'Active' THEN 1 ELSE 0 END) as active,\n  SUM(CASE WHEN requestStatus = 'Confirmed' THEN 1 ELSE 0 END) as confirmed,\n  SUM(CASE WHEN requestStatus = 'Completed' THEN 1 ELSE 0 END) as completed,\n  SUM(CASE WHEN requestStatus LIKE '%Lost%' THEN 1 ELSE 0 END) as lost,\n  SUM(CASE WHEN requestStatus LIKE '%Deleted%' THEN 1 ELSE 0 END) as deleted_by_client\nFROM jobs;\n\nSELECT requestStatus, COUNT(*) as count FROM jobs GROUP BY requestStatus ORDER BY count DESC;\n\nSELECT id, description, requestStatus, locationAddress, artistHourlyRate, dateType, bubbleCreatedAt \nFROM jobs \nWHERE requestStatus IN ('Active', 'Confirmed')\nLIMIT 5;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user FGYqDqdUZjFkzga.root --database AyEgFhxRkEopXHz25XyihS --execute \nSELECT \n  COUNT(*) as total,\n  SUM(CASE WHEN requestStatus = 'Active' THEN 1 ELSE 0 END) as active,\n  SUM(CASE WHEN requestStatus = 'Confirmed' THEN 1 ELSE 0 END) as confirmed,\n  SUM(CASE WHEN requestStatus = 'Completed' THEN 1 ELSE 0 END) as completed,\n  SUM(CASE WHEN requestStatus LIKE '%Lost%' THEN 1 ELSE 0 END) as lost,\n  SUM(CASE WHEN requestStatus LIKE '%Deleted%' THEN 1 ELSE 0 END) as deleted_by_client\nFROM jobs;\n\nSELECT requestStatus, COUNT(*) as count FROM jobs GROUP BY requestStatus ORDER BY count DESC;\n\nSELECT id, description, requestStatus, locationAddress, artistHourlyRate, dateType, bubbleCreatedAt \nFROM jobs \nWHERE requestStatus IN ('Active', 'Confirmed')\nLIMIT 5;\n",
+  "rows": [
+    {
+      "total": "160",
+      "active": "17",
+      "confirmed": "14",
+      "completed": "36",
+      "lost": "47",
+      "deleted_by_client": "41"
+    },
+    {
+      "total": "6-7:15pm adv beg / ages 10-15",
+      "active": "Confirmed",
+      "confirmed": "Bayside, Queens, NY, USA",
+      "completed": "NULL",
+      "lost": "NULL",
+      "deleted_by_client": "2023-05-01 16:53:53"
+    },
+    {
+      "total": "6-7:15pm preteen/teen adv beg ballet",
+      "active": "Confirmed",
+      "confirmed": "220-40 Northern Blvd, Queens, NY 11361, USA",
+      "completed": "NULL",
+      "lost": "NULL",
+      "deleted_by_client": "2023-05-01 16:54:35"
+    },
+    {
+      "total": "6-7:15pm preteen/teens (beginners)",
+      "active": "Confirmed",
+      "confirmed": "Bayside, Queens, NY, USA",
+      "completed": "NULL",
+      "lost": "NULL",
+      "deleted_by_client": "2023-05-01 16:55:24"
+    },
+    {
+      "total": "6pm: acro ages 13-15 (8 students) - inter/adv",
+      "active": "Confirmed",
+      "confirmed": "220-40 Northern Blvd, Queens, NY 11361, USA",
+      "completed": "NULL",
+      "lost": "NULL",
+      "deleted_by_client": "2023-05-01 16:55:29"
+    },
+    {
+      "total": "Thank you!",
+      "active": "Confirmed",
+      "confirmed": "Bayside, NY 11361, USA",
+      "completed": "NULL",
+      "lost": "NULL",
+      "deleted_by_client": "2023-06-10 09:21:51"
+    }
+  ],
+  "messages": [
+    "requestStatus\tcount",
+    "Lost - No Revenue\t47",
+    "Deleted by Client\t41",
+    "Completed\t36",
+    "Active\t17",
+    "Confirmed\t14",
+    "Submissions Paused\t5",
+    "id\tdescription\trequestStatus\tlocationAddress\tartistHourlyRate\tdateType\tbubbleCreatedAt",
+    "29\t4-5pm beginners / ages 5-6 yrs old",
+    "5-6pm beginners / ages 7-9 yrs old",
+    "30\t4-5pm 5-6 yrs old ballet",
+    "5-6pm 7-9 yrs old ballet",
+    "31\tLooking for a strong ballet teacher to sub while original teacher is out-of-town on Wednesdays, April 19, April 26, May 3, May 10, May 17, May 24, and May 31. Please specify your ballet training, thank you!",
+    "4-5pm 6&7 years old",
+    "5-6pm 8&9 years old ",
+    "32\t4pm: acro 6 years old (6 students)",
+    "5pm: acro ages 11-15 (8 students) - adv beginners",
+    "41\tSeeking Mondays 6:30-8:30pm tap teacher, ages 10-12 & teens+, for advanced technique and choreography to add to our stellar faculty at our gorgeous studio in the heart of Bayside, Queens! ",
+    "*Resume MUST include  (list employed studios) 3+ years teaching experience to be considered. ",
+    "*Please DO NOT apply if you can not commit to a minimum of one day a week for the upcoming season of Oct-May",
+    "*If you are prioritizing auditions, DO NOT apply. Flexible with having to take with advanced notice, but not on a regular basis.  ",
+    "*LIRR round trip reimbursement offered. Easy and quick 30 min commute from Penn."
+  ],
+  "stdout": "total\tactive\tconfirmed\tcompleted\tlost\tdeleted_by_client\n160\t17\t14\t36\t47\t41\nrequestStatus\tcount\nLost - No Revenue\t47\nDeleted by Client\t41\nCompleted\t36\nActive\t17\nConfirmed\t14\nSubmissions Paused\t5\nid\tdescription\trequestStatus\tlocationAddress\tartistHourlyRate\tdateType\tbubbleCreatedAt\n29\t4-5pm beginners / ages 5-6 yrs old\n5-6pm beginners / ages 7-9 yrs old\n6-7:15pm adv beg / ages 10-15\tConfirmed\tBayside, Queens, NY, USA\tNULL\tNULL\t2023-05-01 16:53:53\n30\t4-5pm 5-6 yrs old ballet\n5-6pm 7-9 yrs old ballet\n6-7:15pm preteen/teen adv beg ballet\tConfirmed\t220-40 Northern Blvd, Queens, NY 11361, USA\tNULL\tNULL\t2023-05-01 16:54:35\n31\tLooking for a strong ballet teacher to sub while original teacher is out-of-town on Wednesdays, April 19, April 26, May 3, May 10, May 17, May 24, and May 31. Please specify your ballet training, thank you!\n\n4-5pm 6&7 years old\n5-6pm 8&9 years old \n6-7:15pm preteen/teens (beginners)\tConfirmed\tBayside, Queens, NY, USA\tNULL\tNULL\t2023-05-01 16:55:24\n32\t4pm: acro 6 years old (6 students)\n5pm: acro ages 11-15 (8 students) - adv beginners\n6pm: acro ages 13-15 (8 students) - inter/adv\tConfirmed\t220-40 Northern Blvd, Queens, NY 11361, USA\tNULL\tNULL\t2023-05-01 16:55:29\n41\tSeeking Mondays 6:30-8:30pm tap teacher, ages 10-12 & teens+, for advanced technique and choreography to add to our stellar faculty at our gorgeous studio in the heart of Bayside, Queens! \n\n*Resume MUST include  (list employed studios) 3+ years teaching experience to be considered. \n\n*Please DO NOT apply if you can not commit to a minimum of one day a week for the upcoming season of Oct-May\n\n*If you are prioritizing auditions, DO NOT apply. Flexible with having to take with advanced notice, but not on a regular basis.  \n\n*LIRR round trip reimbursement offered. Easy and quick 30 min commute from Penn.\n\nThank you!\tConfirmed\tBayside, NY 11361, USA\tNULL\tNULL\t2023-06-10 09:21:51\n",
+  "stderr": "",
+  "execution_time_ms": 71
+}
