@@ -70,3 +70,12 @@
 - [x] Wire /jobs page to real DB data
 - [x] Add jobs tRPC router (myJobs, myStats, publicList)
 - [x] Write vitest tests for jobs logic (14 tests passing)
+
+## Interested Artists (Applicants)
+- [x] Inspect Bubble "interested artists" table structure via Data API
+- [x] Design interested_artists table schema (21 columns) and run db:push migration
+- [x] Seed all 472 interested artist records from Bubble (429 Interested, 32 Confirmed, 11 Declined)
+- [x] Add applicants tRPC router (myApplicants, myStats, byJob)
+- [x] Wire dashboard Artists page to real applicant data (filterable table with expand rows)
+- [x] Wire dashboard Overview applicant stats to real data
+- [x] Write vitest tests for interested artists logic (21 tests passing, 35 total)

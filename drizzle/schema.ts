@@ -133,3 +133,65 @@ export const jobs = mysqlTable("jobs", {
 
 export type Job = typeof jobs.$inferSelect;
 export type InsertJob = typeof jobs.$inferInsert;
+
+// ── Interested Artists (Bubble: interested artists) ───────────────────────────
+/**
+ * Applicant records — one row per artist who expressed interest in a job.
+ * Connects jobs ↔ artists (Bubble User records) ↔ clients.
+ */
+export const interestedArtists = mysqlTable("interested_artists", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Bubble internal record ID */
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+
+  // ── Relationships ──────────────────────────────────────────────────────────
+  /** FK → jobs.id (the job this application is for) */
+  jobId: int("jobId"),
+  /** Bubble request/job ID (for cross-referencing) */
+  bubbleRequestId: varchar("bubbleRequestId", { length: 64 }),
+  /** FK → users.id (the artist who applied) — null until artist is migrated */
+  artistUserId: int("artistUserId"),
+  /** Bubble artist user ID */
+  bubbleArtistId: varchar("bubbleArtistId", { length: 64 }),
+  /** FK → users.id (the client/hirer) */
+  clientUserId: int("clientUserId"),
+  /** Bubble client user ID */
+  bubbleClientId: varchar("bubbleClientId", { length: 64 }),
+  /** Bubble service ID */
+  bubbleServiceId: varchar("bubbleServiceId", { length: 64 }),
+  /** Bubble booking ID (if converted to a booking) */
+  bubbleBookingId: varchar("bubbleBookingId", { length: 64 }),
+
+  // ── Status ─────────────────────────────────────────────────────────────────
+  /** Interested | Confirmed | Declined */
+  status: varchar("status", { length: 64 }),
+  /** Whether this application was converted to a booking */
+  converted: boolean("converted").default(false),
+
+  // ── Rates ──────────────────────────────────────────────────────────────────
+  isHourlyRate: boolean("isHourlyRate").default(true),
+  artistHourlyRate: int("artistHourlyRate"),
+  clientHourlyRate: int("clientHourlyRate"),
+  artistFlatRate: int("artistFlatRate"),
+  clientFlatRate: int("clientFlatRate"),
+  totalHours: int("totalHours"),
+
+  // ── Scheduling ─────────────────────────────────────────────────────────────
+  startDate: timestamp("startDate"),
+  endDate: timestamp("endDate"),
+
+  // ── Content ────────────────────────────────────────────────────────────────
+  /** Artist's resume/portfolio link (S3 URL) */
+  resumeLink: text("resumeLink"),
+  /** Optional message from the artist */
+  message: text("message"),
+
+  // ── Timestamps ─────────────────────────────────────────────────────────────
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
+});
+
+export type InterestedArtist = typeof interestedArtists.$inferSelect;
+export type InsertInterestedArtist = typeof interestedArtists.$inferInsert;

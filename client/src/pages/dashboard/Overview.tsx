@@ -13,14 +13,22 @@ import {
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 
-const APPLICANTS = [
-  { name: "Sasha K.", times: 9, initials: "SK", color: "bg-purple-500" },
-  { name: "Marlon S.", times: 9, initials: "MS", color: "bg-blue-500" },
-  { name: "Amie B.", times: 6, initials: "AB", color: "bg-pink-500" },
-  { name: "gracen n.", times: 3, initials: "GN", color: "bg-green-500" },
-  { name: "Jesse B.", times: 3, initials: "JB", color: "bg-orange-500" },
-  { name: "Alex M.", times: 3, initials: "AM", color: "bg-teal-500" },
+const AVATAR_COLORS = [
+  "bg-purple-500", "bg-blue-500", "bg-pink-500", "bg-green-500",
+  "bg-orange-500", "bg-teal-500", "bg-indigo-500", "bg-violet-500",
 ];
+
+function getArtistInitials(bubbleId: string | null | undefined) {
+  if (!bubbleId) return "?";
+  // Use the last 2 chars of the Bubble ID as a deterministic placeholder
+  return bubbleId.slice(-2).toUpperCase();
+}
+
+function getArtistColor(bubbleId: string | null | undefined) {
+  if (!bubbleId) return AVATAR_COLORS[0];
+  const idx = bubbleId.charCodeAt(bubbleId.length - 1) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[idx];
+}
 
 function formatJobDate(dateStr: string | Date | null | undefined) {
   if (!dateStr) return "Flexible";
@@ -58,6 +66,10 @@ export default function Overview() {
     status: jobFilter === "active" ? ["Active", "Confirmed"] : undefined,
   });
 
+  // Real applicant data
+  const { data: applicantStats } = trpc.applicants.myStats.useQuery();
+  const { data: recentApplicants, isLoading: applicantsLoading } = trpc.applicants.myApplicants.useQuery({ limit: 6 });
+
   const stats = [
     {
       label: "Active Jobs",
@@ -85,8 +97,8 @@ export default function Overview() {
     },
     {
       label: "Applicants",
-      value: "—",
-      change: "Coming soon",
+      value: statsLoading ? "—" : String(applicantStats?.total ?? 0),
+      change: statsLoading ? "" : `${applicantStats?.confirmed ?? 0} confirmed`,
       icon: <Users size={18} />,
       color: "text-purple-500",
       bg: "bg-purple-50",
@@ -296,21 +308,40 @@ export default function Overview() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
               <h2 className="text-sm font-bold text-[#111]">My Applicants</h2>
-              <span className="text-xs text-gray-400">{APPLICANTS.length} artists</span>
+              <span className="text-xs text-gray-400">{applicantStats?.total ?? "—"} total</span>
             </div>
             <div className="divide-y divide-gray-100">
-              {APPLICANTS.map((a) => (
-                <div key={a.name} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer group">
-                  <div className={`w-8 h-8 rounded-full ${a.color} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
-                    {a.initials}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#111] truncate">{a.name}</p>
-                    <p className="text-xs text-gray-400">Applied to you {a.times} {a.times === 1 ? "time" : "times"}</p>
-                  </div>
-                  <ChevronRight size={14} className="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+              {applicantsLoading ? (
+                <div className="flex items-center justify-center py-8 text-gray-400">
+                  <Loader2 size={16} className="animate-spin mr-2" />
+                  <span className="text-xs">Loading...</span>
                 </div>
-              ))}
+              ) : !recentApplicants || recentApplicants.length === 0 ? (
+                <div className="p-6 text-center text-gray-400 text-xs">
+                  <Users size={24} className="mx-auto mb-2 opacity-30" />
+                  <p>No applicants yet</p>
+                </div>
+              ) : (
+                recentApplicants.map((a) => (
+                  <div key={a.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer group">
+                    <div className={`w-8 h-8 rounded-full ${getArtistColor(a.bubbleArtistId)} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+                      {getArtistInitials(a.bubbleArtistId)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#111] truncate">Artist #{a.bubbleArtistId?.slice(-6)}</p>
+                      <p className="text-xs text-gray-400">
+                        <span className={`inline-block px-1.5 py-0.5 rounded-full text-xs font-medium mr-1 ${
+                          a.status === 'Confirmed' ? 'bg-blue-100 text-blue-700' :
+                          a.status === 'Declined' ? 'bg-red-100 text-red-600' :
+                          'bg-orange-50 text-[#F25722]'
+                        }`}>{a.status}</span>
+                        {a.artistHourlyRate ? `$${a.artistHourlyRate}/hr` : a.artistFlatRate ? `$${a.artistFlatRate} flat` : "Open rate"}
+                      </p>
+                    </div>
+                    <ChevronRight size={14} className="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                ))
+              )}
             </div>
             <div className="p-4 border-t border-gray-100">
               <Link href="/dashboard/artists">

@@ -1,6 +1,6 @@
 import { and, desc, eq, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, jobs, users } from "../drizzle/schema";
+import { InsertUser, interestedArtists, jobs, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -205,4 +205,80 @@ export async function setUserPassword(
     .update(users)
     .set({ passwordHash, passwordIsTemporary: isTemporary, updatedAt: new Date() })
     .where(eq(users.id, userId));
+}
+
+// ── Interested Artists queries ────────────────────────────────────────────────
+
+/**
+ * Get all interested artist records for a client, optionally filtered by job.
+ */
+export async function getInterestedArtistsByClientId(
+  clientUserId: number,
+  limit = 100,
+  offset = 0,
+  statusFilter?: string[],
+  jobId?: number
+) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [eq(interestedArtists.clientUserId, clientUserId)];
+  if (statusFilter && statusFilter.length > 0) {
+    const statusConds = statusFilter.map(s => eq(interestedArtists.status, s));
+    conditions.push(or(...statusConds)!);
+  }
+  if (jobId !== undefined) {
+    conditions.push(eq(interestedArtists.jobId, jobId));
+  }
+
+  return db
+    .select()
+    .from(interestedArtists)
+    .where(and(...conditions))
+    .orderBy(desc(interestedArtists.bubbleCreatedAt))
+    .limit(limit)
+    .offset(offset);
+}
+
+/**
+ * Get applicant stats for a client (counts by status).
+ */
+export async function getApplicantStatsByClientId(clientUserId: number) {
+  const db = await getDb();
+  if (!db) return { total: 0, interested: 0, confirmed: 0, declined: 0 };
+
+  const result = await db
+    .select({
+      status: interestedArtists.status,
+      count: sql<number>`COUNT(*)`
+    })
+    .from(interestedArtists)
+    .where(eq(interestedArtists.clientUserId, clientUserId))
+    .groupBy(interestedArtists.status);
+
+  const stats = { total: 0, interested: 0, confirmed: 0, declined: 0 };
+  for (const row of result) {
+    const count = Number(row.count);
+    stats.total += count;
+    if (row.status === 'Interested') stats.interested += count;
+    if (row.status === 'Confirmed') stats.confirmed += count;
+    if (row.status === 'Declined') stats.declined += count;
+  }
+  return stats;
+}
+
+/**
+ * Get applicants for a specific job.
+ */
+export async function getApplicantsByJobId(jobId: number, limit = 50, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db
+    .select()
+    .from(interestedArtists)
+    .where(eq(interestedArtists.jobId, jobId))
+    .orderBy(desc(interestedArtists.bubbleCreatedAt))
+    .limit(limit)
+    .offset(offset);
 }

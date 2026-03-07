@@ -3,7 +3,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId } from "./db";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import { z } from "zod";
@@ -169,6 +169,54 @@ export const appRouter = router({
       }))
       .query(async ({ input }) => {
         return getPublicJobs(input.limit, input.offset);
+      }),
+  }),
+
+  // ── Applicants (Interested Artists) ────────────────────────────────────────
+  applicants: router({
+    /**
+     * Get all applicants for the currently logged-in client.
+     */
+    myApplicants: protectedProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(200).default(100),
+        offset: z.number().min(0).default(0),
+        status: z.array(z.string()).optional(),
+        jobId: z.number().optional(),
+      }))
+      .query(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        return getInterestedArtistsByClientId(
+          user.id,
+          input.limit,
+          input.offset,
+          input.status,
+          input.jobId
+        );
+      }),
+
+    /**
+     * Get applicant stats for the currently logged-in client.
+     */
+    myStats: protectedProcedure
+      .query(async ({ ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) return { total: 0, interested: 0, confirmed: 0, declined: 0 };
+        return getApplicantStatsByClientId(user.id);
+      }),
+
+    /**
+     * Get applicants for a specific job (by local job ID).
+     */
+    byJob: protectedProcedure
+      .input(z.object({
+        jobId: z.number(),
+        limit: z.number().min(1).max(100).default(50),
+        offset: z.number().min(0).default(0),
+      }))
+      .query(async ({ input }) => {
+        return getApplicantsByJobId(input.jobId, input.limit, input.offset);
       }),
   }),
 
