@@ -1,11 +1,21 @@
 /*
- * ARTSWRK DASHBOARD — ARTISTS (Applicants)
- * Real data from the interested_artists table, sourced from Bubble.
+ * ARTSWRK DASHBOARD — ARTISTS
+ * Three tabs: Discover (default) | Browse Artists | My Artists
+ * Discover matches the original Artswrk Bubble app layout:
+ *   - Spotlight cards with color overlays
+ *   - Search bar
+ *   - Roles filter pills
+ *   - Artist grid
  */
 
-import { useState } from "react";
-import { Search, Users, Filter, ChevronRight, Loader2, AlertCircle, ExternalLink, Clock, DollarSign, CheckCircle2, XCircle, FileText } from "lucide-react";
+import { useState, useMemo } from "react";
+import {
+  Search, Users, ChevronRight, Loader2, AlertCircle,
+  CheckCircle2, XCircle, DollarSign, Clock, FileText, ExternalLink,
+} from "lucide-react";
 import { trpc } from "@/lib/trpc";
+
+// ─── Shared helpers ───────────────────────────────────────────────────────────
 
 const AVATAR_COLORS = [
   "bg-purple-500", "bg-blue-500", "bg-pink-500", "bg-green-500",
@@ -13,20 +23,45 @@ const AVATAR_COLORS = [
   "bg-rose-500", "bg-cyan-500", "bg-amber-500", "bg-lime-500",
 ];
 
-function getArtistColor(bubbleId: string | null | undefined) {
-  if (!bubbleId) return AVATAR_COLORS[0];
+function getArtistColor(seed: string | null | undefined) {
+  if (!seed) return AVATAR_COLORS[0];
   let hash = 0;
-  for (let i = 0; i < bubbleId.length; i++) {
-    hash = (hash * 31 + bubbleId.charCodeAt(i)) & 0xffffffff;
-  }
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) & 0xffffffff;
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-function getArtistInitials(firstName: string | null | undefined, lastName: string | null | undefined, bubbleId: string | null | undefined) {
+function getInitials(firstName?: string | null, lastName?: string | null, name?: string | null) {
   if (firstName && lastName) return `${firstName[0]}${lastName[0]}`.toUpperCase();
   if (firstName) return firstName.slice(0, 2).toUpperCase();
-  if (bubbleId) return bubbleId.slice(-2).toUpperCase();
+  if (name) return name[0].toUpperCase();
   return "?";
+}
+
+function ArtistAvatar({ firstName, lastName, name, profilePicture, seed, size = "md" }: {
+  firstName?: string | null; lastName?: string | null; name?: string | null;
+  profilePicture?: string | null; seed?: string | null; size?: "sm" | "md" | "lg";
+}) {
+  const sz = size === "sm" ? "w-8 h-8 text-xs" : size === "lg" ? "w-14 h-14 text-base" : "w-10 h-10 text-sm";
+  const initials = getInitials(firstName, lastName, name);
+  const color = getArtistColor(seed ?? firstName);
+  if (profilePicture) {
+    return (
+      <img src={profilePicture} alt={firstName ?? name ?? "Artist"}
+        className={`${sz} rounded-full object-cover flex-shrink-0`}
+        onError={(e) => {
+          const el = e.currentTarget;
+          el.style.display = "none";
+          const fb = el.nextElementSibling as HTMLElement;
+          if (fb) fb.style.display = "flex";
+        }}
+      />
+    );
+  }
+  return (
+    <div className={`${sz} rounded-full ${color} flex items-center justify-center text-white font-bold flex-shrink-0`}>
+      {initials}
+    </div>
+  );
 }
 
 function formatDate(d: Date | string | null | undefined) {
@@ -42,18 +77,363 @@ function StatusBadge({ status }: { status: string | null | undefined }) {
     Declined: { cls: "bg-red-100 text-red-600", icon: <XCircle size={11} /> },
     Interested: { cls: "bg-orange-50 text-[#F25722]", icon: null },
   }[status ?? ""] ?? { cls: "bg-gray-100 text-gray-500", icon: null };
-
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${cfg.cls}`}>
-      {cfg.icon}
-      {status ?? "Unknown"}
+      {cfg.icon}{status ?? "Unknown"}
     </span>
   );
 }
 
+// ─── Spotlight data ───────────────────────────────────────────────────────────
+
+const SPOTLIGHT_GROUPS = [
+  {
+    title: "Broadway Dance Center Faculty",
+    count: 24,
+    color: "from-purple-600/80 to-purple-900/80",
+    bg: "bg-purple-700",
+    image: "https://images.unsplash.com/photo-1547153760-18fc86324498?w=600&q=80",
+  },
+  {
+    title: "Acrobatic Arts Certified Teachers",
+    count: 18,
+    color: "from-green-500/80 to-teal-700/80",
+    bg: "bg-green-600",
+    image: "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=600&q=80",
+  },
+  {
+    title: "Alvin Ailey Certified",
+    count: 31,
+    color: "from-orange-500/80 to-orange-700/80",
+    bg: "bg-orange-500",
+    image: "https://images.unsplash.com/photo-1508700929628-666bc8bd84ea?w=600&q=80",
+  },
+  {
+    title: "Broadway Performers",
+    count: 42,
+    color: "from-pink-600/80 to-rose-800/80",
+    bg: "bg-pink-600",
+    image: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=600&q=80",
+  },
+];
+
+const ROLES = [
+  "Dance Educator", "Choreographer", "Dancer", "Movement Director",
+  "Photographer", "Dance Adjudicator", "Videographer", "Acting Coach",
+  "Vocal Coach", "Music Teacher", "Yoga Instructor", "Pilates Instructor",
+];
+
+// ─── Discover Tab ─────────────────────────────────────────────────────────────
+
+function DiscoverTab({ onBrowse }: { onBrowse: (role?: string) => void }) {
+  const [search, setSearch] = useState("");
+
+  // Use the artists already in our DB (from interested_artists + bookings)
+  const { data: allApplicants } = trpc.applicants.myApplicants.useQuery({ limit: 500 });
+
+  // Derive unique artists from applicants for the "featured" grid
+  const uniqueArtists = useMemo(() => {
+    if (!allApplicants) return [];
+    const seen = new Set<string>();
+    return allApplicants.filter((a) => {
+      const key = (a as any).bubbleArtistId ?? String(a.id);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [allApplicants]);
+
+  const filteredArtists = useMemo(() => {
+    if (!search) return uniqueArtists.slice(0, 12);
+    const q = search.toLowerCase();
+    return uniqueArtists.filter((a) => {
+      const name = [(a as any).artistFirstName, (a as any).artistLastName, (a as any).artistName]
+        .filter(Boolean).join(" ").toLowerCase();
+      return name.includes(q);
+    }).slice(0, 24);
+  }, [uniqueArtists, search]);
+
+  return (
+    <div className="space-y-8">
+      {/* Discover header */}
+      <div>
+        <h2 className="text-2xl font-black text-[#111] mb-6">Discover</h2>
+
+        {/* Spotlight */}
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-base font-bold text-[#111]">Spotlight</h3>
+          <button className="text-sm text-gray-400 hover:text-gray-600 transition-colors">View all</button>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+          {SPOTLIGHT_GROUPS.map((group) => (
+            <button
+              key={group.title}
+              onClick={() => onBrowse()}
+              className="relative rounded-2xl overflow-hidden aspect-[3/4] group cursor-pointer text-left"
+            >
+              {/* Background image */}
+              <img
+                src={group.image}
+                alt={group.title}
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              />
+              {/* Color overlay */}
+              <div className={`absolute inset-0 bg-gradient-to-b ${group.color}`} />
+              {/* Content */}
+              <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+                <p className="text-xs font-bold tracking-widest uppercase text-white/70 mb-1">Spotlight</p>
+                <p className="text-base font-black leading-snug mb-2">{group.title}</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-white/80">{group.count} Artists</span>
+                  <ChevronRight size={16} className="text-white/60 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div className="relative mb-8">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search artists by name or keyword..."
+            className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-gray-200 text-sm text-[#111] placeholder-gray-400 focus:outline-none focus:border-[#FFBC5D] transition-all bg-white shadow-sm"
+          />
+        </div>
+
+        {/* Roles */}
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-base font-bold text-[#111]">Roles</h3>
+          <button className="text-sm text-gray-400 hover:text-gray-600 transition-colors">View all</button>
+        </div>
+        <div className="flex flex-wrap gap-2 mb-8">
+          {ROLES.map((role) => (
+            <button
+              key={role}
+              onClick={() => onBrowse(role)}
+              className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-[#111] bg-white hover:border-[#F25722] hover:text-[#F25722] transition-all"
+            >
+              {role}
+            </button>
+          ))}
+        </div>
+
+        {/* Artists from your network */}
+        {uniqueArtists.length > 0 && (
+          <>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-bold text-[#111]">
+                {search ? "Search Results" : "Artists You've Worked With"}
+              </h3>
+              {!search && (
+                <button onClick={() => onBrowse()} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+                  View all
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {filteredArtists.map((a) => {
+                const firstName = (a as any).artistFirstName as string | null;
+                const lastName = (a as any).artistLastName as string | null;
+                const name = (a as any).artistName as string | null;
+                const photo = (a as any).artistProfilePicture as string | null;
+                const slug = (a as any).artistSlug as string | null;
+                const displayName = firstName && lastName ? `${firstName} ${lastName}` : name ?? "Artist";
+                const role = (a as any).artistType ?? "Artist";
+
+                return (
+                  <div key={a.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow group cursor-pointer">
+                    {/* Photo */}
+                    <div className="aspect-[4/5] relative overflow-hidden bg-gray-100">
+                      {photo ? (
+                        <img src={photo} alt={displayName}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          onError={(e) => {
+                            const el = e.currentTarget;
+                            el.style.display = "none";
+                            const fb = el.nextElementSibling as HTMLElement;
+                            if (fb) fb.style.display = "flex";
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className={`w-full h-full ${getArtistColor(firstName)} flex items-center justify-center text-white text-3xl font-black`}
+                        style={{ display: photo ? "none" : "flex" }}
+                      >
+                        {getInitials(firstName, lastName, name)}
+                      </div>
+                    </div>
+                    {/* Info */}
+                    <div className="p-3">
+                      <p className="text-sm font-bold text-[#111] truncate">{displayName}</p>
+                      {slug && <p className="text-xs text-gray-400 truncate">@{slug}</p>}
+                      {role && role !== "Artist" && (
+                        <span className="mt-1.5 inline-block px-2 py-0.5 rounded-full text-xs font-semibold artist-grad-bg text-white">
+                          {role}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Browse Artists Tab ───────────────────────────────────────────────────────
+
+function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>(initialRole ?? "");
+
+  const { data: allApplicants, isLoading } = trpc.applicants.myApplicants.useQuery({ limit: 500 });
+
+  const uniqueArtists = useMemo(() => {
+    if (!allApplicants) return [];
+    const seen = new Set<string>();
+    return allApplicants.filter((a) => {
+      const key = (a as any).bubbleArtistId ?? String(a.id);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [allApplicants]);
+
+  const filtered = useMemo(() => {
+    return uniqueArtists.filter((a) => {
+      const firstName = (a as any).artistFirstName as string | null;
+      const lastName = (a as any).artistLastName as string | null;
+      const name = (a as any).artistName as string | null;
+      const fullName = [firstName, lastName, name].filter(Boolean).join(" ").toLowerCase();
+      const matchesSearch = !search || fullName.includes(search.toLowerCase());
+      const artistType = ((a as any).artistType ?? "").toLowerCase();
+      const matchesRole = !roleFilter || artistType.includes(roleFilter.toLowerCase());
+      return matchesSearch && matchesRole;
+    });
+  }, [uniqueArtists, search, roleFilter]);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-gray-500">{filtered.length} artists available</p>
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-4">
+        <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search artists by name or keyword..."
+          className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 text-sm text-[#111] placeholder-gray-400 focus:outline-none focus:border-[#FFBC5D] transition-all bg-white shadow-sm"
+        />
+      </div>
+
+      {/* Role pills */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        <button
+          onClick={() => setRoleFilter("")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
+            !roleFilter ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+          }`}
+        >
+          All
+        </button>
+        {ROLES.map((role) => (
+          <button
+            key={role}
+            onClick={() => setRoleFilter(roleFilter === role ? "" : role)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
+              roleFilter === role
+                ? "bg-[#F25722] text-white border-[#F25722]"
+                : "bg-white text-gray-600 border-gray-200 hover:border-[#F25722] hover:text-[#F25722]"
+            }`}
+          >
+            {role}
+          </button>
+        ))}
+      </div>
+
+      {/* Artist grid */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20 text-gray-400">
+          <Loader2 size={24} className="animate-spin mr-3" />
+          <span className="text-sm">Loading artists...</span>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+          <Users size={40} className="mb-3 opacity-30" />
+          <p className="text-sm font-medium">No artists found</p>
+          <button onClick={() => { setSearch(""); setRoleFilter(""); }} className="mt-2 text-xs text-[#F25722] font-semibold hover:opacity-70">
+            Clear filters
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {filtered.map((a) => {
+            const firstName = (a as any).artistFirstName as string | null;
+            const lastName = (a as any).artistLastName as string | null;
+            const name = (a as any).artistName as string | null;
+            const photo = (a as any).artistProfilePicture as string | null;
+            const slug = (a as any).artistSlug as string | null;
+            const displayName = firstName && lastName ? `${firstName} ${lastName}` : name ?? "Artist";
+            const role = (a as any).artistType ?? "";
+            const location = (a as any).artistLocation ?? "";
+
+            return (
+              <div key={a.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow group cursor-pointer">
+                <div className="aspect-[4/5] relative overflow-hidden bg-gray-100">
+                  {photo ? (
+                    <img src={photo} alt={displayName}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={(e) => {
+                        const el = e.currentTarget;
+                        el.style.display = "none";
+                        const fb = el.nextElementSibling as HTMLElement;
+                        if (fb) fb.style.display = "flex";
+                      }}
+                    />
+                  ) : null}
+                  <div
+                    className={`w-full h-full ${getArtistColor(firstName)} flex items-center justify-center text-white text-3xl font-black`}
+                    style={{ display: photo ? "none" : "flex" }}
+                  >
+                    {getInitials(firstName, lastName, name)}
+                  </div>
+                  {/* PRO badge */}
+                  <div className="absolute top-2 right-2">
+                    <span className="bg-black/70 text-white text-xs font-bold px-2 py-0.5 rounded-full">PRO</span>
+                  </div>
+                </div>
+                <div className="p-3">
+                  <p className="text-sm font-bold text-[#111] truncate">{displayName}</p>
+                  {location && <p className="text-xs text-gray-400 truncate">{location}</p>}
+                  {role && (
+                    <span className="mt-1.5 inline-block px-2 py-0.5 rounded-full text-xs font-semibold artist-grad-bg text-white">
+                      {role}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── My Artists Tab ───────────────────────────────────────────────────────────
+
 type StatusFilter = "all" | "Interested" | "Confirmed" | "Declined";
 
-export default function Artists() {
+function MyArtistsTab() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -64,18 +444,11 @@ export default function Artists() {
     status: statusFilter === "all" ? undefined : [statusFilter],
   });
 
-  // Client-side search filter on artist name, status, or job ID
   const filtered = (applicants ?? []).filter((a) => {
     if (!search) return true;
     const q = search.toLowerCase();
-    const fullName = [a.artistFirstName, a.artistLastName].filter(Boolean).join(" ").toLowerCase();
-    return (
-      fullName.includes(q) ||
-      (a.artistName ?? "").toLowerCase().includes(q) ||
-      (a.bubbleArtistId ?? "").toLowerCase().includes(q) ||
-      (a.status ?? "").toLowerCase().includes(q) ||
-      (a.bubbleRequestId ?? "").toLowerCase().includes(q)
-    );
+    const fullName = [(a as any).artistFirstName, (a as any).artistLastName].filter(Boolean).join(" ").toLowerCase();
+    return fullName.includes(q) || ((a as any).artistName ?? "").toLowerCase().includes(q) || (a.status ?? "").toLowerCase().includes(q);
   });
 
   const filterTabs: { key: StatusFilter; label: string; count: number }[] = [
@@ -86,16 +459,8 @@ export default function Artists() {
   ];
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-7">
-        <h1 className="text-2xl font-black text-[#111]">Artists</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Artists who have applied to your jobs — {stats?.total ?? "…"} total applicants
-        </p>
-      </div>
-
-      {/* Stats row */}
+    <div>
+      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
           { label: "Total", value: stats?.total ?? 0, color: "text-gray-700", bg: "bg-gray-50" },
@@ -112,41 +477,32 @@ export default function Artists() {
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-5">
-        {/* Status tabs */}
         <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
           {filterTabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setStatusFilter(tab.key)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                statusFilter === tab.key
-                  ? "bg-white text-[#111] shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
+                statusFilter === tab.key ? "bg-white text-[#111] shadow-sm" : "text-gray-500 hover:text-gray-700"
               }`}
             >
               {tab.label}
-              {tab.count > 0 && (
-                <span className={`ml-1.5 text-xs ${statusFilter === tab.key ? "text-gray-400" : "text-gray-400"}`}>
-                  {tab.count}
-                </span>
-              )}
+              {tab.count > 0 && <span className="ml-1.5 text-xs text-gray-400">{tab.count}</span>}
             </button>
           ))}
         </div>
-
-        {/* Search */}
         <div className="flex-1 relative max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by artist name or status..."
+            placeholder="Search by artist name..."
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-300 focus:outline-none focus:border-[#FFBC5D] transition-all bg-white"
           />
         </div>
       </div>
 
-      {/* Content */}
+      {/* Table */}
       {isLoading ? (
         <div className="flex items-center justify-center py-20 text-gray-400">
           <Loader2 size={24} className="animate-spin mr-3" />
@@ -155,21 +511,16 @@ export default function Artists() {
       ) : error ? (
         <div className="flex items-center justify-center py-20 text-red-400 gap-2">
           <AlertCircle size={20} />
-          <span className="text-sm">Failed to load applicants. Please try again.</span>
+          <span className="text-sm">Failed to load applicants.</span>
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400">
           <Users size={40} className="mb-3 opacity-30" />
           <p className="text-sm font-medium">No applicants found</p>
-          {search && (
-            <button onClick={() => setSearch("")} className="mt-2 text-xs text-[#F25722] font-semibold hover:opacity-70">
-              Clear search
-            </button>
-          )}
+          {search && <button onClick={() => setSearch("")} className="mt-2 text-xs text-[#F25722] font-semibold hover:opacity-70">Clear search</button>}
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          {/* Table header */}
           <div className="hidden sm:grid grid-cols-12 gap-3 px-5 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider">
             <div className="col-span-3">Artist</div>
             <div className="col-span-2">Status</div>
@@ -177,201 +528,130 @@ export default function Artists() {
             <div className="col-span-2">Rate</div>
             <div className="col-span-2">Date</div>
           </div>
-
-          {/* Rows */}
           <div className="divide-y divide-gray-100">
-            {filtered.map((a) => (
-              <div key={a.id}>
-                <div
-                  className="grid grid-cols-12 gap-3 px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer group items-center"
-                  onClick={() => setExpanded(expanded === a.id ? null : a.id)}
-                >
-                  {/* Artist avatar + name */}
-                  <div className="col-span-3 flex items-center gap-3">
-                    {(a as any).artistProfilePicture ? (
-                      <img
-                        src={(a as any).artistProfilePicture}
-                        alt={(a as any).artistName ?? "Artist"}
-                        className="w-9 h-9 rounded-full object-cover flex-shrink-0 border border-gray-100"
-                        onError={(e) => {
-                          const el = e.currentTarget;
-                          el.style.display = "none";
-                          const fallback = el.nextElementSibling as HTMLElement;
-                          if (fallback) fallback.style.display = "flex";
-                        }}
-                      />
-                    ) : null}
-                    <div
-                      className={`w-9 h-9 rounded-full ${getArtistColor(a.bubbleArtistId)} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}
-                      style={{ display: (a as any).artistProfilePicture ? "none" : "flex" }}
-                    >
-                      {getArtistInitials((a as any).artistFirstName, (a as any).artistLastName, a.bubbleArtistId)}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[#111] truncate">
-                        {(a as any).artistFirstName && (a as any).artistLastName
-                          ? `${(a as any).artistFirstName} ${(a as any).artistLastName}`
-                          : (a as any).artistName ?? `Artist #${a.bubbleArtistId?.slice(-6) ?? "—"}`}
-                      </p>
-                      {(a as any).artistSlug && (
-                        <p className="text-xs text-gray-400 truncate hidden sm:block">
-                          @{(a as any).artistSlug}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+            {filtered.map((a) => {
+              const firstName = (a as any).artistFirstName as string | null;
+              const lastName = (a as any).artistLastName as string | null;
+              const name = (a as any).artistName as string | null;
+              const photo = (a as any).artistProfilePicture as string | null;
+              const slug = (a as any).artistSlug as string | null;
+              const displayName = firstName && lastName ? `${firstName} ${lastName}` : name ?? `Artist #${a.bubbleArtistId?.slice(-6) ?? "—"}`;
+              const isExpanded = expanded === a.id;
 
-                  {/* Status */}
-                  <div className="col-span-2">
-                    <StatusBadge status={a.status} />
-                    {a.converted && (
-                      <span className="block mt-1 text-xs text-green-600 font-medium">Converted</span>
-                    )}
-                  </div>
-
-                  {/* Job link */}
-                  <div className="col-span-3">
-                    {a.jobId ? (
-                      <p className="text-xs text-gray-500 truncate">
-                        Job #{a.jobId}
-                        {a.bubbleRequestId && (
-                          <span className="text-gray-300 ml-1">({a.bubbleRequestId.slice(-6)})</span>
-                        )}
-                      </p>
-                    ) : (
-                      <span className="text-xs text-gray-300">—</span>
-                    )}
-                  </div>
-
-                  {/* Rate */}
-                  <div className="col-span-2">
-                    {a.isHourlyRate ? (
-                      <div>
-                        {a.artistHourlyRate && (
-                          <p className="text-xs font-semibold text-green-600">${a.artistHourlyRate}/hr</p>
-                        )}
-                        {a.clientHourlyRate && a.clientHourlyRate !== a.artistHourlyRate && (
-                          <p className="text-xs text-gray-400">Client: ${a.clientHourlyRate}/hr</p>
-                        )}
+              return (
+                <div key={a.id}>
+                  <div
+                    className="grid grid-cols-12 gap-3 px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer items-center"
+                    onClick={() => setExpanded(isExpanded ? null : a.id)}
+                  >
+                    <div className="col-span-3 flex items-center gap-3">
+                      <ArtistAvatar firstName={firstName} lastName={lastName} name={name} profilePicture={photo} seed={a.bubbleArtistId} size="md" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[#111] truncate">{displayName}</p>
+                        {slug && <p className="text-xs text-gray-400 truncate hidden sm:block">@{slug}</p>}
                       </div>
-                    ) : (
-                      <div>
-                        {a.artistFlatRate && (
-                          <p className="text-xs font-semibold text-green-600">${a.artistFlatRate} flat</p>
-                        )}
-                      </div>
-                    )}
-                    {!a.artistHourlyRate && !a.artistFlatRate && (
-                      <span className="text-xs text-gray-300">Open rate</span>
-                    )}
+                    </div>
+                    <div className="col-span-2"><StatusBadge status={a.status} /></div>
+                    <div className="col-span-3">
+                      {a.jobId ? (
+                        <p className="text-xs text-gray-500 truncate">Job #{a.jobId}</p>
+                      ) : <span className="text-xs text-gray-300">—</span>}
+                    </div>
+                    <div className="col-span-2">
+                      {a.isHourlyRate && a.artistHourlyRate ? (
+                        <p className="text-xs font-semibold text-green-600">${a.artistHourlyRate}/hr</p>
+                      ) : a.artistFlatRate ? (
+                        <p className="text-xs font-semibold text-green-600">${a.artistFlatRate} flat</p>
+                      ) : <span className="text-xs text-gray-300">—</span>}
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-xs text-gray-500">{formatDate(a.createdAt) ?? "—"}</p>
+                    </div>
                   </div>
 
-                  {/* Date */}
-                  <div className="col-span-2 flex items-center justify-between">
-                    <p className="text-xs text-gray-400">
-                      {formatDate(a.bubbleCreatedAt) ?? "—"}
-                    </p>
-                    <ChevronRight
-                      size={14}
-                      className={`text-gray-300 transition-transform ${expanded === a.id ? "rotate-90" : ""}`}
-                    />
-                  </div>
-                </div>
-
-                {/* Expanded detail row */}
-                {expanded === a.id && (
-                  <div className="px-5 pb-5 pt-2 bg-gray-50 border-t border-gray-100">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-                      {/* Scheduling */}
-                      {(a.startDate || a.endDate) && (
-                        <div className="flex items-start gap-2">
-                          <Clock size={13} className="text-gray-400 mt-0.5 flex-shrink-0" />
-                          <div>
-                            <p className="font-semibold text-gray-600 mb-0.5">Schedule</p>
-                            {a.startDate && <p className="text-gray-500">Start: {formatDate(a.startDate)}</p>}
-                            {a.endDate && <p className="text-gray-500">End: {formatDate(a.endDate)}</p>}
-                            {a.totalHours && <p className="text-gray-500">{a.totalHours} hours total</p>}
-                          </div>
+                  {isExpanded && (
+                    <div className="bg-gray-50 border-t border-gray-100 px-5 py-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                      {(a as any).scheduleText && (
+                        <div>
+                          <p className="text-gray-400 font-semibold mb-0.5 flex items-center gap-1"><Clock size={10} /> Schedule</p>
+                          <p className="text-[#111]">{(a as any).scheduleText}</p>
                         </div>
                       )}
-
-                      {/* Booking */}
-                      {a.bubbleBookingId && (
-                        <div className="flex items-start gap-2">
-                          <CheckCircle2 size={13} className="text-blue-500 mt-0.5 flex-shrink-0" />
-                          <div>
-                            <p className="font-semibold text-gray-600 mb-0.5">Booking</p>
-                            <p className="text-gray-500 font-mono">{a.bubbleBookingId.slice(-12)}</p>
-                          </div>
+                      {(a as any).bookingId && (
+                        <div>
+                          <p className="text-gray-400 font-semibold mb-0.5">Booking ID</p>
+                          <p className="text-[#111] font-mono">{(a as any).bookingId}</p>
                         </div>
                       )}
-
-                      {/* Resume */}
-                      {a.resumeLink && (
-                        <div className="flex items-start gap-2">
-                          <FileText size={13} className="text-gray-400 mt-0.5 flex-shrink-0" />
-                          <div>
-                            <p className="font-semibold text-gray-600 mb-0.5">Resume / Portfolio</p>
-                            <a
-                              href={a.resumeLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[#F25722] hover:opacity-70 transition-opacity flex items-center gap-1"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              View file <ExternalLink size={11} />
-                            </a>
-                          </div>
+                      {(a as any).resumeUrl && (
+                        <div>
+                          <p className="text-gray-400 font-semibold mb-0.5 flex items-center gap-1"><FileText size={10} /> Resume</p>
+                          <a href={(a as any).resumeUrl} target="_blank" rel="noopener noreferrer"
+                            className="text-[#F25722] font-semibold flex items-center gap-1 hover:opacity-70">
+                            <ExternalLink size={10} /> View
+                          </a>
                         </div>
                       )}
-
-                      {/* Message */}
                       {a.message && (
-                        <div className="sm:col-span-3 flex items-start gap-2">
-                          <div className="w-4 flex-shrink-0" />
-                          <div>
-                            <p className="font-semibold text-gray-600 mb-0.5">Message</p>
-                            <p className="text-gray-500 leading-relaxed">{a.message}</p>
-                          </div>
+                        <div className="col-span-2">
+                          <p className="text-gray-400 font-semibold mb-0.5">Message</p>
+                          <p className="text-[#111] italic">"{a.message}"</p>
                         </div>
                       )}
-
-                      {/* Availability */}
-                      {(a as any).artistAvailability && (
-                        <div className="flex items-start gap-2">
-                          <div className="w-4 flex-shrink-0" />
-                          <div>
-                            <p className="font-semibold text-gray-600 mb-0.5">Availability</p>
-                            <p className="text-gray-500">{(a as any).artistAvailability}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Bubble IDs for reference */}
-                      <div className="sm:col-span-3 pt-2 border-t border-gray-200 text-gray-300 font-mono text-xs">
-                        <span className="mr-4">Artist: {a.bubbleArtistId}</span>
-                        <span>Record: {a.bubbleId}</span>
-                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Footer */}
-          <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
-            <p className="text-xs text-gray-400">
-              Showing {filtered.length} of {applicants?.length ?? 0} applicants
-            </p>
-            {search && (
-              <button onClick={() => setSearch("")} className="text-xs text-[#F25722] font-semibold hover:opacity-70">
-                Clear filter
-              </button>
-            )}
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Main Artists Page ────────────────────────────────────────────────────────
+
+type Tab = "discover" | "browse" | "my";
+
+export default function Artists() {
+  const [activeTab, setActiveTab] = useState<Tab>("discover");
+  const [browseRole, setBrowseRole] = useState<string | undefined>(undefined);
+
+  function handleBrowse(role?: string) {
+    setBrowseRole(role);
+    setActiveTab("browse");
+  }
+
+  const tabs: { key: Tab; label: string }[] = [
+    { key: "discover", label: "Discover" },
+    { key: "browse", label: "Browse Artists" },
+    { key: "my", label: "My Artists" },
+  ];
+
+  return (
+    <div className="p-6 max-w-6xl mx-auto">
+      {/* Tab bar */}
+      <div className="flex items-center gap-0 border-b border-gray-200 mb-7">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-5 py-3 text-sm font-semibold transition-all border-b-2 -mb-px ${
+              activeTab === tab.key
+                ? "border-[#111] text-[#111]"
+                : "border-transparent text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      {activeTab === "discover" && <DiscoverTab onBrowse={handleBrowse} />}
+      {activeTab === "browse" && <BrowseArtistsTab initialRole={browseRole} />}
+      {activeTab === "my" && <MyArtistsTab />}
     </div>
   );
 }
