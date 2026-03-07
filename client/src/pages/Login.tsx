@@ -1,6 +1,6 @@
 /*
  * ARTSWRK LOGIN PAGE
- * Design: Clean, minimal — matches brand identity
+ * Uses tRPC auth.demoLogin mutation → creates real JWT session cookie
  * Font: Poppins
  * Hirer gradient: #FFBC5D → #F25722
  */
@@ -8,19 +8,26 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { Eye, EyeOff, Sparkles, ArrowRight } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { trpc } from "@/lib/trpc";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
   const [, navigate] = useLocation();
 
+  const demoLogin = trpc.auth.demoLogin.useMutation({
+    onSuccess: () => {
+      navigate("/dashboard");
+    },
+    onError: (err) => {
+      setError(err.message || "Invalid email or password.");
+    },
+  });
+
   function fillDemo() {
-    setEmail("demo@artswrk.com");
+    setEmail("nick+ferrari@artswrk.com");
     setPassword("ArtswrkDemo2024");
     setError("");
   }
@@ -28,16 +35,10 @@ export default function Login() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 600)); // simulate network
-    const ok = login(email, password);
-    setLoading(false);
-    if (ok) {
-      navigate("/dashboard");
-    } else {
-      setError("Invalid email or password. Try the demo account below.");
-    }
+    demoLogin.mutate({ email: email.trim().toLowerCase(), password });
   }
+
+  const loading = demoLogin.isPending;
 
   return (
     <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center px-4">
@@ -125,11 +126,15 @@ export default function Login() {
           <div className="space-y-1 mb-4">
             <div className="flex items-center justify-between text-xs">
               <span className="text-gray-500">Email</span>
-              <span className="font-mono font-semibold text-[#111]">demo@artswrk.com</span>
+              <span className="font-mono font-semibold text-[#111]">nick+ferrari@artswrk.com</span>
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-gray-500">Password</span>
               <span className="font-mono font-semibold text-[#111]">ArtswrkDemo2024</span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-500">Account</span>
+              <span className="font-semibold text-[#111]">Phyllis F · Ferrari Dance Center NYC</span>
             </div>
           </div>
           <button

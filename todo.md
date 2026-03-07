@@ -49,6 +49,8 @@
 - [x] Add artswrkUsers tRPC router (getByEmail, getByBubbleId, list)
 
 ## Upcoming
+- [x] Wire demo login to real database (login as nick+ferrari@artswrk.com)
+- [x] Display real DB user data in dashboard header/profile
 - [ ] Artist-side dashboard (profile, job applications, earnings)
 - [ ] Settings page (profile editing, notifications, billing)
 - [ ] Real Google Maps integration on /jobs

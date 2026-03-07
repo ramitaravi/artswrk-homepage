@@ -1,10 +1,11 @@
 /*
  * ARTSWRK DASHBOARD LAYOUT
  * Persistent left sidebar + top header + scrollable content area
+ * Uses real tRPC auth session — user data comes from the database
  * Hirer gradient: #FFBC5D → #F25722
- * Artist gradient: #ec008c → #ff7171
  */
 
+import { useEffect } from "react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
@@ -21,12 +22,13 @@ import {
   Settings,
   LogOut,
   Menu,
-  X,
   Bell,
   Crown,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
 
 interface NavItem {
   label: string;
@@ -90,15 +92,54 @@ function NavLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const [, navigate] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  function handleLogout() {
-    logout();
+  // Fetch the full artswrk user record from DB using the authenticated user's email
+  const { data: artswrkUser } = trpc.artswrkUsers.getByEmail.useQuery(
+    { email: user?.email ?? "" },
+    { enabled: !!user?.email }
+  );
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/login");
+    }
+  }, [loading, user, navigate]);
+
+  async function handleLogout() {
+    await logout();
     navigate("/login");
   }
+
+  // Derive display values — prefer real DB data, fall back to session data
+  const displayName = artswrkUser
+    ? `${artswrkUser.firstName || ""} ${artswrkUser.lastName || ""}`.trim() || artswrkUser.name || user?.name || "User"
+    : user?.name || "User";
+
+  const displayStudio = artswrkUser?.clientCompanyName || "Artswrk";
+  const displayLocation = ""; // location fields not yet in schema
+  const isPremium = artswrkUser?.clientPremium ?? false;
+
+  const avatarInitials = displayName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#f5f5f5]">
+        <Loader2 className="animate-spin text-[#F25722]" size={32} />
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -119,15 +160,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* User info */}
-      {!collapsed && user && (
+      {!collapsed && (
         <div className="px-4 py-4 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full hirer-grad-bg flex items-center justify-center text-white text-xs font-black flex-shrink-0">
-              {user.avatar}
-            </div>
+            {artswrkUser?.profilePicture ? (
+              <img
+                src={artswrkUser.profilePicture}
+                alt={displayName}
+                className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-full hirer-grad-bg flex items-center justify-center text-white text-xs font-black flex-shrink-0">
+                {avatarInitials}
+              </div>
+            )}
             <div className="min-w-0">
-              <p className="text-white text-sm font-semibold truncate">{user.name}</p>
-              <p className="text-gray-500 text-xs truncate">{user.studio}</p>
+              <p className="text-white text-sm font-semibold truncate">{displayName}</p>
+              <p className="text-gray-500 text-xs truncate">{displayStudio}</p>
+              {isPremium && (
+                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 mt-0.5">
+                  <Crown size={8} /> PREMIUM
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -207,12 +261,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               <Menu size={20} />
             </button>
-            {user && (
-              <div>
-                <p className="text-sm font-bold text-[#111]">{user.studio}</p>
-                <p className="text-xs text-gray-400">{user.location}</p>
-              </div>
-            )}
+            <div>
+              <p className="text-sm font-bold text-[#111]">{displayStudio}</p>
+              {displayLocation && <p className="text-xs text-gray-400">{displayLocation}</p>}
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
@@ -230,9 +282,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
 
             {/* Avatar */}
-            {user && (
+            {artswrkUser?.profilePicture ? (
+              <img
+                src={artswrkUser.profilePicture}
+                alt={displayName}
+                className="w-8 h-8 rounded-full object-cover cursor-pointer"
+              />
+            ) : (
               <div className="w-8 h-8 rounded-full hirer-grad-bg flex items-center justify-center text-white text-xs font-black cursor-pointer">
-                {user.avatar}
+                {avatarInitials}
               </div>
             )}
           </div>

@@ -1,10 +1,9 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch, useLocation, Redirect } from "wouter";
+import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Home from "./pages/Home";
 import Jobs from "./pages/Jobs";
 import Login from "./pages/Login";
@@ -20,17 +19,16 @@ import SubLists from "./pages/dashboard/SubLists";
 import Community from "./pages/dashboard/Community";
 import Benefits from "./pages/dashboard/Benefits";
 
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { isAuthenticated } = useAuth();
-  if (!isAuthenticated) return <Redirect to="/login" />;
+// DashboardLayout handles auth protection internally (redirects to /login if not authenticated)
+function DashRoute({ component: Component }: { component: React.ComponentType }) {
   return (
     <DashboardLayout>
       <Component />
     </DashboardLayout>
   );
 }
+
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
       {/* Public routes */}
@@ -38,36 +36,36 @@ function Router() {
       <Route path="/jobs" component={Jobs} />
       <Route path="/login" component={Login} />
 
-      {/* Dashboard routes (protected) */}
+      {/* Dashboard routes — auth protection is inside DashboardLayout */}
       <Route path="/dashboard">
-        {() => <ProtectedRoute component={Overview} />}
+        {() => <DashRoute component={Overview} />}
       </Route>
       <Route path="/dashboard/jobs">
-        {() => <ProtectedRoute component={DashJobs} />}
+        {() => <DashRoute component={DashJobs} />}
       </Route>
       <Route path="/dashboard/bookings">
-        {() => <ProtectedRoute component={Bookings} />}
+        {() => <DashRoute component={Bookings} />}
       </Route>
       <Route path="/dashboard/payments">
-        {() => <ProtectedRoute component={Payments} />}
+        {() => <DashRoute component={Payments} />}
       </Route>
       <Route path="/dashboard/artists">
-        {() => <ProtectedRoute component={Artists} />}
+        {() => <DashRoute component={Artists} />}
       </Route>
       <Route path="/dashboard/messages">
-        {() => <ProtectedRoute component={Messages} />}
+        {() => <DashRoute component={Messages} />}
       </Route>
       <Route path="/dashboard/company">
-        {() => <ProtectedRoute component={CompanyPage} />}
+        {() => <DashRoute component={CompanyPage} />}
       </Route>
       <Route path="/dashboard/sublists">
-        {() => <ProtectedRoute component={SubLists} />}
+        {() => <DashRoute component={SubLists} />}
       </Route>
       <Route path="/dashboard/community">
-        {() => <ProtectedRoute component={Community} />}
+        {() => <DashRoute component={Community} />}
       </Route>
       <Route path="/dashboard/benefits">
-        {() => <ProtectedRoute component={Benefits} />}
+        {() => <DashRoute component={Benefits} />}
       </Route>
 
       {/* Fallback */}
@@ -80,14 +78,12 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <ThemeProvider defaultTheme="light">
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
-        </ThemeProvider>
-      </AuthProvider>
+      <ThemeProvider defaultTheme="light">
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }
