@@ -80,8 +80,8 @@ function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-3">
-            <a href="#" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">Login</a>
-            <a href="#" className="text-sm font-semibold text-white bg-[#111] px-4 py-2 rounded-full hover:bg-gray-800 transition-colors">Join</a>
+            <Link href="/login" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">Login</Link>
+            <Link href="/login" className="text-sm font-semibold text-white bg-[#111] px-4 py-2 rounded-full hover:bg-gray-800 transition-colors">Join</Link>
           </div>
 
           <button className="md:hidden p-2" onClick={() => setMobileOpen(!mobileOpen)}>
@@ -96,8 +96,8 @@ function Navbar() {
             <a key={item} href="#" className="block text-sm font-medium text-gray-700 py-1">{item}</a>
           ))}
           <div className="flex gap-3 pt-2">
-            <a href="#" className="text-sm font-medium text-gray-700">Login</a>
-            <a href="#" className="text-sm font-semibold text-white bg-[#111] px-4 py-2 rounded-full">Join</a>
+            <Link href="/login" className="text-sm font-medium text-gray-700">Login</Link>
+            <Link href="/login" className="text-sm font-semibold text-white bg-[#111] px-4 py-2 rounded-full">Join</Link>
           </div>
         </div>
       )}
