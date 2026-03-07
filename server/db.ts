@@ -209,8 +209,12 @@ export async function setUserPassword(
 
 // ── Interested Artists queries ────────────────────────────────────────────────
 
+// Alias for the artist user join
+const artistUser = users;
+
 /**
  * Get all interested artist records for a client, optionally filtered by job.
+ * JOINs on users table to include real artist name + photo.
  */
 export async function getInterestedArtistsByClientId(
   clientUserId: number,
@@ -231,13 +235,51 @@ export async function getInterestedArtistsByClientId(
     conditions.push(eq(interestedArtists.jobId, jobId));
   }
 
-  return db
-    .select()
+  const rows = await db
+    .select({
+      // All interested_artists columns
+      id: interestedArtists.id,
+      bubbleId: interestedArtists.bubbleId,
+      jobId: interestedArtists.jobId,
+      bubbleRequestId: interestedArtists.bubbleRequestId,
+      artistUserId: interestedArtists.artistUserId,
+      bubbleArtistId: interestedArtists.bubbleArtistId,
+      clientUserId: interestedArtists.clientUserId,
+      bubbleClientId: interestedArtists.bubbleClientId,
+      bubbleServiceId: interestedArtists.bubbleServiceId,
+      bubbleBookingId: interestedArtists.bubbleBookingId,
+      status: interestedArtists.status,
+      converted: interestedArtists.converted,
+      isHourlyRate: interestedArtists.isHourlyRate,
+      artistHourlyRate: interestedArtists.artistHourlyRate,
+      clientHourlyRate: interestedArtists.clientHourlyRate,
+      artistFlatRate: interestedArtists.artistFlatRate,
+      clientFlatRate: interestedArtists.clientFlatRate,
+      totalHours: interestedArtists.totalHours,
+      startDate: interestedArtists.startDate,
+      endDate: interestedArtists.endDate,
+      resumeLink: interestedArtists.resumeLink,
+      message: interestedArtists.message,
+      createdAt: interestedArtists.createdAt,
+      updatedAt: interestedArtists.updatedAt,
+      bubbleCreatedAt: interestedArtists.bubbleCreatedAt,
+      bubbleModifiedAt: interestedArtists.bubbleModifiedAt,
+      // Artist user fields
+      artistFirstName: artistUser.firstName,
+      artistLastName: artistUser.lastName,
+      artistName: artistUser.name,
+      artistProfilePicture: artistUser.profilePicture,
+      artistSlug: artistUser.slug,
+      artistAvailability: artistUser.optionAvailability,
+    })
     .from(interestedArtists)
+    .leftJoin(artistUser, eq(interestedArtists.artistUserId, artistUser.id))
     .where(and(...conditions))
     .orderBy(desc(interestedArtists.bubbleCreatedAt))
     .limit(limit)
     .offset(offset);
+
+  return rows;
 }
 
 /**
@@ -289,6 +331,7 @@ import { bookings } from "../drizzle/schema";
 
 /**
  * Get all bookings for a client, optionally filtered by status.
+ * JOINs on users table to include real artist name + photo.
  */
 export async function getBookingsByClientId(
   clientUserId: number,
@@ -306,8 +349,52 @@ export async function getBookingsByClientId(
   }
 
   return db
-    .select()
+    .select({
+      // All bookings columns
+      id: bookings.id,
+      bubbleId: bookings.bubbleId,
+      jobId: bookings.jobId,
+      bubbleRequestId: bookings.bubbleRequestId,
+      interestedArtistId: bookings.interestedArtistId,
+      bubbleInterestedArtistId: bookings.bubbleInterestedArtistId,
+      clientUserId: bookings.clientUserId,
+      bubbleClientId: bookings.bubbleClientId,
+      artistUserId: bookings.artistUserId,
+      bubbleArtistId: bookings.bubbleArtistId,
+      bookingStatus: bookings.bookingStatus,
+      paymentStatus: bookings.paymentStatus,
+      clientRate: bookings.clientRate,
+      artistRate: bookings.artistRate,
+      totalClientRate: bookings.totalClientRate,
+      totalArtistRate: bookings.totalArtistRate,
+      grossProfit: bookings.grossProfit,
+      stripeFee: bookings.stripeFee,
+      postFeeRevenue: bookings.postFeeRevenue,
+      hours: bookings.hours,
+      externalPayment: bookings.externalPayment,
+      startDate: bookings.startDate,
+      endDate: bookings.endDate,
+      locationAddress: bookings.locationAddress,
+      locationLat: bookings.locationLat,
+      locationLng: bookings.locationLng,
+      description: bookings.description,
+      stripeCheckoutUrl: bookings.stripeCheckoutUrl,
+      addedToSpreadsheet: bookings.addedToSpreadsheet,
+      deleted: bookings.deleted,
+      createdAt: bookings.createdAt,
+      updatedAt: bookings.updatedAt,
+      bubbleCreatedAt: bookings.bubbleCreatedAt,
+      bubbleModifiedAt: bookings.bubbleModifiedAt,
+      // Artist user fields
+      artistFirstName: artistUser.firstName,
+      artistLastName: artistUser.lastName,
+      artistName: artistUser.name,
+      artistProfilePicture: artistUser.profilePicture,
+      artistSlug: artistUser.slug,
+      artistAvailability: artistUser.optionAvailability,
+    })
     .from(bookings)
+    .leftJoin(artistUser, eq(bookings.artistUserId, artistUser.id))
     .where(and(...conditions))
     .orderBy(desc(bookings.startDate))
     .limit(limit)

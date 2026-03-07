@@ -1,0 +1,16 @@
+{
+  "query": "SELECT \n  (SELECT COUNT(*) FROM interested_artists WHERE artistUserId IS NOT NULL) as ia_linked,\n  (SELECT COUNT(*) FROM interested_artists) as ia_total,\n  (SELECT COUNT(*) FROM bookings WHERE artistUserId IS NOT NULL) as bk_linked,\n  (SELECT COUNT(*) FROM bookings) as bk_total;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user FGYqDqdUZjFkzga.root --database AyEgFhxRkEopXHz25XyihS --execute SELECT \n  (SELECT COUNT(*) FROM interested_artists WHERE artistUserId IS NOT NULL) as ia_linked,\n  (SELECT COUNT(*) FROM interested_artists) as ia_total,\n  (SELECT COUNT(*) FROM bookings WHERE artistUserId IS NOT NULL) as bk_linked,\n  (SELECT COUNT(*) FROM bookings) as bk_total;\n",
+  "rows": [
+    {
+      "ia_linked": "468",
+      "ia_total": "472",
+      "bk_linked": "224",
+      "bk_total": "224"
+    }
+  ],
+  "messages": [],
+  "stdout": "ia_linked\tia_total\tbk_linked\tbk_total\n468\t472\t224\t224\n",
+  "stderr": "",
+  "execution_time_ms": 68
+}

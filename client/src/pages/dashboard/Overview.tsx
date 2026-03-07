@@ -18,9 +18,10 @@ const AVATAR_COLORS = [
   "bg-orange-500", "bg-teal-500", "bg-indigo-500", "bg-violet-500",
 ];
 
-function getArtistInitials(bubbleId: string | null | undefined) {
+function getArtistInitials(firstName: string | null | undefined, lastName: string | null | undefined, bubbleId: string | null | undefined) {
+  if (firstName && lastName) return `${firstName[0]}${lastName[0]}`.toUpperCase();
+  if (firstName) return firstName.slice(0, 2).toUpperCase();
   if (!bubbleId) return "?";
-  // Use the last 2 chars of the Bubble ID as a deterministic placeholder
   return bubbleId.slice(-2).toUpperCase();
 }
 
@@ -333,13 +334,37 @@ export default function Overview() {
                   <p>No applicants yet</p>
                 </div>
               ) : (
-                recentApplicants.map((a) => (
+                  recentApplicants.map((a) => {
+                  const aFirstName = (a as any).artistFirstName as string | null | undefined;
+                  const aLastName = (a as any).artistLastName as string | null | undefined;
+                  const aName = (a as any).artistName as string | null | undefined;
+                  const aPic = (a as any).artistProfilePicture as string | null | undefined;
+                  const aDisplayName = aFirstName && aLastName
+                    ? `${aFirstName} ${aLastName}`
+                    : aName ?? `Artist #${a.bubbleArtistId?.slice(-6) ?? "—"}`;
+                  return (
                   <div key={a.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer group">
-                    <div className={`w-8 h-8 rounded-full ${getArtistColor(a.bubbleArtistId)} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
-                      {getArtistInitials(a.bubbleArtistId)}
+                    {aPic ? (
+                      <img
+                        src={aPic}
+                        alt={aDisplayName}
+                        className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-100"
+                        onError={(e) => {
+                          const el = e.currentTarget;
+                          el.style.display = "none";
+                          const fb = el.nextElementSibling as HTMLElement;
+                          if (fb) fb.style.display = "flex";
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`w-8 h-8 rounded-full ${getArtistColor(a.bubbleArtistId)} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}
+                      style={{ display: aPic ? "none" : "flex" }}
+                    >
+                      {getArtistInitials(aFirstName, aLastName, a.bubbleArtistId)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#111] truncate">Artist #{a.bubbleArtistId?.slice(-6)}</p>
+                      <p className="text-sm font-semibold text-[#111] truncate">{aDisplayName}</p>
                       <p className="text-xs text-gray-400">
                         <span className={`inline-block px-1.5 py-0.5 rounded-full text-xs font-medium mr-1 ${
                           a.status === 'Confirmed' ? 'bg-blue-100 text-blue-700' :
@@ -351,7 +376,8 @@ export default function Overview() {
                     </div>
                     <ChevronRight size={14} className="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
             <div className="p-4 border-t border-gray-100">

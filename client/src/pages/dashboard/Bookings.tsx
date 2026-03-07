@@ -24,8 +24,9 @@ function formatCurrency(cents: number | null | undefined) {
   return `$${cents.toLocaleString()}`;
 }
 
-function getInitials(id: string) {
-  // Use last 4 chars of Bubble ID as a stable short identifier
+function getInitials(firstName: string | null | undefined, lastName: string | null | undefined, id: string) {
+  if (firstName && lastName) return `${firstName[0]}${lastName[0]}`.toUpperCase();
+  if (firstName) return firstName.slice(0, 2).toUpperCase();
   return id?.slice(-4).toUpperCase() ?? "??";
 }
 
@@ -66,8 +67,16 @@ function BookingRow({ booking }: { booking: Booking }) {
   const payCfg = PAYMENT_STATUS_CONFIG[paymentStatus] ?? PAYMENT_STATUS_CONFIG.Unpaid;
 
   const artistId = booking.bubbleArtistId ?? "";
-  const initials = getInitials(artistId);
+  const artistFirstName = (booking as any).artistFirstName as string | null | undefined;
+  const artistLastName = (booking as any).artistLastName as string | null | undefined;
+  const artistName = (booking as any).artistName as string | null | undefined;
+  const artistProfilePicture = (booking as any).artistProfilePicture as string | null | undefined;
+  const artistSlug = (booking as any).artistSlug as string | null | undefined;
+  const initials = getInitials(artistFirstName, artistLastName, artistId);
   const color = avatarColor(artistId);
+  const displayName = artistFirstName && artistLastName
+    ? `${artistFirstName} ${artistLastName}`
+    : artistName ?? `Artist #${artistId.slice(-6) || "—"}`;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
@@ -76,7 +85,23 @@ function BookingRow({ booking }: { booking: Booking }) {
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-4 flex-1 min-w-0">
             {/* Artist avatar */}
-            <div className={`w-11 h-11 rounded-full ${color} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+            {artistProfilePicture ? (
+              <img
+                src={artistProfilePicture}
+                alt={displayName}
+                className="w-11 h-11 rounded-full object-cover flex-shrink-0 border border-gray-100"
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  el.style.display = "none";
+                  const fallback = el.nextElementSibling as HTMLElement;
+                  if (fallback) fallback.style.display = "flex";
+                }}
+              />
+            ) : null}
+            <div
+              className={`w-11 h-11 rounded-full ${color} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}
+              style={{ display: artistProfilePicture ? "none" : "flex" }}
+            >
               {initials}
             </div>
 
@@ -91,9 +116,15 @@ function BookingRow({ booking }: { booking: Booking }) {
                 </span>
               </div>
 
+              {/* Artist name */}
+              <p className="text-sm font-bold text-[#111] mb-0.5">{displayName}</p>
+              {artistSlug && (
+                <p className="text-xs text-gray-400 mb-1">@{artistSlug}</p>
+              )}
+
               {/* Job description snippet */}
               {booking.description && (
-                <p className="text-sm text-gray-700 font-medium mb-2 line-clamp-1">{booking.description}</p>
+                <p className="text-sm text-gray-500 mb-2 line-clamp-1">{booking.description}</p>
               )}
 
               {/* Meta row */}
@@ -153,7 +184,7 @@ function BookingRow({ booking }: { booking: Booking }) {
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Booking Details</p>
             <div className="flex items-center gap-2 text-gray-600">
               <User size={13} className="text-gray-400 flex-shrink-0" />
-              <span className="text-xs">Artist ID: <span className="font-mono text-gray-500">{booking.bubbleArtistId?.slice(-8) ?? "—"}</span></span>
+              <span className="text-xs">Artist: <span className="font-semibold text-gray-700">{displayName}</span></span>
             </div>
             {booking.bubbleRequestId && (
               <div className="flex items-center gap-2 text-gray-600">

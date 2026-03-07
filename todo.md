@@ -89,3 +89,13 @@
 - [x] Add Bookings stat card to Overview dashboard
 - [x] Add View Bookings button to job expanded rows in DashJobs
 - [x] Write vitest tests for bookings logic (21 tests, 56 total passing)
+
+## Artist User Records
+- [x] Collect 193 unique artist Bubble IDs from interested_artists + bookings tables
+- [x] Fetch all 194 artist User records from Bubble API (batched)
+- [x] Upsert 194 artist records into users table (userRole=artist)
+- [x] Back-fill artistUserId FK on interested_artists (468/472) and bookings (224/224)
+- [x] Update Artists dashboard page to show real names, photos, @slug
+- [x] Update Bookings page to show real artist names and photos
+- [x] Update Overview sidebar to show real artist names and photos in recent applicants feed
+- [x] 56 vitest tests passing (no new tests needed — artist data flows through existing JOIN queries)

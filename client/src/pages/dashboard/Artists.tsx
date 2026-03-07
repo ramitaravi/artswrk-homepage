@@ -22,9 +22,11 @@ function getArtistColor(bubbleId: string | null | undefined) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-function getArtistInitials(bubbleId: string | null | undefined) {
-  if (!bubbleId) return "?";
-  return bubbleId.slice(-2).toUpperCase();
+function getArtistInitials(firstName: string | null | undefined, lastName: string | null | undefined, bubbleId: string | null | undefined) {
+  if (firstName && lastName) return `${firstName[0]}${lastName[0]}`.toUpperCase();
+  if (firstName) return firstName.slice(0, 2).toUpperCase();
+  if (bubbleId) return bubbleId.slice(-2).toUpperCase();
+  return "?";
 }
 
 function formatDate(d: Date | string | null | undefined) {
@@ -62,11 +64,14 @@ export default function Artists() {
     status: statusFilter === "all" ? undefined : [statusFilter],
   });
 
-  // Client-side search filter on Bubble artist ID (until artist profiles are migrated)
+  // Client-side search filter on artist name, status, or job ID
   const filtered = (applicants ?? []).filter((a) => {
     if (!search) return true;
     const q = search.toLowerCase();
+    const fullName = [a.artistFirstName, a.artistLastName].filter(Boolean).join(" ").toLowerCase();
     return (
+      fullName.includes(q) ||
+      (a.artistName ?? "").toLowerCase().includes(q) ||
       (a.bubbleArtistId ?? "").toLowerCase().includes(q) ||
       (a.status ?? "").toLowerCase().includes(q) ||
       (a.bubbleRequestId ?? "").toLowerCase().includes(q)
@@ -135,7 +140,7 @@ export default function Artists() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by artist ID or status..."
+            placeholder="Search by artist name or status..."
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-300 focus:outline-none focus:border-[#FFBC5D] transition-all bg-white"
           />
         </div>
@@ -181,18 +186,38 @@ export default function Artists() {
                   className="grid grid-cols-12 gap-3 px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer group items-center"
                   onClick={() => setExpanded(expanded === a.id ? null : a.id)}
                 >
-                  {/* Artist avatar + ID */}
+                  {/* Artist avatar + name */}
                   <div className="col-span-3 flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-full ${getArtistColor(a.bubbleArtistId)} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
-                      {getArtistInitials(a.bubbleArtistId)}
+                    {(a as any).artistProfilePicture ? (
+                      <img
+                        src={(a as any).artistProfilePicture}
+                        alt={(a as any).artistName ?? "Artist"}
+                        className="w-9 h-9 rounded-full object-cover flex-shrink-0 border border-gray-100"
+                        onError={(e) => {
+                          const el = e.currentTarget;
+                          el.style.display = "none";
+                          const fallback = el.nextElementSibling as HTMLElement;
+                          if (fallback) fallback.style.display = "flex";
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`w-9 h-9 rounded-full ${getArtistColor(a.bubbleArtistId)} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}
+                      style={{ display: (a as any).artistProfilePicture ? "none" : "flex" }}
+                    >
+                      {getArtistInitials((a as any).artistFirstName, (a as any).artistLastName, a.bubbleArtistId)}
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-[#111] truncate">
-                        Artist #{a.bubbleArtistId?.slice(-6) ?? "—"}
+                        {(a as any).artistFirstName && (a as any).artistLastName
+                          ? `${(a as any).artistFirstName} ${(a as any).artistLastName}`
+                          : (a as any).artistName ?? `Artist #${a.bubbleArtistId?.slice(-6) ?? "—"}`}
                       </p>
-                      <p className="text-xs text-gray-400 truncate hidden sm:block">
-                        ID: {a.bubbleArtistId?.slice(0, 12)}…
-                      </p>
+                      {(a as any).artistSlug && (
+                        <p className="text-xs text-gray-400 truncate hidden sm:block">
+                          @{(a as any).artistSlug}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -307,6 +332,17 @@ export default function Artists() {
                           <div>
                             <p className="font-semibold text-gray-600 mb-0.5">Message</p>
                             <p className="text-gray-500 leading-relaxed">{a.message}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Availability */}
+                      {(a as any).artistAvailability && (
+                        <div className="flex items-start gap-2">
+                          <div className="w-4 flex-shrink-0" />
+                          <div>
+                            <p className="font-semibold text-gray-600 mb-0.5">Availability</p>
+                            <p className="text-gray-500">{(a as any).artistAvailability}</p>
                           </div>
                         </div>
                       )}

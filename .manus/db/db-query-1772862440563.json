@@ -1,0 +1,23 @@
+{
+  "query": "\n-- Check FK back-fill coverage\nSELECT \n  (SELECT COUNT(*) FROM interested_artists WHERE artistUserId IS NOT NULL) as ia_linked,\n  (SELECT COUNT(*) FROM interested_artists) as ia_total,\n  (SELECT COUNT(*) FROM bookings WHERE artistUserId IS NOT NULL) as bk_linked,\n  (SELECT COUNT(*) FROM bookings) as bk_total;\n\n-- Sample artist with name\nSELECT u.id, u.bubbleId, u.firstName, u.lastName, u.userRole, u.slug, u.optionAvailability,\n       LEFT(u.profilePicture, 60) as pic_preview\nFROM users u WHERE u.userRole = 'Artist' LIMIT 5;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user FGYqDqdUZjFkzga.root --database AyEgFhxRkEopXHz25XyihS --execute \n-- Check FK back-fill coverage\nSELECT \n  (SELECT COUNT(*) FROM interested_artists WHERE artistUserId IS NOT NULL) as ia_linked,\n  (SELECT COUNT(*) FROM interested_artists) as ia_total,\n  (SELECT COUNT(*) FROM bookings WHERE artistUserId IS NOT NULL) as bk_linked,\n  (SELECT COUNT(*) FROM bookings) as bk_total;\n\n-- Sample artist with name\nSELECT u.id, u.bubbleId, u.firstName, u.lastName, u.userRole, u.slug, u.optionAvailability,\n       LEFT(u.profilePicture, 60) as pic_preview\nFROM users u WHERE u.userRole = 'Artist' LIMIT 5;\n",
+  "rows": [
+    {
+      "ia_linked": "468",
+      "ia_total": "472",
+      "bk_linked": "224",
+      "bk_total": "224"
+    }
+  ],
+  "messages": [
+    "id\tbubbleId\tfirstName\tlastName\tuserRole\tslug\toptionAvailability\tpic_preview",
+    "60077\t1698246437098x492964626791974700\tMegan\tHoleman\tArtist\tmegan-holeman\tAvailable for work\thttps://118d26995be0b113d0cb8cb06dbea400.cdn.bubble.io/f1698",
+    "60078\t1725463885367x818660400304752900\tPrishita\tShivhare\tArtist\tprishita-shivhare\tAvailable for work\thttps://118d26995be0b113d0cb8cb06dbea400.cdn.bubble.io/f1725",
+    "60079\t1677626413163x754903592489737300\tAngela\tWeigel\tArtist\tangela-weigel\tAvailable for work\thttps://s3.amazonaws.com/appforest_uf/f1677626725193x3928157",
+    "60080\t1653050549321x276882897533952800\tVera\tPaganin\tArtist\tvera-paganin\tAvailable for work\thttps://118d26995be0b113d0cb8cb06dbea400.cdn.bubble.io/f1714",
+    "60081\t1690816331924x182803500365975800\tSarah\tPayne\tArtist\tsarah-payne\tAvailable for work\thttps://118d26995be0b113d0cb8cb06dbea400.cdn.bubble.io/f1690"
+  ],
+  "stdout": "ia_linked\tia_total\tbk_linked\tbk_total\n468\t472\t224\t224\nid\tbubbleId\tfirstName\tlastName\tuserRole\tslug\toptionAvailability\tpic_preview\n60077\t1698246437098x492964626791974700\tMegan\tHoleman\tArtist\tmegan-holeman\tAvailable for work\thttps://118d26995be0b113d0cb8cb06dbea400.cdn.bubble.io/f1698\n60078\t1725463885367x818660400304752900\tPrishita\tShivhare\tArtist\tprishita-shivhare\tAvailable for work\thttps://118d26995be0b113d0cb8cb06dbea400.cdn.bubble.io/f1725\n60079\t1677626413163x754903592489737300\tAngela\tWeigel\tArtist\tangela-weigel\tAvailable for work\thttps://s3.amazonaws.com/appforest_uf/f1677626725193x3928157\n60080\t1653050549321x276882897533952800\tVera\tPaganin\tArtist\tvera-paganin\tAvailable for work\thttps://118d26995be0b113d0cb8cb06dbea400.cdn.bubble.io/f1714\n60081\t1690816331924x182803500365975800\tSarah\tPayne\tArtist\tsarah-payne\tAvailable for work\thttps://118d26995be0b113d0cb8cb06dbea400.cdn.bubble.io/f1690\n",
+  "stderr": "",
+  "execution_time_ms": 63
+}
