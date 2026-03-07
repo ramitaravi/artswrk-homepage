@@ -125,6 +125,32 @@
     background-clip: text;
   }
 
+  /* Hirer gradient text (orange → pink) */
+  .hirer-grad-text {
+    background: linear-gradient(135deg, #F97316, #E91E8C);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Artist gradient text (magenta → coral-pink) */
+  .artist-grad-text {
+    background: linear-gradient(135deg, #ec008c, #ff7171);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Hirer gradient background */
+  .hirer-grad-bg {
+    background: linear-gradient(135deg, #F97316, #E91E8C);
+  }
+
+  /* Artist gradient background */
+  .artist-grad-bg {
+    background: linear-gradient(135deg, #ec008c, #ff7171);
+  }
+
   /* Brand gradient background */
   .gradient-bg {
     background: var(--brand-gradient);

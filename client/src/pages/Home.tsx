@@ -2,81 +2,52 @@
  * ARTSWRK HOMEPAGE
  * Design: Refined Modern "Premium Platform"
  * Font: Poppins (400–900)
- * Hirer gradient: #F97316 → #E91E8C
- * Artist gradient: #ec008c → #ff7171
- * Sections toggle between "for hirers" and "for artists" views
+ * Hirer gradient: #F97316 → #E91E8C  (class: hirer-grad-bg / hirer-grad-text)
+ * Artist gradient: #ec008c → #ff7171 (class: artist-grad-bg / artist-grad-text)
+ * All gradient text uses CSS classes — NO inline background+backgroundClip combos.
  */
 
 import { useState } from "react";
-import { ChevronDown, Menu, X, MapPin, Clock, DollarSign } from "lucide-react";
+import { ChevronDown, Menu, X, MapPin, Clock } from "lucide-react";
 
-// ─── Gradient helpers ─────────────────────────────────────────────────────────
-const HIRER_GRAD = "linear-gradient(135deg, #F97316, #E91E8C)";
-const ARTIST_GRAD = "linear-gradient(135deg, #ec008c, #ff7171)";
+type Tab = "hirers" | "artists";
 
-function gradStyle(tab: "hirers" | "artists") {
-  return { background: tab === "hirers" ? HIRER_GRAD : ARTIST_GRAD };
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function gradBgClass(tab: Tab) {
+  return tab === "hirers" ? "hirer-grad-bg" : "artist-grad-bg";
 }
-
-function GradText({ tab, children }: { tab: "hirers" | "artists"; children: React.ReactNode }) {
-  return (
-    <span
-      style={{
-        background: tab === "hirers" ? HIRER_GRAD : ARTIST_GRAD,
-        WebkitBackgroundClip: "text",
-        WebkitTextFillColor: "transparent",
-        backgroundClip: "text",
-      }}
-    >
-      {children}
-    </span>
-  );
+function gradTextClass(tab: Tab) {
+  return tab === "hirers" ? "hirer-grad-text" : "artist-grad-text";
 }
 
 // ─── Asset URLs ───────────────────────────────────────────────────────────────
-const ASSETS = {
-  strip1: "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/artist-strip-1-aY8po4fr7wkR7kHuYcLRjW.webp",
-  strip2: "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/artist-strip-2-Vo37fp95iDpS9ybaZkYWJB.webp",
-  strip3: "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/artist-strip-3-hjiUkBU9Pft72RAaeq8oxW.webp",
-  strip4: "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/artist-strip-4-VXD8jrv6pEif6NSzyXHom4.webp",
-};
+const STRIP = [
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/artist-strip-1-aY8po4fr7wkR7kHuYcLRjW.webp",
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/artist-strip-2-Vo37fp95iDpS9ybaZkYWJB.webp",
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/artist-strip-3-hjiUkBU9Pft72RAaeq8oxW.webp",
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/artist-strip-4-VXD8jrv6pEif6NSzyXHom4.webp",
+  "https://images.unsplash.com/photo-1547153760-18fc86324498?w=300&q=80",
+  "https://images.unsplash.com/photo-1508700929628-666bc8bd84ea?w=300&q=80",
+  "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=300&q=80",
+  "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=300&q=80",
+  "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=300&q=80",
+  "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=300&q=80",
+];
 
 // ─── Navbar ───────────────────────────────────────────────────────────────────
-function Navbar({ tab }: { tab: "hirers" | "artists" }) {
+function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [hirersOpen, setHirersOpen] = useState(false);
   const [artistsOpen, setArtistsOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useState(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  });
 
   return (
-    <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled ? "bg-white/95 backdrop-blur-md shadow-sm" : "bg-white"
-      }`}
-    >
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-100">
       <div className="mx-auto px-5 lg:px-10 max-w-7xl">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <a href="/" className="flex items-center gap-0 select-none">
-            <span
-              className="font-black text-2xl tracking-tight"
-              style={{ fontFamily: "Poppins, sans-serif", ...{ background: HIRER_GRAD, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" } }}
-            >
-              ARTS
-            </span>
-            <span
-              className="font-black text-2xl tracking-tight bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5"
-              style={{ fontFamily: "Poppins, sans-serif" }}
-            >
-              WRK
-            </span>
+          <a href="/" className="flex items-center select-none">
+            <span className="font-black text-2xl tracking-tight hirer-grad-text">ARTS</span>
+            <span className="font-black text-2xl tracking-tight bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">WRK</span>
           </a>
 
           {/* Desktop Nav */}
@@ -137,42 +108,30 @@ function Navbar({ tab }: { tab: "hirers" | "artists" }) {
   );
 }
 
-// ─── Hero Section ─────────────────────────────────────────────────────────────
-function Hero({ tab, setTab }: { tab: "hirers" | "artists"; setTab: (t: "hirers" | "artists") => void }) {
+// ─── Hero ─────────────────────────────────────────────────────────────────────
+function Hero({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   const [email, setEmail] = useState("");
-
   const headline = tab === "hirers" ? "The Hiring Platform for Artists" : "The Jobs Platform for Artists";
   const cta = tab === "hirers" ? "Start Hiring →" : "Find Work →";
 
   return (
-    <section className="pt-28 pb-16 bg-white text-center relative overflow-hidden">
+    <section className="pt-28 pb-16 bg-white text-center">
       <div className="mx-auto px-5 lg:px-10 max-w-4xl">
         {/* Logo badge */}
-        <div className="inline-flex items-center gap-0 mb-6 select-none">
-          <span
-            className="font-black text-3xl tracking-tight"
-            style={{ fontFamily: "Poppins, sans-serif", background: HIRER_GRAD, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}
-          >
-            ARTS
-          </span>
-          <span
-            className="font-black text-3xl tracking-tight bg-[#111] text-white px-2 py-0.5 rounded ml-1"
-            style={{ fontFamily: "Poppins, sans-serif" }}
-          >
-            WRK
-          </span>
+        <div className="inline-flex items-center mb-6 select-none">
+          <span className="font-black text-3xl tracking-tight hirer-grad-text">ARTS</span>
+          <span className="font-black text-3xl tracking-tight bg-[#111] text-white px-2 py-0.5 rounded ml-1">WRK</span>
         </div>
 
         {/* Toggle pills */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          {(["hirers", "artists"] as const).map((t) => (
+          {(["hirers", "artists"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
-                tab === t ? "text-white shadow-md" : "text-gray-500 bg-gray-100 hover:bg-gray-200"
+                tab === t ? `text-white shadow-md ${gradBgClass(t)}` : "text-gray-500 bg-gray-100 hover:bg-gray-200"
               }`}
-              style={tab === t ? gradStyle(t) : {}}
             >
               for {t}
             </button>
@@ -180,10 +139,7 @@ function Hero({ tab, setTab }: { tab: "hirers" | "artists"; setTab: (t: "hirers"
         </div>
 
         {/* Headline */}
-        <h1
-          className="text-5xl md:text-6xl lg:text-7xl font-black text-[#111] leading-[1.05] tracking-tight mb-8"
-          style={{ fontFamily: "Poppins, sans-serif" }}
-        >
+        <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-[#111] leading-[1.05] tracking-tight mb-8">
           {headline}
         </h1>
 
@@ -195,12 +151,8 @@ function Hero({ tab, setTab }: { tab: "hirers" | "artists"; setTab: (t: "hirers"
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Enter your email address"
             className="w-full sm:flex-1 px-4 py-3 rounded-full border border-gray-200 text-sm focus:outline-none focus:ring-2 transition-all"
-            style={{ fontFamily: "Poppins, sans-serif" }}
           />
-          <button
-            className="whitespace-nowrap px-6 py-3 rounded-full text-sm font-semibold text-white transition-all hover:opacity-90"
-            style={{ ...gradStyle(tab), fontFamily: "Poppins, sans-serif" }}
-          >
+          <button className={`whitespace-nowrap px-6 py-3 rounded-full text-sm font-semibold text-white transition-all hover:opacity-90 ${gradBgClass(tab)}`}>
             {cta}
           </button>
         </div>
@@ -211,54 +163,42 @@ function Hero({ tab, setTab }: { tab: "hirers" | "artists"; setTab: (t: "hirers"
 
 // ─── Artist Strip ─────────────────────────────────────────────────────────────
 function ArtistStrip() {
-  const images = [
-    ASSETS.strip1, ASSETS.strip2, ASSETS.strip3, ASSETS.strip4,
-    "https://images.unsplash.com/photo-1547153760-18fc86324498?w=300&q=80",
-    "https://images.unsplash.com/photo-1508700929628-666bc8bd84ea?w=300&q=80",
-    "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=300&q=80",
-    "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=300&q=80",
-    "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=300&q=80",
-    "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=300&q=80",
-  ];
-  const doubled = [...images, ...images];
-
+  const doubled = [...STRIP, ...STRIP];
   return (
     <section className="py-6 bg-white overflow-hidden">
-      <div className="relative overflow-hidden">
-        <div className="ticker-track">
-          {doubled.map((src, i) => (
-            <div key={i} className="flex-shrink-0 w-36 h-48 md:w-44 md:h-60 mx-1.5 rounded-2xl overflow-hidden">
-              <img src={src} alt={`Artist ${i}`} className="w-full h-full object-cover transition-transform duration-500 hover:scale-105" />
-            </div>
-          ))}
-        </div>
+      <div className="ticker-track">
+        {doubled.map((src, i) => (
+          <div key={i} className="flex-shrink-0 w-36 h-48 md:w-44 md:h-60 mx-1.5 rounded-2xl overflow-hidden">
+            <img src={src} alt="" className="w-full h-full object-cover transition-transform duration-500 hover:scale-105" />
+          </div>
+        ))}
       </div>
     </section>
   );
 }
 
-// ─── For Hirers Feature Section ───────────────────────────────────────────────
-function ForHirers() {
-  const hireItems = [
-    { emoji: "🩰", title: "Hire Dance Teachers", desc: "Hire part-time or full-time staff for your studio" },
-    { emoji: "🎤", title: "Hire Dance Judges", desc: "Find experienced judges for your competitions" },
-    { emoji: "🎵", title: "Hire Music Teachers", desc: "Connect with qualified music instructors" },
-    { emoji: "📸", title: "Hire Photographers", desc: "Book professional arts photographers" },
-    { emoji: "🎥", title: "Hire Videographers", desc: "Find videographers who specialize in the arts" },
-    { emoji: "📽️", title: "Hire Event & Production Staff", desc: "Staff your next performance or event" },
-  ];
+// ─── For Hirers ───────────────────────────────────────────────────────────────
+const HIRER_ITEMS = [
+  { emoji: "🩰", title: "Hire Dance Teachers", desc: "Hire part-time or full-time staff for your studio" },
+  { emoji: "🎤", title: "Hire Dance Judges", desc: "Find experienced judges for your competitions" },
+  { emoji: "🎵", title: "Hire Music Teachers", desc: "Connect with qualified music instructors" },
+  { emoji: "📸", title: "Hire Photographers", desc: "Book professional arts photographers" },
+  { emoji: "🎥", title: "Hire Videographers", desc: "Find videographers who specialize in the arts" },
+  { emoji: "📽️", title: "Hire Event & Production Staff", desc: "Staff your next performance or event" },
+];
 
+function ForHirers() {
   return (
     <section className="py-20 bg-white">
       <div className="mx-auto px-5 lg:px-10 max-w-7xl">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           <div>
             <p className="eyebrow mb-3">For Hirers</p>
-            <h2 className="text-4xl md:text-5xl font-black text-[#111] leading-tight mb-8" style={{ fontFamily: "Poppins, sans-serif" }}>
+            <h2 className="text-4xl md:text-5xl font-black text-[#111] leading-tight mb-8">
               Post Jobs & Hire Qualified Talent
             </h2>
             <div className="space-y-3">
-              {hireItems.map((item) => (
+              {HIRER_ITEMS.map((item) => (
                 <div key={item.title} className="flex items-start gap-3 p-3 rounded-xl hover:bg-orange-50 transition-colors group cursor-pointer">
                   <span className="text-xl mt-0.5 flex-shrink-0">{item.emoji}</span>
                   <div>
@@ -280,19 +220,16 @@ function ForHirers() {
               </div>
               <div className="relative">
                 <img src="https://images.unsplash.com/photo-1547153760-18fc86324498?w=700&q=80" alt="Artist profile" className="w-full h-72 object-cover opacity-80" />
-                <div className="absolute bottom-4 right-4 bg-white rounded-lg px-3 py-1.5 shadow-lg">
-                  <span className="font-black text-lg" style={{ fontFamily: "Poppins, sans-serif" }}>WRK</span>
-                </div>
                 <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-xl p-3 shadow-lg max-w-[200px]">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-full" style={{ background: HIRER_GRAD }} />
+                    <div className="w-8 h-8 rounded-full hirer-grad-bg flex-shrink-0" />
                     <div>
                       <p className="font-semibold text-xs text-[#111]">Ramita R.</p>
                       <p className="text-xs text-gray-500">she/her · New York, NY</p>
                     </div>
                   </div>
                   <div className="flex text-yellow-400 text-xs mb-2">★★★★★</div>
-                  <button className="w-full text-xs font-semibold text-white py-1.5 rounded-lg" style={{ background: HIRER_GRAD }}>
+                  <button className="w-full text-xs font-semibold text-white py-1.5 rounded-lg hirer-grad-bg">
                     View Profile →
                   </button>
                 </div>
@@ -305,30 +242,28 @@ function ForHirers() {
   );
 }
 
-// ─── For Artists Feature Section ──────────────────────────────────────────────
-function ForArtists() {
-  const artistItems = [
-    { emoji: "🩰", title: "Dance Teachers", desc: "Find substitute, guest, or full-time work at dance studios" },
-    { emoji: "🎤", title: "Dance Judges", desc: "Judge competitions and events across the country" },
-    { emoji: "🎵", title: "Music Teachers", desc: "Teach piano, voice, violin, and more" },
-    { emoji: "📸", title: "Photographers", desc: "Shoot performances, headshots, and events" },
-    { emoji: "🎥", title: "Videographers", desc: "Film recitals, competitions, and productions" },
-    { emoji: "📽️", title: "Event & Production Staff", desc: "Work backstage and behind the scenes" },
-  ];
+// ─── For Artists ──────────────────────────────────────────────────────────────
+const ARTIST_ITEMS = [
+  { emoji: "🩰", title: "Dance Teachers", desc: "Find substitute, guest, or full-time work at dance studios" },
+  { emoji: "🎤", title: "Dance Judges", desc: "Judge competitions and events across the country" },
+  { emoji: "🎵", title: "Music Teachers", desc: "Teach piano, voice, violin, and more" },
+  { emoji: "📸", title: "Photographers", desc: "Shoot performances, headshots, and events" },
+  { emoji: "🎥", title: "Videographers", desc: "Film recitals, competitions, and productions" },
+  { emoji: "📽️", title: "Event & Production Staff", desc: "Work backstage and behind the scenes" },
+];
 
+function ForArtists() {
   return (
     <section className="py-20 bg-white">
       <div className="mx-auto px-5 lg:px-10 max-w-7xl">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ background: ARTIST_GRAD, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-              For Artists
-            </p>
-            <h2 className="text-4xl md:text-5xl font-black text-[#111] leading-tight mb-8" style={{ fontFamily: "Poppins, sans-serif" }}>
+            <p className="text-xs font-semibold uppercase tracking-widest mb-3 artist-grad-text">For Artists</p>
+            <h2 className="text-4xl md:text-5xl font-black text-[#111] leading-tight mb-8">
               Jobs for Arts Workers
             </h2>
             <div className="space-y-3">
-              {artistItems.map((item) => (
+              {ARTIST_ITEMS.map((item) => (
                 <div key={item.title} className="flex items-start gap-3 p-3 rounded-xl hover:bg-pink-50 transition-colors group cursor-pointer">
                   <span className="text-xl mt-0.5 flex-shrink-0">{item.emoji}</span>
                   <div>
@@ -338,10 +273,7 @@ function ForArtists() {
                 </div>
               ))}
             </div>
-            <button
-              className="mt-6 px-6 py-3 rounded-full text-sm font-semibold text-white transition-all hover:opacity-90"
-              style={{ background: ARTIST_GRAD, fontFamily: "Poppins, sans-serif" }}
-            >
+            <button className="mt-6 px-6 py-3 rounded-full text-sm font-semibold text-white transition-all hover:opacity-90 artist-grad-bg">
               Learn More →
             </button>
           </div>
@@ -355,22 +287,17 @@ function ForArtists() {
                 <div className="w-3 h-3 rounded-full bg-green-500" />
               </div>
               <div className="relative">
-                <img
-                  src="https://images.unsplash.com/photo-1518611012118-696072aa579a?w=700&q=80"
-                  alt="Artist working"
-                  className="w-full h-72 object-cover opacity-85"
-                />
-                {/* Profile card */}
+                <img src="https://images.unsplash.com/photo-1518611012118-696072aa579a?w=700&q=80" alt="Artist working" className="w-full h-72 object-cover opacity-85" />
                 <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-xl p-3 shadow-lg max-w-[220px]">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-full" style={{ background: ARTIST_GRAD }} />
+                    <div className="w-8 h-8 rounded-full artist-grad-bg flex-shrink-0" />
                     <div>
                       <p className="font-semibold text-xs text-[#111]">Dance Teacher</p>
                       <p className="text-xs text-gray-500">New York, NY · $45/hr</p>
                     </div>
                   </div>
                   <div className="flex text-yellow-400 text-xs mb-2">★★★★★</div>
-                  <button className="w-full text-xs font-semibold text-white py-1.5 rounded-lg" style={{ background: ARTIST_GRAD }}>
+                  <button className="w-full text-xs font-semibold text-white py-1.5 rounded-lg artist-grad-bg">
                     Apply Now →
                   </button>
                 </div>
@@ -383,7 +310,7 @@ function ForArtists() {
   );
 }
 
-// ─── Jobs For Artists Section ─────────────────────────────────────────────────
+// ─── Jobs For Artists ─────────────────────────────────────────────────────────
 const SAMPLE_JOBS = [
   { title: "Substitute Teacher", location: "Mount Vernon, NY", posted: "21 hours ago", date: "Sat, Mar 28, 2026", rate: "$45.00/hr" },
   { title: "Voice Teacher", location: "Milford, MI", posted: "a day ago", date: "Mon, May 4, 2026", rate: "$22.00/hr" },
@@ -396,46 +323,34 @@ function JobsForArtists() {
     <section className="py-20 bg-[#fafafa]">
       <div className="mx-auto px-5 lg:px-10 max-w-7xl">
         <div className="mb-10">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ background: ARTIST_GRAD, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-            Jobs for Artists
-          </p>
-          <h2 className="text-4xl md:text-5xl font-black text-[#111] leading-tight" style={{ fontFamily: "Poppins, sans-serif" }}>
-            Browse Open Jobs
-          </h2>
+          <p className="text-xs font-semibold uppercase tracking-widest mb-3 artist-grad-text">Jobs for Artists</p>
+          <h2 className="text-4xl md:text-5xl font-black text-[#111] leading-tight">Browse Open Jobs</h2>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {SAMPLE_JOBS.map((job) => (
-            <div key={job.title + job.location} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow group">
+            <div key={job.title + job.location} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between gap-3">
-                <div className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-white text-sm font-bold" style={{ background: ARTIST_GRAD }}>
+                <div className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-white text-sm font-bold artist-grad-bg">
                   {job.title[0]}
                 </div>
-                <button
-                  className="flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold text-white transition-all hover:opacity-90"
-                  style={{ background: ARTIST_GRAD }}
-                >
+                <button className="flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold text-white artist-grad-bg hover:opacity-90 transition-opacity">
                   Apply
                 </button>
               </div>
-              <h3 className="font-bold text-[#111] text-base mt-3 mb-1" style={{ fontFamily: "Poppins, sans-serif" }}>{job.title}</h3>
+              <h3 className="font-bold text-[#111] text-base mt-3 mb-1">{job.title}</h3>
               <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
                 <span className="flex items-center gap-1"><MapPin size={11} />{job.location}</span>
                 <span className="flex items-center gap-1"><Clock size={11} />Posted {job.posted}</span>
               </div>
               <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100">
                 <span className="text-xs text-gray-500">{job.date}</span>
-                <span className="flex items-center gap-1 text-sm font-bold text-[#111]"><DollarSign size={13} className="text-green-500" />{job.rate.replace("$", "")}</span>
+                <span className="text-sm font-bold text-green-600">{job.rate}</span>
               </div>
             </div>
           ))}
         </div>
-
         <div className="text-center mt-8">
-          <button
-            className="px-8 py-3 rounded-full text-sm font-semibold text-white transition-all hover:opacity-90"
-            style={{ background: ARTIST_GRAD, fontFamily: "Poppins, sans-serif" }}
-          >
+          <button className="px-8 py-3 rounded-full text-sm font-semibold text-white artist-grad-bg hover:opacity-90 transition-opacity">
             View All Open Jobs →
           </button>
         </div>
@@ -445,20 +360,20 @@ function JobsForArtists() {
 }
 
 // ─── Logo Ticker ──────────────────────────────────────────────────────────────
-function LogoTicker({ tab }: { tab: "hirers" | "artists" }) {
-  const logos = [
-    "Austen Dance Collective", "Ferrari Dance Center NYC", "Allegra Dance Greenwich",
-    "Armonk Center for Dance", "Broadway Dance Theater", "Steps on Broadway",
-    "Peridance Center", "Broadway Dance Academy",
-  ];
-  const doubled = [...logos, ...logos];
+const LOGOS = [
+  "Austen Dance Collective", "Ferrari Dance Center NYC", "Allegra Dance Greenwich",
+  "Armonk Center for Dance", "Broadway Dance Theater", "Steps on Broadway",
+  "Peridance Center", "Broadway Dance Academy",
+];
 
+function LogoTicker({ tab }: { tab: Tab }) {
+  const doubled = [...LOGOS, ...LOGOS];
   return (
     <div className="overflow-hidden py-6 border-y border-gray-100">
       <div className="ticker-track" style={{ animationDuration: "30s" }}>
         {doubled.map((name, i) => (
           <div key={i} className="flex-shrink-0 flex items-center gap-2 mx-8">
-            <div className="w-2 h-2 rounded-full flex-shrink-0" style={gradStyle(tab)} />
+            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${gradBgClass(tab)}`} />
             <span className="text-sm font-semibold text-gray-400 whitespace-nowrap">{name}</span>
           </div>
         ))}
@@ -467,22 +382,20 @@ function LogoTicker({ tab }: { tab: "hirers" | "artists" }) {
   );
 }
 
-// ─── For Businesses Section ───────────────────────────────────────────────────
+// ─── For Businesses ───────────────────────────────────────────────────────────
 const BUSINESS_CARDS = [
   { label: "Dance Studio", img: "https://images.unsplash.com/photo-1547153760-18fc86324498?w=600&q=80" },
   { label: "Dance Competition", img: "https://images.unsplash.com/photo-1508700929628-666bc8bd84ea?w=600&q=80" },
   { label: "Music School", img: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=600&q=80" },
 ];
 
-function ForBusinesses({ tab }: { tab: "hirers" | "artists" }) {
+function ForBusinesses({ tab }: { tab: Tab }) {
   return (
     <section className="py-20 bg-white">
       <div className="mx-auto px-5 lg:px-10 max-w-7xl">
         <div className="mb-10">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ background: gradStyle(tab).background as string, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-            For Businesses
-          </p>
-          <h2 className="text-4xl md:text-5xl font-black text-[#111] leading-tight mb-3" style={{ fontFamily: "Poppins, sans-serif" }}>
+          <p className={`text-xs font-semibold uppercase tracking-widest mb-3 ${gradTextClass(tab)}`}>For Businesses</p>
+          <h2 className="text-4xl md:text-5xl font-black text-[#111] leading-tight mb-3">
             Hiring tools for performing arts businesses
           </h2>
           <p className="text-gray-500 text-lg">Join 700+ dance studios, music schools, and more hiring with Artswrk</p>
@@ -497,10 +410,7 @@ function ForBusinesses({ tab }: { tab: "hirers" | "artists" }) {
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
               <div className="absolute bottom-5 left-5">
                 <p className="text-white/80 text-sm font-medium">I'm hiring for my</p>
-                <h3 className="text-white text-2xl font-black" style={{ fontFamily: "Poppins, sans-serif" }}>{card.label}</h3>
-              </div>
-              <div className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="text-white text-sm">→</span>
+                <h3 className="text-white text-2xl font-black">{card.label}</h3>
               </div>
             </div>
           ))}
@@ -523,21 +433,16 @@ const ARTIST_STEPS = [
   { title: "Get Booked & Paid Online", desc: "Tax season has never been easier. Get direct deposits for all your work and receive one 1099.", img: "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=500&q=80", badge: "03" },
 ];
 
-function HowItWorks({ tab }: { tab: "hirers" | "artists" }) {
+function HowItWorks({ tab }: { tab: Tab }) {
   const steps = tab === "hirers" ? HIRER_STEPS : ARTIST_STEPS;
   const headline = tab === "hirers" ? "One tool to find, hire, and pay artists" : "Get paid to do the work you love";
-  const grad = tab === "hirers" ? HIRER_GRAD : ARTIST_GRAD;
 
   return (
-    <section className="py-20 bg-[#fafafa]" id="how-it-works">
+    <section className="py-20 bg-[#fafafa]">
       <div className="mx-auto px-5 lg:px-10 max-w-7xl">
         <div className="text-center mb-14">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ background: grad, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-            How It Works
-          </p>
-          <h2 className="text-4xl md:text-5xl font-black text-[#111] leading-tight" style={{ fontFamily: "Poppins, sans-serif" }}>
-            {headline}
-          </h2>
+          <p className={`text-xs font-semibold uppercase tracking-widest mb-3 ${gradTextClass(tab)}`}>How It Works</p>
+          <h2 className="text-4xl md:text-5xl font-black text-[#111] leading-tight">{headline}</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -550,12 +455,12 @@ function HowItWorks({ tab }: { tab: "hirers" | "artists" }) {
               </div>
               <div className="relative overflow-hidden h-48">
                 <img src={step.img} alt={step.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                <div className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-black" style={{ background: grad, fontFamily: "Poppins, sans-serif" }}>
+                <div className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-black ${gradBgClass(tab)}`}>
                   {step.badge}
                 </div>
               </div>
               <div className="p-5">
-                <h3 className="font-black text-[#111] text-lg mb-2" style={{ fontFamily: "Poppins, sans-serif" }}>{step.title}</h3>
+                <h3 className="font-black text-[#111] text-lg mb-2">{step.title}</h3>
                 <p className="text-gray-500 text-sm leading-relaxed">{step.desc}</p>
               </div>
             </div>
@@ -566,7 +471,7 @@ function HowItWorks({ tab }: { tab: "hirers" | "artists" }) {
   );
 }
 
-// ─── FAQ Section ──────────────────────────────────────────────────────────────
+// ─── FAQ ──────────────────────────────────────────────────────────────────────
 const HIRER_FAQS = [
   { q: "Are there fees to hire on Artswrk?", a: "Artswrk charges a small service fee on bookings made through the platform. There are no upfront subscription costs to post jobs or browse artists — you only pay when you successfully hire." },
   { q: "How do payments work?", a: "Payments are processed securely through Artswrk. Once you confirm a booking, you'll receive a simple payment link. Artists receive their payment after the booking is completed." },
@@ -585,10 +490,8 @@ const ARTIST_FAQS = [
   { q: "Who are the Artswrk clients?", a: "Artswrk clients include dance studios, music schools, dance competitions, event production companies, and individual families looking to hire performing arts professionals." },
 ];
 
-function FAQItem({ q, a, tab }: { q: string; a: string; tab: "hirers" | "artists" }) {
+function FAQItem({ q, a, tab }: { q: string; a: string; tab: Tab }) {
   const [open, setOpen] = useState(false);
-  const grad = tab === "hirers" ? HIRER_GRAD : ARTIST_GRAD;
-
   return (
     <div className="border-b border-gray-100 last:border-0">
       <button className="w-full flex items-center justify-between py-4 text-left gap-4 group" onClick={() => setOpen(!open)}>
@@ -600,24 +503,22 @@ function FAQItem({ q, a, tab }: { q: string; a: string; tab: "hirers" | "artists
   );
 }
 
-function FAQ({ tab }: { tab: "hirers" | "artists" }) {
+function FAQ({ tab }: { tab: Tab }) {
   const faqs = tab === "hirers" ? HIRER_FAQS : ARTIST_FAQS;
-  const grad = tab === "hirers" ? HIRER_GRAD : ARTIST_GRAD;
+  const emailColor = tab === "hirers" ? "text-orange-500" : "text-pink-500";
 
   return (
     <section className="py-20 bg-white">
       <div className="mx-auto px-5 lg:px-10 max-w-7xl">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20">
           <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ background: grad, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-              FAQs
-            </p>
-            <h2 className="text-4xl md:text-5xl font-black text-[#111] leading-tight mb-4" style={{ fontFamily: "Poppins, sans-serif" }}>
+            <p className={`text-xs font-semibold uppercase tracking-widest mb-3 ${gradTextClass(tab)}`}>FAQs</p>
+            <h2 className="text-4xl md:text-5xl font-black text-[#111] leading-tight mb-4">
               Frequently Asked Questions
             </h2>
             <p className="text-gray-500 text-base">
               Couldn't find the answer you were looking for?{" "}
-              <a href="mailto:contact@artswrk.com" className="font-medium underline underline-offset-2 hover:opacity-70 transition-opacity" style={{ color: tab === "hirers" ? "#F97316" : "#ec008c" }}>
+              <a href="mailto:contact@artswrk.com" className={`font-medium underline underline-offset-2 hover:opacity-70 transition-opacity ${emailColor}`}>
                 Contact us at contact@artswrk.com
               </a>
             </p>
@@ -634,29 +535,23 @@ function FAQ({ tab }: { tab: "hirers" | "artists" }) {
 }
 
 // ─── CTA Banner ───────────────────────────────────────────────────────────────
-function CTABanner({ tab }: { tab: "hirers" | "artists" }) {
+function CTABanner({ tab }: { tab: Tab }) {
   const headline = tab === "hirers" ? "Ready to hire your next artist?" : "Ready to find your next gig?";
-  const sub = tab === "hirers"
-    ? "Join 700+ performing arts businesses already hiring on Artswrk."
-    : "Join 5,000+ artists already earning on Artswrk.";
+  const sub = tab === "hirers" ? "Join 700+ performing arts businesses already hiring on Artswrk." : "Join 5,000+ artists already earning on Artswrk.";
   const cta = tab === "hirers" ? "Start Hiring →" : "Find Work →";
 
   return (
     <section className="py-20 bg-[#111]">
       <div className="mx-auto px-5 lg:px-10 max-w-4xl text-center">
-        <h2 className="text-4xl md:text-5xl font-black text-white leading-tight mb-4" style={{ fontFamily: "Poppins, sans-serif" }}>{headline}</h2>
+        <h2 className="text-4xl md:text-5xl font-black text-white leading-tight mb-4">{headline}</h2>
         <p className="text-gray-400 text-lg mb-8">{sub}</p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
           <input
             type="email"
             placeholder="Enter your email address"
-            className="w-full sm:flex-1 px-4 py-3 rounded-full bg-white/10 border border-white/20 text-white placeholder-gray-500 text-sm focus:outline-none transition-all"
-            style={{ fontFamily: "Poppins, sans-serif" }}
+            className="w-full sm:flex-1 px-4 py-3 rounded-full bg-white/10 border border-white/20 text-white placeholder-gray-500 text-sm focus:outline-none"
           />
-          <button
-            className="whitespace-nowrap px-6 py-3 rounded-full text-sm font-semibold text-white transition-all hover:opacity-90"
-            style={{ ...gradStyle(tab), fontFamily: "Poppins, sans-serif" }}
-          >
+          <button className={`whitespace-nowrap px-6 py-3 rounded-full text-sm font-semibold text-white hover:opacity-90 transition-opacity ${gradBgClass(tab)}`}>
             {cta}
           </button>
         </div>
@@ -672,9 +567,9 @@ function Footer() {
       <div className="mx-auto px-5 lg:px-10 max-w-7xl">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
           <div className="col-span-2 md:col-span-1">
-            <div className="flex items-center gap-0 mb-4 select-none">
-              <span className="font-black text-xl tracking-tight" style={{ fontFamily: "Poppins, sans-serif", background: HIRER_GRAD, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>ARTS</span>
-              <span className="font-black text-xl tracking-tight bg-white text-[#111] px-1.5 py-0.5 rounded ml-0.5" style={{ fontFamily: "Poppins, sans-serif" }}>WRK</span>
+            <div className="flex items-center mb-4 select-none">
+              <span className="font-black text-xl tracking-tight hirer-grad-text">ARTS</span>
+              <span className="font-black text-xl tracking-tight bg-white text-[#111] px-1.5 py-0.5 rounded ml-0.5">WRK</span>
             </div>
             <p className="text-sm text-gray-500 leading-relaxed">The hiring platform for performing arts professionals.</p>
           </div>
@@ -714,11 +609,11 @@ function Footer() {
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export default function Home() {
-  const [tab, setTab] = useState<"hirers" | "artists">("hirers");
+  const [tab, setTab] = useState<Tab>("hirers");
 
   return (
-    <div className="min-h-screen bg-white" style={{ fontFamily: "Poppins, sans-serif" }}>
-      <Navbar tab={tab} />
+    <div className="min-h-screen bg-white">
+      <Navbar />
       <Hero tab={tab} setTab={setTab} />
       <ArtistStrip />
 
