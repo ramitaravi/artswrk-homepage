@@ -1,9 +1,10 @@
 /*
  * ARTSWRK HOMEPAGE — Design System
  * Design Philosophy: Refined Modern "Premium Platform"
- * Typography: Syne (display, 700/800) + DM Sans (body, 400/500)
- * Colors: White base, near-black text, orange-coral gradient accent
- * Brand gradient: #F97316 (coral) → #E91E8C (hot pink/magenta)
+ * Typography: Poppins (all weights, 400–900)
+ * Colors: White base, near-black text
+ *   Hirer gradient: #F97316 → #E91E8C
+ *   Artist gradient: #ec008c → #ff7171
  */
 
 @import "tailwindcss";
@@ -59,11 +60,14 @@
   --input: oklch(0.9 0.005 0);
   --ring: oklch(0.65 0.22 35);
 
-  /* Brand gradient colors */
+  /* Brand gradient colors — Hirers */
   --brand-coral: #F97316;
   --brand-pink: #E91E8C;
   --brand-gradient: linear-gradient(135deg, #F97316, #E91E8C);
   --brand-gradient-text: linear-gradient(135deg, #F97316, #E91E8C);
+  /* Brand gradient colors — Artists */
+  --artist-gradient: linear-gradient(135deg, #ec008c, #ff7171);
+  --artist-gradient-text: linear-gradient(135deg, #ec008c, #ff7171);
 }
 
 @layer base {
@@ -72,10 +76,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'DM Sans', sans-serif;
-  }
-  h1, h2, h3, h4 {
-    font-family: 'Syne', sans-serif;
+    font-family: 'Poppins', sans-serif;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
@@ -131,7 +132,7 @@
 
   /* Eyebrow label style */
   .eyebrow {
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Poppins', sans-serif;
     font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.08em;
@@ -179,7 +180,7 @@
     background: var(--brand-gradient);
     color: white;
     border: none;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Poppins', sans-serif;
     font-weight: 600;
     transition: opacity 0.15s ease, transform 0.15s ease;
   }
