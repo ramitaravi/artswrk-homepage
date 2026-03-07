@@ -1,6 +1,6 @@
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, interestedArtists, jobs, users } from "../drizzle/schema";
+import { InsertUser, bookings, conversations, interestedArtists, jobs, messages, payments, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -327,8 +327,6 @@ export async function getApplicantsByJobId(jobId: number, limit = 50, offset = 0
 
 // ── Booking queries ───────────────────────────────────────────────────────────
 
-import { bookings } from "../drizzle/schema";
-
 /**
  * Get all bookings for a client, optionally filtered by status.
  * JOINs on users table to include real artist name + photo.
@@ -476,8 +474,6 @@ export async function getBookingByInterestedArtistId(interestedArtistId: number)
 }
 
 // ── Payment queries ───────────────────────────────────────────────────────────
-
-import { payments, conversations, messages } from "../drizzle/schema";
 
 /**
  * Get all payments for a client, joined with booking info.
@@ -669,4 +665,87 @@ export async function getMessageStatsByClientId(clientUserId: number) {
     totalMessages: Number(msgResult[0]?.totalMessages ?? 0),
     unreadMessages: Number(convoResult[0]?.unreadMessages ?? 0),
   };
+}
+
+// ── Wallet / Payment helpers ──────────────────────────────────────────────────
+
+/**
+ * Get wallet stats for the Payments page:
+ * - totalSpent: sum of clientRate for all completed/confirmed/pay-now bookings
+ * - futurePayments: sum of clientRate for confirmed bookings (upcoming)
+ * - pendingCount: number of "Pay Now" bookings
+ * - totalPaidAmount: sum of stripeAmount (cents) for succeeded payments → divide by 100 for dollars
+ */
+export async function getWalletStatsByClientId(clientUserId: number) {
+  const db = await getDb();
+  if (!db) return { totalSpent: 0, futurePayments: 0, pendingCount: 0, totalPaidAmount: 0 };
+
+  const [totalRow] = await db
+    .select({ total: sql<number>`SUM(COALESCE(clientRate, 0))` })
+    .from(bookings)
+    .where(and(
+      eq(bookings.clientUserId, clientUserId),
+      inArray(bookings.bookingStatus, ['Completed', 'Confirmed', 'Pay Now'])
+    ));
+
+  const [futureRow] = await db
+    .select({ total: sql<number>`SUM(COALESCE(clientRate, 0))` })
+    .from(bookings)
+    .where(and(
+      eq(bookings.clientUserId, clientUserId),
+      eq(bookings.bookingStatus, 'Confirmed')
+    ));
+
+  const [pendingRow] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(bookings)
+    .where(and(
+      eq(bookings.clientUserId, clientUserId),
+      eq(bookings.bookingStatus, 'Pay Now')
+    ));
+
+  const [paidRow] = await db
+    .select({ total: sql<number>`SUM(COALESCE(stripeAmount, 0))` })
+    .from(payments)
+    .where(and(
+      eq(payments.clientUserId, clientUserId),
+      eq(payments.stripeStatus, 'succeeded')
+    ));
+
+  return {
+    totalSpent: Number(totalRow?.total ?? 0),
+    futurePayments: Number(futureRow?.total ?? 0),
+    pendingCount: Number(pendingRow?.count ?? 0),
+    // stripeAmount is in cents — divide by 100 for dollars
+    totalPaidAmount: Number(paidRow?.total ?? 0) / 100,
+  };
+}
+
+/**
+ * Get pending "Pay Now" bookings for the client, joined with artist info.
+ */
+export async function getPendingPaymentsByClientId(clientUserId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db
+    .select({
+      id: bookings.id,
+      clientRate: bookings.clientRate,
+      startDate: bookings.startDate,
+      bookingStatus: bookings.bookingStatus,
+      stripeCheckoutUrl: bookings.stripeCheckoutUrl,
+      artistFirstName: artistUser.firstName,
+      artistLastName: artistUser.lastName,
+      artistName: artistUser.name,
+      artistProfilePicture: artistUser.profilePicture,
+      artistSlug: artistUser.slug,
+    })
+    .from(bookings)
+    .leftJoin(artistUser, eq(bookings.artistUserId, artistUser.id))
+    .where(and(
+      eq(bookings.clientUserId, clientUserId),
+      eq(bookings.bookingStatus, 'Pay Now')
+    ))
+    .orderBy(bookings.startDate);
 }

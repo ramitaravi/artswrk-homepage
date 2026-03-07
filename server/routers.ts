@@ -3,7 +3,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId } from "./db";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import { z } from "zod";
@@ -303,6 +303,26 @@ export const appRouter = router({
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) return { total: 0, succeeded: 0, totalAmount: 0, totalFees: 0 };
         return getPaymentStatsByClientId(user.id);
+      }),
+
+    /**
+     * Get wallet stats: total spent, future payments, pending count.
+     */
+    walletStats: protectedProcedure
+      .query(async ({ ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) return { totalSpent: 0, futurePayments: 0, pendingCount: 0, totalPaidAmount: 0 };
+        return getWalletStatsByClientId(user.id);
+      }),
+
+    /**
+     * Get pending "Pay Now" bookings for the client.
+     */
+    pendingPayments: protectedProcedure
+      .query(async ({ ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) return [];
+        return getPendingPaymentsByClientId(user.id);
       }),
   }),
 
