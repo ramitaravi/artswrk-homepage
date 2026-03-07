@@ -286,11 +286,62 @@ function DiscoverTab({ onBrowse }: { onBrowse: (role?: string) => void }) {
   );
 }
 
+// ─── Organization tabs data ──────────────────────────────────────────────────
+
+const ORG_TABS = [
+  { key: "all", label: "All Artists", logo: null },
+  {
+    key: "cli",
+    label: "CLI Conservatory",
+    logo: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=80&q=80",
+    logoText: "CLI",
+    color: "bg-purple-600",
+  },
+  {
+    key: "acro",
+    label: "Acrobatic Arts",
+    logo: "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=80&q=80",
+    logoText: "AA",
+    color: "bg-green-600",
+  },
+  {
+    key: "rider",
+    label: "Rider University",
+    logo: "https://images.unsplash.com/photo-1547153760-18fc86324498?w=80&q=80",
+    logoText: "RU",
+    color: "bg-red-700",
+  },
+  {
+    key: "wisc",
+    label: "Univ. of Wisconsin",
+    logo: "https://images.unsplash.com/photo-1508700929628-666bc8bd84ea?w=80&q=80",
+    logoText: "UW",
+    color: "bg-red-800",
+  },
+  {
+    key: "broadway",
+    label: "Broadway Alumni",
+    logo: null,
+    logoText: "BA",
+    color: "bg-amber-600",
+  },
+];
+
+const SERVICE_TYPES = [
+  "Competition Choreography", "Substitute Teacher", "Recurring Classes",
+  "Private Lessons", "Master Classes", "Photoshoot", "Videoshoot",
+  "Dance Competition Judge", "Acting Coach", "Vocal Coach",
+  "Event Choreography", "Event Performers", "Yoga Instructor", "Pilates Instructor",
+];
+
 // ─── Browse Artists Tab ───────────────────────────────────────────────────────
 
 function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>(initialRole ?? "");
+  const [orgTab, setOrgTab] = useState("all");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [serviceType, setServiceType] = useState("");
 
   const { data: allApplicants, isLoading } = trpc.applicants.myApplicants.useQuery({ limit: 500 });
 
@@ -314,117 +365,272 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
       const matchesSearch = !search || fullName.includes(search.toLowerCase());
       const artistType = ((a as any).artistType ?? "").toLowerCase();
       const matchesRole = !roleFilter || artistType.includes(roleFilter.toLowerCase());
-      return matchesSearch && matchesRole;
+      const matchesService = !serviceType || artistType.includes(serviceType.toLowerCase());
+      return matchesSearch && matchesRole && matchesService;
     });
-  }, [uniqueArtists, search, roleFilter]);
+  }, [uniqueArtists, search, roleFilter, serviceType]);
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-gray-500">{filtered.length} artists available</p>
-      </div>
+    <div className="flex gap-6">
+      {/* Main content */}
+      <div className="flex-1 min-w-0">
+        {/* Header row */}
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm text-gray-500">
+            <span className="font-bold text-[#111]">{filtered.length}</span> artists available near you
+          </p>
+          {/* Grid / List toggle */}
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`p-1.5 rounded-md transition-all ${
+                viewMode === "grid" ? "bg-white shadow-sm text-[#111]" : "text-gray-400 hover:text-gray-600"
+              }`}
+              title="Grid view"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="0" y="0" width="6" height="6" rx="1" fill="currentColor"/>
+                <rect x="8" y="0" width="6" height="6" rx="1" fill="currentColor"/>
+                <rect x="0" y="8" width="6" height="6" rx="1" fill="currentColor"/>
+                <rect x="8" y="8" width="6" height="6" rx="1" fill="currentColor"/>
+              </svg>
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`p-1.5 rounded-md transition-all ${
+                viewMode === "list" ? "bg-white shadow-sm text-[#111]" : "text-gray-400 hover:text-gray-600"
+              }`}
+              title="List view"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="0" y="0" width="14" height="2.5" rx="1" fill="currentColor"/>
+                <rect x="0" y="5.5" width="14" height="2.5" rx="1" fill="currentColor"/>
+                <rect x="0" y="11" width="14" height="2.5" rx="1" fill="currentColor"/>
+              </svg>
+            </button>
+          </div>
+        </div>
 
-      {/* Search */}
-      <div className="relative mb-4">
-        <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search artists by name or keyword..."
-          className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 text-sm text-[#111] placeholder-gray-400 focus:outline-none focus:border-[#FFBC5D] transition-all bg-white shadow-sm"
-        />
-      </div>
+        {/* Search */}
+        <div className="relative mb-4">
+          <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search artists by name or keyword..."
+            className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-gray-200 text-sm text-[#111] placeholder-gray-400 focus:outline-none focus:border-[#FFBC5D] transition-all bg-white shadow-sm"
+          />
+        </div>
 
-      {/* Role pills */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        <button
-          onClick={() => setRoleFilter("")}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
-            !roleFilter ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
-          }`}
-        >
-          All
-        </button>
-        {ROLES.map((role) => (
+        {/* Organization tabs */}
+        <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
+          {ORG_TABS.map((org) => (
+            <button
+              key={org.key}
+              onClick={() => setOrgTab(org.key)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
+                orgTab === org.key
+                  ? "border-[#111] bg-[#111] text-white"
+                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-400"
+              }`}
+            >
+              {org.logo ? (
+                <img src={org.logo} alt={org.label} className="w-5 h-5 rounded object-cover" />
+              ) : org.logoText ? (
+                <span className={`w-5 h-5 rounded text-white text-xs font-black flex items-center justify-center ${
+                  orgTab === org.key ? "bg-white/20" : (org as any).color ?? "bg-gray-400"
+                }`}>{org.logoText}</span>
+              ) : null}
+              {org.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Role filter pills */}
+        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 scrollbar-hide">
           <button
-            key={role}
-            onClick={() => setRoleFilter(roleFilter === role ? "" : role)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
-              roleFilter === role
-                ? "bg-[#F25722] text-white border-[#F25722]"
-                : "bg-white text-gray-600 border-gray-200 hover:border-[#F25722] hover:text-[#F25722]"
+            onClick={() => setRoleFilter("")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border flex-shrink-0 ${
+              !roleFilter ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
             }`}
           >
-            {role}
+            All
           </button>
-        ))}
-      </div>
-
-      {/* Artist grid */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-20 text-gray-400">
-          <Loader2 size={24} className="animate-spin mr-3" />
-          <span className="text-sm">Loading artists...</span>
+          {ROLES.map((role) => (
+            <button
+              key={role}
+              onClick={() => setRoleFilter(roleFilter === role ? "" : role)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border flex-shrink-0 ${
+                roleFilter === role
+                  ? "bg-[#F25722] text-white border-[#F25722]"
+                  : "bg-white text-gray-600 border-gray-200 hover:border-[#F25722] hover:text-[#F25722]"
+              }`}
+            >
+              {role}
+            </button>
+          ))}
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-          <Users size={40} className="mb-3 opacity-30" />
-          <p className="text-sm font-medium">No artists found</p>
-          <button onClick={() => { setSearch(""); setRoleFilter(""); }} className="mt-2 text-xs text-[#F25722] font-semibold hover:opacity-70">
-            Clear filters
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {filtered.map((a) => {
-            const firstName = (a as any).artistFirstName as string | null;
-            const lastName = (a as any).artistLastName as string | null;
-            const name = (a as any).artistName as string | null;
-            const photo = (a as any).artistProfilePicture as string | null;
-            const slug = (a as any).artistSlug as string | null;
-            const displayName = firstName && lastName ? `${firstName} ${lastName}` : name ?? "Artist";
-            const role = (a as any).artistType ?? "";
-            const location = (a as any).artistLocation ?? "";
 
-            return (
-              <div key={a.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow group cursor-pointer">
-                <div className="aspect-[4/5] relative overflow-hidden bg-gray-100">
-                  {photo ? (
-                    <img src={photo} alt={displayName}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      onError={(e) => {
-                        const el = e.currentTarget;
-                        el.style.display = "none";
-                        const fb = el.nextElementSibling as HTMLElement;
-                        if (fb) fb.style.display = "flex";
-                      }}
-                    />
-                  ) : null}
-                  <div
-                    className={`w-full h-full ${getArtistColor(firstName)} flex items-center justify-center text-white text-3xl font-black`}
-                    style={{ display: photo ? "none" : "flex" }}
-                  >
-                    {getInitials(firstName, lastName, name)}
+        {/* Artist grid or list */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20 text-gray-400">
+            <Loader2 size={24} className="animate-spin mr-3" />
+            <span className="text-sm">Loading artists...</span>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+            <Users size={40} className="mb-3 opacity-30" />
+            <p className="text-sm font-medium">No artists found</p>
+            <button onClick={() => { setSearch(""); setRoleFilter(""); setServiceType(""); }} className="mt-2 text-xs text-[#F25722] font-semibold hover:opacity-70">
+              Clear filters
+            </button>
+          </div>
+        ) : viewMode === "grid" ? (
+          // ── Grid view: 3 cols on md, 4 on lg ──
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4">
+            {filtered.map((a) => {
+              const firstName = (a as any).artistFirstName as string | null;
+              const lastName = (a as any).artistLastName as string | null;
+              const name = (a as any).artistName as string | null;
+              const photo = (a as any).artistProfilePicture as string | null;
+              const displayName = firstName && lastName ? `${firstName} ${lastName}` : name ?? "Artist";
+              const role = (a as any).artistType ?? "";
+              const location = (a as any).artistLocation ?? "";
+
+              return (
+                <div key={a.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-lg transition-all group cursor-pointer">
+                  {/* Portrait photo */}
+                  <div className="aspect-[3/4] relative overflow-hidden bg-gray-100">
+                    {photo ? (
+                      <img src={photo} alt={displayName}
+                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                        onError={(e) => {
+                          const el = e.currentTarget;
+                          el.style.display = "none";
+                          const fb = el.nextElementSibling as HTMLElement;
+                          if (fb) fb.style.display = "flex";
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`w-full h-full ${getArtistColor(firstName)} flex items-center justify-center text-white text-4xl font-black`}
+                      style={{ display: photo ? "none" : "flex" }}
+                    >
+                      {getInitials(firstName, lastName, name)}
+                    </div>
+                    {/* PRO badge */}
+                    <div className="absolute top-2.5 right-2.5">
+                      <span className="bg-black/75 backdrop-blur-sm text-white text-[10px] font-black px-2 py-0.5 rounded-full tracking-wide">PRO</span>
+                    </div>
                   </div>
-                  {/* PRO badge */}
-                  <div className="absolute top-2 right-2">
-                    <span className="bg-black/70 text-white text-xs font-bold px-2 py-0.5 rounded-full">PRO</span>
+                  {/* Card info */}
+                  <div className="p-3">
+                    <p className="text-sm font-bold text-[#111] truncate">{displayName}</p>
+                    {location && <p className="text-xs text-gray-400 truncate mt-0.5">{location}</p>}
+                    {role && (
+                      <span className="mt-2 inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#ec008c]/10 text-[#ec008c]">
+                        {role}
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div className="p-3">
-                  <p className="text-sm font-bold text-[#111] truncate">{displayName}</p>
-                  {location && <p className="text-xs text-gray-400 truncate">{location}</p>}
+              );
+            })}
+          </div>
+        ) : (
+          // ── List view ──
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-100 overflow-hidden">
+            {filtered.map((a) => {
+              const firstName = (a as any).artistFirstName as string | null;
+              const lastName = (a as any).artistLastName as string | null;
+              const name = (a as any).artistName as string | null;
+              const photo = (a as any).artistProfilePicture as string | null;
+              const displayName = firstName && lastName ? `${firstName} ${lastName}` : name ?? "Artist";
+              const role = (a as any).artistType ?? "";
+              const location = (a as any).artistLocation ?? "";
+              const slug = (a as any).artistSlug as string | null;
+
+              return (
+                <div key={a.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer group">
+                  {/* Photo */}
+                  <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100">
+                    {photo ? (
+                      <img src={photo} alt={displayName} className="w-full h-full object-cover object-top"
+                        onError={(e) => {
+                          const el = e.currentTarget;
+                          el.style.display = "none";
+                          const fb = el.nextElementSibling as HTMLElement;
+                          if (fb) fb.style.display = "flex";
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`w-full h-full ${getArtistColor(firstName)} flex items-center justify-center text-white text-sm font-black`}
+                      style={{ display: photo ? "none" : "flex" }}
+                    >
+                      {getInitials(firstName, lastName, name)}
+                    </div>
+                  </div>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold text-[#111] truncate">{displayName}</p>
+                      <span className="bg-black/80 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tracking-wide flex-shrink-0">PRO</span>
+                    </div>
+                    {location && <p className="text-xs text-gray-400 truncate">{location}</p>}
+                  </div>
+                  {/* Role tag */}
                   {role && (
-                    <span className="mt-1.5 inline-block px-2 py-0.5 rounded-full text-xs font-semibold artist-grad-bg text-white">
+                    <span className="flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#ec008c]/10 text-[#ec008c]">
                       {role}
                     </span>
                   )}
+                  <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-500 flex-shrink-0 transition-colors" />
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Right sidebar */}
+      <div className="hidden lg:block w-64 flex-shrink-0">
+        {/* Post a Job CTA */}
+        <div className="bg-pink-50 rounded-2xl p-5 mb-4 border border-pink-100">
+          <p className="text-sm font-bold text-[#111] mb-1">Not sure what you're looking for?</p>
+          <p className="text-xs text-gray-500 mb-4">Post a FREE Job!</p>
+          <button className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors flex items-center justify-center gap-2">
+            ☆ Post a Job →
+          </button>
         </div>
-      )}
+
+        {/* Location */}
+        <div className="mb-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Location</p>
+          <div className="relative">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              placeholder="Search Location..."
+              className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-400 focus:outline-none focus:border-[#FFBC5D] transition-all bg-white"
+            />
+          </div>
+        </div>
+
+        {/* Service Type */}
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Service Type</p>
+          <select
+            value={serviceType}
+            onChange={(e) => setServiceType(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 focus:outline-none focus:border-[#FFBC5D] transition-all bg-white"
+          >
+            <option value="">Select a Service...</option>
+            {SERVICE_TYPES.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+      </div>
     </div>
   );
 }
