@@ -48,6 +48,50 @@ export const users = mysqlTable("users", {
 
   // ── Artist Fields ──────────────────────────────────────────────────────────
   stripeCustomerId: varchar("stripeCustomerId", { length: 64 }),
+  /** Short bio / about text */
+  bio: text("bio"),
+  /** Pronouns (e.g. "She/her", "They/them") */
+  pronouns: varchar("pronouns", { length: 64 }),
+  /** JSON array of discipline strings (e.g. ["Ballet", "Hip Hop"]) */
+  artistDisciplines: text("artistDisciplines"),
+  /** JSON array of service/role strings (e.g. ["Dance Educator", "Choreographer"]) */
+  artistServices: text("artistServices"),
+  /** JSON array of master artist type strings */
+  masterArtistTypes: text("masterArtistTypes"),
+  /** JSON array of master style strings */
+  masterStyles: text("masterStyles"),
+  /** JSON array of experience strings */
+  artistExperiences: text("artistExperiences"),
+  /** Location string (city, state) */
+  location: varchar("location", { length: 256 }),
+  /** Portfolio URL */
+  portfolio: text("portfolio"),
+  /** Website URL */
+  website: text("website"),
+  /** Instagram handle */
+  instagram: varchar("instagram", { length: 128 }),
+  /** TikTok handle or URL */
+  tiktok: text("tiktok"),
+  /** YouTube URL */
+  youtube: text("youtube"),
+  /** JSON array of resume file URLs */
+  resumes: text("resumes"),
+  /** JSON array of video URLs */
+  videos: text("videos"),
+  /** Artswrk PRO status */
+  artswrkPro: boolean("artswrkPro").default(false),
+  /** Artswrk Basic status */
+  artswrkBasic: boolean("artswrkBasic").default(false),
+  /** Business or Individual */
+  businessOrIndividual: varchar("businessOrIndividual", { length: 64 }),
+  /** Business type */
+  businessType: varchar("businessType", { length: 128 }),
+  /** Business name */
+  artistBusinessName: varchar("artistBusinessName", { length: 256 }),
+  /** Transportation accommodation */
+  artistTransportationAccommodation: varchar("artistTransportationAccommodation", { length: 128 }),
+  /** Hiring category */
+  hiringCategory: varchar("hiringCategory", { length: 128 }),
 
   // ── Onboarding ─────────────────────────────────────────────────────────────
   onboardingStep: int("onboardingStep").default(0),

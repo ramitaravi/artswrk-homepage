@@ -749,3 +749,111 @@ export async function getPendingPaymentsByClientId(clientUserId: number) {
     ))
     .orderBy(bookings.startDate);
 }
+
+// ── Artist Profile Queries ─────────────────────────────────────────────────────
+
+/** Get a single artist user by their local DB id */
+export async function getArtistById(artistId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const [artist] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, artistId))
+    .limit(1);
+
+  return artist ?? null;
+}
+
+/** Get a single artist user by their Bubble ID */
+export async function getArtistByBubbleId(bubbleId: string) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const [artist] = await db
+    .select()
+    .from(users)
+    .where(eq(users.bubbleId, bubbleId))
+    .limit(1);
+
+  return artist ?? null;
+}
+
+/** Get an artist's full history with a specific client:
+ *  - jobs they applied to
+ *  - bookings
+ *  - conversations
+ */
+export async function getArtistHistoryForClient(artistUserId: number, clientUserId: number) {
+  const db = await getDb();
+  if (!db) return { applications: [], bookings: [], conversations: [] };
+
+  // Applications (interested artists)
+  const applications = await db
+    .select({
+      id: interestedArtists.id,
+      status: interestedArtists.status,
+      startDate: interestedArtists.startDate,
+      endDate: interestedArtists.endDate,
+      artistHourlyRate: interestedArtists.artistHourlyRate,
+      clientHourlyRate: interestedArtists.clientHourlyRate,
+      artistFlatRate: interestedArtists.artistFlatRate,
+      clientFlatRate: interestedArtists.clientFlatRate,
+      message: interestedArtists.message,
+      resumeLink: interestedArtists.resumeLink,
+      bubbleCreatedAt: interestedArtists.bubbleCreatedAt,
+      jobId: interestedArtists.jobId,
+      jobDescription: jobs.description,
+      jobLocationAddress: jobs.locationAddress,
+      jobStartDate: jobs.startDate,
+    })
+    .from(interestedArtists)
+    .leftJoin(jobs, eq(interestedArtists.jobId, jobs.id))
+    .where(and(
+      eq(interestedArtists.artistUserId, artistUserId),
+      eq(interestedArtists.clientUserId, clientUserId),
+    ))
+    .orderBy(desc(interestedArtists.bubbleCreatedAt));
+
+  // Bookings
+  const artistBookings = await db
+    .select({
+      id: bookings.id,
+      bookingStatus: bookings.bookingStatus,
+      clientRate: bookings.clientRate,
+      artistRate: bookings.artistRate,
+      startDate: bookings.startDate,
+      endDate: bookings.endDate,
+      locationAddress: bookings.locationAddress,
+      stripeCheckoutUrl: bookings.stripeCheckoutUrl,
+      bubbleCreatedAt: bookings.bubbleCreatedAt,
+    })
+    .from(bookings)
+    .where(and(
+      eq(bookings.artistUserId, artistUserId),
+      eq(bookings.clientUserId, clientUserId),
+    ))
+    .orderBy(desc(bookings.bubbleCreatedAt));
+
+  // Conversations
+  const artistConversations = await db
+    .select({
+      id: conversations.id,
+      lastMessageDate: conversations.lastMessageDate,
+      unreadCount: conversations.unreadCount,
+      bubbleCreatedAt: conversations.bubbleCreatedAt,
+    })
+    .from(conversations)
+    .where(and(
+      eq(conversations.artistUserId, artistUserId),
+      eq(conversations.clientUserId, clientUserId),
+    ))
+    .orderBy(desc(conversations.bubbleCreatedAt));
+
+  return {
+    applications,
+    bookings: artistBookings,
+    conversations: artistConversations,
+  };
+}

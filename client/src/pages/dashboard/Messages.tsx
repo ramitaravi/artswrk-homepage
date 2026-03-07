@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
+import { useLocation } from "wouter";
 import { Search, MessageSquare } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -174,6 +175,7 @@ export default function Messages() {
   const [activeConvoId, setActiveConvoId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [, navigate] = useLocation();
 
   const { data: conversations, isLoading: convosLoading } = trpc.messages.myConversations.useQuery({ limit: 200 });
   const { data: msgs, isLoading: msgsLoading } = trpc.messages.byConversation.useQuery(
@@ -295,7 +297,10 @@ export default function Messages() {
                 </div>
               </div>
               <div>
-                <p className="text-sm font-bold text-[#111]">{artistDisplayName}</p>
+                <p
+                  className={`text-sm font-bold text-[#111] ${activeConvo.artistUserId ? 'cursor-pointer hover:text-[#F25722] transition-colors' : ''}`}
+                  onClick={() => activeConvo.artistUserId && navigate(`/dashboard/artists/${activeConvo.artistUserId}`)}
+                >{artistDisplayName}</p>
                 {activeConvo.artistSlug && (
                   <p className="text-xs text-gray-400">@{activeConvo.artistSlug}</p>
                 )}

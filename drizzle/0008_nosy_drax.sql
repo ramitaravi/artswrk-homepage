@@ -1,0 +1,1 @@
+ALTER TABLE `users` MODIFY COLUMN `tiktok` text;

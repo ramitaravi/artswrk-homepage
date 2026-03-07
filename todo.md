@@ -117,3 +117,10 @@
 - [x] Wire dashboard Payments page to real data (stats, searchable history, receipt links, cards used)
 - [x] Add Payments stat card to Overview dashboard
 - [x] 56 vitest tests passing
+
+## Artist Profile Page
+- [x] Capture original Artswrk profile page layout
+- [x] Create ArtistProfile page with header, bio, services, history sections
+- [x] Add tRPC artists.getById and artists.getHistory endpoints
+- [x] Wire click-through from Browse Artists (grid + list), My Artists table, Bookings page, Messages page
+- [x] Register route /dashboard/artists/:artistId in App.tsx

@@ -18,6 +18,7 @@ import CompanyPage from "./pages/dashboard/CompanyPage";
 import SubLists from "./pages/dashboard/SubLists";
 import Community from "./pages/dashboard/Community";
 import Benefits from "./pages/dashboard/Benefits";
+import ArtistProfile from "./pages/dashboard/ArtistProfile";
 import Admin from "./pages/Admin";
 
 // DashboardLayout handles auth protection internally (redirects to /login if not authenticated)
@@ -52,6 +53,13 @@ function Router() {
       </Route>
       <Route path="/dashboard/artists">
         {() => <DashRoute component={Artists} />}
+      </Route>
+      <Route path="/dashboard/artists/:artistId">
+        {(params) => (
+          <DashboardLayout>
+            <ArtistProfile />
+          </DashboardLayout>
+        )}
       </Route>
       <Route path="/dashboard/messages">
         {() => <DashRoute component={Messages} />}

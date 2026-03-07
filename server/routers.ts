@@ -3,7 +3,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient } from "./db";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import { z } from "zod";
@@ -179,7 +179,7 @@ export const appRouter = router({
      */
     myApplicants: protectedProcedure
       .input(z.object({
-        limit: z.number().min(1).max(200).default(100),
+        limit: z.number().min(1).max(500).default(100),
         offset: z.number().min(0).default(0),
         status: z.array(z.string()).optional(),
         jobId: z.number().optional(),
@@ -363,6 +363,43 @@ export const appRouter = router({
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) return { totalConversations: 0, totalMessages: 0, unreadMessages: 0 };
         return getMessageStatsByClientId(user.id);
+      }),
+  }),
+
+  // ── Artist Profile ──────────────────────────────────────────────────────────
+  artists: router({
+    /**
+     * Get a single artist by their local DB id.
+     */
+    getById: protectedProcedure
+      .input(z.object({ artistId: z.number() }))
+      .query(async ({ input }) => {
+        return getArtistById(input.artistId);
+      }),
+
+    /**
+     * Get an artist's full history with the currently logged-in client.
+     */
+    getHistory: protectedProcedure
+      .input(z.object({ artistId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        return getArtistHistoryForClient(input.artistId, user.id);
+      }),
+
+    /**
+     * List all artists who have interacted with the current client (distinct artists from interested_artists).
+     */
+    listMyArtists: protectedProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(200).default(100),
+        offset: z.number().min(0).default(0),
+      }))
+      .query(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        return getInterestedArtistsByClientId(user.id, input.limit, input.offset);
       }),
   }),
 

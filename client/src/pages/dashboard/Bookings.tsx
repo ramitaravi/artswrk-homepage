@@ -4,6 +4,7 @@
  */
 
 import { useState } from "react";
+import { useLocation } from "wouter";
 import {
   Calendar, Clock, MapPin, DollarSign, CheckCircle, AlertCircle,
   ChevronDown, ChevronUp, CreditCard, User, Briefcase, ExternalLink,
@@ -60,6 +61,8 @@ const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, { label: string; className: s
 
 function BookingRow({ booking }: { booking: Booking }) {
   const [expanded, setExpanded] = useState(false);
+  const [, navigate] = useLocation();
+  const artistUserId = (booking as any).artistUserId as number | null | undefined;
 
   const bookingStatus = (booking.bookingStatus ?? "Confirmed") as BookingStatus;
   const paymentStatus = (booking.paymentStatus ?? "Unpaid") as PaymentStatus;
@@ -74,9 +77,13 @@ function BookingRow({ booking }: { booking: Booking }) {
   const artistSlug = (booking as any).artistSlug as string | null | undefined;
   const initials = getInitials(artistFirstName, artistLastName, artistId);
   const color = avatarColor(artistId);
-  const displayName = artistFirstName && artistLastName
+   const displayName = artistFirstName && artistLastName
     ? `${artistFirstName} ${artistLastName}`
     : artistName ?? `Artist #${artistId.slice(-6) || "—"}`;
+
+  function handleArtistClick() {
+    if (artistUserId) navigate(`/dashboard/artists/${artistUserId}`);
+  }
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
@@ -117,7 +124,10 @@ function BookingRow({ booking }: { booking: Booking }) {
               </div>
 
               {/* Artist name */}
-              <p className="text-sm font-bold text-[#111] mb-0.5">{displayName}</p>
+              <p
+                className={`text-sm font-bold text-[#111] mb-0.5 ${artistUserId ? 'cursor-pointer hover:text-[#F25722] transition-colors' : ''}`}
+                onClick={artistUserId ? handleArtistClick : undefined}
+              >{displayName}</p>
               {artistSlug && (
                 <p className="text-xs text-gray-400 mb-1">@{artistSlug}</p>
               )}
