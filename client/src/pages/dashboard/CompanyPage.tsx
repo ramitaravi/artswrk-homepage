@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { Building2, MapPin, Globe, Instagram, Upload, Plus, Edit3, Eye, Crown } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function CompanyPage() {
   const { user } = useAuth();
@@ -60,14 +60,14 @@ export default function CompanyPage() {
             <div>
               {editing ? (
                 <input
-                  defaultValue={user?.studio}
+                  defaultValue={user?.clientCompanyName ?? ""}
                   className="text-xl font-black text-[#111] border-b border-[#FFBC5D] focus:outline-none bg-transparent w-full mb-1"
                 />
               ) : (
-                <h2 className="text-xl font-black text-[#111] mb-1">{user?.studio}</h2>
+                <h2 className="text-xl font-black text-[#111] mb-1">{user?.clientCompanyName}</h2>
               )}
               <div className="flex items-center gap-3 flex-wrap">
-                <span className="flex items-center gap-1 text-xs text-gray-500"><MapPin size={11} /> {user?.location}</span>
+                <span className="flex items-center gap-1 text-xs text-gray-500"><MapPin size={11} /> Location TBD</span>
                 <span className="flex items-center gap-1 text-xs text-gray-500"><Globe size={11} /> fieldcrestdance.com</span>
                 <span className="flex items-center gap-1 text-xs text-gray-500"><Instagram size={11} /> @fieldcrestdance</span>
               </div>

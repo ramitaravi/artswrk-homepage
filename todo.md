@@ -62,3 +62,4 @@
 - [x] Add passwordHash field to users schema
 - [x] Build /admin page for setting temporary passwords
 - [x] Update login to authenticate against stored password hash
+- [x] Fix AuthProvider error in dashboard pages (replace old AuthContext with tRPC useAuth)

@@ -10,7 +10,7 @@ import {
   Clock, MapPin, ChevronRight, Sparkles, Image, Search, Plus,
   MoreHorizontal, RefreshCw
 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 const STATS = [
   { label: "Active Jobs", value: "7", change: "+2 this week", icon: <Briefcase size={18} />, color: "text-orange-500", bg: "bg-orange-50" },
@@ -63,7 +63,7 @@ export default function Overview() {
       {/* Welcome header */}
       <div className="mb-7">
         <h1 className="text-2xl font-black text-[#111]">
-          Welcome back, {user?.name.split(" ")[0]}! 👋
+          Welcome back, {(user?.name ?? user?.firstName ?? "there").split(" ")[0]}! 👋
         </h1>
         <p className="text-gray-500 text-sm mt-1">Here is your hiring dashboard.</p>
       </div>
