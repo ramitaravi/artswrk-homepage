@@ -7,13 +7,12 @@
  * All gradient text uses CSS classes — NO inline background+backgroundClip combos.
  */
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
-import { ChevronDown, Menu, X, MapPin, Clock } from "lucide-react";
+import { ChevronDown, Menu, X, MapPin, Clock, Sparkles, CheckCircle2, Users, ArrowRight, Zap } from "lucide-react";
 
 type Tab = "hirers" | "artists";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function gradBgClass(tab: Tab) {
   return tab === "hirers" ? "hirer-grad-bg" : "artist-grad-bg";
 }
@@ -21,7 +20,6 @@ function gradTextClass(tab: Tab) {
   return tab === "hirers" ? "hirer-grad-text" : "artist-grad-text";
 }
 
-// ─── Asset URLs ───────────────────────────────────────────────────────────────
 const STRIP = [
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/artist-strip-1-aY8po4fr7wkR7kHuYcLRjW.webp",
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/artist-strip-2-Vo37fp95iDpS9ybaZkYWJB.webp",
@@ -45,13 +43,11 @@ function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-100">
       <div className="mx-auto px-5 lg:px-10 max-w-7xl">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
           <a href="/" className="flex items-center select-none">
             <span className="font-black text-2xl tracking-tight hirer-grad-text">ARTS</span>
             <span className="font-black text-2xl tracking-tight bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">WRK</span>
           </a>
 
-          {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-6">
             <Link href="/jobs" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">Jobs</Link>
             <a href="#" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">About</a>
@@ -109,22 +105,286 @@ function Navbar() {
   );
 }
 
+// ─── Job Post Flow ────────────────────────────────────────────────────────────
+const EXAMPLE_POSTS = [
+  "Looking for a sub teacher this Saturday 3/15 from 4-5pm. Hip hop class, ages 8-12. $50/hr. Studio is in Lincoln Park, Chicago. DM me if interested!",
+  "Need a ballet teacher for recurring classes starting April. Mon/Wed evenings 5-7pm. Competitive rate, experience required. Evanston, IL.",
+  "Hiring a dance competition judge for our spring showcase May 3rd. All day event in Oak Park. Open rate, travel covered. Please reach out!",
+  "Looking for a piano teacher for private lessons, 2x per week. Flexible schedule. $40-60/hr depending on experience. Naperville area.",
+];
+
+function parseJobText(text: string) {
+  const titleMap: [RegExp, string][] = [
+    [/sub(stitute)?\s+teacher/i, "Substitute Teacher"],
+    [/ballet/i, "Ballet Teacher"],
+    [/hip\s*hop/i, "Hip Hop Teacher"],
+    [/piano/i, "Piano Teacher"],
+    [/violin/i, "Violin Teacher"],
+    [/voice|vocal/i, "Vocal Coach"],
+    [/judge|adjudicat/i, "Dance Adjudicator"],
+    [/choreograph/i, "Competition Choreographer"],
+    [/photograph/i, "Photographer"],
+    [/videograph/i, "Videographer"],
+    [/yoga/i, "Yoga Instructor"],
+    [/pilates/i, "Pilates Instructor"],
+    [/teacher|instructor|coach/i, "Dance Teacher"],
+  ];
+  let title = "Arts Professional";
+  for (const [re, label] of titleMap) {
+    if (re.test(text)) { title = label; break; }
+  }
+
+  const rateMatch = text.match(/(\$[\d,]+(?:\.\d{2})?(?:\s*\/\s*hr)?|\$[\d]+-\$?[\d]+(?:\/hr)?|open rate)/i);
+  const rate = rateMatch ? rateMatch[0].replace(/\s/g, "") : "Open rate";
+
+  const locMatch = text.match(/(?:in|at|near|@)\s+([A-Z][a-zA-Z\s]+(?:,\s*[A-Z]{2})?)/)
+    || text.match(/([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*,\s*[A-Z]{2})/);
+  const location = locMatch ? locMatch[1].trim() : "Location TBD";
+
+  const dateMatch = text.match(/(this\s+\w+|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[^,.]*/i);
+  const date = dateMatch ? dateMatch[0].trim() : "Flexible / Ongoing";
+
+  const isRecurring = /recurring|ongoing|weekly|monthly|regular|2x|3x|per week/i.test(text);
+  const jobType = isRecurring ? "Recurring" : "One-time";
+
+  return { title, rate, location, date, jobType };
+}
+
+function JobPostFlow() {
+  const [step, setStep] = useState<"input" | "preview" | "signup">("input");
+  const [text, setText] = useState("");
+  const [parsed, setParsed] = useState<ReturnType<typeof parseJobText> | null>(null);
+  const [exampleIdx, setExampleIdx] = useState(0);
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!text) setExampleIdx((i) => (i + 1) % EXAMPLE_POSTS.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [text]);
+
+  function handleAnalyze() {
+    if (!text.trim()) return;
+    setParsed(parseJobText(text));
+    setStep("preview");
+  }
+
+  function handleUseExample() {
+    setText(EXAMPLE_POSTS[exampleIdx]);
+    if (textareaRef.current) textareaRef.current.focus();
+  }
+
+  // ── Step: Signup ──
+  if (step === "signup") {
+    return (
+      <div className="flex flex-col items-center px-5 py-10">
+        <div className="w-16 h-16 rounded-full hirer-grad-bg flex items-center justify-center mb-5 shadow-lg">
+          <CheckCircle2 size={32} className="text-white" />
+        </div>
+
+        <h2 className="text-3xl md:text-4xl font-black text-[#111] mb-2 text-center">
+          Your job is ready to go live!
+        </h2>
+        <p className="text-gray-500 text-base mb-3 max-w-md text-center">
+          Create a free account to publish{" "}
+          <span className="font-semibold text-[#111]">"{parsed?.title}"</span> to{" "}
+          <span className="font-bold hirer-grad-text">5,000+ artists</span> — in under 60 seconds.
+        </p>
+
+        <div className="flex items-center gap-4 mb-8 text-xs text-gray-400 flex-wrap justify-center">
+          <span className="flex items-center gap-1"><Users size={12} /> 5,000+ artists</span>
+          <span className="w-1 h-1 rounded-full bg-gray-300" />
+          <span className="flex items-center gap-1"><Zap size={12} /> Avg. 3 applicants in 24hrs</span>
+          <span className="w-1 h-1 rounded-full bg-gray-300" />
+          <span className="flex items-center gap-1"><CheckCircle2 size={12} /> Free to post</span>
+        </div>
+
+        <div className="w-full max-w-sm space-y-3">
+          <input
+            type="text"
+            placeholder="Your name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
+          />
+          <input
+            type="email"
+            placeholder="Your email address"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
+          />
+          <button className="w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+            <Sparkles size={16} />
+            Create Free Account & Publish Job
+          </button>
+          <p className="text-xs text-gray-400 text-center">No credit card required · Free to post</p>
+        </div>
+
+        <button
+          onClick={() => setStep("preview")}
+          className="mt-5 text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
+        >
+          ← Back to preview
+        </button>
+      </div>
+    );
+  }
+
+  // ── Step: Preview ──
+  if (step === "preview" && parsed) {
+    return (
+      <div className="flex flex-col items-center px-5 py-8">
+        <div className="flex items-center gap-2 mb-5">
+          <div className="w-6 h-6 rounded-full hirer-grad-bg flex items-center justify-center">
+            <CheckCircle2 size={14} className="text-white" />
+          </div>
+          <p className="text-sm font-semibold text-gray-600">Here's how your job will appear to artists</p>
+        </div>
+
+        <div className="w-full max-w-md bg-white rounded-2xl border-2 border-gray-100 shadow-lg overflow-hidden mb-6">
+          <div className="hirer-grad-bg px-5 py-3 flex items-center justify-between">
+            <span className="text-white text-xs font-bold uppercase tracking-wider">Job Preview</span>
+            <span className="text-white/80 text-xs">artswrk.com/jobs</span>
+          </div>
+
+          <div className="p-5">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl hirer-grad-bg flex items-center justify-center text-white font-black text-sm flex-shrink-0">
+                  {parsed.title[0]}
+                </div>
+                <div>
+                  <h3 className="font-black text-[#111] text-base">{parsed.title}</h3>
+                  <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                    <MapPin size={10} /> {parsed.location}
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-orange-50 text-[#F25722] flex-shrink-0">
+                {parsed.jobType}
+              </span>
+            </div>
+
+            <div className="space-y-2 text-sm text-gray-600 mb-4">
+              <div className="flex items-center gap-2">
+                <Clock size={13} className="text-gray-400 flex-shrink-0" />
+                <span>{parsed.date}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-400 text-xs font-bold">$</span>
+                <span className="font-semibold text-[#111]">{parsed.rate}</span>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500 leading-relaxed mb-4 max-h-20 overflow-hidden relative">
+              {text}
+              <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-gray-50" />
+            </div>
+
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50 border border-amber-100">
+              <Users size={14} className="text-[#F25722] flex-shrink-0" />
+              <p className="text-xs text-gray-600">
+                Visible to <span className="font-bold text-[#111]">5,000+ artists</span> in the Artswrk network
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 w-full max-w-md">
+          <button
+            onClick={() => setStep("input")}
+            className="flex-1 py-3 rounded-xl text-sm font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => setStep("signup")}
+            className="flex-[2] py-3 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+          >
+            Publish to 5,000+ Artists <ArrowRight size={16} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Step: Input ──
+  return (
+    <div className="flex flex-col items-center px-5 py-8">
+      <div className="w-full max-w-xl">
+        <div className="relative">
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={EXAMPLE_POSTS[exampleIdx]}
+            rows={4}
+            className="w-full px-5 py-4 rounded-2xl border-2 border-gray-200 text-sm text-[#111] placeholder-gray-300 focus:outline-none focus:border-[#FFBC5D] transition-all resize-none leading-relaxed shadow-sm"
+          />
+          <div className="absolute top-3 right-3 opacity-30">
+            <Sparkles size={16} className="text-[#F25722]" />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between mt-2 mb-4">
+          <button
+            onClick={handleUseExample}
+            className="text-xs text-[#F25722] font-semibold hover:opacity-70 transition-opacity flex items-center gap-1"
+          >
+            <Sparkles size={11} /> Try an example
+          </button>
+          <span className="text-xs text-gray-300">
+            {text.length > 0 ? `${text.length} chars` : "Just describe it naturally"}
+          </span>
+        </div>
+
+        <button
+          onClick={handleAnalyze}
+          disabled={!text.trim()}
+          className={`w-full py-4 rounded-2xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+            text.trim()
+              ? "text-white hirer-grad-bg hover:opacity-90 shadow-md"
+              : "text-gray-300 bg-gray-100 cursor-not-allowed"
+          }`}
+        >
+          <Sparkles size={16} />
+          Preview My Job Post
+        </button>
+
+        <div className="flex items-center justify-center gap-5 mt-4 flex-wrap">
+          {[
+            { icon: <Users size={12} />, label: "5,000+ artists" },
+            { icon: <Zap size={12} />, label: "Post in 60 seconds" },
+            { icon: <CheckCircle2 size={12} />, label: "Free to post" },
+          ].map(({ icon, label }) => (
+            <div key={label} className="flex items-center gap-1 text-xs text-gray-400">
+              {icon} {label}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 function Hero({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   const [email, setEmail] = useState("");
   const headline = tab === "hirers" ? "The Hiring Platform for Artists" : "The Jobs Platform for Artists";
-  const cta = tab === "hirers" ? "Start Hiring →" : "Find Work →";
+  const cta = "Find Work →";
 
   return (
-    <section className="pt-28 pb-16 bg-white text-center">
+    <section className="pt-28 pb-0 bg-white text-center">
       <div className="mx-auto px-5 lg:px-10 max-w-4xl">
-        {/* Logo badge */}
         <div className="inline-flex items-center mb-6 select-none">
           <span className="font-black text-3xl tracking-tight hirer-grad-text">ARTS</span>
           <span className="font-black text-3xl tracking-tight bg-[#111] text-white px-2 py-0.5 rounded ml-1">WRK</span>
         </div>
 
-        {/* Toggle pills */}
         <div className="flex items-center justify-center gap-2 mb-8">
           {(["hirers", "artists"] as Tab[]).map((t) => (
             <button
@@ -139,24 +399,36 @@ function Hero({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
           ))}
         </div>
 
-        {/* Headline */}
-        <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-[#111] leading-[1.05] tracking-tight mb-8">
+        <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-[#111] leading-[1.05] tracking-tight mb-3">
           {headline}
         </h1>
 
-        {/* CTA row */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 max-w-lg mx-auto">
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Enter your email address"
-            className="w-full sm:flex-1 px-4 py-3 rounded-full border border-gray-200 text-sm focus:outline-none focus:ring-2 transition-all"
-          />
-          <button className={`whitespace-nowrap px-6 py-3 rounded-full text-sm font-semibold text-white transition-all hover:opacity-90 ${gradBgClass(tab)}`}>
-            {cta}
-          </button>
-        </div>
+        {tab === "hirers" ? (
+          <>
+            <p className="text-gray-400 text-base mb-0 max-w-lg mx-auto">
+              Describe your job below — we'll turn it into a listing and send it to 5,000+ artists instantly.
+            </p>
+            <JobPostFlow />
+          </>
+        ) : (
+          <>
+            <p className="text-gray-400 text-base mb-8 max-w-lg mx-auto">
+              Browse open jobs from studios, schools, and companies across the country.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 max-w-lg mx-auto pb-16">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email address"
+                className="w-full sm:flex-1 px-4 py-3 rounded-full border border-gray-200 text-sm focus:outline-none focus:ring-2 transition-all"
+              />
+              <button className="whitespace-nowrap px-6 py-3 rounded-full text-sm font-semibold text-white transition-all hover:opacity-90 artist-grad-bg">
+                {cta}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </section>
   );
@@ -211,7 +483,6 @@ function ForHirers() {
             </div>
           </div>
 
-          {/* App mockup */}
           <div className="relative">
             <div className="bg-[#111] rounded-2xl overflow-hidden shadow-2xl">
               <div className="flex items-center gap-2 px-4 py-3 bg-[#1a1a1a]">
@@ -279,7 +550,6 @@ function ForArtists() {
             </button>
           </div>
 
-          {/* Artist profile mockup */}
           <div className="relative">
             <div className="bg-[#111] rounded-2xl overflow-hidden shadow-2xl">
               <div className="flex items-center gap-2 px-4 py-3 bg-[#1a1a1a]">
@@ -351,9 +621,9 @@ function JobsForArtists() {
           ))}
         </div>
         <div className="text-center mt-8">
-          <button className="px-8 py-3 rounded-full text-sm font-semibold text-white artist-grad-bg hover:opacity-90 transition-opacity">
+          <Link href="/jobs" className="px-8 py-3 rounded-full text-sm font-semibold text-white artist-grad-bg hover:opacity-90 transition-opacity inline-block">
             View All Open Jobs →
-          </button>
+          </Link>
         </div>
       </div>
     </section>
@@ -491,7 +761,7 @@ const ARTIST_FAQS = [
   { q: "Who are the Artswrk clients?", a: "Artswrk clients include dance studios, music schools, dance competitions, event production companies, and individual families looking to hire performing arts professionals." },
 ];
 
-function FAQItem({ q, a, tab }: { q: string; a: string; tab: Tab }) {
+function FAQItem({ q, a }: { q: string; a: string; tab: Tab }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="border-b border-gray-100 last:border-0">
