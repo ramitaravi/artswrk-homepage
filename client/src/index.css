@@ -61,10 +61,10 @@
   --ring: oklch(0.65 0.22 35);
 
   /* Brand gradient colors — Hirers */
-  --brand-coral: #F97316;
-  --brand-pink: #E91E8C;
-  --brand-gradient: linear-gradient(135deg, #F97316, #E91E8C);
-  --brand-gradient-text: linear-gradient(135deg, #F97316, #E91E8C);
+  --brand-coral: #FFBC5D;
+  --brand-pink: #F25722;
+  --brand-gradient: linear-gradient(135deg, #FFBC5D, #F25722);
+  --brand-gradient-text: linear-gradient(135deg, #FFBC5D, #F25722);
   /* Brand gradient colors — Artists */
   --artist-gradient: linear-gradient(135deg, #ec008c, #ff7171);
   --artist-gradient-text: linear-gradient(135deg, #ec008c, #ff7171);
@@ -125,9 +125,9 @@
     background-clip: text;
   }
 
-  /* Hirer gradient text (orange → pink) */
+  /* Hirer gradient text (amber → orange-red) */
   .hirer-grad-text {
-    background: linear-gradient(135deg, #F97316, #E91E8C);
+    background: linear-gradient(135deg, #FFBC5D, #F25722);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -143,7 +143,7 @@
 
   /* Hirer gradient background */
   .hirer-grad-bg {
-    background: linear-gradient(135deg, #F97316, #E91E8C);
+    background: linear-gradient(135deg, #FFBC5D, #F25722);
   }
 
   /* Artist gradient background */

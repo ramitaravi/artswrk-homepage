@@ -2,12 +2,13 @@
  * ARTSWRK HOMEPAGE
  * Design: Refined Modern "Premium Platform"
  * Font: Poppins (400–900)
- * Hirer gradient: #F97316 → #E91E8C  (class: hirer-grad-bg / hirer-grad-text)
+ * Hirer gradient: #FFBC5D → #F25722  (class: hirer-grad-bg / hirer-grad-text)
  * Artist gradient: #ec008c → #ff7171 (class: artist-grad-bg / artist-grad-text)
  * All gradient text uses CSS classes — NO inline background+backgroundClip combos.
  */
 
 import { useState } from "react";
+import { Link } from "wouter";
 import { ChevronDown, Menu, X, MapPin, Clock } from "lucide-react";
 
 type Tab = "hirers" | "artists";
@@ -52,7 +53,7 @@ function Navbar() {
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-6">
-            <a href="#" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">Jobs</a>
+            <Link href="/jobs" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">Jobs</Link>
             <a href="#" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">About</a>
 
             <div className="relative" onMouseEnter={() => setHirersOpen(true)} onMouseLeave={() => setHirersOpen(false)}>
