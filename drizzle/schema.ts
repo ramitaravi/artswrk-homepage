@@ -54,6 +54,12 @@ export const users = mysqlTable("users", {
   userSignedUp: boolean("userSignedUp").default(false),
   beta: boolean("beta").default(false),
 
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  /** bcrypt hash of a temporary password set by admin. Null = no password login. */
+  passwordHash: varchar("passwordHash", { length: 256 }),
+  /** Flag to force password reset on next login */
+  passwordIsTemporary: boolean("passwordIsTemporary").default(true),
+
   // ── Metadata ───────────────────────────────────────────────────────────────
   bubbleCreatedAt: timestamp("bubbleCreatedAt"),
   bubbleModifiedAt: timestamp("bubbleModifiedAt"),

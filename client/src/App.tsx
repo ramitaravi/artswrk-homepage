@@ -18,6 +18,7 @@ import CompanyPage from "./pages/dashboard/CompanyPage";
 import SubLists from "./pages/dashboard/SubLists";
 import Community from "./pages/dashboard/Community";
 import Benefits from "./pages/dashboard/Benefits";
+import Admin from "./pages/Admin";
 
 // DashboardLayout handles auth protection internally (redirects to /login if not authenticated)
 function DashRoute({ component: Component }: { component: React.ComponentType }) {
@@ -67,6 +68,9 @@ function Router() {
       <Route path="/dashboard/benefits">
         {() => <DashRoute component={Benefits} />}
       </Route>
+
+      {/* Admin */}
+      <Route path="/admin" component={Admin} />
 
       {/* Fallback */}
       <Route path="/404" component={NotFound} />

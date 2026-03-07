@@ -17,11 +17,11 @@ export default function Login() {
   const [error, setError] = useState("");
   const [, navigate] = useLocation();
 
-  const demoLogin = trpc.auth.demoLogin.useMutation({
+  const passwordLogin = trpc.auth.passwordLogin.useMutation({
     onSuccess: () => {
       navigate("/dashboard");
     },
-    onError: (err) => {
+    onError: (err: { message?: string }) => {
       setError(err.message || "Invalid email or password.");
     },
   });
@@ -35,10 +35,10 @@ export default function Login() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    demoLogin.mutate({ email: email.trim().toLowerCase(), password });
+    passwordLogin.mutate({ email: email.trim().toLowerCase(), password });
   }
 
-  const loading = demoLogin.isPending;
+  const loading = passwordLogin.isPending;
 
   return (
     <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center px-4">

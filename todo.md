@@ -59,3 +59,6 @@
 - [ ] Wire signup CTAs to real auth flow
 - [ ] Port more Bubble data types (jobs, bookings, payments, etc.)
 - [ ] Bulk user migration from Bubble Data API
+- [x] Add passwordHash field to users schema
+- [x] Build /admin page for setting temporary passwords
+- [x] Update login to authenticate against stored password hash

@@ -1,18 +1,14 @@
+import bcrypt from "bcryptjs";
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getAllUsers, getUserByBubbleId, getUserByEmail } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById } from "./db";
 import { sdk } from "./_core/sdk";
+import { ENV } from "./_core/env";
 import { z } from "zod";
 
-// Demo credentials — maps email → Bubble ID for seeded test accounts
-const DEMO_ACCOUNTS: Record<string, { bubbleId: string; password: string }> = {
-  "nick+ferrari@artswrk.com": {
-    bubbleId: "1659533883431x527826980339748400",
-    password: "ArtswrkDemo2024",
-  },
-};
+const SALT_ROUNDS = 12;
 
 export const appRouter = router({
   system: systemRouter,
@@ -21,25 +17,24 @@ export const appRouter = router({
     me: publicProcedure.query(opts => opts.ctx.user),
 
     /**
-     * Demo login — creates a real JWT session for a seeded Bubble user.
-     * Only works for accounts in DEMO_ACCOUNTS; safe to leave in for testing.
+     * Password login — works for any user who has had a password set by an admin.
      */
-    demoLogin: publicProcedure
-      .input(z.object({ email: z.string().email(), password: z.string() }))
+    passwordLogin: publicProcedure
+      .input(z.object({ email: z.string().email(), password: z.string().min(1) }))
       .mutation(async ({ input, ctx }) => {
-        const demo = DEMO_ACCOUNTS[input.email.toLowerCase()];
-        if (!demo || demo.password !== input.password) {
-          throw new Error("Invalid credentials");
+        const user = await getUserByEmail(input.email.toLowerCase().trim());
+        if (!user || !user.passwordHash) {
+          throw new Error("Invalid email or password");
         }
 
-        const user = await getUserByBubbleId(demo.bubbleId);
-        if (!user) {
-          throw new Error("Demo user not found in database");
+        const valid = await bcrypt.compare(input.password, user.passwordHash);
+        if (!valid) {
+          throw new Error("Invalid email or password");
         }
 
-        // Create a real JWT session token using the user's openId
+        // Create a real JWT session
         const sessionToken = await sdk.createSessionToken(user.openId, {
-          name: user.name || user.firstName || "Demo User",
+          name: user.name || user.firstName || "User",
           expiresInMs: ONE_YEAR_MS,
         });
 
@@ -51,6 +46,7 @@ export const appRouter = router({
 
         return {
           success: true,
+          isTemporary: user.passwordIsTemporary ?? true,
           user: {
             id: user.id,
             email: user.email,
@@ -72,6 +68,68 @@ export const appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
+  }),
+
+  // ── Admin procedures ────────────────────────────────────────────────────────
+  admin: router({
+    /**
+     * Set a temporary password for any user by email.
+     * Only callable by the app owner (ENV.ownerOpenId).
+     */
+    setPassword: protectedProcedure
+      .input(z.object({
+        email: z.string().email(),
+        password: z.string().min(6, "Password must be at least 6 characters"),
+        isTemporary: z.boolean().default(true),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        // Only the owner can set passwords
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") {
+          throw new Error("Forbidden: admin only");
+        }
+
+        const user = await getUserByEmail(input.email.toLowerCase().trim());
+        if (!user) {
+          throw new Error(`No user found with email: ${input.email}`);
+        }
+
+        const hash = await bcrypt.hash(input.password, SALT_ROUNDS);
+        await setUserPassword(user.id, hash, input.isTemporary);
+
+        return {
+          success: true,
+          message: `Password set for ${user.email} (${user.firstName || user.name || "user"})`,
+          isTemporary: input.isTemporary,
+        };
+      }),
+
+    /**
+     * List all users — admin only.
+     */
+    listUsers: protectedProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(100).default(50),
+        offset: z.number().min(0).default(0),
+        search: z.string().optional(),
+      }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") {
+          throw new Error("Forbidden: admin only");
+        }
+        return getAllUsers(input.limit, input.offset);
+      }),
+
+    /**
+     * Get a single user by ID — admin only.
+     */
+    getUser: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") {
+          throw new Error("Forbidden: admin only");
+        }
+        return getUserById(input.id);
+      }),
   }),
 
   // ── Artswrk user queries ────────────────────────────────────────────────────
