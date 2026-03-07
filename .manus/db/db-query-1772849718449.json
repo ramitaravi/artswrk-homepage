@@ -1,0 +1,24 @@
+{
+  "query": "SELECT id, email, name, firstName, lastName, userRole, clientCompanyName, clientPremium, onboardingStep, bubbleId, slug, createdAt FROM users WHERE email = 'nick+ferrari@artswrk.com';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user FGYqDqdUZjFkzga.root --database AyEgFhxRkEopXHz25XyihS --execute SELECT id, email, name, firstName, lastName, userRole, clientCompanyName, clientPremium, onboardingStep, bubbleId, slug, createdAt FROM users WHERE email = 'nick+ferrari@artswrk.com';",
+  "rows": [
+    {
+      "id": "1",
+      "email": "nick+ferrari@artswrk.com",
+      "name": "Phyllis F",
+      "firstName": "Phyllis",
+      "lastName": "F",
+      "userRole": "Client",
+      "clientCompanyName": "Ferrari Dance Center NYC",
+      "clientPremium": "1",
+      "onboardingStep": "5",
+      "bubbleId": "1659533883431x527826980339748400",
+      "slug": "phyllis-d",
+      "createdAt": "2026-03-07 02:14:20"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\temail\tname\tfirstName\tlastName\tuserRole\tclientCompanyName\tclientPremium\tonboardingStep\tbubbleId\tslug\tcreatedAt\n1\tnick+ferrari@artswrk.com\tPhyllis F\tPhyllis\tF\tClient\tFerrari Dance Center NYC\t1\t5\t1659533883431x527826980339748400\tphyllis-d\t2026-03-07 02:14:20\n",
+  "stderr": "",
+  "execution_time_ms": 134
+}

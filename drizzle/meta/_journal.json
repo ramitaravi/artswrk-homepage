@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1772849565825,
+      "tag": "0000_perpetual_nightshade",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1772849613962,
+      "tag": "0001_low_mystique",
+      "breakpoints": true
+    }
+  ]
+}
