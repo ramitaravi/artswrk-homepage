@@ -124,3 +124,13 @@
 - [x] Add tRPC artists.getById and artists.getHistory endpoints
 - [x] Wire click-through from Browse Artists (grid + list), My Artists table, Bookings page, Messages page
 - [x] Register route /dashboard/artists/:artistId in App.tsx
+
+## /jobs Page Redesign (Artist View)
+- [x] Three-tab layout: Jobs Near Me (map + list), PRO Jobs, Applications
+- [x] Jobs Near Me tab: left job list + right Google Maps panel with red pin markers
+- [x] Search bar, location input, Artist Type + Service Type filter dropdowns
+- [x] PRO Jobs tab: PRO upsell banner + locked blurred preview (no direct-flagged jobs in DB yet)
+- [x] Applications tab: status-tagged application cards + login CTA
+- [x] Wire real job data from DB (publicList tRPC endpoint)
+- [x] Map markers from job locationLat/locationLng fields
+- [x] Clicking map pin selects job and shows floating detail card
