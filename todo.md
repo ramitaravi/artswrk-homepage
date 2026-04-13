@@ -134,3 +134,22 @@
 - [x] Wire real job data from DB (publicList tRPC endpoint)
 - [x] Map markers from job locationLat/locationLng fields
 - [x] Clicking map pin selects job and shows floating detail card
+
+## Post a Job Flow (/post-job)
+- [x] Add Stripe integration (webdev_add_feature)
+- [x] Users table already has clientStripeCustomerId, clientSubscriptionId, clientPremium fields
+- [x] Reuse jobs table with requestStatus: "Pending Payment" → "Active" after payment
+- [x] AI job parsing tRPC endpoint (postJob.parseText) using LLM with structured JSON output
+- [x] Job creation tRPC endpoint (postJob.createAndCheckout) that inserts into jobs table
+- [x] Stripe checkout session helper ($30 one-time payment with saved card support)
+- [x] Stripe subscription session helper (monthly $29/mo PRO plan)
+- [x] Stripe webhook handler at /api/stripe/webhook to activate job after payment
+- [x] Step 1: Natural language input page with rotating example placeholders
+- [x] Step 2: Smart summary form with AI autofill + account data prefill (studio name, location, rate, dates)
+- [x] Step 3: Payment step ($30 one-time or Subscribe & Save $29/mo) with Stripe redirect
+- [x] Logged-out view: shows warning + redirects to login before payment
+- [x] Logged-in view: prefills studio name and location from user account
+- [x] postJob.verifyCheckout endpoint to activate job on success page
+- [x] Success page at /post-job/success with job activation and confetti
+- [ ] Wire "Post a Job" CTAs on homepage, dashboard, and navbar to /post-job
+- [ ] Write vitest tests for job parsing and creation logic

@@ -857,3 +857,93 @@ export async function getArtistHistoryForClient(artistUserId: number, clientUser
     conversations: artistConversations,
   };
 }
+
+// ── Job Creation ──────────────────────────────────────────────────────────────
+
+export interface CreateJobInput {
+  clientUserId?: number;
+  clientEmail?: string;
+  description?: string;
+  locationAddress?: string;
+  locationLat?: string;
+  locationLng?: string;
+  dateType?: string;
+  startDate?: Date;
+  endDate?: Date;
+  isHourly?: boolean;
+  openRate?: boolean;
+  clientHourlyRate?: number;
+  artistHourlyRate?: number;
+  transportation?: boolean;
+  /** Job status — "Pending Payment" until Stripe confirms, then "Active" */
+  requestStatus?: string;
+  slug?: string;
+}
+
+/**
+ * Insert a new job row and return the created record.
+ */
+export async function createJob(input: CreateJobInput) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [result] = await db
+    .insert(jobs)
+    .values({
+      clientUserId: input.clientUserId,
+      clientEmail: input.clientEmail,
+      description: input.description,
+      locationAddress: input.locationAddress,
+      locationLat: input.locationLat,
+      locationLng: input.locationLng,
+      dateType: input.dateType ?? "Single Date",
+      startDate: input.startDate,
+      endDate: input.endDate,
+      isHourly: input.isHourly ?? true,
+      openRate: input.openRate ?? false,
+      clientHourlyRate: input.clientHourlyRate,
+      artistHourlyRate: input.artistHourlyRate,
+      transportation: input.transportation ?? false,
+      requestStatus: input.requestStatus ?? "Pending Payment",
+      slug: input.slug,
+    });
+  const newId = (result as { insertId: number }).insertId;
+  const [job] = await db.select().from(jobs).where(eq(jobs.id, newId));
+  return job;
+}
+
+/**
+ * Activate a job after successful Stripe payment.
+ */
+export async function activateJob(jobId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(jobs)
+    .set({ requestStatus: "Active" })
+    .where(eq(jobs.id, jobId));
+}
+
+/**
+ * Save Stripe customer ID on the user record (client side).
+ */
+export async function saveClientStripeCustomerId(userId: number, stripeCustomerId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(users)
+    .set({ clientStripeCustomerId: stripeCustomerId })
+    .where(eq(users.id, userId));
+}
+
+/**
+ * Save Stripe subscription ID on the user record (client side).
+ */
+export async function saveClientSubscriptionId(userId: number, subscriptionId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(users)
+    .set({ clientSubscriptionId: subscriptionId, clientPremium: true })
+    .where(eq(users.id, userId));
+}

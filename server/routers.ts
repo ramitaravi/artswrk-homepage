@@ -3,7 +3,9 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId } from "./db";
+import { invokeLLM } from "./_core/llm";
+import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, getStripe } from "./stripe";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import { z } from "zod";
@@ -400,6 +402,163 @@ export const appRouter = router({
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
         return getInterestedArtistsByClientId(user.id, input.limit, input.offset);
+      }),
+  }),
+
+  // ── Job Posting (Post a Job flow) ─────────────────────────────────────────
+  postJob: router({
+    /**
+     * Parse a natural language job description using AI and return structured fields.
+     * Public so unauthenticated users can preview before being asked to log in.
+     */
+    parseText: publicProcedure
+      .input(z.object({ text: z.string().min(10).max(2000) }))
+      .mutation(async ({ input }) => {
+        const response = await invokeLLM({
+          messages: [
+            {
+              role: "system",
+              content: `You are an assistant that extracts structured job posting data from natural language descriptions for an arts hiring platform (Artswrk). Extract the following fields and return valid JSON. For fields you cannot determine, return null. Today's date is ${new Date().toISOString().split('T')[0]}.
+
+Fields to extract:
+- title: string (short job title, e.g. "Ballet Substitute Teacher", "Hip Hop Choreographer", "Competition Judge")
+- description: string (the original text, cleaned up)
+- locationAddress: string or null (full address or city/state)
+- dateType: "Single Date" | "Ongoing" | "Recurring" (infer from context)
+- startDate: ISO 8601 datetime string or null
+- endDate: ISO 8601 datetime string or null (for single date jobs, this is the end time same day)
+- isHourly: boolean (true if hourly rate, false if flat rate)
+- openRate: boolean (true if rate is open/negotiable)
+- clientHourlyRate: number or null (hourly rate in dollars)
+- clientFlatRate: number or null (flat rate in dollars, only if not hourly)
+- transportation: boolean (true if travel/transportation is covered)
+- serviceType: string or null (e.g. "Ballet", "Hip Hop", "Yoga", "Competition", "Piano", "Violin")`,
+            },
+            { role: "user", content: input.text },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "job_parse",
+              strict: true,
+              schema: {
+                type: "object",
+                properties: {
+                  title: { type: ["string", "null"] },
+                  description: { type: "string" },
+                  locationAddress: { type: ["string", "null"] },
+                  dateType: { type: "string", enum: ["Single Date", "Ongoing", "Recurring"] },
+                  startDate: { type: ["string", "null"] },
+                  endDate: { type: ["string", "null"] },
+                  isHourly: { type: "boolean" },
+                  openRate: { type: "boolean" },
+                  clientHourlyRate: { type: ["number", "null"] },
+                  clientFlatRate: { type: ["number", "null"] },
+                  transportation: { type: "boolean" },
+                  serviceType: { type: ["string", "null"] },
+                },
+                required: ["title", "description", "locationAddress", "dateType", "startDate", "endDate", "isHourly", "openRate", "clientHourlyRate", "clientFlatRate", "transportation", "serviceType"],
+                additionalProperties: false,
+              },
+            },
+          },
+        });
+        const content = response.choices[0].message.content;
+        return JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+      }),
+
+    /**
+     * Create a draft job and return the job ID + Stripe checkout URL.
+     * Requires authentication.
+     */
+    createAndCheckout: protectedProcedure
+      .input(z.object({
+        description: z.string().min(10),
+        locationAddress: z.string().optional(),
+        locationLat: z.string().optional(),
+        locationLng: z.string().optional(),
+        dateType: z.enum(["Single Date", "Ongoing", "Recurring"]).default("Single Date"),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        isHourly: z.boolean().default(true),
+        openRate: z.boolean().default(false),
+        clientHourlyRate: z.number().optional(),
+        clientFlatRate: z.number().optional(),
+        transportation: z.boolean().default(false),
+        plan: z.enum(["one_time", "subscription"]).default("one_time"),
+        origin: z.string().url(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+
+        // Create the job in "Pending Payment" status
+        const job = await createJob({
+          clientUserId: user.id,
+          clientEmail: user.email ?? undefined,
+          description: input.description,
+          locationAddress: input.locationAddress,
+          locationLat: input.locationLat,
+          locationLng: input.locationLng,
+          dateType: input.dateType,
+          startDate: input.startDate ? new Date(input.startDate) : undefined,
+          endDate: input.endDate ? new Date(input.endDate) : undefined,
+          isHourly: input.isHourly,
+          openRate: input.openRate,
+          clientHourlyRate: input.clientHourlyRate,
+          transportation: input.transportation,
+          requestStatus: "Pending Payment",
+        });
+
+        // Create Stripe checkout session
+        const checkoutOpts = {
+          email: user.email ?? undefined,
+          userId: user.id,
+          jobId: job.id,
+          origin: input.origin,
+          stripeCustomerId: user.clientStripeCustomerId,
+        };
+
+        const { url, sessionId } = input.plan === "subscription"
+          ? await createSubscriptionCheckoutSession(checkoutOpts)
+          : await createJobPostCheckoutSession(checkoutOpts);
+
+        return { jobId: job.id, checkoutUrl: url, sessionId };
+      }),
+
+    /**
+     * Verify a completed Stripe checkout session and activate the job.
+     * Called from the success page.
+     */
+    verifyCheckout: protectedProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+
+        const stripe = getStripe();
+        const session = await stripe.checkout.sessions.retrieve(input.sessionId);
+
+        if (session.payment_status !== "paid" && session.status !== "complete") {
+          throw new Error("Payment not completed");
+        }
+
+        const jobId = session.metadata?.job_id ? parseInt(session.metadata.job_id) : null;
+        if (jobId) {
+          await activateJob(jobId);
+        }
+
+        // Save Stripe customer ID for future use
+        if (session.customer && typeof session.customer === "string" && !user.clientStripeCustomerId) {
+          await saveClientStripeCustomerId(user.id, session.customer);
+        }
+
+        // Save subscription ID if applicable
+        if (session.subscription && typeof session.subscription === "string") {
+          await saveClientSubscriptionId(user.id, session.subscription);
+        }
+
+        return { success: true, jobId, plan: session.metadata?.type ?? "one_time" };
       }),
   }),
 
