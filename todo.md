@@ -225,3 +225,13 @@
 - [x] Admin Payments page: paginated payments list (customer, status, amount, date, Stripe ID)
 - [x] Settings section: password management tool preserved from old /admin
 - [x] Write 13 vitest tests for admin procedures (82 total passing)
+
+## Lambarri Data Seed (bubble ID: 1660327940281x921038367851854000)
+- [x] Confirmed no separate clientCompanies table in Bubble; company info is on user record
+- [x] Upserted Lambarri user: Alexa S. / Lambarri Dance Arts (DB id: 780128)
+- [x] Seeded 92 jobs from Bubble
+- [x] Seeded 468 bookings (271 paid, $74,667 total revenue)
+- [x] No interested-artist or payment records found in Bubble for this client
+- [x] Upserted 38 unique artist users from bookings
+- [x] Back-filled artistUserId FK on 468 bookings
+- [x] Total DB: 236 users, 257 jobs, 692 bookings
