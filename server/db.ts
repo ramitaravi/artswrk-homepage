@@ -59,6 +59,10 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.role = 'admin';
       updateSet.role = 'admin';
     }
+    // IMPORTANT: When role is not explicitly provided, do NOT include role in updateSet.
+    // This preserves manually-set admin roles from being overwritten on each login.
+    // The INSERT default is 'user', but ON DUPLICATE KEY UPDATE will only touch role
+    // if it was explicitly set above.
 
     if (!values.lastSignedIn) {
       values.lastSignedIn = new Date();
