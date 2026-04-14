@@ -529,7 +529,7 @@ export default function ArtistProfile() {
 
   const TABS: { key: Tab; label: string }[] = [
     { key: "about", label: "About" },
-    { key: "history", label: "History with Ferrari" },
+    { key: "history", label: "History with You" },
     { key: "resume", label: "Resume & Media" },
   ];
 
