@@ -10,19 +10,21 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
   Users,
-  Briefcase,
-  Building2,
   MapPin,
   CreditCard,
   ChevronRight,
-  Home,
-  Archive,
   ExternalLink,
   MessageCircle,
   Star,
+  X,
+  Plus,
+  CheckCircle2,
+  Home,
+  Archive,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { toast } from "sonner";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -413,6 +415,297 @@ function ApplicationsPanel({ applications }: { applications: any[] }) {
   );
 }
 
+// ── Post Job Modal ───────────────────────────────────────────────────────────────────────────────────
+
+const JOB_CATEGORIES = [
+  "Dance Teacher",
+  "Choreographer",
+  "Competition Judge",
+  "Performer",
+  "Yoga / Pilates Instructor",
+  "Fitness Instructor",
+  "Photographer",
+  "Videographer",
+  "Music Teacher",
+  "Acting Coach",
+  "Other",
+];
+
+function PostJobModal({
+  user,
+  companies,
+  onClose,
+  onSuccess,
+}: {
+  user: any;
+  companies: any[];
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [step, setStep] = useState<"form" | "success">("form");
+  const [form, setForm] = useState({
+    serviceType: "",
+    company: companies.length > 0 ? companies[0].name : "",
+    logo: companies.length > 0 ? (companies[0].logoUrl || "") : "",
+    bubbleClientCompanyId: companies.length > 0 ? (companies[0].bubbleId || "") : "",
+    category: "",
+    location: "",
+    budget: "",
+    workFromAnywhere: false,
+    description: "",
+    applyEmail: user?.email || "",
+  });
+
+  const postJob = trpc.enterprise.postJob.useMutation({
+    onSuccess: () => {
+      setStep("success");
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to post job. Please try again.");
+    },
+  });
+
+  function handleCompanyChange(companyName: string) {
+    const found = companies.find((c) => c.name === companyName);
+    setForm((f) => ({
+      ...f,
+      company: companyName,
+      logo: found?.logoUrl || "",
+      bubbleClientCompanyId: found?.bubbleId || "",
+    }));
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.serviceType.trim()) {
+      toast.error("Job title is required");
+      return;
+    }
+    if (!form.company.trim()) {
+      toast.error("Company is required");
+      return;
+    }
+    postJob.mutate({
+      serviceType: form.serviceType,
+      company: form.company,
+      logo: form.logo || undefined,
+      category: form.category || undefined,
+      location: form.location || undefined,
+      budget: form.budget || undefined,
+      workFromAnywhere: form.workFromAnywhere,
+      description: form.description || undefined,
+      applyEmail: form.applyEmail || undefined,
+      bubbleClientCompanyId: form.bubbleClientCompanyId || undefined,
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        {/* Modal header */}
+        <div className="bg-[#111] px-6 py-4 flex items-center justify-between rounded-t-2xl">
+          <div className="flex items-center gap-3">
+            {form.logo ? (
+              <img
+                src={fixUrl(form.logo) || ""}
+                alt={form.company}
+                className="w-12 h-12 rounded-full object-contain bg-white p-1"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-sm">
+                {initials(form.company || "C")}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="text-white/60 hover:text-white transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {step === "success" ? (
+          <div className="flex flex-col items-center px-8 py-12 text-center">
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-5">
+              <CheckCircle2 size={32} className="text-green-600" />
+            </div>
+            <h2 className="text-2xl font-black text-[#111] mb-2">Job Posted!</h2>
+            <p className="text-gray-500 text-sm mb-6">
+              Your job has been posted successfully and is now visible to artists.
+            </p>
+            <button
+              onClick={onSuccess}
+              className="px-6 py-3 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="px-6 py-6 space-y-0">
+            {/* Job Title */}
+            <div className="flex items-start gap-4 py-4 border-b border-gray-100">
+              <label className="w-36 text-sm font-bold text-[#111] pt-2 flex-shrink-0">
+                Job Title
+              </label>
+              <input
+                type="text"
+                placeholder="Job Title"
+                value={form.serviceType}
+                onChange={(e) => setForm((f) => ({ ...f, serviceType: e.target.value }))}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
+                required
+              />
+            </div>
+
+            {/* Company */}
+            <div className="flex items-start gap-4 py-4 border-b border-gray-100">
+              <label className="w-36 text-sm font-bold text-[#111] pt-2 flex-shrink-0">
+                Company
+              </label>
+              {companies.length > 0 ? (
+                <select
+                  value={form.company}
+                  onChange={(e) => handleCompanyChange(e.target.value)}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-gray-50 border border-[#ec008c] text-sm focus:outline-none focus:border-[#F25722] transition-all"
+                  required
+                >
+                  <option value="">Choose an option...</option>
+                  {companies.map((c) => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  placeholder="Company name"
+                  value={form.company}
+                  onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
+                  required
+                />
+              )}
+            </div>
+
+            {/* Category */}
+            <div className="flex items-start gap-4 py-4 border-b border-gray-100">
+              <label className="w-36 text-sm font-bold text-[#111] pt-2 flex-shrink-0">
+                Category
+              </label>
+              <select
+                value={form.category}
+                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
+              >
+                <option value="">Choose an option...</option>
+                {JOB_CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Location */}
+            <div className="flex items-start gap-4 py-4 border-b border-gray-100">
+              <label className="w-36 text-sm font-bold text-[#111] pt-2 flex-shrink-0">
+                Location
+              </label>
+              <input
+                type="text"
+                placeholder="Start typing..."
+                value={form.location}
+                onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
+                disabled={form.workFromAnywhere}
+              />
+            </div>
+
+            {/* Rate */}
+            <div className="flex items-start gap-4 py-4 border-b border-gray-100">
+              <label className="w-36 text-sm font-bold text-[#111] pt-2 flex-shrink-0">
+                Rate
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. $50/hr or $500 flat"
+                value={form.budget}
+                onChange={(e) => setForm((f) => ({ ...f, budget: e.target.value }))}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
+              />
+            </div>
+
+            {/* Work from anywhere */}
+            <div className="flex items-center gap-4 py-4 border-b border-gray-100">
+              <label className="w-36 text-sm font-bold text-[#111] flex-shrink-0">
+                Work from anywhere?
+              </label>
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, workFromAnywhere: !f.workFromAnywhere }))}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                  form.workFromAnywhere ? "bg-green-500" : "bg-gray-300"
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    form.workFromAnywhere ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Apply Email */}
+            <div className="flex items-start gap-4 py-4 border-b border-gray-100">
+              <label className="w-36 text-sm font-bold text-[#111] pt-2 flex-shrink-0">
+                Apply Email
+              </label>
+              <input
+                type="email"
+                placeholder="email@company.com"
+                value={form.applyEmail}
+                onChange={(e) => setForm((f) => ({ ...f, applyEmail: e.target.value }))}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
+              />
+            </div>
+
+            {/* Description */}
+            <div className="flex items-start gap-4 py-4">
+              <label className="w-36 text-sm font-bold text-[#111] pt-2 flex-shrink-0">
+                Description
+              </label>
+              <textarea
+                placeholder="Describe the role, requirements, and any other details..."
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                rows={5}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all resize-none"
+              />
+            </div>
+
+            {/* Submit */}
+            <div className="flex justify-end pt-2 pb-2">
+              <button
+                type="submit"
+                disabled={postJob.isPending}
+                className="px-8 py-3 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {postJob.isPending ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Posting...
+                  </>
+                ) : (
+                  "Post Job"
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Master View (Jobs / Companies / Artists tabs) ─────────────────────────────
 
 type MasterTab = "jobs" | "companies" | "artists";
@@ -425,7 +718,10 @@ function MasterView({
   onSelectJob: (job: any) => void;
 }) {
   const [tab, setTab] = useState<MasterTab>("jobs");
+  const [showPostJob, setShowPostJob] = useState(false);
   const userId = user?.id;
+
+  const utils = trpc.useUtils();
 
   const { data: jobsData, isLoading: jobsLoading } =
     trpc.enterprise.getJobs.useQuery(
@@ -438,11 +734,9 @@ function MasterView({
     { enabled: !!userId }
   );
 
-  const { data: companiesData, isLoading: companiesLoading } =
-    trpc.enterprise.getCompanies.useQuery(
-      { clientUserId: userId },
-      { enabled: !!userId }
-    );
+  // Use real client companies from DB (seeded from premium_jobs)
+  const { data: clientCompaniesData, isLoading: companiesLoading } =
+    trpc.enterprise.getClientCompanies.useQuery();
 
   const { data: artistsData, isLoading: artistsLoading } =
     trpc.enterprise.getInterestedArtists.useQuery(
@@ -452,7 +746,7 @@ function MasterView({
 
   const jobs = jobsData?.jobs || [];
   const applications = appsData?.applications || [];
-  const companies = companiesData?.companies || [];
+  const companies = clientCompaniesData?.companies || [];
   const artists = artistsData?.artists || [];
 
   // Use job logo as fallback since the logged-in user may be a different account
@@ -469,6 +763,20 @@ function MasterView({
 
   return (
     <div className="flex-1 overflow-y-auto">
+      {/* Post Job Modal */}
+      {showPostJob && (
+        <PostJobModal
+          user={user}
+          companies={companies}
+          onClose={() => setShowPostJob(false)}
+          onSuccess={() => {
+            setShowPostJob(false);
+            utils.enterprise.getJobs.invalidate();
+            utils.enterprise.getClientCompanies.invalidate();
+          }}
+        />
+      )}
+
       {/* Company header card */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6 flex items-start justify-between">
         <div>
@@ -488,11 +796,12 @@ function MasterView({
           )}
           <h1 className="text-2xl font-black text-[#111]">{displayName}</h1>
         </div>
-        <Link href="/post-job">
-          <button className="flex items-center gap-2 px-5 py-2.5 rounded-full border-2 border-[#111] text-sm font-bold text-[#111] hover:bg-[#111] hover:text-white transition-colors">
-            + Post Job
-          </button>
-        </Link>
+        <button
+          onClick={() => setShowPostJob(true)}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-full border-2 border-[#111] text-sm font-bold text-[#111] hover:bg-[#111] hover:text-white transition-colors"
+        >
+          <Plus size={15} /> Post Job
+        </button>
       </div>
 
       {/* Tab bar */}

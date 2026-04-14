@@ -564,3 +564,27 @@ export const premiumJobInterestedArtists = mysqlTable("premium_job_interested_ar
 });
 export type PremiumJobInterestedArtist = typeof premiumJobInterestedArtists.$inferSelect;
 export type InsertPremiumJobInterestedArtist = typeof premiumJobInterestedArtists.$inferInsert;
+
+/**
+ * Client Companies — companies associated with enterprise users.
+ * Derived from distinct company names/logos in premium_jobs.
+ * Each enterprise user can have multiple companies.
+ */
+export const clientCompanies = mysqlTable("client_companies", {
+  id: int("id").autoincrement().primaryKey(),
+  /** FK → users.id (the enterprise user who owns this company) */
+  ownerUserId: int("ownerUserId").notNull(),
+  /** Company display name */
+  name: varchar("name", { length: 256 }).notNull(),
+  /** Company logo URL */
+  logo: text("logo"),
+  /** Bubble client company ID (for deduplication) */
+  bubbleClientCompanyId: varchar("bubbleClientCompanyId", { length: 64 }),
+  /** Website URL */
+  website: text("website"),
+  /** Description */
+  description: text("description"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ClientCompany = typeof clientCompanies.$inferSelect;
+export type InsertClientCompany = typeof clientCompanies.$inferInsert;

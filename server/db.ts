@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, bookings, conversations, interestedArtists, jobs, messages, payments, premiumJobInterestedArtists, premiumJobs, users } from "../drizzle/schema";
+import { ClientCompany, InsertClientCompany, InsertUser, bookings, clientCompanies, conversations, interestedArtists, jobs, messages, payments, premiumJobInterestedArtists, premiumJobs, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -1703,4 +1703,51 @@ export async function getEnterpriseClients(opts: {
   );
 
   return { clients: enriched, total: Number(countRow?.count ?? 0) };
+}
+
+// ── Client Companies ──────────────────────────────────────────────────────────
+
+/** Get all client companies for an enterprise user */
+export async function getClientCompaniesByUserId(userId: number): Promise<ClientCompany[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(clientCompanies)
+    .where(eq(clientCompanies.ownerUserId, userId))
+    .orderBy(asc(clientCompanies.name));
+}
+
+/** Create a new premium job */
+export async function createPremiumJob(data: {
+  serviceType: string;
+  company: string;
+  logo?: string | null;
+  category?: string | null;
+  location?: string | null;
+  budget?: string | null;
+  workFromAnywhere?: boolean;
+  description?: string | null;
+  applyEmail?: string | null;
+  createdByUserId: number;
+  bubbleClientCompanyId?: string | null;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(premiumJobs).values({
+    serviceType: data.serviceType,
+    company: data.company,
+    logo: data.logo ?? null,
+    category: data.category ?? null,
+    location: data.location ?? null,
+    budget: data.budget ?? null,
+    workFromAnywhere: data.workFromAnywhere ?? false,
+    description: data.description ?? null,
+    applyEmail: data.applyEmail ?? null,
+    createdByUserId: data.createdByUserId,
+    bubbleClientCompanyId: data.bubbleClientCompanyId ?? null,
+    status: "Active",
+  });
+  // @ts-ignore
+  return result[0].insertId;
 }

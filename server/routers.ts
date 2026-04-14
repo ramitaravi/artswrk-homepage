@@ -3,7 +3,7 @@ import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, ONE_YEAR_MS } from "@shared/con
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createPremiumJob } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
@@ -987,8 +987,46 @@ Fields to extract:
         }));
         return { applicants };
       }),
+
+    /** Get client companies for this enterprise user */
+    getClientCompanies: protectedProcedure
+      .query(async ({ ctx }) => {
+        const companies = await getClientCompaniesByUserId(ctx.user.id);
+        return { companies };
+      }),
+
+    /** Create a new premium job */
+    postJob: protectedProcedure
+      .input(z.object({
+        serviceType: z.string().min(1, 'Job title is required'),
+        company: z.string().min(1, 'Company is required'),
+        logo: z.string().optional(),
+        category: z.string().optional(),
+        location: z.string().optional(),
+        budget: z.string().optional(),
+        workFromAnywhere: z.boolean().default(false),
+        description: z.string().optional(),
+        applyEmail: z.string().email().optional().or(z.literal('')),
+        bubbleClientCompanyId: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const jobId = await createPremiumJob({
+          serviceType: input.serviceType,
+          company: input.company,
+          logo: input.logo || null,
+          category: input.category || null,
+          location: input.location || null,
+          budget: input.budget || null,
+          workFromAnywhere: input.workFromAnywhere,
+          description: input.description || null,
+          applyEmail: input.applyEmail || null,
+          createdByUserId: ctx.user.id,
+          bubbleClientCompanyId: input.bubbleClientCompanyId || null,
+        });
+        return { success: true, jobId };
+      }),
   }),
-    // ── Artswrk user queries ───────────────────────────────────────────
+  // ── Artswrk user queries ─────────────────────────────────────────────────────────────────
   artswrkUsers: router({
     getById: publicProcedure
       .input(z.object({ id: z.number() }))

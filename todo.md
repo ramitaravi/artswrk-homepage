@@ -365,3 +365,13 @@
 - [x] Wire Artists tab to real interested artists data from DB
 - [x] Fix location display ([object Object] bug from Bubble import)
 - [x] Fix company header logo to use job logo as fallback
+
+## Enterprise Post Job Modal + Companies Tab Fix
+- [x] Check Bubble API for client companies (clientCompanies table or similar)
+- [x] Seed client companies per enterprise user into DB (11 companies from premium_jobs)
+- [x] Add enterprise.getClientCompanies tRPC procedure (returns companies for logged-in user)
+- [x] Build Enterprise Post Job modal (Job Title, Company dropdown, Category, Location, Rate, Work from Anywhere toggle, Description textarea, Apply Email)
+- [x] Apply email field autofilled with logged-in user's email
+- [x] Wire "+ Post Job" button in enterprise sidebar to open the modal
+- [x] Wire Companies tab to real client companies data from DB
+- [x] Add enterprise.postJob tRPC procedure to save new jobs to premium_jobs table
