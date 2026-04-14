@@ -223,6 +223,7 @@ export const appRouter = router({
         offset: z.number().min(0).default(0),
         search: z.string().optional(),
         status: z.string().optional(),
+        clientUserId: z.number().optional(),
       }))
       .query(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");

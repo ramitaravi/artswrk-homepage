@@ -1398,11 +1398,18 @@ type EnterpriseClient = {
 };
 
 function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; onClose: () => void }) {
+  const [expandedJobId, setExpandedJobId] = useState<number | null>(null);
+
   const { data: jobsData, isLoading } = trpc.admin.premiumJobs.useQuery({
-    search: client.clientCompanyName || client.name || "",
-    limit: 50,
+    clientUserId: client.id,
+    limit: 100,
     offset: 0,
   });
+
+  const { data: artistsData } = trpc.admin.premiumJobArtists.useQuery(
+    { jobId: expandedJobId! },
+    { enabled: expandedJobId !== null }
+  );
 
   const logo = client.enterpriseLogoUrl || client.profilePicture;
   const companyName = client.clientCompanyName || displayName(client);
@@ -1475,27 +1482,112 @@ function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; 
             <p className="text-sm text-gray-400 text-center py-8">No PRO jobs found for this client.</p>
           ) : (
             <div className="space-y-3">
-              {jobsData.jobs.map((job: any) => (
-                <div key={job.id} className="border border-gray-100 rounded-xl p-4 bg-gray-50 hover:bg-white transition-colors">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[#111] text-sm truncate">{job.serviceType || 'Untitled Role'}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{job.category} {job.location ? `· ${job.location}` : ''}</p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {job.budget && (
-                        <span className="text-xs font-semibold px-2 py-1 rounded-full bg-[#FFF0E6] text-[#F25722]">{job.budget}</span>
-                      )}
-                      <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                        job.status === 'Active' ? 'bg-green-50 text-green-600' :
-                        job.status === 'Closed' ? 'bg-red-50 text-red-500' :
-                        'bg-gray-100 text-gray-500'
-                      }`}>{job.status || 'Unknown'}</span>
-                      <span className="text-xs text-gray-400">{job.interestedArtistCount ?? 0} artists</span>
-                    </div>
+              {jobsData.jobs.map((job: any) => {
+                const isExpanded = expandedJobId === job.id;
+                return (
+                  <div key={job.id} className="border border-gray-100 rounded-xl overflow-hidden bg-gray-50">
+                    {/* Job row — click to expand artists */}
+                    <button
+                      onClick={() => setExpandedJobId(isExpanded ? null : job.id)}
+                      className="w-full text-left p-4 hover:bg-white transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-[#111] text-sm truncate">{job.serviceType || 'Untitled Role'}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{job.category}{job.location ? ` · ${job.location}` : ''}</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {job.budget && (
+                            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-[#FFF0E6] text-[#F25722]">{job.budget}</span>
+                          )}
+                          <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                            job.status === 'Active' ? 'bg-green-50 text-green-600' :
+                            job.status === 'Closed' ? 'bg-red-50 text-red-500' :
+                            'bg-gray-100 text-gray-500'
+                          }`}>{job.status || 'Unknown'}</span>
+                          <span className="text-xs text-gray-400">{job.interestedCount ?? 0} artists</span>
+                          <span className="text-gray-400 text-xs">{isExpanded ? '▲' : '▼'}</span>
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Expanded: interested artists */}
+                    {isExpanded && (
+                      <div className="border-t border-gray-100 bg-white px-4 pb-4 pt-3">
+                        {!artistsData ? (
+                          <div className="flex items-center gap-2 text-xs text-gray-400 py-2">
+                            <div className="w-3 h-3 border border-gray-300 border-t-[#F25722] rounded-full animate-spin" />
+                            Loading artists…
+                          </div>
+                        ) : artistsData.length === 0 ? (
+                          <p className="text-xs text-gray-400 py-2">No interested artists yet.</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {artistsData.map((a: any) => (
+                              <div key={a.id} className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
+                                {/* Avatar */}
+                                {a.artistProfilePicture ? (
+                                  <img
+                                    src={a.artistProfilePicture.startsWith('//') ? 'https:' + a.artistProfilePicture : a.artistProfilePicture}
+                                    alt={a.artistFirstName || ''}
+                                    className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#ec008c] to-[#ff7171] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                                    {(a.artistFirstName || 'A')[0]}
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="font-semibold text-[#111] text-sm">
+                                      {a.artistFirstName} {a.artistLastName}
+                                    </p>
+                                    {a.rate && (
+                                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-pink-50 text-pink-600 flex-shrink-0">{a.rate}</span>
+                                    )}
+                                  </div>
+                                  {a.artistLocation && (
+                                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                      <MapPin size={9} /> {a.artistLocation}
+                                    </p>
+                                  )}
+                                  {(a.message || a.artistBio) && (
+                                    <p className="text-xs text-gray-600 mt-1 leading-relaxed line-clamp-2">
+                                      {a.message || a.artistBio}
+                                    </p>
+                                  )}
+                                  <div className="flex items-center gap-2 mt-2">
+                                    {a.resumeLink && (
+                                      <a
+                                        href={a.resumeLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs font-semibold text-white bg-[#111] px-3 py-1 rounded-full hover:bg-gray-800 transition-colors"
+                                      >
+                                        View Submission →
+                                      </a>
+                                    )}
+                                    {a.artistSlug && (
+                                      <a
+                                        href={`https://artswrk.com/artists/${a.artistSlug}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-gray-500 hover:text-[#F25722] transition-colors"
+                                      >
+                                        Profile ↗
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

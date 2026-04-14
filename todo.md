@@ -332,3 +332,9 @@
 - [x] Built Enterprise Clients card grid (logo, company name, email, hiring category, job count, artist count)
 - [x] Built Enterprise Client modal (header, description, website/instagram links, PRO jobs list)
 - [x] 92 tests passing
+
+## Enterprise Client Modal Fix
+- [x] Add clientUserId filter to admin.premiumJobs tRPC endpoint
+- [x] Update EnterpriseClientModal to query by clientUserId instead of company name search
+- [x] Show interested artists per job inside the modal (expandable job rows with artist cards: photo, name, location, rate badge, message, View Submission + Profile links)
+- [x] 92 tests passing

@@ -1447,11 +1447,13 @@ export async function getAllPremiumJobs({
   offset = 0,
   status,
   search,
+  clientUserId,
 }: {
   limit?: number;
   offset?: number;
   status?: string;
   search?: string;
+  clientUserId?: number;
 } = {}) {
   const db = await getDb();
   if (!db) return { jobs: [], total: 0 };
@@ -1459,6 +1461,7 @@ export async function getAllPremiumJobs({
   // Build WHERE conditions
   const conditions = [];
   if (status) conditions.push(eq(premiumJobs.status, status));
+  if (clientUserId) conditions.push(eq(premiumJobs.createdByUserId, clientUserId));
   if (search) {
     const like = `%${search}%`;
     conditions.push(
