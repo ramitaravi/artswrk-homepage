@@ -20,6 +20,7 @@ import Community from "./pages/dashboard/Community";
 import Benefits from "./pages/dashboard/Benefits";
 import ArtistProfile from "./pages/dashboard/ArtistProfile";
 import PostJob from "./pages/PostJob";
+import Signup from "./pages/Signup";
 import Admin from "./pages/Admin";
 
 // DashboardLayout handles auth protection internally (redirects to /login if not authenticated)
@@ -40,6 +41,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/post-job/success" component={PostJob} />
       <Route path="/post-job" component={PostJob} />
+      <Route path="/signup" component={Signup} />
 
       {/* Dashboard routes — auth protection is inside DashboardLayout */}
       <Route path="/dashboard">

@@ -3,7 +3,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, getStripe } from "./stripe";
 import { sdk } from "./_core/sdk";
@@ -559,6 +559,62 @@ Fields to extract:
         }
 
         return { success: true, jobId, plan: session.metadata?.type ?? "one_time" };
+      }),
+  }),
+
+  // ── Signup & Onboarding ────────────────────────────────────────────────────
+  signup: router({
+    /**
+     * Register a new user account.
+     * Creates the user, hashes the password, and sets a session cookie.
+     */
+    register: publicProcedure
+      .input(z.object({
+        firstName: z.string().min(1),
+        lastName: z.string().min(1),
+        email: z.string().email(),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const email = input.email.toLowerCase().trim();
+        const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
+        let newUser: { id: number; openId: string };
+        try {
+          newUser = await createNewUser({ email, firstName: input.firstName, lastName: input.lastName, passwordHash });
+        } catch (err: any) {
+          if (err.message === "EMAIL_TAKEN") {
+            throw new Error("An account with this email already exists.");
+          }
+          throw err;
+        }
+        // Create session cookie so user is logged in immediately
+        const sessionToken = await sdk.createSessionToken(newUser.openId, {
+          name: `${input.firstName} ${input.lastName}`,
+          expiresInMs: ONE_YEAR_MS,
+        });
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        return { success: true, userId: newUser.id };
+      }),
+
+    /**
+     * Save onboarding step data (business type, company details, etc.).
+     */
+    updateOnboarding: protectedProcedure
+      .input(z.object({
+        businessOrIndividual: z.string().optional(),
+        hiringCategory: z.string().optional(),
+        clientCompanyName: z.string().optional(),
+        location: z.string().optional(),
+        website: z.string().optional(),
+        phoneNumber: z.string().optional(),
+        onboardingStep: z.number().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        await updateUserOnboarding(user.id, input);
+        return { success: true };
       }),
   }),
 

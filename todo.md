@@ -151,5 +151,20 @@
 - [x] Logged-in view: prefills studio name and location from user account
 - [x] postJob.verifyCheckout endpoint to activate job on success page
 - [x] Success page at /post-job/success with job activation and confetti
-- [ ] Wire "Post a Job" CTAs on homepage, dashboard, and navbar to /post-job
+- [x] Wire "Post a Job" CTAs on homepage, dashboard, and navbar to /post-job
 - [ ] Write vitest tests for job parsing and creation logic
+
+## Signup & Onboarding Flow (/signup)
+- [x] Step 1: Account creation (firstName, lastName, email, password)
+- [x] Step 2: Hiring for yourself or a business? (businessOrIndividual field)
+- [x] Step 3a: Business type selection (Dance Studio, Dance Competition, Music School, Event Company, Other → hiringCategory field)
+- [x] Step 3b: Artist type selection for individuals
+- [x] Step 4a: Studio/Music School — studio name + Google Places lookup (name, address, website, phone)
+- [x] Step 4b: Competition/Event Company — competition name + website
+- [x] Step 4c: Other — business name + website
+- [x] Step 5: Pricing plan (Studio/Music School: $30/post or $50/mo | Enterprise: $100/post or $250/mo | Talk to Sales)
+- [x] Step 6: Post your first job? → route to /post-job or go to dashboard
+- [x] tRPC signup.register endpoint (create user, hash password, set session)
+- [x] tRPC signup.updateOnboarding endpoint (save businessOrIndividual, hiringCategory, company details)
+- [x] Wire Join/Signup CTAs on homepage navbar, hero, and Login page to /signup
+- [ ] Write vitest tests for signup logic

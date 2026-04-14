@@ -8,7 +8,7 @@
  */
 
 import { useState, useRef, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { ChevronDown, Menu, X, MapPin, Clock, Sparkles, CheckCircle2, Users, ArrowRight, Zap } from "lucide-react";
 
 type Tab = "hirers" | "artists";
@@ -81,7 +81,7 @@ function Navbar() {
 
           <div className="hidden md:flex items-center gap-3">
             <Link href="/login" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">Login</Link>
-            <Link href="/login" className="text-sm font-semibold text-white bg-[#111] px-4 py-2 rounded-full hover:bg-gray-800 transition-colors">Join</Link>
+            <Link href="/signup" className="text-sm font-semibold text-white bg-[#111] px-4 py-2 rounded-full hover:bg-gray-800 transition-colors">Join</Link>
           </div>
 
           <button className="md:hidden p-2" onClick={() => setMobileOpen(!mobileOpen)}>
@@ -97,7 +97,7 @@ function Navbar() {
           ))}
           <div className="flex gap-3 pt-2">
             <Link href="/login" className="text-sm font-medium text-gray-700">Login</Link>
-            <Link href="/login" className="text-sm font-semibold text-white bg-[#111] px-4 py-2 rounded-full">Join</Link>
+            <Link href="/signup" className="text-sm font-semibold text-white bg-[#111] px-4 py-2 rounded-full">Join</Link>
           </div>
         </div>
       )}
@@ -158,6 +158,13 @@ function JobPostFlow() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [, navigate] = useLocation();
+
+  function handleCreateAccount() {
+    // Pre-fill the post-job flow with the job text, then redirect to signup
+    if (text) sessionStorage.setItem("postJobText", text);
+    navigate("/signup");
+  }
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -217,7 +224,7 @@ function JobPostFlow() {
             onChange={(e) => setEmail(e.target.value)}
             className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
           />
-          <button className="w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+          <button onClick={handleCreateAccount} className="w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
             <Sparkles size={16} />
             Create Free Account & Publish Job
           </button>

@@ -947,3 +947,66 @@ export async function saveClientSubscriptionId(userId: number, subscriptionId: s
     .set({ clientSubscriptionId: subscriptionId, clientPremium: true })
     .where(eq(users.id, userId));
 }
+
+/**
+ * Create a brand-new user account (self-signup).
+ * Generates a unique openId prefixed "local_" and stores the bcrypt hash.
+ */
+export async function createNewUser(input: {
+  email: string;
+  firstName: string;
+  lastName: string;
+  passwordHash: string;
+}): Promise<{ id: number; openId: string }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Check for duplicate email
+  const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, input.email)).limit(1);
+  if (existing.length > 0) throw new Error("EMAIL_TAKEN");
+
+  const { randomUUID } = await import("crypto");
+  const openId = `local_${randomUUID()}`;
+  const name = `${input.firstName} ${input.lastName}`.trim();
+
+  const result = await db.insert(users).values({
+    openId,
+    email: input.email,
+    firstName: input.firstName,
+    lastName: input.lastName,
+    name,
+    passwordHash: input.passwordHash,
+    passwordIsTemporary: false,
+    userRole: "Client",
+    userSignedUp: true,
+    onboardingStep: 1,
+    lastSignedIn: new Date(),
+  });
+  const newId = (result as any).insertId as number;
+  return { id: newId, openId };
+}
+
+/**
+ * Save onboarding data to the user record.
+ */
+export async function updateUserOnboarding(userId: number, data: {
+  businessOrIndividual?: string;
+  hiringCategory?: string;
+  clientCompanyName?: string;
+  location?: string;
+  website?: string;
+  phoneNumber?: string;
+  onboardingStep?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const updateData: Record<string, unknown> = {};
+  if (data.businessOrIndividual !== undefined) updateData.businessOrIndividual = data.businessOrIndividual;
+  if (data.hiringCategory !== undefined) updateData.hiringCategory = data.hiringCategory;
+  if (data.clientCompanyName !== undefined) updateData.clientCompanyName = data.clientCompanyName;
+  if (data.location !== undefined) updateData.location = data.location;
+  if (data.website !== undefined) updateData.website = data.website;
+  if (data.phoneNumber !== undefined) updateData.phoneNumber = data.phoneNumber;
+  if (data.onboardingStep !== undefined) updateData.onboardingStep = data.onboardingStep;
+  await db.update(users).set(updateData as any).where(eq(users.id, userId));
+}
