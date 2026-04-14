@@ -1429,6 +1429,20 @@ export async function getAdminBookings({
  * Get all premium jobs created by a specific user (enterprise client).
  * Returns full job details ordered by creation date desc.
  */
+/**
+ * Get a single premium job by its ID.
+ */
+export async function getPremiumJobById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(premiumJobs)
+    .where(eq(premiumJobs.id, id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function getPremiumJobsByUserId(userId: number) {
   const db = await getDb();
   if (!db) return [];

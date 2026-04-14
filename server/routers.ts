@@ -3,7 +3,7 @@ import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, ONE_YEAR_MS } from "@shared/con
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
@@ -953,10 +953,49 @@ Fields to extract:
           }));
         return { artists };
       }),
+    /** Get a single premium job by ID */
+    getJobDetail: publicProcedure
+      .input(z.object({ jobId: z.number() }))
+      .query(async ({ input }) => {
+        const job = await getPremiumJobById(input.jobId);
+        return { job };
+      }),
+    /** Get applicants (interested artists) for a specific premium job */
+    getJobApplicants: publicProcedure
+      .input(z.object({ jobId: z.number() }))
+      .query(async ({ input }) => {
+        const raw = await getPremiumJobInterestedArtists(input.jobId);
+        const applicants = (raw as any[]).map((ia) => ({
+          id: ia.id,
+          artistUserId: ia.artistUserId,
+          name: ia.artistFirstName
+            ? `${ia.artistFirstName || ''} ${ia.artistLastName || ''}`.trim()
+            : (ia.artistName || 'Artist'),
+          firstName: ia.artistFirstName,
+          lastName: ia.artistLastName,
+          profilePicture: ia.artistProfilePicture,
+          location: ia.artistLocation,
+          bio: ia.artistBio,
+          disciplines: ia.artistDisciplines,
+          slug: ia.artistSlug,
+          message: ia.message,
+          rate: ia.rate,
+          resumeLink: ia.resumeLink,
+          status: ia.status,
+          createdAt: ia.createdAt,
+          artswrkPro: ia.artswrkPro,
+        }));
+        return { applicants };
+      }),
   }),
-
-  // ── Artswrk user queries ────────────────────────────────────────────────────
+    // ── Artswrk user queries ───────────────────────────────────────────
   artswrkUsers: router({
+    getById: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const user = await getUserById(input.id);
+        return { user };
+      }),
     getByEmail: publicProcedure
       .input(z.object({ email: z.string().email() }))
       .query(async ({ input }) => {

@@ -338,3 +338,18 @@
 - [x] Update EnterpriseClientModal to query by clientUserId instead of company name search
 - [x] Show interested artists per job inside the modal (expandable job rows with artist cards: photo, name, location, rate badge, message, View Submission + Profile links)
 - [x] 92 tests passing
+
+## Enterprise Dashboard Rebuild (Company + Job Detail Views)
+- [ ] Inspect live enterprise dashboard at artswrk.com/version-live/enterprise
+- [ ] Build company page view (logo, name, + Post Job, Jobs tab, job cards with avatar stack + Interested Artists sidebar panel)
+- [ ] Build job detail view (breadcrumb nav, job header with logo/title/company/date/status, Archive Job button, Applicants tab with table: Name+address, View Application, Message button; Details tab with job description)
+- [ ] Wire views as sub-routes or state within the Enterprise page
+- [ ] Match styling closely to live Artswrk enterprise dashboard
+
+## Enterprise Dashboard Improvements
+- [x] Add getJobDetail and getJobApplicants tRPC procedures to enterprise router
+- [x] Add getPremiumJobById db helper
+- [x] Build Company View: company logo, name, job cards with status badges, Interested Artists panel
+- [x] Build Job Detail View: breadcrumb navigation, Applicants tab (table with View Application + Message), Details tab (description, category, location, apply email)
+- [x] Add "View Detail →" button on each job card to navigate to job detail view
+- [x] Breadcrumb navigation: Home → Company → Job Title
