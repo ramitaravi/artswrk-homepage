@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -194,6 +194,84 @@ export const appRouter = router({
       .query(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
         return getAdminPayments(input);
+      }),
+
+    /**
+     * Impersonate a user — creates a session token for the target user,
+     * backs up the current admin session in a separate cookie, and returns
+     * the target user's details so the frontend can redirect appropriately.
+     */
+    impersonate: protectedProcedure
+      .input(z.object({ userId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") {
+          throw new Error("Forbidden: admin only");
+        }
+        const target = await getUserById(input.userId);
+        if (!target) throw new Error("User not found");
+
+        // Back up the current admin session cookie before overwriting it
+        const currentCookie = ctx.req.headers.cookie
+          ? ctx.req.headers.cookie.split(";").find((c: string) => c.trim().startsWith(COOKIE_NAME + "="))
+          : undefined;
+        const adminToken = currentCookie ? currentCookie.split("=").slice(1).join("=").trim() : "";
+
+        // Create a new session token for the target user
+        const targetToken = await sdk.createSessionToken(target.openId, {
+          name: target.name || target.firstName || target.email || "User",
+          expiresInMs: ONE_YEAR_MS,
+        });
+
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+
+        // Save the admin's original session in a backup cookie
+        if (adminToken) {
+          ctx.res.cookie(ADMIN_SESSION_COOKIE_NAME, adminToken, {
+            ...cookieOptions,
+            maxAge: ONE_YEAR_MS,
+          });
+        }
+
+        // Set the session cookie to the target user's token
+        ctx.res.cookie(COOKIE_NAME, targetToken, {
+          ...cookieOptions,
+          maxAge: ONE_YEAR_MS,
+        });
+
+        return {
+          success: true,
+          targetUser: {
+            id: target.id,
+            name: target.name || target.firstName || target.email,
+            email: target.email,
+            userRole: target.userRole,
+            enterprise: (target as any).enterprise,
+          },
+        };
+      }),
+
+    /**
+     * Stop impersonating — restore the original admin session from the backup cookie.
+     */
+    stopImpersonating: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        const cookies = ctx.req.headers.cookie || "";
+        const adminBackup = cookies.split(";").find((c: string) => c.trim().startsWith(ADMIN_SESSION_COOKIE_NAME + "="));
+        if (!adminBackup) throw new Error("No admin session backup found");
+
+        const adminToken = adminBackup.split("=").slice(1).join("=").trim();
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+
+        // Restore the admin session
+        ctx.res.cookie(COOKIE_NAME, adminToken, {
+          ...cookieOptions,
+          maxAge: ONE_YEAR_MS,
+        });
+
+        // Clear the backup cookie
+        ctx.res.clearCookie(ADMIN_SESSION_COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+
+        return { success: true };
       }),
   }),
 

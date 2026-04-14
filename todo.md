@@ -270,3 +270,13 @@
 - [x] Route /enterprise registered in App.tsx
 - [x] Non-enterprise users redirected to /dashboard
 - [x] 82 vitest tests passing (no new tests needed)
+
+## Admin Impersonation ("Run As Client")
+- [ ] Promote ramita+studio@artswrk.com to admin role in DB
+- [ ] Add admin.impersonate tRPC mutation (admin-only, creates a session token for target user)
+- [ ] Add "Run As" button to Admin Clients table rows
+- [ ] Add "Run As" button to Admin Artists table rows
+- [ ] On impersonate: set session cookie as target user and redirect to /dashboard
+- [ ] Show "Impersonating [Name]" banner when running as another user
+- [ ] Add "Return to Admin" button in the impersonation banner to restore original admin session
+- [ ] Write vitest tests for impersonate procedure

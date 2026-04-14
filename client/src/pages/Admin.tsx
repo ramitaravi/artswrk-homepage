@@ -14,8 +14,9 @@ import {
   Search, Shield, ChevronLeft, ChevronRight, Menu, X, TrendingUp,
   DollarSign, Calendar, Star, UserCheck, Building2, Key,
   AlertCircle, CheckCircle2, Eye, EyeOff, LogOut, Filter,
-  MapPin, Clock, ArrowUpRight,
+  MapPin, Clock, ArrowUpRight, UserCog, ArrowLeft,
 } from "lucide-react";
+import { ADMIN_SESSION_COOKIE_NAME } from "@shared/const";
 import { Link } from "wouter";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -119,6 +120,93 @@ function StatCard({ label, value, sub, icon, accent }: {
         {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
       </div>
     </div>
+  );
+}
+
+// ─── Impersonation Banner ────────────────────────────────────────────────────
+function ImpersonationBanner() {
+  const [isImpersonating, setIsImpersonating] = useState(false);
+  const utils = trpc.useUtils();
+  const stopMutation = trpc.admin.stopImpersonating.useMutation({
+    onSuccess: () => {
+      utils.invalidate();
+      window.location.href = "/admin";
+    },
+  });
+
+  useEffect(() => {
+    // Check if the admin backup cookie exists (means we're impersonating)
+    const cookies = document.cookie.split(";").map(c => c.trim());
+    const hasBackup = cookies.some(c => c.startsWith(ADMIN_SESSION_COOKIE_NAME + "="));
+    setIsImpersonating(hasBackup);
+  }, []);
+
+  if (!isImpersonating) return null;
+
+  return (
+    <div className="fixed top-0 left-0 right-0 z-[100] bg-[#F25722] text-white px-5 py-2.5 flex items-center justify-between shadow-lg">
+      <div className="flex items-center gap-2 text-sm font-semibold">
+        <UserCog size={16} />
+        <span>You are viewing as another user</span>
+      </div>
+      <button
+        onClick={() => stopMutation.mutate()}
+        disabled={stopMutation.isPending}
+        className="flex items-center gap-1.5 text-xs font-bold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60"
+      >
+        {stopMutation.isPending ? (
+          <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+        ) : (
+          <ArrowLeft size={13} />
+        )}
+        Return to Admin
+      </button>
+    </div>
+  );
+}
+
+// ─── Run As Button ────────────────────────────────────────────────────────────
+function RunAsButton({ userId, userName, userRole, enterprise }: {
+  userId: number;
+  userName: string;
+  userRole?: string | null;
+  enterprise?: boolean | null;
+}) {
+  const impersonateMutation = trpc.admin.impersonate.useMutation({
+    onSuccess: (data) => {
+      // Redirect to the appropriate dashboard based on user type
+      if (data.targetUser.enterprise) {
+        window.location.href = "/enterprise";
+      } else if (data.targetUser.userRole === "Artist") {
+        window.location.href = "/dashboard";
+      } else {
+        window.location.href = "/dashboard";
+      }
+    },
+    onError: (err) => {
+      alert("Failed to impersonate: " + err.message);
+    },
+  });
+
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        if (confirm(`Run as ${userName}?`)) {
+          impersonateMutation.mutate({ userId });
+        }
+      }}
+      disabled={impersonateMutation.isPending}
+      title={`Run as ${userName}`}
+      className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-orange-50 text-[#F25722] hover:bg-orange-100 transition-colors disabled:opacity-50 whitespace-nowrap"
+    >
+      {impersonateMutation.isPending ? (
+        <div className="w-3 h-3 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" />
+      ) : (
+        <UserCog size={11} />
+      )}
+      Run As
+    </button>
   );
 }
 
@@ -332,13 +420,14 @@ function ArtistsSection() {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Types</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Plan</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Joined</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Actions</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={5} className="px-5 py-10 text-center text-gray-400 text-xs">Loading…</td></tr>
+                <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-xs">Loading…</td></tr>
               ) : data?.artists.length === 0 ? (
-                <tr><td colSpan={5} className="px-5 py-10 text-center text-gray-400 text-xs">No artists found</td></tr>
+                <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-xs">No artists found</td></tr>
               ) : data?.artists.map(a => {
                 const types = (() => { try { return JSON.parse(a.masterArtistTypes || "[]"); } catch { return []; } })();
                 return (
@@ -377,6 +466,9 @@ function ArtistsSection() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(a.bubbleCreatedAt || a.createdAt)}</td>
+                    <td className="px-4 py-3">
+                      <RunAsButton userId={a.id} userName={displayName(a)} userRole="Artist" />
+                    </td>
                   </tr>
                 );
               })}
@@ -485,13 +577,14 @@ function ClientsSection() {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Plan</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Type</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Joined</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Actions</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-xs">Loading…</td></tr>
+                <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400 text-xs">Loading…</td></tr>
               ) : data?.clients.length === 0 ? (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-xs">No clients found</td></tr>
+                <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400 text-xs">No clients found</td></tr>
               ) : data?.clients.map(c => (
                 <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                   <td className="px-5 py-3">
@@ -520,6 +613,9 @@ function ClientsSection() {
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500">{c.businessOrIndividual || "—"}</td>
                   <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(c.bubbleCreatedAt || c.createdAt)}</td>
+                  <td className="px-4 py-3">
+                    <RunAsButton userId={c.id} userName={displayName(c)} userRole="Client" enterprise={(c as any).enterprise} />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -969,6 +1065,7 @@ export default function Admin() {
 
   return (
     <div className="flex min-h-screen bg-[#f8f8f8]">
+      <ImpersonationBanner />
       <Sidebar active={section} onSelect={setSection} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(c => !c)} />
 
       <main className="flex-1 overflow-auto">
