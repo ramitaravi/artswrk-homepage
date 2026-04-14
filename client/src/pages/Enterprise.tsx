@@ -1,797 +1,919 @@
-/**
+/*
  * ARTSWRK ENTERPRISE DASHBOARD
- * Two views:
- *  1. Company Page View — logo, company name, "+ Post Job", Jobs tab, job cards + Interested Artists panel
- *  2. Job Detail View — breadcrumb, logo, job title, company | posted date, Active badge, Archive Job,
- *                       Applicants / Details tabs, applicants table with "View Application →" + "Message" buttons
- *
- * Matches the live Bubble enterprise dashboard at artswrk.com/version-live/enterprise
+ * Layout: Left sidebar (Dashboard, Browse Artists) + main content area
+ * Master view: Jobs / Companies / Artists tabs
+ * Job detail view: breadcrumb → Applicants + Details tabs
  */
-import { useState, useMemo } from "react";
+
+import { useState } from "react";
+import { Link, useLocation } from "wouter";
 import {
-  Home,
-  ChevronRight,
-  Plus,
-  Trash2,
-  Loader2,
+  LayoutDashboard,
+  Users,
+  Briefcase,
+  Building2,
   MapPin,
+  CreditCard,
+  ChevronRight,
+  Home,
+  Archive,
   ExternalLink,
-  User,
-  ArrowLeft,
+  MessageCircle,
+  Star,
 } from "lucide-react";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import { getLoginUrl } from "@/const";
+import { useAuth } from "@/_core/hooks/useAuth";
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatDate(d: Date | string | null | undefined): string {
-  if (!d) return "";
-  const date = typeof d === "string" ? new Date(d) : d;
-  return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+function fixUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith("//")) return `https:${url}`;
+  return url;
 }
 
-function AvatarFallback({ name, size = 40 }: { name: string; size?: number }) {
-  const initials = name
+function initials(name: string): string {
+  return name
     .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
+    .map((w) => w[0])
     .join("")
-    .toUpperCase();
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+// ── Avatar ────────────────────────────────────────────────────────────────────
+
+function Avatar({
+  src,
+  name,
+  size = "md",
+}: {
+  src?: string | null;
+  name: string;
+  size?: "sm" | "md" | "lg" | "xl";
+}) {
+  const sizeClass = {
+    sm: "w-8 h-8 text-xs",
+    md: "w-10 h-10 text-sm",
+    lg: "w-14 h-14 text-base",
+    xl: "w-20 h-20 text-xl",
+  }[size];
+
+  const url = fixUrl(src);
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt={name}
+        className={`${sizeClass} rounded-full object-cover flex-shrink-0`}
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = "none";
+        }}
+      />
+    );
+  }
   return (
     <div
-      className="rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-semibold flex-shrink-0"
-      style={{ width: size, height: size, fontSize: size * 0.35 }}
+      className={`${sizeClass} rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-bold flex-shrink-0`}
     >
-      {initials || <User size={size * 0.5} />}
+      {initials(name)}
     </div>
   );
 }
 
-function ArtistAvatar({
-  src,
-  name,
-  size = 40,
-}: {
-  src?: string | null;
-  name: string;
-  size?: number;
-}) {
-  const [errored, setErrored] = useState(false);
-  if (!src || errored) return <AvatarFallback name={name} size={size} />;
+// ── Status Badge ──────────────────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status?: string }) {
+  const s = (status || "").toLowerCase();
+  if (s === "active" || s === "open") {
+    return (
+      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+        Active
+      </span>
+    );
+  }
+  if (s === "completed" || s === "closed") {
+    return (
+      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 border border-gray-200">
+        Completed
+      </span>
+    );
+  }
+  if (s === "archived") {
+    return (
+      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-400 border border-gray-200">
+        Archived
+      </span>
+    );
+  }
   return (
-    <img
-      src={src}
-      alt={name}
-      className="rounded-full object-cover flex-shrink-0"
-      style={{ width: size, height: size }}
-      onError={() => setErrored(true)}
-    />
+    <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200">
+      {status || "Active"}
+    </span>
   );
 }
 
-// ── Avatar Stack (overlapping avatars + count badge) ─────────────────────────
+// ── Applicant Avatar Stack ────────────────────────────────────────────────────
 
-function AvatarStack({
-  artists,
-}: {
-  artists: Array<{ profilePicture?: string | null; name: string }>;
-}) {
-  const visible = artists.slice(0, 2);
+function AvatarStack({ artists }: { artists: any[] }) {
+  const visible = artists.slice(0, 3);
   const extra = artists.length - visible.length;
   return (
     <div className="flex items-center">
-      <div className="flex -space-x-2">
-        {visible.map((a, i) => (
-          <div key={i} className="ring-2 ring-white rounded-full">
-            <ArtistAvatar src={a.profilePicture} name={a.name} size={32} />
-          </div>
-        ))}
-      </div>
+      {visible.map((a, i) => (
+        <div
+          key={a.id || i}
+          className="w-8 h-8 rounded-full border-2 border-white -ml-2 first:ml-0 overflow-hidden flex-shrink-0"
+        >
+          {fixUrl(a.profilePicture) ? (
+            <img
+              src={fixUrl(a.profilePicture)!}
+              alt={a.name || "Artist"}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                const el = e.target as HTMLImageElement;
+                el.style.display = "none";
+                el.parentElement!.style.background =
+                  "linear-gradient(135deg, #FFBC5D, #F25722)";
+                el.parentElement!.innerHTML = `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:white;font-size:10px;font-weight:700">${initials(a.name || "A")}</span>`;
+              }}
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-xs font-bold">
+              {initials(a.name || a.firstName || "A")}
+            </div>
+          )}
+        </div>
+      ))}
       {extra > 0 && (
-        <span className="ml-2 text-sm font-semibold text-gray-600 bg-gray-100 rounded-full px-2 py-0.5">
-          + {extra}
+        <span className="ml-1.5 text-xs font-semibold text-gray-500">
+          +{extra}
         </span>
       )}
     </div>
   );
 }
 
-// ── Status Badge ─────────────────────────────────────────────────────────────
+// ── Sidebar ───────────────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status?: string | null }) {
-  const s = status || "Active";
-  const isActive = s.toLowerCase() === "active";
+type SidebarItem = {
+  icon: React.ReactNode;
+  label: string;
+  href?: string;
+  onClick?: () => void;
+  active?: boolean;
+};
+
+function Sidebar({
+  activeSection,
+  onNavigate,
+}: {
+  activeSection: string;
+  onNavigate: (section: string) => void;
+}) {
+  const [, navigate] = useLocation();
+
+  const items: SidebarItem[] = [
+    {
+      icon: <LayoutDashboard size={18} />,
+      label: "Dashboard",
+      onClick: () => onNavigate("dashboard"),
+      active: activeSection === "dashboard",
+    },
+    {
+      icon: <Users size={18} />,
+      label: "Browse Artists",
+      onClick: () => navigate("/dashboard/artists"),
+      active: false,
+    },
+  ];
+
   return (
-    <span
-      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-        isActive
-          ? "bg-green-50 text-green-700 border border-green-200"
-          : "bg-gray-100 text-gray-600 border border-gray-200"
-      }`}
-    >
-      {s}
-    </span>
+    <aside className="w-56 flex-shrink-0 border-r border-gray-100 bg-white min-h-screen pt-6 px-3">
+      <div className="mb-6 px-3">
+        <Link href="/">
+          <span className="font-black text-xl tracking-tight">
+            <span className="hirer-grad-text">ARTS</span>
+            <span className="bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">
+              WRK
+            </span>
+          </span>
+        </Link>
+      </div>
+
+      <nav className="space-y-1">
+        {items.map((item) => (
+          <button
+            key={item.label}
+            onClick={item.onClick}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-left ${
+              item.active
+                ? "bg-orange-50 text-[#F25722]"
+                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            }`}
+          >
+            {item.icon}
+            {item.label}
+          </button>
+        ))}
+      </nav>
+    </aside>
   );
 }
 
-// ── Job Card (Company View) ───────────────────────────────────────────────────
+// ── Job Card (Jobs Tab) ───────────────────────────────────────────────────────
 
 function JobCard({
   job,
   applicants,
-  isSelected,
-  onClick,
   onViewDetail,
 }: {
   job: any;
   applicants: any[];
-  isSelected: boolean;
-  onClick: () => void;
   onViewDetail: () => void;
 }) {
-  const rawLogo = job.logo;
-  const logoUrl = rawLogo?.startsWith("//") ? `https:${rawLogo}` : rawLogo;
-  const companyName = job.company || "Company";
-  const jobTitle = job.serviceType || "Job";
+  const rawLogo = job.logo || job.enterpriseLogoUrl;
+  const logoUrl = fixUrl(rawLogo);
+  const companyName = job.company || job.clientCompanyName || "Company";
+  const jobTitle = job.serviceType || job.title || "Job";
+  // Guard against stringified [object Object] from Bubble import
+  const rawLocation = job.location || job.clientLocation;
+  const location =
+    rawLocation && !rawLocation.includes("[object") && rawLocation !== "[object Object]"
+      ? rawLocation
+      : job.workFromAnywhere
+        ? "Work from Anywhere"
+        : null;
+  const rate = job.rate || job.clientRate;
+  const status = job.status || job.requestStatus;
 
   return (
-    <button
-      onClick={onClick}
-      className={`w-full text-left p-4 rounded-xl border transition-all ${
-        isSelected
-          ? "border-gray-900 bg-gray-50 shadow-sm"
-          : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
-      }`}
-    >
-      <div className="flex items-start gap-3">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-4">
+      <div className="flex items-start gap-4">
         {/* Company logo */}
-        <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 flex items-center justify-center">
+        <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-gray-50 border border-gray-100">
           {logoUrl ? (
-            <img src={logoUrl} alt={companyName} className="w-full h-full object-cover" />
+            <img
+              src={logoUrl}
+              alt={companyName}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
           ) : (
-            <span className="text-xs font-bold text-gray-400">{companyName[0]}</span>
+            <div className="w-full h-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-sm">
+              {initials(companyName)}
+            </div>
           )}
         </div>
 
+        {/* Job info */}
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-gray-900 text-sm leading-tight truncate">{jobTitle}</h3>
-          <p className="text-xs text-gray-500 mt-0.5 truncate">{companyName}</p>
-
-          {/* Location */}
-          {(job.workFromAnywhere || job.location) && (
-            <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-              <MapPin size={10} className="flex-shrink-0" />
-              {job.workFromAnywhere ? "Work from Anywhere" : job.location}
-            </p>
-          )}
-
-          {/* Budget badge */}
-          {job.budget && (
-            <span className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-[#F25722] bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5">
-              <span className="text-[10px]">💳</span> {job.budget}
+          <h3 className="font-bold text-[#111] text-sm leading-snug mb-0.5 truncate">
+            {jobTitle}
+          </h3>
+          <p className="text-xs text-gray-500 mb-1">{companyName}</p>
+          <p className="text-xs text-gray-400 flex items-center gap-1">
+            <MapPin size={10} />
+            {location}
+          </p>
+          {rate && (
+            <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722] text-xs font-semibold">
+              <CreditCard size={10} />
+              {rate}
             </span>
           )}
         </div>
 
-        {/* Right side: avatar stack + status + view detail */}
+        {/* Right: avatar stack + status + view detail */}
         <div className="flex flex-col items-end gap-2 flex-shrink-0">
           {applicants.length > 0 && <AvatarStack artists={applicants} />}
-          <StatusBadge status={job.status} />
+          <StatusBadge status={status} />
           <button
-            onClick={(e) => { e.stopPropagation(); onViewDetail(); }}
-            className="text-xs font-semibold text-[#F25722] hover:underline flex items-center gap-1 mt-1"
+            onClick={onViewDetail}
+            className="text-xs font-semibold text-[#F25722] hover:underline flex items-center gap-1"
           >
-            View Detail →
+            View Detail <ChevronRight size={12} />
           </button>
         </div>
       </div>
-    </button>
-  );
-}
-
-// ── Interested Artists Panel (Company View right column) ──────────────────────
-
-function InterestedArtistsPanel({ artists }: { artists: any[] }) {
-  if (artists.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-          <User size={20} className="text-gray-400" />
-        </div>
-        <p className="text-sm text-gray-500">No applications yet</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {artists.map((artist) => {
-        const name = artist.firstName
-          ? `${artist.firstName} ${artist.lastName || ""}`.trim()
-          : artist.name || "Artist";
-        return (
-          <div key={artist.id} className="flex items-center gap-3">
-            <ArtistAvatar src={artist.profilePicture} name={name} size={48} />
-            <div className="min-w-0">
-              <p className="font-semibold text-gray-900 text-sm">{name}</p>
-              {artist.location && (
-                <p className="text-xs text-gray-500 truncate">{artist.location}</p>
-              )}
-            </div>
-          </div>
-        );
-      })}
     </div>
   );
 }
 
-// ── Job Applicants Panel (fetches for a specific job) ─────────────────────────
+// ── Company Card (Companies Tab) ──────────────────────────────────────────────
 
-function JobApplicantsPanel({ jobId }: { jobId: number }) {
-  const { data, isLoading } = trpc.enterprise.getJobApplicants.useQuery(
-    { jobId },
-    { enabled: !!jobId }
-  );
-
-  const applicants = data?.applicants ?? [];
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="animate-spin text-gray-400" size={20} />
-      </div>
-    );
-  }
-
-  return <InterestedArtistsPanel artists={applicants} />;
-}
-
-// ── Company Page View ─────────────────────────────────────────────────────────
-
-function CompanyView({
-  enterpriseUser,
-  onSelectJob,
-}: {
-  enterpriseUser: any;
-  onSelectJob: (job: any) => void;
-}) {
-  const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
-
-  const { data: jobsData, isLoading: jobsLoading } = trpc.enterprise.getJobs.useQuery(
-    { clientUserId: enterpriseUser?.id },
-    { enabled: !!enterpriseUser?.id }
-  );
-
-  const jobs = jobsData?.jobs ?? [];
-
-  // Auto-select first job
-  const effectiveJobId = selectedJobId ?? (jobs[0]?.id ?? null);
-
-  const rawLogo = enterpriseUser?.enterpriseLogoUrl;
-  const logoUrl = rawLogo?.startsWith("//") ? `https:${rawLogo}` : rawLogo;
-  const companyName = enterpriseUser?.clientCompanyName || enterpriseUser?.name || "Company";
-
+function CompanyCard({ company }: { company: any }) {
+  const logoUrl = fixUrl(company.logoUrl);
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Back arrow */}
-      <div className="max-w-6xl mx-auto px-4 pt-6 pb-2">
-        <button
-          onClick={() => window.history.back()}
-          className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors text-sm"
-        >
-          <ArrowLeft size={16} />
-          Back
-        </button>
-      </div>
-
-      {/* Company header card */}
-      <div className="max-w-6xl mx-auto px-4 pb-6">
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 flex items-start justify-between">
-          <div className="flex flex-col gap-4">
-            {/* Logo */}
-            <div className="w-32 h-32 rounded-full overflow-hidden bg-gray-900 flex items-center justify-center">
-              {logoUrl ? (
-                <img src={logoUrl} alt={companyName} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-3xl font-black text-white">{companyName[0]}</span>
-              )}
-            </div>
-            {/* Company name */}
-            <h1 className="text-2xl font-black text-gray-900">{companyName}</h1>
-          </div>
-
-          {/* Post Job button */}
-          <Button
-            variant="outline"
-            className="rounded-full border-gray-900 text-gray-900 hover:bg-gray-50 font-semibold"
-            onClick={() => toast.info("Premium job posting coming soon!")}
-          >
-            <Plus size={16} className="mr-1" /> Post Job
-          </Button>
-        </div>
-      </div>
-
-      {/* Jobs tab + content */}
-      <div className="max-w-6xl mx-auto px-4 pb-10">
-        {/* Tab bar */}
-        <div className="border-b border-gray-200 mb-6">
-          <button className="pb-3 px-1 text-sm font-bold text-gray-900 border-b-2 border-gray-900">
-            Jobs
-          </button>
-        </div>
-
-        {jobsLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="animate-spin text-[#F25722]" size={28} />
-          </div>
-        ) : jobs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <p className="text-gray-500 mb-4">No jobs posted yet.</p>
-            <Button
-              className="bg-gray-900 text-white hover:bg-gray-800 rounded-full"
-              onClick={() => toast.info("Premium job posting coming soon!")}
-            >
-              <Plus size={16} className="mr-2" /> Post a Job
-            </Button>
-          </div>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+      {/* Logo area */}
+      <div className="h-40 bg-gray-50 flex items-center justify-center p-6">
+        {logoUrl ? (
+          <img
+            src={logoUrl}
+            alt={company.name}
+            className="max-h-full max-w-full object-contain"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            {/* Job cards column */}
-            <div className="lg:col-span-3 space-y-3">
-              {jobs.map((job: any) => {
-                const isSelected = effectiveJobId === job.id;
-                return (
-                  <JobCard
-                    key={job.id}
-                    job={job}
-                    applicants={[]}
-                    isSelected={isSelected}
-                    onClick={() => setSelectedJobId(job.id)}
-                    onViewDetail={() => onSelectJob(job)}
-                  />
-                );
-              })}
-            </div>
-
-            {/* Interested Artists panel */}
-            <div className="lg:col-span-2">
-              <div className="bg-white rounded-2xl border border-gray-200 p-5 sticky top-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Interested Artists</h2>
-                {effectiveJobId !== null ? (
-                  <JobApplicantsPanel jobId={effectiveJobId} />
-                ) : (
-                  <InterestedArtistsPanel artists={[]} />
-                )}
-              </div>
-            </div>
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-2xl">
+            {initials(company.name)}
           </div>
         )}
       </div>
+      {/* Info */}
+      <div className="p-4 border-t border-gray-100">
+        <h3 className="font-bold text-[#111] text-sm mb-1">{company.name}</h3>
+        {company.location && (
+          <p className="text-xs text-gray-400 flex items-center gap-1 mb-2">
+            <MapPin size={10} />
+            {company.location}
+          </p>
+        )}
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-[#F25722]">
+            {company.openRoles} open role{company.openRoles !== 1 ? "s" : ""}
+          </span>
+          <span className="text-xs text-gray-400">View →</span>
+        </div>
+      </div>
     </div>
   );
 }
 
-// ── Applicants Tab ────────────────────────────────────────────────────────────
+// ── Artist Row (Artists Tab) ──────────────────────────────────────────────────
 
-function ApplicantsTab({
-  applicants,
-  isLoading,
+function ArtistRow({ artist }: { artist: any }) {
+  const name =
+    artist.firstName
+      ? `${artist.firstName} ${artist.lastName || ""}`.trim()
+      : artist.name || "Artist";
+  return (
+    <div className="flex items-center gap-4 py-3 border-b border-gray-50 last:border-0">
+      <Avatar src={artist.profilePicture} name={name} size="md" />
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-sm text-[#111] truncate">{name}</p>
+        {artist.location && (
+          <p className="text-xs text-gray-400 flex items-center gap-1">
+            <MapPin size={10} />
+            {artist.location}
+          </p>
+        )}
+      </div>
+      {artist.artswrkPro && (
+        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-600 text-xs font-semibold border border-yellow-200">
+          <Star size={10} fill="currentColor" />
+          PRO
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ── Applications Panel ────────────────────────────────────────────────────────
+
+function ApplicationsPanel({ applications }: { applications: any[] }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sticky top-6">
+      <h3 className="font-bold text-[#111] text-base mb-4">Applications</h3>
+      {applications.length === 0 ? (
+        <p className="text-sm text-gray-400 text-center py-6">
+          No applications yet
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {applications.slice(0, 10).map((app) => {
+            const name = app.artistName || "Artist";
+            return (
+              <div key={app.id} className="flex items-center gap-3">
+                <Avatar src={app.profilePicture} name={name} size="sm" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm text-[#111] truncate">
+                    {name}
+                  </p>
+                  <p className="text-xs text-gray-400 truncate">
+                    {app.jobTitle}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+          {applications.length > 10 && (
+            <p className="text-xs text-gray-400 text-center pt-1">
+              +{applications.length - 10} more
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Master View (Jobs / Companies / Artists tabs) ─────────────────────────────
+
+type MasterTab = "jobs" | "companies" | "artists";
+
+function MasterView({
+  user,
+  onSelectJob,
 }: {
-  applicants: any[];
-  isLoading: boolean;
+  user: any;
+  onSelectJob: (job: any) => void;
 }) {
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="animate-spin text-[#F25722]" size={28} />
-      </div>
+  const [tab, setTab] = useState<MasterTab>("jobs");
+  const userId = user?.id;
+
+  const { data: jobsData, isLoading: jobsLoading } =
+    trpc.enterprise.getJobs.useQuery(
+      { clientUserId: userId },
+      { enabled: !!userId }
     );
-  }
 
-  if (applicants.length === 0) {
-    return (
-      <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center">
-        <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-          <User size={24} className="text-gray-400" />
-        </div>
-        <p className="text-gray-500 font-medium">No applications yet</p>
-        <p className="text-gray-400 text-sm mt-1">Artists who apply will appear here.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-100">
-        <h2 className="text-lg font-bold text-gray-900">Applications</h2>
-      </div>
-
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-100">
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[40%]">
-                Name
-              </th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[30%]">
-                Details
-              </th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[30%]">
-                Get In Touch
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {applicants.map((applicant) => {
-              const name = applicant.firstName
-                ? `${applicant.firstName} ${applicant.lastName || ""}`.trim()
-                : applicant.name || "Artist";
-
-              return (
-                <tr key={applicant.id} className="hover:bg-gray-50 transition-colors">
-                  {/* Name + location */}
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <ArtistAvatar src={applicant.profilePicture} name={name} size={40} />
-                      <div>
-                        <p className="font-semibold text-gray-900 text-sm">{name}</p>
-                        {applicant.location && (
-                          <p className="text-xs text-gray-500 mt-0.5">{applicant.location}</p>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* View Application link */}
-                  <td className="px-6 py-4">
-                    {applicant.resumeLink ? (
-                      <a
-                        href={applicant.resumeLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[#ec008c] hover:text-[#c4006f] font-medium text-sm transition-colors"
-                      >
-                        View Application →
-                      </a>
-                    ) : applicant.slug ? (
-                      <a
-                        href={`/artists/${applicant.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[#ec008c] hover:text-[#c4006f] font-medium text-sm transition-colors"
-                      >
-                        View Application →
-                      </a>
-                    ) : (
-                      <span className="text-gray-400 text-sm">—</span>
-                    )}
-                  </td>
-
-                  {/* Message button */}
-                  <td className="px-6 py-4">
-                    <Button
-                      className="bg-gray-900 text-white hover:bg-gray-800 rounded-full px-6 text-sm font-semibold"
-                      onClick={() => toast.info("Messaging feature coming soon!")}
-                    >
-                      Message
-                    </Button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+  const { data: appsData } = trpc.enterprise.getApplications.useQuery(
+    { clientUserId: userId },
+    { enabled: !!userId }
   );
-}
 
-// ── Details Tab ───────────────────────────────────────────────────────────────
+  const { data: companiesData, isLoading: companiesLoading } =
+    trpc.enterprise.getCompanies.useQuery(
+      { clientUserId: userId },
+      { enabled: !!userId }
+    );
 
-function DetailsTab({ job }: { job: any }) {
+  const { data: artistsData, isLoading: artistsLoading } =
+    trpc.enterprise.getInterestedArtists.useQuery(
+      { clientUserId: userId },
+      { enabled: !!userId }
+    );
+
+  const jobs = jobsData?.jobs || [];
+  const applications = appsData?.applications || [];
+  const companies = companiesData?.companies || [];
+  const artists = artistsData?.artists || [];
+
+  // Use job logo as fallback since the logged-in user may be a different account
+  const firstJobLogo = jobs.length > 0 ? fixUrl(jobs[0].logo) : null;
+  const rawLogo = user?.enterpriseLogoUrl || user?.profilePicture;
+  const logoUrl = fixUrl(rawLogo) || firstJobLogo;
+  const displayName = user?.name || user?.firstName || "Enterprise";
+
+  const tabs: { id: MasterTab; label: string }[] = [
+    { id: "jobs", label: "Jobs" },
+    { id: "companies", label: "Companies" },
+    { id: "artists", label: "Artists" },
+  ];
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5">
-      {job.description && (
+    <div className="flex-1 overflow-y-auto">
+      {/* Company header card */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6 flex items-start justify-between">
         <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            Description
-          </h3>
-          <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
-            {job.description}
-          </p>
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={displayName}
+              className="w-24 h-24 object-contain mb-4"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          ) : (
+            <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-3xl mb-4">
+              {initials(displayName)}
+            </div>
+          )}
+          <h1 className="text-2xl font-black text-[#111]">{displayName}</h1>
         </div>
-      )}
+        <Link href="/post-job">
+          <button className="flex items-center gap-2 px-5 py-2.5 rounded-full border-2 border-[#111] text-sm font-bold text-[#111] hover:bg-[#111] hover:text-white transition-colors">
+            + Post Job
+          </button>
+        </Link>
+      </div>
 
-      {job.category && (
-        <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            Category
-          </h3>
-          <p className="text-gray-700 text-sm">{job.category}</p>
-        </div>
-      )}
-
-      {job.budget && (
-        <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            Compensation
-          </h3>
-          <p className="text-gray-700 text-sm">{job.budget}</p>
-        </div>
-      )}
-
-      {(job.location || job.workFromAnywhere) && (
-        <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            Location
-          </h3>
-          <p className="text-gray-700 text-sm flex items-center gap-1">
-            <MapPin size={14} className="text-gray-400" />
-            {job.workFromAnywhere ? "Work from Anywhere" : job.location}
-          </p>
-        </div>
-      )}
-
-      {job.applyEmail && (
-        <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            Apply Email
-          </h3>
-          <a
-            href={`mailto:${job.applyEmail}`}
-            className="text-[#ec008c] text-sm hover:underline"
+      {/* Tab bar */}
+      <div className="flex items-center gap-0 border-b border-gray-200 mb-6">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+              tab === t.id
+                ? "border-[#111] text-[#111]"
+                : "border-transparent text-gray-400 hover:text-gray-700"
+            }`}
           >
-            {job.applyEmail}
-          </a>
-        </div>
-      )}
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      {job.applyLink && (
-        <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            Apply Link
-          </h3>
-          <a
-            href={job.applyLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[#ec008c] text-sm hover:underline flex items-center gap-1"
-          >
-            <ExternalLink size={12} />
-            {job.applyLink}
-          </a>
-        </div>
-      )}
+      {/* Tab content */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Main content */}
+        <div className="lg:col-span-3">
+          {/* Jobs Tab */}
+          {tab === "jobs" && (
+            <div className="space-y-3">
+              {jobsLoading ? (
+                <div className="text-center py-12 text-gray-400 text-sm">
+                  Loading jobs…
+                </div>
+              ) : jobs.length === 0 ? (
+                <div className="text-center py-12 text-gray-400 text-sm">
+                  No jobs found. Post your first job!
+                </div>
+              ) : (
+                jobs.map((job: any) => (
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    applicants={applications.filter(
+                      (a: any) => a.jobTitle === (job.serviceType || job.title)
+                    )}
+                    onViewDetail={() => onSelectJob(job)}
+                  />
+                ))
+              )}
+            </div>
+          )}
 
-      {job.tag && (
-        <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            Tags
-          </h3>
-          <p className="text-gray-700 text-sm">{job.tag}</p>
+          {/* Companies Tab */}
+          {tab === "companies" && (
+            <div>
+              {companiesLoading ? (
+                <div className="text-center py-12 text-gray-400 text-sm">
+                  Loading companies…
+                </div>
+              ) : companies.length === 0 ? (
+                <div className="text-center py-12 text-gray-400 text-sm">
+                  No companies found.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {companies.map((company: any) => (
+                    <CompanyCard key={company.id} company={company} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Artists Tab */}
+          {tab === "artists" && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <h3 className="font-bold text-[#111] text-base mb-4">
+                Interested Artists ({artists.length})
+              </h3>
+              {artistsLoading ? (
+                <div className="text-center py-8 text-gray-400 text-sm">
+                  Loading artists…
+                </div>
+              ) : artists.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 text-sm">
+                  No interested artists yet.
+                </div>
+              ) : (
+                <div>
+                  {artists.map((artist: any) => (
+                    <ArtistRow key={artist.id} artist={artist} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Applications panel (right column) */}
+        <div className="lg:col-span-1">
+          <ApplicationsPanel applications={applications} />
+        </div>
+      </div>
     </div>
   );
 }
 
 // ── Job Detail View ───────────────────────────────────────────────────────────
 
-type JobDetailTab = "applicants" | "details";
+type DetailTab = "applicants" | "details";
 
 function JobDetailView({
-  jobId,
-  companyName,
-  enterpriseUser,
+  job,
+  user,
   onBack,
 }: {
-  jobId: number;
-  companyName: string;
-  enterpriseUser: any;
+  job: any;
+  user: any;
   onBack: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<JobDetailTab>("applicants");
+  const [tab, setTab] = useState<DetailTab>("applicants");
 
-  const { data: jobData, isLoading: jobLoading } = trpc.enterprise.getJobDetail.useQuery(
-    { jobId },
-    { enabled: !!jobId }
-  );
-
-  const { data: applicantsData, isLoading: applicantsLoading } =
-    trpc.enterprise.getJobApplicants.useQuery({ jobId }, { enabled: !!jobId });
-
-  const job = jobData?.job;
-  const applicants = applicantsData?.applicants ?? [];
-
-  const rawJobLogo = job?.logo;
-  const jobLogoUrl = rawJobLogo?.startsWith("//") ? `https:${rawJobLogo}` : rawJobLogo;
-  const rawEnterpriseLogo = enterpriseUser?.enterpriseLogoUrl;
-  const enterpriseLogoUrl = rawEnterpriseLogo?.startsWith("//")
-    ? `https:${rawEnterpriseLogo}`
-    : rawEnterpriseLogo;
-  const displayLogo = jobLogoUrl || enterpriseLogoUrl;
-
-  if (jobLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="animate-spin text-[#F25722]" size={32} />
-      </div>
+  const { data: applicantsData, isLoading } =
+    trpc.enterprise.getJobApplicants.useQuery(
+      { jobId: job.id },
+      { enabled: !!job.id }
     );
-  }
 
-  if (!job) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500">Job not found.</p>
-      </div>
-    );
-  }
+  const applicants = applicantsData?.applicants || [];
 
-  const jobTitle = job.serviceType || "Job";
-  const postedDate = job.bubbleCreatedAt || job.createdAt;
+  const rawLogo = job.logo || job.enterpriseLogoUrl || user?.enterpriseLogoUrl;
+  const logoUrl = fixUrl(rawLogo);
+  const jobTitle = job.serviceType || job.title || "Job";
+  const postedBy = user?.name || "Enterprise";
+  const postedDate = job.createdAt
+    ? new Date(job.createdAt).toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+    : null;
+  const status = job.status || job.requestStatus;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-5xl mx-auto px-4 py-6">
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-1 text-sm mb-6 bg-white rounded-xl border border-gray-200 px-4 py-3 w-fit">
-          <button
-            onClick={onBack}
-            className="text-blue-700 hover:text-blue-900 transition-colors flex items-center"
-          >
-            <Home size={16} className="text-blue-700" />
-          </button>
-          <ChevronRight size={14} className="text-gray-400" />
-          <button
-            onClick={onBack}
-            className="text-gray-600 hover:text-gray-900 transition-colors font-medium"
-          >
-            {companyName}
-          </button>
-          <ChevronRight size={14} className="text-gray-400" />
-          <span className="text-gray-900 font-medium">{jobTitle}</span>
-        </nav>
+    <div className="flex-1 overflow-y-auto">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+        <button
+          onClick={() => {}}
+          className="hover:text-gray-600 transition-colors"
+        >
+          <Home size={14} />
+        </button>
+        <ChevronRight size={14} />
+        <button
+          onClick={onBack}
+          className="hover:text-[#F25722] transition-colors font-medium"
+        >
+          {postedBy}
+        </button>
+        <ChevronRight size={14} />
+        <span className="text-[#111] font-semibold truncate max-w-xs">
+          {jobTitle}
+        </span>
+      </nav>
 
-        {/* Job header card */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-          <div className="flex items-start justify-between">
-            <div className="flex flex-col gap-4">
-              {/* Logo */}
-              <div className="w-32 h-32 rounded-full overflow-hidden bg-gray-900 flex items-center justify-center">
-                {displayLogo ? (
-                  <img
-                    src={displayLogo}
-                    alt={companyName}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span className="text-3xl font-black text-white">{companyName[0]}</span>
-                )}
-              </div>
-
-              {/* Job title */}
-              <div>
-                <h1 className="text-3xl font-black text-gray-900 mb-1">{jobTitle}</h1>
-                <p className="text-gray-500 text-sm">
-                  {companyName}
-                  {postedDate && <> | Posted {formatDate(postedDate)}</>}
-                </p>
-                <div className="mt-3">
-                  <StatusBadge status={job.status} />
+      {/* Job header card */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start gap-4">
+            <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={postedBy}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-lg">
+                  {initials(postedBy)}
                 </div>
+              )}
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-[#111] mb-1">
+                {jobTitle}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {postedBy}
+                {postedDate ? ` | Posted ${postedDate}` : ""}
+              </p>
+              <div className="mt-2">
+                <StatusBadge status={status} />
               </div>
             </div>
-
-            {/* Archive Job button */}
-            <Button
-              variant="outline"
-              className="border-red-300 text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2"
-              onClick={() => toast.info("Archive job feature coming soon!")}
-            >
-              <Trash2 size={15} />
-              Archive Job
-            </Button>
           </div>
+          <button className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 text-red-500 text-sm font-semibold hover:bg-red-50 transition-colors">
+            <Archive size={14} />
+            Archive Job
+          </button>
         </div>
-
-        {/* Tabs */}
-        <div className="border-b border-gray-200 mb-6">
-          <div className="flex gap-6">
-            {(["applicants", "details"] as JobDetailTab[]).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`pb-3 px-1 text-sm font-semibold capitalize transition-colors ${
-                  activeTab === tab
-                    ? "text-gray-900 border-b-2 border-gray-900"
-                    : "text-gray-400 hover:text-gray-600"
-                }`}
-              >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Tab content */}
-        {activeTab === "applicants" && (
-          <ApplicantsTab applicants={applicants} isLoading={applicantsLoading} />
-        )}
-        {activeTab === "details" && <DetailsTab job={job} />}
       </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-0 border-b border-gray-200 mb-6">
+        {(["applicants", "details"] as DetailTab[]).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-5 py-3 text-sm font-semibold capitalize border-b-2 transition-colors ${
+              tab === t
+                ? "border-[#111] text-[#111]"
+                : "border-transparent text-gray-400 hover:text-gray-700"
+            }`}
+          >
+            {t === "applicants" ? "Applicants" : "Details"}
+          </button>
+        ))}
+      </div>
+
+      {/* Applicants Tab */}
+      {tab === "applicants" && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          {isLoading ? (
+            <div className="text-center py-12 text-gray-400 text-sm">
+              Loading applicants…
+            </div>
+          ) : applicants.length === 0 ? (
+            <div className="text-center py-12 text-gray-400 text-sm">
+              No applicants yet.
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">
+                    Name
+                  </th>
+                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-5 py-3 hidden md:table-cell">
+                    Details
+                  </th>
+                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">
+                    Get In Touch
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {applicants.map((a: any) => {
+                  const name = a.firstName
+                    ? `${a.firstName} ${a.lastName || ""}`.trim()
+                    : a.name || "Artist";
+                  const profileUrl = a.slug
+                    ? `https://artswrk.com/version-live/artist-profile?slug=${a.slug}`
+                    : null;
+                  return (
+                    <tr
+                      key={a.id}
+                      className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors"
+                    >
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <Avatar
+                            src={a.profilePicture}
+                            name={name}
+                            size="md"
+                          />
+                          <div>
+                            <p className="font-semibold text-sm text-[#111]">
+                              {name}
+                            </p>
+                            {a.location && (
+                              <p className="text-xs text-gray-400 flex items-center gap-1">
+                                <MapPin size={10} />
+                                {a.location}
+                              </p>
+                            )}
+                            {a.artswrkPro && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-yellow-50 text-yellow-600 text-xs font-semibold">
+                                <Star size={9} fill="currentColor" />
+                                PRO
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 hidden md:table-cell">
+                        {profileUrl ? (
+                          <a
+                            href={profileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-sm font-semibold text-[#F25722] hover:underline"
+                          >
+                            View Application <ExternalLink size={12} />
+                          </a>
+                        ) : (
+                          <span className="text-sm text-gray-300">—</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4">
+                        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#111] text-white text-xs font-semibold hover:bg-gray-800 transition-colors">
+                          <MessageCircle size={12} />
+                          Message
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* Details Tab */}
+      {tab === "details" && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
+          {job.description && (
+            <div>
+              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                Description
+              </h4>
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+                {job.description}
+              </p>
+            </div>
+          )}
+          {job.category && (
+            <div>
+              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                Category
+              </h4>
+              <p className="text-sm text-gray-700">{job.category}</p>
+            </div>
+          )}
+          <div>
+            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+              Location
+            </h4>
+            <p className="text-sm text-gray-700 flex items-center gap-1">
+              <MapPin size={13} className="text-gray-400" />
+              {job.location && !job.location.includes("[object") ? job.location : job.workFromAnywhere ? "Work from Anywhere" : "TBD"}
+            </p>
+          </div>
+          {job.applyEmail && (
+            <div>
+              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                Apply Email
+              </h4>
+              <a
+                href={`mailto:${job.applyEmail}`}
+                className="text-sm text-[#F25722] hover:underline"
+              >
+                {job.applyEmail}
+              </a>
+            </div>
+          )}
+          {job.rate && (
+            <div>
+              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                Rate
+              </h4>
+              <p className="text-sm text-gray-700">{job.rate}</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Main Enterprise Page ──────────────────────────────────────────────────────
 
-type PageView = { type: "company" } | { type: "job"; jobId: number };
-
 export default function Enterprise() {
-  const { user, loading, isAuthenticated } = useAuth();
-  const [view, setView] = useState<PageView>({ type: "company" });
+  const { user, loading } = useAuth();
+  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [activeSection] = useState("dashboard");
 
-  // Determine which enterprise user to show
-  // Admin sees REVEL (id 780544) as demo; enterprise users see their own data
-  const enterpriseUserId = useMemo(() => {
-    if (!user) return undefined;
-    if (user.role === "admin") return 780544; // REVEL Dance Convention demo
-    return user.id as number;
-  }, [user]);
-
-  // Fetch enterprise user info
-  const { data: enterpriseUserData } = trpc.artswrkUsers.getById.useQuery(
-    { id: enterpriseUserId! },
-    { enabled: !!enterpriseUserId }
+  // Fetch the enterprise user data from DB (by ID to get full profile)
+  const { data: userById } = trpc.artswrkUsers.getById.useQuery(
+    { id: (user as any)?.id || 0 },
+    { enabled: !!(user as any)?.id }
   );
 
-  const enterpriseUser = enterpriseUserData?.user;
-  const companyName = enterpriseUser?.clientCompanyName || enterpriseUser?.name || "Company";
+  // userById returns { user: {...} }, auth user already has full fields
+  const enterpriseUser = (userById as any)?.user || user;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="animate-spin text-[#F25722]" size={32} />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-[#F25722] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-gray-400">Loading dashboard…</p>
+        </div>
       </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
-        <p className="text-gray-600 font-medium">
-          Please sign in to access the Enterprise Dashboard.
-        </p>
-        <Button
-          className="bg-gray-900 text-white hover:bg-gray-800 rounded-full"
-          onClick={() => (window.location.href = getLoginUrl())}
-        >
-          Sign In
-        </Button>
-      </div>
-    );
-  }
-
-  if (view.type === "company") {
-    return (
-      <CompanyView
-        enterpriseUser={enterpriseUser}
-        onSelectJob={(job) => setView({ type: "job", jobId: job.id })}
-      />
     );
   }
 
   return (
-    <JobDetailView
-      jobId={view.jobId}
-      companyName={companyName}
-      enterpriseUser={enterpriseUser}
-      onBack={() => setView({ type: "company" })}
-    />
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Sidebar */}
+      <Sidebar
+        activeSection={activeSection}
+        onNavigate={() => setSelectedJob(null)}
+      />
+
+      {/* Main content */}
+      <main className="flex-1 p-6 overflow-hidden">
+        {selectedJob ? (
+          <JobDetailView
+            job={selectedJob}
+            user={enterpriseUser}
+            onBack={() => setSelectedJob(null)}
+          />
+        ) : (
+          <MasterView
+            user={enterpriseUser}
+            onSelectJob={(job) => setSelectedJob(job)}
+          />
+        )}
+      </main>
+    </div>
   );
 }

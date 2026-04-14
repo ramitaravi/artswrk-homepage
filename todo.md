@@ -353,3 +353,15 @@
 - [x] Build Job Detail View: breadcrumb navigation, Applicants tab (table with View Application + Message), Details tab (description, category, location, apply email)
 - [x] Add "View Detail →" button on each job card to navigate to job detail view
 - [x] Breadcrumb navigation: Home → Company → Job Title
+
+## Enterprise Dashboard v2 (Sidebar + Tabs)
+- [x] Add sidebar layout to Enterprise page (Dashboard, Browse Artists nav items)
+- [x] Add Jobs / Companies / Artists tabs to the enterprise master view
+- [x] Jobs tab: job cards with applicant avatar stack, pay rate badge, status, View Detail
+- [x] Companies tab: company logo cards with open roles count (matching Bubble design)
+- [x] Artists/Interested Artists tab: list of interested artists across all jobs
+- [x] Applications right panel: show real applicant photos + names + job title
+- [x] Wire Companies tab to real enterprise company data from DB
+- [x] Wire Artists tab to real interested artists data from DB
+- [x] Fix location display ([object Object] bug from Bubble import)
+- [x] Fix company header logo to use job logo as fallback
