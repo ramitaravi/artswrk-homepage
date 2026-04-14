@@ -187,3 +187,8 @@
 - [x] Boost upsell card on PostJob success page (only shown if not already boosted)
 - [x] Boost button on DashJobs expanded job card (Active/Pending/Open jobs only)
 - [x] Stripe webhook handles boost payment via checkout.session.completed with boost metadata
+
+## PostJob Step 3/4 Revision
+- [ ] Restore $30 flat post card in Step 3 (unhide it, remove boost slider from Step 3)
+- [ ] Add optional Step 4: Boost slider (available to both one-time and subscribers)
+- [ ] Step 4 shows "Skip for now" option so boost is truly optional

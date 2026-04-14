@@ -84,11 +84,12 @@ const EXAMPLES = [
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
-function StepIndicator({ step }: { step: 1 | 2 | 3 }) {
+function StepIndicator({ step }: { step: 1 | 2 | 3 | 4 }) {
   const steps = [
     { n: 1, label: "Describe" },
     { n: 2, label: "Review" },
     { n: 3, label: "Publish" },
+    { n: 4, label: "Boost" },
   ];
   return (
     <div className="flex items-center justify-center gap-0 mb-8">
@@ -615,42 +616,17 @@ function Step2({
 
 // ─── Step 3: Payment ──────────────────────────────────────────────────────────
 
-/** Compute performance tier from daily budget */
-function getBoostTier(daily: number) {
-  if (daily >= 50) return { label: "High", color: "text-green-600", bar: 90, hint: "Top placement — maximum visibility." };
-  if (daily >= 25) return { label: "Competitive", color: "text-[#F25722]", bar: 60, hint: "Strong placement among active jobs." };
-  return { label: "Moderate", color: "text-amber-500", bar: 30, hint: "Increase to $25+ to be competitive." };
-}
-
-function calcBoostTotal(daily: number, days: number) {
-  return daily * days;
-}
-
-const DURATION_OPTIONS = [
-  { label: "3 days", days: 3 },
-  { label: "1 week", days: 7 },
-  { label: "2 weeks", days: 14 },
-  { label: "1 month", days: 30 },
-];
-
 function Step3({
   form,
   onBack,
+  onNext,
 }: {
   form: FormData;
   onBack: () => void;
+  onNext: (plan: "one_time" | "subscription") => void;
 }) {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
-
-  // Boost slider state
-  const [dailyBudget, setDailyBudget] = useState(20);
-  const [durationDays, setDurationDays] = useState(7);
-
-  const tier = getBoostTier(dailyBudget);
-  const total = calcBoostTotal(dailyBudget, durationDays);
-  const expectedViews = `${dailyBudget * durationDays * 8}–${dailyBudget * durationDays * 14}`;
-  const expectedApplicants = `${Math.max(1, Math.floor(dailyBudget * durationDays / 15))}–${Math.max(2, Math.ceil(dailyBudget * durationDays / 8))}`;
   const hasSavedCard = !!user?.clientStripeCustomerId;
   const isPro = user?.clientPremium;
 
@@ -664,60 +640,7 @@ function Step3({
     },
   });
 
-  const boostCheckout = trpc.boost.createCheckout.useMutation({
-    onSuccess: (data) => {
-      window.open(data.checkoutUrl, "_blank");
-      toast.success("Redirecting to boost checkout...");
-    },
-    onError: (err) => {
-      toast.error(`Boost setup failed: ${err.message}`);
-    },
-  });
-
-  // First create the job, then open boost checkout
-  const [pendingBoost, setPendingBoost] = useState(false);
-  const createdJobId = useRef<number | null>(null);
-
-  const createJobForBoost = trpc.postJob.createAndCheckout.useMutation({
-    onSuccess: async (data) => {
-      // Extract jobId from successUrl metadata if available, otherwise open the post checkout
-      // For boost flow: open the boost checkout instead
-      window.open(data.checkoutUrl, "_blank");
-      toast.success("Job created! Redirecting to boost checkout...");
-      setPendingBoost(false);
-    },
-    onError: (err) => {
-      toast.error(`Failed to create job: ${err.message}`);
-      setPendingBoost(false);
-    },
-  });
-
-  function handleBoostLaunch() {
-    if (!isAuthenticated) {
-      sessionStorage.setItem("postJobPending", JSON.stringify(form));
-      navigate(getLoginUrl());
-      return;
-    }
-    setPendingBoost(true);
-    // Store boost params in sessionStorage so the success page can trigger boost checkout
-    sessionStorage.setItem("pendingBoost", JSON.stringify({ dailyBudget, durationDays }));
-    createAndCheckout.mutate({
-      description: form.description,
-      locationAddress: form.locationAddress || undefined,
-      dateType: form.dateType,
-      startDate: form.startDate || undefined,
-      endDate: form.endDate || undefined,
-      isHourly: form.isHourly,
-      openRate: form.openRate,
-      clientHourlyRate: form.clientHourlyRate ? parseFloat(form.clientHourlyRate) : undefined,
-      clientFlatRate: form.clientFlatRate ? parseFloat(form.clientFlatRate) : undefined,
-      transportation: form.transportation,
-      plan: "one_time",
-      origin: window.location.origin,
-    });
-  }
-
-  function handleSubscription() {
+  function handlePlan(plan: "one_time" | "subscription") {
     if (!isAuthenticated) {
       sessionStorage.setItem("postJobPending", JSON.stringify(form));
       navigate(getLoginUrl());
@@ -734,29 +657,25 @@ function Step3({
       clientHourlyRate: form.clientHourlyRate ? parseFloat(form.clientHourlyRate) : undefined,
       clientFlatRate: form.clientFlatRate ? parseFloat(form.clientFlatRate) : undefined,
       transportation: form.transportation,
-      plan: "subscription",
+      plan,
       origin: window.location.origin,
     });
+    // Advance to boost step
+    onNext(plan);
   }
 
-  const isLoading = createAndCheckout.isPending || boostCheckout.isPending || pendingBoost;
+  const isLoading = createAndCheckout.isPending;
 
   return (
     <div className="max-w-2xl mx-auto">
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-black text-[#111] mb-1">
-          Publish your job
-        </h2>
-        <p className="text-gray-500 text-sm">
-          Set your budget for maximum visibility, or subscribe and save.
-        </p>
+        <h2 className="text-2xl font-black text-[#111] mb-1">Publish your job</h2>
+        <p className="text-gray-500 text-sm">Choose how you'd like to post. You can boost visibility in the next step.</p>
       </div>
 
       {/* Job summary */}
       <div className="bg-gray-50 rounded-2xl border border-gray-200 p-4 mb-6">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-          Your listing
-        </p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Your listing</p>
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl hirer-grad-bg flex items-center justify-center text-white font-black text-sm flex-shrink-0">
             {(form.studioName || form.title || "J")[0].toUpperCase()}
@@ -767,25 +686,14 @@ function Step3({
             </p>
             <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1 flex-wrap">
               {form.studioName && <span>{form.studioName}</span>}
-              {form.locationAddress && (
-                <>
-                  <span>·</span>
-                  <MapPin size={10} />
-                  <span>{form.locationAddress}</span>
-                </>
-              )}
-              {form.dateType && (
-                <>
-                  <span>·</span>
-                  <span>{form.dateType}</span>
-                </>
-              )}
+              {form.locationAddress && (<><span>·</span><MapPin size={10} /><span>{form.locationAddress}</span></>)}
+              {form.dateType && (<><span>·</span><span>{form.dateType}</span></>)}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Already PRO */}
+      {/* Already PRO — just post */}
       {isPro && (
         <div className="mb-5 p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-orange-100 flex items-center gap-3">
           <Crown size={20} className="text-[#F25722] flex-shrink-0" />
@@ -794,7 +702,7 @@ function Step3({
             <p className="text-xs text-gray-500">Unlimited job posts are included in your plan.</p>
           </div>
           <Button
-            onClick={handleSubscription}
+            onClick={() => handlePlan("subscription")}
             disabled={isLoading}
             className="ml-auto flex-none hirer-grad-bg border-0 hover:opacity-90"
           >
@@ -803,118 +711,45 @@ function Step3({
         </div>
       )}
 
-      {/* Pricing — two-column: boost slider left, subscription right */}
+      {/* Pricing — two cards */}
       {!isPro && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 items-start">
 
-          {/* ── On-demand: Boost slider ── */}
+          {/* ── Pay per post ── */}
           <div className="bg-white rounded-2xl border-2 border-gray-200 p-5 flex flex-col gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg hirer-grad-bg flex items-center justify-center">
-                <Zap size={16} className="text-white" />
+              <div className="w-8 h-8 rounded-lg bg-[#111] flex items-center justify-center">
+                <DollarSign size={16} className="text-white" />
               </div>
               <div>
-                <p className="font-bold text-[#111] leading-tight">On-Demand Post</p>
-                <p className="text-[11px] text-gray-400">You choose the price</p>
+                <p className="font-bold text-[#111] leading-tight">Pay Per Post</p>
+                <p className="text-[11px] text-gray-400">One-time · no commitment</p>
               </div>
             </div>
-
-            {/* Daily budget */}
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-xs font-bold text-gray-700">Daily Budget</p>
-                <p className="text-xs text-gray-400">Recommended: $20–35</p>
-              </div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="flex items-center border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 flex-1">
-                  <span className="text-gray-400 text-sm mr-1">$</span>
-                  <span className="text-lg font-black text-[#111]">{dailyBudget}</span>
-                  <span className="text-gray-400 text-xs ml-auto">per day</span>
-                </div>
-              </div>
-              <Slider
-                min={5}
-                max={100}
-                step={5}
-                value={[dailyBudget]}
-                onValueChange={([v]) => setDailyBudget(v)}
-                className="[&_[data-slot=slider-range]]:bg-gradient-to-r [&_[data-slot=slider-range]]:from-[#FFBC5D] [&_[data-slot=slider-range]]:to-[#F25722]"
-              />
-              <div className="flex justify-between text-[10px] text-gray-400 mt-1">
-                <span>$5</span>
-                <span>$100</span>
-              </div>
+              <span className="text-3xl font-black text-[#111]">$30</span>
+              <span className="text-gray-400 text-sm ml-1">/post</span>
             </div>
-
-            {/* Duration */}
-            <div>
-              <p className="text-xs font-bold text-gray-700 mb-2">Ad Duration</p>
-              <div className="grid grid-cols-4 gap-1.5">
-                {DURATION_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.days}
-                    onClick={() => setDurationDays(opt.days)}
-                    className={`py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      durationDays === opt.days
-                        ? "hirer-grad-bg text-white border-transparent"
-                        : "border-gray-200 text-gray-600 hover:border-[#F25722] hover:text-[#F25722]"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Performance preview */}
-            <div className="bg-orange-50 rounded-xl p-3 border border-orange-100">
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-xs font-bold text-gray-700">Performance</p>
-                <p className={`text-xs font-black ${tier.color}`}>{tier.label}</p>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1.5 overflow-hidden">
-                <div
-                  className="h-full rounded-full hirer-grad-bg transition-all duration-300"
-                  style={{ width: `${tier.bar}%` }}
-                />
-              </div>
-              <p className={`text-[11px] ${tier.color} font-medium`}>{tier.hint}</p>
-            </div>
-
-            {/* Stats row */}
-            <div className="space-y-1.5">
+            <ul className="space-y-1.5 flex-1">
               {[
-                { icon: Eye, label: "Expected Views", value: expectedViews },
-                { icon: Users, label: "Expected Applicants", value: expectedApplicants },
-                { icon: Star, label: "Featured Placements", value: dailyBudget >= 25 ? "Yes" : "No" },
-              ].map(({ icon: Icon, label, value }) => (
-                <div key={label} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-0">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                    <Icon size={11} className="text-gray-400" />
-                    {label}
-                  </div>
-                  <span className="text-xs font-bold text-[#111]">{value}</span>
-                </div>
+                "Single job listing",
+                "Visible to 5,000+ artists",
+                "Manage applicants in dashboard",
+                hasSavedCard ? "Charge saved card" : "Secure Stripe checkout",
+              ].map((f) => (
+                <li key={f} className="flex items-center gap-2 text-xs text-gray-600">
+                  <CheckCircle2 size={12} className="text-gray-400 flex-shrink-0" />
+                  {f}
+                </li>
               ))}
-            </div>
-
-            {/* Total + CTA */}
-            <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
-              <p className="text-xs text-gray-500 mb-0.5">Total cost</p>
-              <p className="text-2xl font-black text-[#111]">${total.toFixed(2)}</p>
-              <p className="text-[10px] text-gray-400">Actual cost may be lower based on performance</p>
-            </div>
-
+            </ul>
             <Button
-              onClick={handleBoostLaunch}
+              onClick={() => handlePlan("one_time")}
               disabled={isLoading}
-              className="w-full font-bold hirer-grad-bg border-0 hover:opacity-90 transition-opacity"
+              variant="outline"
+              className="w-full font-bold border-2 border-[#111] text-[#111] hover:bg-[#111] hover:text-white transition-colors bg-transparent"
             >
-              {isLoading && pendingBoost ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <><Zap size={14} className="mr-1.5" /> Launch Job Ad · ${total.toFixed(2)}{hasSavedCard && <span className="ml-1.5 text-xs font-normal opacity-70">· saved card</span>}</>
-              )}
+              {isLoading ? <Loader2 size={16} className="animate-spin" /> : <>Post for $30{hasSavedCard && <span className="ml-1.5 text-xs font-normal opacity-60">· saved card</span>}</>}
             </Button>
           </div>
 
@@ -949,15 +784,11 @@ function Step3({
               ))}
             </ul>
             <Button
-              onClick={handleSubscription}
+              onClick={() => handlePlan("subscription")}
               disabled={isLoading}
               className="w-full font-bold hirer-grad-bg border-0 hover:opacity-90 transition-opacity"
             >
-              {isLoading && !pendingBoost ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <>Subscribe & Save{hasSavedCard && <span className="ml-1.5 text-xs font-normal opacity-70">· saved card</span>}</>
-              )}
+              {isLoading ? <Loader2 size={16} className="animate-spin" /> : <>Subscribe & Save{hasSavedCard && <span className="ml-1.5 text-xs font-normal opacity-70">· saved card</span>}</>}
             </Button>
           </div>
         </div>
@@ -979,6 +810,180 @@ function Step3({
         <p className="text-xs text-gray-400 flex-1 text-center">
           🔒 Secure payment via Stripe · Test card: 4242 4242 4242 4242
         </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Step 4: Boost (optional) ─────────────────────────────────────────────────
+
+function getBoostTier(daily: number) {
+  if (daily >= 50) return { label: "High", color: "text-green-600", bar: 90, hint: "Top placement — maximum visibility." };
+  if (daily >= 25) return { label: "Competitive", color: "text-[#F25722]", bar: 60, hint: "Strong placement among active jobs." };
+  return { label: "Moderate", color: "text-amber-500", bar: 30, hint: "Increase to $25+ to be competitive." };
+}
+
+const DURATION_OPTIONS = [
+  { label: "3 days", days: 3 },
+  { label: "1 week", days: 7 },
+  { label: "2 weeks", days: 14 },
+  { label: "1 month", days: 30 },
+];
+
+function Step4({
+  onSkip,
+}: {
+  onSkip: () => void;
+}) {
+  const { user } = useAuth();
+  const [dailyBudget, setDailyBudget] = useState(20);
+  const [durationDays, setDurationDays] = useState(7);
+
+  const tier = getBoostTier(dailyBudget);
+  const total = dailyBudget * durationDays;
+  const expectedViews = `${dailyBudget * durationDays * 8}–${dailyBudget * durationDays * 14}`;
+  const expectedApplicants = `${Math.max(1, Math.floor(dailyBudget * durationDays / 15))}–${Math.max(2, Math.ceil(dailyBudget * durationDays / 8))}`;
+  const hasSavedCard = !!user?.clientStripeCustomerId;
+
+  const boostCheckout = trpc.boost.createCheckout.useMutation({
+    onSuccess: (data) => {
+      window.open(data.checkoutUrl, "_blank");
+      toast.success("Redirecting to boost checkout...");
+    },
+    onError: (err) => {
+      toast.error(`Boost setup failed: ${err.message}`);
+    },
+  });
+
+  // We don't have a jobId yet (job is created on Stripe success), so we open boost checkout
+  // with a placeholder — the webhook will link them. For now, store params in sessionStorage.
+  function handleLaunchBoost() {
+    sessionStorage.setItem("pendingBoost", JSON.stringify({ dailyBudget, durationDays }));
+    toast.success("Boost queued! Complete your job payment first, then boost will be applied.");
+    onSkip(); // Navigate to success/dashboard after queuing
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <div className="text-center mb-6">
+        <div className="inline-flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-full px-4 py-1.5 mb-3">
+          <Zap size={14} className="text-[#F25722]" />
+          <span className="text-xs font-bold text-[#F25722]">Optional — skip anytime</span>
+        </div>
+        <h2 className="text-2xl font-black text-[#111] mb-1">Boost your job for top visibility</h2>
+        <p className="text-gray-500 text-sm">Set a daily budget and duration. Available to all plans — even PRO subscribers.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 items-start">
+        {/* Left: controls */}
+        <div className="space-y-5">
+          {/* Daily budget */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-bold text-gray-800">Daily Ad Budget</p>
+              <p className="text-xs text-gray-400">Recommended: $20–35</p>
+            </div>
+            <div className="flex items-center border border-gray-200 rounded-xl px-4 py-3 bg-gray-50 mb-3">
+              <span className="text-gray-400 text-base mr-2">$</span>
+              <span className="text-2xl font-black text-[#111]">{dailyBudget}</span>
+              <span className="text-gray-400 text-sm ml-auto">per day</span>
+            </div>
+            <Slider
+              min={5}
+              max={100}
+              step={5}
+              value={[dailyBudget]}
+              onValueChange={([v]) => setDailyBudget(v)}
+              className="[&_[data-slot=slider-range]]:bg-gradient-to-r [&_[data-slot=slider-range]]:from-[#FFBC5D] [&_[data-slot=slider-range]]:to-[#F25722]"
+            />
+            <div className="flex justify-between text-[11px] text-gray-400 mt-1">
+              <span>$5</span>
+              <span>$100</span>
+            </div>
+          </div>
+
+          {/* Duration */}
+          <div>
+            <p className="text-sm font-bold text-gray-800 mb-2">Ad Duration</p>
+            <div className="grid grid-cols-4 gap-2">
+              {DURATION_OPTIONS.map((opt) => (
+                <button
+                  key={opt.days}
+                  onClick={() => setDurationDays(opt.days)}
+                  className={`py-2 rounded-xl text-xs font-semibold border transition-all ${
+                    durationDays === opt.days
+                      ? "hirer-grad-bg text-white border-transparent shadow-sm"
+                      : "border-gray-200 text-gray-600 hover:border-[#F25722] hover:text-[#F25722]"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-2">You can pause or close your boost at any time.</p>
+          </div>
+
+          {/* Total */}
+          <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
+            <p className="text-xs text-gray-500 mb-0.5">Total budget</p>
+            <p className="text-3xl font-black text-[#111]">${total.toFixed(2)}</p>
+            <p className="text-[11px] text-gray-400">Actual cost may be lower based on performance</p>
+          </div>
+        </div>
+
+        {/* Right: performance preview */}
+        <div className="space-y-3">
+          <p className="text-sm font-bold text-gray-800">Ad Performance Preview</p>
+
+          {/* Tier card */}
+          <div className="bg-orange-50 rounded-2xl p-4 border border-orange-100">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-gray-700">Performance:</p>
+              <p className={`text-sm font-black ${tier.color}`}>{tier.label}</p>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-2 overflow-hidden">
+              <div
+                className="h-full rounded-full hirer-grad-bg transition-all duration-300"
+                style={{ width: `${tier.bar}%` }}
+              />
+            </div>
+            <p className={`text-xs ${tier.color} font-medium`}>{tier.hint}</p>
+          </div>
+
+          {/* Stats */}
+          {[
+            { label: "Expected Views", value: expectedViews },
+            { label: "Expected Applicants", value: expectedApplicants },
+            { label: "Featured Placements", value: dailyBudget >= 25 ? "Yes" : "No" },
+          ].map(({ label, value }) => (
+            <div key={label} className="flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-gray-200">
+              <span className="text-sm text-gray-600">{label}</span>
+              <span className="text-sm font-bold text-[#111]">{value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* CTAs */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Button
+          variant="outline"
+          onClick={onSkip}
+          className="flex-1 font-semibold text-gray-600 border-gray-300"
+        >
+          Skip for now
+        </Button>
+        <Button
+          onClick={handleLaunchBoost}
+          disabled={boostCheckout.isPending}
+          className="flex-1 font-bold hirer-grad-bg border-0 hover:opacity-90 transition-opacity"
+        >
+          {boostCheckout.isPending ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <><Zap size={14} className="mr-1.5" /> Launch Boost · ${total.toFixed(2)}{hasSavedCard && <span className="ml-1.5 text-xs font-normal opacity-70">· saved card</span>}</>
+          )}
+        </Button>
       </div>
     </div>
   );
@@ -1094,10 +1099,11 @@ export default function PostJob() {
 
   if (isSuccess) return <SuccessPage />;
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [rawText, setRawText] = useState("");
   const [parsed, setParsed] = useState<ParsedJob | null>(null);
   const [form, setForm] = useState<FormData | null>(null);
+  const [, navigate] = useLocation();
 
   return (
     <div className="min-h-screen bg-white">
@@ -1160,6 +1166,13 @@ export default function PostJob() {
           <Step3
             form={form}
             onBack={() => setStep(2)}
+            onNext={() => setStep(4)}
+          />
+        )}
+
+        {step === 4 && (
+          <Step4
+            onSkip={() => navigate("/dashboard/jobs")}
           />
         )}
       </div>
