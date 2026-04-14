@@ -1,0 +1,537 @@
+/**
+ * ARTIST DASHBOARD
+ * Matches the live Artswrk Bubble dashboard design at /version-830zu/dashboard-2
+ * Sidebar: Dashboard, Jobs, Bookings, Payments, Messages, Profile, PRO Features
+ * Main: Greeting, Affiliations, Tasks, Profile Boost, PRO Jobs, Jobs for You
+ */
+
+import { useState } from "react";
+import { Link, useLocation } from "wouter";
+import {
+  LayoutDashboard,
+  Briefcase,
+  Calendar,
+  CreditCard,
+  MessageSquare,
+  User,
+  Star,
+  Building2,
+  Gift,
+  Users,
+  Settings,
+  LogOut,
+  MapPin,
+  Clock,
+  ChevronRight,
+  CheckCircle2,
+  AlertCircle,
+  ExternalLink,
+  Sparkles,
+  ArrowRight,
+} from "lucide-react";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
+import { getLoginUrl } from "@/const";
+
+// ─── Placeholder data (to be replaced with real API data) ─────────────────────
+
+const AFFILIATIONS = [
+  "CLI Conservatory",
+  "University of Arizona",
+  "Rutgers Mason Gross",
+  "Drexel University",
+  "We Are Queens",
+  "Clemson University",
+  "So You Think You Can Dance",
+  "Acrobatic Arts",
+  "Hubbard Street",
+  "Rider University",
+  "University of Wisconsin Madison",
+];
+
+const PRO_JOBS = [
+  { id: 1, title: "Judge | March 15, 2026", company: "DreamMaker", location: "Work From Anywhere", applied: true },
+  { id: 2, title: "Judges", company: "DreamMaker", location: "Work From Anywhere", applied: false },
+  { id: 3, title: "General Staff", company: "Imagine", location: "Work From Anywhere", applied: false },
+  { id: 4, title: "Tabulator", company: "Destiny Talent Competition", location: "Work From Anywhere", applied: true },
+  { id: 5, title: "Judge", company: "Destiny Talent Competition", location: "Work From Anywhere", applied: false },
+  { id: 6, title: "Emcee", company: "Destiny Talent Competition", location: "Work From Anywhere", applied: false },
+  { id: 7, title: "Social Media / Content Creator", company: "Ailey Extension", location: "Work From Anywhere", applied: false },
+  { id: 8, title: "Core Crew", company: "[solidcore]", location: "New York, NY, USA", applied: false },
+  { id: 9, title: "Intern", company: "Artistic Dance Exchange", location: "Work From Anywhere", applied: true },
+  { id: 10, title: "Event Staff", company: "AmeriDance", location: "Work From Anywhere", applied: false },
+  { id: 11, title: "Summer Staff", company: "AmeriDance", location: "Work From Anywhere", applied: false },
+  { id: 12, title: "Judge", company: "AmeriDance", location: "Work From Anywhere", applied: false },
+];
+
+const JOBS_FOR_YOU = [
+  { id: 1, studio: "Dance Studio", serviceType: "Competition Choreography", location: "New York, NY", postedAgo: "2 months ago", date: "Mon, 2/16/26, 8:56 pm", rate: "Open rate", applied: false, logo: null },
+  { id: 2, studio: "For Dancers Only", serviceType: "Substitute Teacher", location: "Totowa, NJ", postedAgo: "5 months ago", date: "Sat, 11/22/25, 12:00 am", rate: "$50.00/hr", applied: false, logo: null },
+  { id: 3, studio: "Fancy Feet Dance Studio", serviceType: "Competition Choreography", location: "Mount Vernon, NY", postedAgo: "9 months ago", date: "Sat, 7/26/25, 3:50 pm", rate: "Open rate", applied: false, logo: null },
+  { id: 4, studio: "DWDP", serviceType: "Master Classes", location: "Deer Park, NY", postedAgo: "a year ago", date: "Thu, 8/07/25, 1:00 pm – 8/07/25, 3:00 pm", rate: "Open rate", applied: true, logo: null },
+  { id: 5, studio: "The Edge of Dance", serviceType: "Master Classes", location: "Armonk, NY", postedAgo: "a year ago", date: "Thu, 2/27/25, 6:00 pm – 2/27/25, 8:00 pm", rate: "$65.00/hr", applied: true, logo: null },
+  { id: 6, studio: "Norwalk Academy of Dance", serviceType: "Substitute Teacher", location: "Norwalk, CT", postedAgo: "a year ago", date: "Fri, 2/28/25, 4:15 pm – 2/28/25, 7:15 pm", rate: "$50.00/hr", applied: false, logo: null },
+  { id: 7, studio: "Isabels School of Dance", serviceType: "Substitute Teacher", location: "Bogota, NJ", postedAgo: "a year ago", date: "Tue, 2/25/25, 5:00 pm", rate: "$30.00/hr", applied: false, logo: null },
+  { id: 8, studio: "Create Dance Center", serviceType: "Substitute Teacher", location: "Massapequa, NY", postedAgo: "a year ago", date: "Thu, 3/06/25, 4:45 pm – 3/06/25, 7:30 pm", rate: "$50.00/hr", applied: false, logo: null },
+  { id: 9, studio: "Miss Colleens Elite Dancentre", serviceType: "Recurring Classes", location: "Rockville Centre, NY", postedAgo: "a year ago", date: "Dates Flexible", rate: "$40.00/hr", applied: false, logo: null },
+  { id: 10, studio: "Artistry Dance Complex", serviceType: "Recurring Classes", location: "Massapequa, NY", postedAgo: "a year ago", date: "Thu, 8/07/25, 7:30 pm", rate: "Open rate", applied: false, logo: null },
+];
+
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+
+type SidebarTab = "dashboard" | "jobs" | "bookings" | "payments" | "messages" | "profile" | "pro-jobs" | "companies" | "benefits" | "community" | "settings";
+
+interface SidebarProps {
+  activeTab: SidebarTab;
+  onTabChange: (tab: SidebarTab) => void;
+  onLogout: () => void;
+}
+
+function Sidebar({ activeTab, onTabChange, onLogout }: SidebarProps) {
+  const navItem = (tab: SidebarTab, icon: React.ReactNode, label: string, pro = false) => (
+    <button
+      key={tab}
+      onClick={() => onTabChange(tab)}
+      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
+        activeTab === tab
+          ? "bg-gray-100 text-gray-900"
+          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+      }`}
+    >
+      <span className="w-5 h-5 flex-shrink-0">{icon}</span>
+      <span>{label}</span>
+      {pro && (
+        <span className="ml-auto text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">PRO</span>
+      )}
+    </button>
+  );
+
+  return (
+    <aside className="w-56 flex-shrink-0 bg-white border-r border-gray-100 flex flex-col h-full">
+      {/* Logo */}
+      <div className="px-5 py-5 border-b border-gray-100">
+        <Link href="/" className="flex items-center select-none">
+          <span className="font-black text-xl tracking-tight" style={{ background: "linear-gradient(90deg,#FFBC5D,#F25722)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>ARTS</span>
+          <span className="font-black text-xl tracking-tight bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">WRK</span>
+        </Link>
+      </div>
+
+      {/* Main nav */}
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        {navItem("dashboard", <LayoutDashboard size={16} />, "Dashboard")}
+        {navItem("jobs", <Briefcase size={16} />, "Jobs")}
+        {navItem("bookings", <Calendar size={16} />, "Bookings")}
+        {navItem("payments", <CreditCard size={16} />, "Payments")}
+        {navItem("messages", <MessageSquare size={16} />, "Messages")}
+        {navItem("profile", <User size={16} />, "Profile")}
+
+        {/* PRO section */}
+        <div className="pt-4 pb-1">
+          <p className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Premium Features</p>
+        </div>
+        {navItem("pro-jobs", <Star size={16} />, "PRO Jobs", true)}
+        {navItem("companies", <Building2 size={16} />, "Companies", true)}
+        {navItem("benefits", <Gift size={16} />, "Benefits", true)}
+        {navItem("community", <Users size={16} />, "Community", true)}
+      </nav>
+
+      {/* Bottom nav */}
+      <div className="px-3 py-3 border-t border-gray-100 space-y-0.5">
+        {navItem("settings", <Settings size={16} />, "Settings")}
+        <button
+          onClick={onLogout}
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors text-left"
+        >
+          <LogOut size={16} className="w-5 h-5 flex-shrink-0" />
+          <span>Logout</span>
+        </button>
+      </div>
+
+      {/* Footer */}
+      <div className="px-5 py-3 border-t border-gray-100">
+        <p className="text-[10px] text-gray-400">
+          <a href="#" className="hover:underline">Terms</a> · <a href="#" className="hover:underline">Privacy</a>
+        </p>
+        <p className="text-[10px] text-gray-400 mt-0.5">Artswrk 2026 ©</p>
+      </div>
+    </aside>
+  );
+}
+
+// ─── Studio Logo Avatar ───────────────────────────────────────────────────────
+
+function StudioAvatar({ name, logo, size = "md" }: { name: string; logo?: string | null; size?: "sm" | "md" | "lg" }) {
+  const [imgError, setImgError] = useState(false);
+  const sizeClass = size === "sm" ? "w-8 h-8 text-xs" : size === "lg" ? "w-14 h-14 text-lg" : "w-10 h-10 text-sm";
+  const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+
+  if (logo && !imgError) {
+    return (
+      <img
+        src={logo.startsWith("//") ? `https:${logo}` : logo}
+        alt={name}
+        className={`${sizeClass} rounded-full object-cover flex-shrink-0 border border-gray-100`}
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+
+  return (
+    <div className={`${sizeClass} rounded-full flex-shrink-0 flex items-center justify-center font-bold text-white`}
+      style={{ background: "linear-gradient(135deg,#FFBC5D,#F25722)" }}>
+      {initials}
+    </div>
+  );
+}
+
+// ─── Dashboard Tab ────────────────────────────────────────────────────────────
+
+function DashboardTab({ user }: { user: any }) {
+  const firstName = user?.firstName || user?.name?.split(" ")[0] || "there";
+
+  return (
+    <div className="space-y-8">
+      {/* Greeting + Profile */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <StudioAvatar name={user?.name || "Artist"} logo={user?.profilePicture} size="lg" />
+            <div>
+              <h1 className="text-2xl font-black text-gray-900">Hey, {firstName} 🎉</h1>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                  <Star size={11} className="fill-amber-500 text-amber-500" /> Artswrk PRO Member
+                </span>
+              </div>
+              <div className="mt-3">
+                <p className="text-xs font-semibold text-gray-500 mb-2">My Affiliations</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {AFFILIATIONS.map(aff => (
+                    <span key={aff} className="text-xs bg-gray-50 border border-gray-200 text-gray-700 px-2 py-0.5 rounded-full">{aff}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          <a
+            href={`https://artswrk.com/artist/${user?.slug || "ramita-ravi"}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-shrink-0 flex items-center gap-1.5 text-sm font-semibold text-gray-700 border border-gray-200 px-4 py-2 rounded-full hover:bg-gray-50 transition-colors"
+          >
+            View Profile <ExternalLink size={13} />
+          </a>
+        </div>
+      </div>
+
+      {/* Your Tasks */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <h2 className="text-base font-bold text-gray-900">Your Tasks</h2>
+          <span className="w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">1</span>
+        </div>
+        <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+          <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Mark as complete (1)</p>
+            <p className="text-xs text-gray-500 mt-0.5">1 booking must be marked as complete</p>
+          </div>
+          <button className="ml-auto text-xs font-semibold text-amber-700 hover:underline flex-shrink-0">View →</button>
+        </div>
+      </div>
+
+      {/* Profile Boost */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+              Profile Boost <span className="text-amber-500">⭐️</span>
+            </h2>
+            <p className="text-sm text-gray-500 mt-1 max-w-md">
+              Want to get in front of studios like you do on Facebook? Create a boosted post to directly reach hundreds of studios near you.
+            </p>
+          </div>
+          <button className="flex-shrink-0 flex items-center gap-1.5 text-sm font-semibold text-white px-4 py-2 rounded-full transition-opacity hover:opacity-90"
+            style={{ background: "linear-gradient(90deg,#ec008c,#ff7171)" }}>
+            Get started <ArrowRight size={13} />
+          </button>
+        </div>
+      </div>
+
+      {/* PRO Jobs */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+            Jobs <span className="text-xs font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">PRO ⭐️</span>
+          </h2>
+          <button className="text-sm font-semibold text-gray-600 hover:text-gray-900 flex items-center gap-1">
+            View PRO Jobs <ChevronRight size={14} />
+          </button>
+        </div>
+        <div className="space-y-2">
+          {PRO_JOBS.map(job => (
+            <div key={job.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">{job.title}</p>
+                <p className="text-xs text-gray-500">{job.company}</p>
+                <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                  <MapPin size={10} /> {job.location}
+                </p>
+              </div>
+              {job.applied ? (
+                <span className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
+                  <CheckCircle2 size={11} /> Applied!
+                </span>
+              ) : (
+                <button className="flex-shrink-0 text-xs font-semibold text-gray-700 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-50 transition-colors flex items-center gap-1">
+                  Apply <ArrowRight size={11} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Jobs for You */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-bold text-gray-900">Jobs for You</h2>
+          <button className="text-sm font-semibold text-gray-600 hover:text-gray-900 flex items-center gap-1">
+            View All <ChevronRight size={14} />
+          </button>
+        </div>
+        <div className="space-y-3">
+          {JOBS_FOR_YOU.map(job => (
+            <div key={job.id} className="flex items-start gap-3 py-3 border-b border-gray-50 last:border-0">
+              <StudioAvatar name={job.studio} logo={job.logo} size="md" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-gray-900">{job.studio}</p>
+                <p className="text-sm text-gray-700">{job.serviceType}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{job.location} · Posted {job.postedAgo}</p>
+                <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                  <span className="flex items-center gap-1"><Clock size={10} /> {job.date}</span>
+                  <span className="flex items-center gap-1">
+                    <CreditCard size={10} /> {job.rate}
+                  </span>
+                </div>
+              </div>
+              {job.applied ? (
+                <span className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
+                  <CheckCircle2 size={11} /> Applied!
+                </span>
+              ) : (
+                <button className="flex-shrink-0 text-xs font-semibold text-white px-3 py-1.5 rounded-full hover:opacity-90 transition-opacity"
+                  style={{ background: "#111" }}>
+                  Apply
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Jobs Tab ─────────────────────────────────────────────────────────────────
+
+function JobsTab() {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
+      <Briefcase size={40} className="mx-auto text-gray-300 mb-3" />
+      <h2 className="text-lg font-bold text-gray-900 mb-1">Jobs</h2>
+      <p className="text-sm text-gray-500">Browse all available jobs. Data integration coming soon.</p>
+    </div>
+  );
+}
+
+// ─── Bookings Tab ─────────────────────────────────────────────────────────────
+
+function BookingsTab() {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
+      <Calendar size={40} className="mx-auto text-gray-300 mb-3" />
+      <h2 className="text-lg font-bold text-gray-900 mb-1">Bookings</h2>
+      <p className="text-sm text-gray-500">Your confirmed bookings will appear here. Data integration coming soon.</p>
+    </div>
+  );
+}
+
+// ─── Payments Tab ─────────────────────────────────────────────────────────────
+
+function PaymentsTab() {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
+      <CreditCard size={40} className="mx-auto text-gray-300 mb-3" />
+      <h2 className="text-lg font-bold text-gray-900 mb-1">Payments</h2>
+      <p className="text-sm text-gray-500">Your payment history will appear here. Data integration coming soon.</p>
+    </div>
+  );
+}
+
+// ─── Messages Tab ─────────────────────────────────────────────────────────────
+
+function MessagesTab() {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
+      <MessageSquare size={40} className="mx-auto text-gray-300 mb-3" />
+      <h2 className="text-lg font-bold text-gray-900 mb-1">Messages</h2>
+      <p className="text-sm text-gray-500">Your messages will appear here. Data integration coming soon.</p>
+    </div>
+  );
+}
+
+// ─── Profile Tab ─────────────────────────────────────────────────────────────
+
+function ProfileTab({ user }: { user: any }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-6">
+      <div className="flex items-start gap-5 mb-6">
+        <StudioAvatar name={user?.name || "Artist"} logo={user?.profilePicture} size="lg" />
+        <div className="flex-1">
+          <h2 className="text-xl font-black text-gray-900">{user?.name || "Your Name"}</h2>
+          <p className="text-sm text-gray-500 mt-0.5">{user?.email}</p>
+          {user?.bio && (
+            <p className="text-sm text-gray-600 mt-3 leading-relaxed line-clamp-4">{user.bio}</p>
+          )}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="p-4 bg-gray-50 rounded-xl">
+          <p className="text-xs text-gray-500 mb-1">Location</p>
+          <p className="text-sm font-semibold text-gray-900">{user?.location || "Not set"}</p>
+        </div>
+        <div className="p-4 bg-gray-50 rounded-xl">
+          <p className="text-xs text-gray-500 mb-1">Artist Type</p>
+          <p className="text-sm font-semibold text-gray-900">{user?.masterArtistTypes || "Not set"}</p>
+        </div>
+        <div className="p-4 bg-gray-50 rounded-xl">
+          <p className="text-xs text-gray-500 mb-1">Instagram</p>
+          <p className="text-sm font-semibold text-gray-900">{user?.instagram || "Not set"}</p>
+        </div>
+        <div className="p-4 bg-gray-50 rounded-xl">
+          <p className="text-xs text-gray-500 mb-1">Website</p>
+          <p className="text-sm font-semibold text-gray-900">{user?.website || "Not set"}</p>
+        </div>
+      </div>
+      <button className="mt-4 w-full py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+        style={{ background: "linear-gradient(90deg,#FFBC5D,#F25722)" }}>
+        Edit Profile
+      </button>
+    </div>
+  );
+}
+
+// ─── PRO Jobs Tab ─────────────────────────────────────────────────────────────
+
+function ProJobsTab() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
+          PRO Jobs <span className="text-xs font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">⭐️</span>
+        </h2>
+      </div>
+      <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
+        {PRO_JOBS.map(job => (
+          <div key={job.id} className="flex items-center justify-between p-4">
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-gray-900">{job.title}</p>
+              <p className="text-xs text-gray-500">{job.company}</p>
+              <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                <MapPin size={10} /> {job.location}
+              </p>
+            </div>
+            {job.applied ? (
+              <span className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
+                <CheckCircle2 size={11} /> Applied!
+              </span>
+            ) : (
+              <button className="flex-shrink-0 text-xs font-semibold text-gray-700 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-50 transition-colors flex items-center gap-1">
+                Apply <ArrowRight size={11} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Coming Soon Tab ──────────────────────────────────────────────────────────
+
+function ComingSoonTab({ icon, title }: { icon: React.ReactNode; title: string }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
+      <div className="w-12 h-12 mx-auto text-gray-300 mb-3">{icon}</div>
+      <h2 className="text-lg font-bold text-gray-900 mb-1">{title}</h2>
+      <p className="text-sm text-gray-500">Coming soon. Data integration in progress.</p>
+    </div>
+  );
+}
+
+// ─── Main Artist Dashboard ────────────────────────────────────────────────────
+
+export default function ArtistDashboard() {
+  const { user, loading, isAuthenticated, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState<SidebarTab>("dashboard");
+  const [, navigate] = useLocation();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-gray-200 border-t-gray-800 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    window.location.href = getLoginUrl();
+    return null;
+  }
+
+  function handleLogout() {
+    logout();
+    navigate("/");
+  }
+
+  function renderContent() {
+    switch (activeTab) {
+      case "dashboard":
+        return <DashboardTab user={user} />;
+      case "jobs":
+        return <JobsTab />;
+      case "bookings":
+        return <BookingsTab />;
+      case "payments":
+        return <PaymentsTab />;
+      case "messages":
+        return <MessagesTab />;
+      case "profile":
+        return <ProfileTab user={user} />;
+      case "pro-jobs":
+        return <ProJobsTab />;
+      case "companies":
+        return <ComingSoonTab icon={<Building2 size={40} />} title="Companies" />;
+      case "benefits":
+        return <ComingSoonTab icon={<Gift size={40} />} title="Benefits" />;
+      case "community":
+        return <ComingSoonTab icon={<Users size={40} />} title="Community" />;
+      case "settings":
+        return <ComingSoonTab icon={<Settings size={40} />} title="Settings" />;
+      default:
+        return <DashboardTab user={user} />;
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex">
+      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} onLogout={handleLogout} />
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-6 py-8">
+          {renderContent()}
+        </div>
+      </main>
+    </div>
+  );
+}

@@ -1751,3 +1751,134 @@ export async function createPremiumJob(data: {
   // @ts-ignore
   return result[0].insertId;
 }
+
+// ── Artist Dashboard ──────────────────────────────────────────────────────────
+
+/** Get jobs feed for artist dashboard (active/open jobs with client info) */
+export async function getArtistJobsFeed(limit = 20, offset = 0): Promise<{
+  id: number;
+  requestStatus: string | null;
+  startDate: Date | null;
+  endDate: Date | null;
+  isHourly: boolean | null;
+  openRate: boolean | null;
+  artistHourlyRate: string | null;
+  createdAt: Date | null;
+  clientCompanyName: string | null;
+  clientName: string | null;
+  clientLogo: string | null;
+  locationAddress: string | null;
+}[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(
+    `SELECT j.id, j.requestStatus, j.startDate, j.endDate, j.isHourly, j.openRate, j.artistHourlyRate, j.createdAt, j.locationAddress,
+     u.clientCompanyName, u.name as clientName, u.enterpriseLogoUrl as clientLogo
+     FROM jobs j
+     LEFT JOIN users u ON j.clientUserId = u.id
+     WHERE j.requestStatus IN ('Active', 'Submissions Paused')
+     ORDER BY j.createdAt DESC
+     LIMIT ${limit} OFFSET ${offset}`
+  );
+  return (rows[0] as unknown as any[]);
+}
+
+/** Get PRO jobs feed for artist dashboard (active premium jobs) */
+export async function getArtistProJobsFeed(limit = 20, offset = 0): Promise<{
+  id: number;
+  serviceType: string | null;
+  company: string | null;
+  logo: string | null;
+  workFromAnywhere: boolean | null;
+  budget: string | null;
+  location: string | null;
+  createdAt: Date | null;
+}[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(
+    `SELECT id, serviceType, company, logo, workFromAnywhere, budget, location, createdAt
+     FROM premium_jobs
+     WHERE status = 'Active'
+     ORDER BY createdAt DESC
+     LIMIT ${limit} OFFSET ${offset}`
+  );
+  return (rows[0] as unknown as any[]);
+}
+
+/** Get all PRO job applications for an artist */
+export async function getArtistProApplications(artistUserId: number): Promise<{
+  id: number;
+  status: string | null;
+  serviceType: string | null;
+  company: string | null;
+  logo: string | null;
+  workFromAnywhere: boolean | null;
+  budget: string | null;
+  location: string | null;
+  premiumJobId: number;
+}[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(
+    `SELECT pjia.id, pjia.status, pj.serviceType, pj.company, pj.logo, pj.workFromAnywhere, pj.budget, pj.location, pjia.premiumJobId
+     FROM premium_job_interested_artists pjia
+     JOIN premium_jobs pj ON pjia.premiumJobId = pj.id
+     WHERE pjia.artistUserId = ${artistUserId}
+     ORDER BY pjia.id DESC`
+  );
+  return (rows[0] as unknown as any[]);
+}
+
+/** Get bookings for an artist */
+export async function getArtistBookings(artistUserId: number): Promise<{
+  id: number;
+  bookingStatus: string | null;
+  paymentStatus: string | null;
+  clientRate: string | null;
+  artistRate: string | null;
+  startDate: Date | null;
+  endDate: Date | null;
+  locationAddress: string | null;
+  clientCompanyName: string | null;
+  clientName: string | null;
+}[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(
+    `SELECT b.id, b.bookingStatus, b.paymentStatus, b.clientRate, b.artistRate, b.startDate, b.endDate, b.locationAddress,
+     u.clientCompanyName, u.name as clientName
+     FROM bookings b
+     LEFT JOIN users u ON b.clientUserId = u.id
+     WHERE b.artistUserId = ${artistUserId}
+     ORDER BY b.startDate DESC
+     LIMIT 50`
+  );
+  return (rows[0] as unknown as any[]);
+}
+
+/** Get payments for an artist (via bookings) */
+export async function getArtistPayments(artistUserId: number): Promise<{
+  id: number;
+  stripeAmount: number | null;
+  status: string | null;
+  paymentDate: Date | null;
+  createdAt: Date | null;
+  clientCompanyName: string | null;
+  stripeCardBrand: string | null;
+  stripeCardLast4: string | null;
+  stripeReceiptUrl: string | null;
+}[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(
+    `SELECT p.id, p.stripeAmount, p.status, p.paymentDate, p.createdAt, p.stripeCardBrand, p.stripeCardLast4, p.stripeReceiptUrl, u.clientCompanyName
+     FROM payments p
+     JOIN bookings b ON p.bookingId = b.id
+     LEFT JOIN users u ON p.clientUserId = u.id
+     WHERE b.artistUserId = ${artistUserId}
+     ORDER BY p.createdAt DESC
+     LIMIT 50`
+  );
+  return (rows[0] as unknown as any[]);
+}

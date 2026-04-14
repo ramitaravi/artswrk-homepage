@@ -375,3 +375,17 @@
 - [x] Wire "+ Post Job" button in enterprise sidebar to open the modal
 - [x] Wire Companies tab to real client companies data from DB
 - [x] Add enterprise.postJob tRPC procedure to save new jobs to premium_jobs table
+
+## Artist Dashboard (/artist-dashboard)
+- [x] Browse live Bubble artist dashboard design at artswrk.com/version-830zu/dashboard-2
+- [x] Build Artist Dashboard page with sidebar navigation (Dashboard, Jobs, Bookings, Payments, Messages, Profile, PRO Features)
+- [x] Artist Overview: greeting with profile pic, affiliations, tasks, profile boost CTA, PRO jobs list, jobs feed
+- [x] Jobs tab: placeholder (data integration coming)
+- [x] Bookings tab: placeholder (data integration coming)
+- [x] Payments tab: placeholder (data integration coming)
+- [x] Messages tab: placeholder (data integration coming)
+- [x] Profile tab: shows real user profile data from auth
+- [x] PRO Jobs tab: full PRO jobs list with Apply/Applied states
+- [x] Route /artist-dashboard registered in App.tsx
+- [ ] Wire real data from Bubble API (applications, bookings, payments, messages)
+- [ ] Wire "Dashboard" link in top nav to /artist-dashboard for artist users
