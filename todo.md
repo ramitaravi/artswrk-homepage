@@ -168,3 +168,8 @@
 - [x] tRPC signup.updateOnboarding endpoint (save businessOrIndividual, hiringCategory, company details)
 - [x] Wire Join/Signup CTAs on homepage navbar, hero, and Login page to /signup
 - [ ] Write vitest tests for signup logic
+
+## Homepage Navbar Auth State
+- [x] Show logged-in user banner (name + account) when authenticated
+- [x] Replace Login/Join buttons with logout button when logged in
+- [x] Wire logout button to tRPC auth.logout mutation
