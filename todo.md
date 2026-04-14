@@ -293,3 +293,22 @@
 - [x] Wire enterprise.getInterestedArtists to premium_job_interested_artists (deduplicated)
 - [x] Update Enterprise JobCard component to render premium_jobs fields (serviceType, status, budget, workFromAnywhere, logo, category)
 - [x] Write 10 vitest tests for premium_jobs helpers and enterprise procedure logic (92 total passing)
+
+## REVEL Interested Artists Seed
+- [ ] Fetch REVEL's 13 interested artist Bubble IDs from premium_job_interested_artists
+- [ ] Fetch full user records from Bubble for each artist
+- [ ] Upsert into users table with full profile data (name, photo, slug, location, artistTypes, etc.)
+- [ ] Back-fill artistUserId FK on premium_job_interested_artists for REVEL's job
+
+## Admin PRO Jobs Section
+- [ ] Add admin.premiumJobs tRPC endpoint (all premium_jobs, search, filter by status/company, paginated)
+- [ ] Add PRO Jobs nav item to admin sidebar
+- [ ] Build Admin PRO Jobs page (searchable/filterable table with job details, interested artist count)
+- [ ] Register /admin/pro-jobs route in App.tsx
+
+## Admin PRO Jobs Page
+- [x] Add admin.premiumJobs tRPC endpoint (all 185 premium_jobs, search by company/serviceType, filter by status, paginated)
+- [x] Add admin.premiumJobArtists tRPC endpoint (interested artists by job ID)
+- [x] Add PRO Jobs nav item to admin sidebar (with Sparkles icon)
+- [x] Build Admin PRO Jobs page (searchable/filterable table with job details + interested artist count badge, expandable rows showing artists)
+- [x] 92 tests passing

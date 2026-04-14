@@ -1446,15 +1446,28 @@ export async function getAllPremiumJobs({
   limit = 50,
   offset = 0,
   status,
+  search,
 }: {
   limit?: number;
   offset?: number;
   status?: string;
+  search?: string;
 } = {}) {
   const db = await getDb();
   if (!db) return { jobs: [], total: 0 };
 
-  const where = status ? eq(premiumJobs.status, status) : undefined;
+  // Build WHERE conditions
+  const conditions = [];
+  if (status) conditions.push(eq(premiumJobs.status, status));
+  if (search) {
+    const like = `%${search}%`;
+    conditions.push(
+      sql`(${premiumJobs.company} LIKE ${like} OR ${premiumJobs.serviceType} LIKE ${like} OR ${premiumJobs.category} LIKE ${like})`
+    );
+  }
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  // Also fetch interested artist counts per job
   const [countRow] = await db
     .select({ count: sql<number>`count(*)` })
     .from(premiumJobs)
@@ -1468,7 +1481,25 @@ export async function getAllPremiumJobs({
     .limit(limit)
     .offset(offset);
 
-  return { jobs: rows, total: Number(countRow?.count ?? 0) };
+  // Fetch interested artist counts for these jobs
+  const jobIds = rows.map((j) => j.id);
+  let countMap: Record<number, number> = {};
+  if (jobIds.length > 0) {
+    const counts = await db
+      .select({
+        premiumJobId: premiumJobInterestedArtists.premiumJobId,
+        count: sql<number>`count(*)`,
+      })
+      .from(premiumJobInterestedArtists)
+      .where(sql`${premiumJobInterestedArtists.premiumJobId} IN (${sql.join(jobIds.map((id) => sql`${id}`), sql`, `)})`)
+      .groupBy(premiumJobInterestedArtists.premiumJobId);
+    for (const c of counts) countMap[c.premiumJobId] = Number(c.count);
+  }
+
+  return {
+    jobs: rows.map((j) => ({ ...j, interestedCount: countMap[j.id] ?? 0 })),
+    total: Number(countRow?.count ?? 0),
+  };
 }
 
 /**

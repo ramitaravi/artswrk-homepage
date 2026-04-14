@@ -196,6 +196,27 @@ export const appRouter = router({
         return getAdminPayments(input);
       }),
 
+    /** Interested artists for a specific PRO job (admin view) */
+    premiumJobArtists: protectedProcedure
+      .input(z.object({ jobId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        return getPremiumJobInterestedArtists(input.jobId);
+      }),
+
+    /** All PRO jobs with search + filters */
+    premiumJobs: protectedProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(200).default(50),
+        offset: z.number().min(0).default(0),
+        search: z.string().optional(),
+        status: z.string().optional(),
+      }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        return getAllPremiumJobs(input);
+      }),
+
     /**
      * Impersonate a user — creates a session token for the target user,
      * backs up the current admin session in a separate cookie, and returns

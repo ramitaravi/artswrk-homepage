@@ -14,13 +14,13 @@ import {
   Search, Shield, ChevronLeft, ChevronRight, Menu, X, TrendingUp,
   DollarSign, Calendar, Star, UserCheck, Building2, Key,
   AlertCircle, CheckCircle2, Eye, EyeOff, LogOut, Filter,
-  MapPin, Clock, ArrowUpRight, UserCog, ArrowLeft,
+  MapPin, Clock, ArrowUpRight, UserCog, ArrowLeft, Sparkles, Globe, ExternalLink,
 } from "lucide-react";
 import { ADMIN_SESSION_COOKIE_NAME } from "@shared/const";
 import { Link } from "wouter";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type AdminSection = "dashboard" | "artists" | "clients" | "jobs" | "bookings" | "payments" | "settings";
+type AdminSection = "dashboard" | "artists" | "clients" | "jobs" | "pro-jobs" | "bookings" | "payments" | "settings";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmt$(cents: number) {
@@ -45,6 +45,7 @@ const NAV_ITEMS: { id: AdminSection; label: string; icon: React.ReactNode }[] = 
   { id: "artists", label: "Artists", icon: <Users size={16} /> },
   { id: "clients", label: "Clients", icon: <Building2 size={16} /> },
   { id: "jobs", label: "Jobs", icon: <Briefcase size={16} /> },
+  { id: "pro-jobs", label: "PRO Jobs", icon: <Sparkles size={16} /> },
   { id: "bookings", label: "Bookings", icon: <BookOpen size={16} /> },
   { id: "payments", label: "Payments", icon: <CreditCard size={16} /> },
   { id: "settings", label: "Settings", icon: <Settings size={16} /> },
@@ -935,6 +936,241 @@ function PaymentsSection() {
   );
 }
 
+// ─── PRO Jobs Section ───────────────────────────────────────────────────────
+function ProJobsSection() {
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const LIMIT = 50;
+
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data, isLoading } = trpc.admin.premiumJobs.useQuery({
+    limit: LIMIT,
+    offset: (page - 1) * LIMIT,
+    search: debouncedSearch || undefined,
+    status: statusFilter || undefined,
+  });
+
+  // Fetch interested artists for expanded job
+  const { data: artistsData, isLoading: artistsLoading } = trpc.admin.premiumJobArtists.useQuery(
+    { jobId: expandedId! },
+    { enabled: expandedId !== null }
+  );
+
+  const statuses = ["Active", "Inactive", "Draft", "Closed"];
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-black text-[#111]">
+          PRO Jobs
+          <span className="ml-2 text-sm font-normal text-gray-400">({data?.total?.toLocaleString() ?? "…"} total)</span>
+        </h1>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#FFBC5D]/20 to-[#F25722]/20 border border-[#F25722]/20">
+          <Sparkles size={13} className="text-[#F25722]" />
+          <span className="text-xs font-semibold text-[#F25722]">Enterprise / PRO Listings</span>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search company, role, category…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#F25722] bg-white"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+          className="px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#F25722] bg-white"
+        >
+          <option value="">All Statuses</option>
+          {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Company</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Role</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Category</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Budget</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Interested</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Remote</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Posted</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-gray-400 text-xs">Loading…</td></tr>
+              ) : data?.jobs.length === 0 ? (
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-gray-400 text-xs">No PRO jobs found</td></tr>
+              ) : data?.jobs.map(job => (
+                <>
+                  <tr
+                    key={job.id}
+                    className={`border-b border-gray-50 hover:bg-orange-50/30 transition-colors cursor-pointer ${
+                      expandedId === job.id ? "bg-orange-50/40" : ""
+                    }`}
+                    onClick={() => setExpandedId(expandedId === job.id ? null : job.id)}
+                  >
+                    {/* Company */}
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2.5">
+                        {job.logo ? (
+                          <img src={job.logo.startsWith('//') ? `https:${job.logo}` : job.logo}
+                            alt={job.company || ''}
+                            className="w-7 h-7 rounded-lg object-cover flex-shrink-0 border border-gray-100"
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        ) : (
+                          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
+                            {(job.company || 'P')[0]}
+                          </div>
+                        )}
+                        <span className="font-semibold text-[#111] text-xs">{job.company || '—'}</span>
+                      </div>
+                    </td>
+                    {/* Role */}
+                    <td className="px-4 py-3">
+                      <p className="text-xs font-medium text-[#111] max-w-[180px] truncate">{job.serviceType || '—'}</p>
+                    </td>
+                    {/* Category */}
+                    <td className="px-4 py-3">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 font-semibold">
+                        {job.category || '—'}
+                      </span>
+                    </td>
+                    {/* Budget */}
+                    <td className="px-4 py-3 text-xs text-gray-600 max-w-[120px] truncate">{job.budget || '—'}</td>
+                    {/* Status */}
+                    <td className="px-4 py-3">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        job.status === 'Active' ? 'bg-green-50 text-green-600'
+                        : job.status === 'Inactive' || job.status === 'Closed' ? 'bg-red-50 text-red-500'
+                        : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {job.status || '—'}
+                      </span>
+                    </td>
+                    {/* Interested count */}
+                    <td className="px-4 py-3">
+                      {(job as any).interestedCount > 0 ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722]">
+                          <Users size={10} />
+                          {(job as any).interestedCount}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                    </td>
+                    {/* Remote */}
+                    <td className="px-4 py-3">
+                      {job.workFromAnywhere ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-blue-500 font-semibold">
+                          <Globe size={10} /> Remote
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">On-site</span>
+                      )}
+                    </td>
+                    {/* Posted date */}
+                    <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{fmtDate(job.createdAt)}</td>
+                  </tr>
+
+                  {/* Expanded: interested artists */}
+                  {expandedId === job.id && (
+                    <tr key={`${job.id}-expanded`} className="bg-orange-50/20">
+                      <td colSpan={8} className="px-6 py-4">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-bold text-[#111]">Interested Artists ({(job as any).interestedCount ?? 0})</p>
+                            {job.applyEmail && (
+                              <a href={`mailto:${job.applyEmail}`} className="text-[10px] text-[#F25722] hover:underline flex items-center gap-1">
+                                <ExternalLink size={10} /> {job.applyEmail}
+                              </a>
+                            )}
+                          </div>
+                          {artistsLoading ? (
+                            <p className="text-xs text-gray-400">Loading artists…</p>
+                          ) : !artistsData || artistsData.length === 0 ? (
+                            <p className="text-xs text-gray-400">No interested artists recorded yet.</p>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {(artistsData as any[]).map((a: any) => (
+                                <div key={a.id} className="flex items-center gap-2 bg-white rounded-xl px-3 py-2 border border-gray-100 shadow-sm">
+                                  {a.artistProfilePicture ? (
+                                    <img src={a.artistProfilePicture} alt={a.artistName || ''}
+                                      className="w-7 h-7 rounded-full object-cover flex-shrink-0"
+                                      onError={e => { (e.target as HTMLImageElement).style.display='none'; }}
+                                    />
+                                  ) : (
+                                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#ec008c] to-[#ff7171] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
+                                      {(a.artistFirstName || a.artistName || '?')[0]}
+                                    </div>
+                                  )}
+                                  <div>
+                                    <p className="text-xs font-semibold text-[#111]">
+                                      {a.artistFirstName && a.artistLastName
+                                        ? `${a.artistFirstName} ${a.artistLastName}`
+                                        : a.artistName || 'Unknown'}
+                                    </p>
+                                    {a.artistLocation && (
+                                      <p className="text-[10px] text-gray-400">{a.artistLocation}</p>
+                                    )}
+                                  </div>
+                                  {a.artswrkPro && (
+                                    <span className="text-[9px] font-black text-[#F25722] bg-orange-50 px-1.5 py-0.5 rounded-full">PRO</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {/* Description preview */}
+                          {job.description && (
+                            <details className="mt-2">
+                              <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">View description</summary>
+                              <p className="mt-2 text-xs text-gray-600 leading-relaxed max-h-32 overflow-y-auto whitespace-pre-wrap">
+                                {job.description.replace(/\[.*?\]/g, '').substring(0, 600)}{job.description.length > 600 ? '…' : ''}
+                              </p>
+                            </details>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {data && (
+          <div className="px-5 py-3">
+            <Pagination page={page} total={data.total} limit={LIMIT} onPage={setPage} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Settings Section (password tool) ────────────────────────────────────────
 function SettingsSection({ user }: { user: { email?: string | null } }) {
   const [searchEmail, setSearchEmail] = useState("");
@@ -1074,6 +1310,7 @@ export default function Admin() {
           {section === "artists" && <ArtistsSection />}
           {section === "clients" && <ClientsSection />}
           {section === "jobs" && <JobsSection />}
+          {section === "pro-jobs" && <ProJobsSection />}
           {section === "bookings" && <BookingsSection />}
           {section === "payments" && <PaymentsSection />}
           {section === "settings" && <SettingsSection user={user} />}
