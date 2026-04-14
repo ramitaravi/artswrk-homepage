@@ -9,7 +9,8 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { getStripe } from "../stripe";
 import { ENV } from "./env";
-import { activateJob, saveClientStripeCustomerId, saveClientSubscriptionId } from "../db";
+import { activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, getJobById, getUserById } from "../db";
+import { sendJobPostedEmail } from "../email";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -68,6 +69,29 @@ async function startServer() {
         if (jobId) {
           await activateJob(jobId);
           console.log(`[Webhook] Activated job ${jobId}`);
+
+          // Send "Your job has been posted!" email
+          try {
+            const job = await getJobById(jobId);
+            const poster = userId ? await getUserById(userId) : null;
+            if (job && poster?.email) {
+              const appUrl = process.env.VITE_APP_URL || "https://artswrk.com";
+              await sendJobPostedEmail({
+                to: poster.email,
+                firstName: poster.firstName || poster.name?.split(" ")[0] || "there",
+                service: job.masterServiceTypeId || "Dance Teacher",
+                artistType: "Dancer",
+                date: job.startDate
+                  ? new Date(job.startDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+                  : "Flexible / TBD",
+                location: job.locationAddress || "Location TBD",
+                description: job.description || "",
+                jobLink: `${appUrl}/jobs/${jobId}`,
+              });
+            }
+          } catch (emailErr: any) {
+            console.error("[Webhook] Email send failed:", emailErr.message);
+          }
         }
 
         if (userId && session.customer) {

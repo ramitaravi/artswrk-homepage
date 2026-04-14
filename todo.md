@@ -192,3 +192,10 @@
 - [ ] Restore $30 flat post card in Step 3 (unhide it, remove boost slider from Step 3)
 - [ ] Add optional Step 4: Boost slider (available to both one-time and subscribers)
 - [ ] Step 4 shows "Skip for now" option so boost is truly optional
+
+## SendGrid Transactional Email Integration
+- [x] Add SENDGRID_API_KEY secret
+- [x] Create server/email.ts helper with sendTransactionalEmail function
+- [x] Define SENDGRID_TEMPLATES constants (Client - Request Posted: d-e2dcf8797ac545d68a03f610a7323fce)
+- [x] Wire job-posted email in Stripe webhook after checkout.session.completed
+- [x] Variables: FirstName, Service, ArtistType, Date, Location, TransportDetails, TransportReimbursed, Description, joblink, subject
