@@ -7,10 +7,11 @@ import { useState } from "react";
 import {
   Plus, Search, Filter, Clock, Users, RefreshCw,
   MoreHorizontal, ChevronDown, MapPin, DollarSign,
-  Eye, Sparkles, Loader2, Briefcase, CreditCard
+  Eye, Sparkles, Loader2, Briefcase, CreditCard, Zap
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Link, useLocation } from "wouter";
+import BoostJobModal from "@/components/BoostJobModal";
 
 function formatJobDate(dateStr: string | Date | null | undefined) {
   if (!dateStr) return null;
@@ -37,6 +38,8 @@ function getStatusColor(status: string | null | undefined) {
 }
 
 export default function DashJobs() {
+  const [boostJobId, setBoostJobId] = useState<number | null>(null);
+  const [boostJobTitle, setBoostJobTitle] = useState<string>("");
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<"active" | "all" | "archived">("active");
   const [expandedJob, setExpandedJob] = useState<number | null>(null);
@@ -299,6 +302,15 @@ export default function DashJobs() {
                             <CreditCard size={12} /> View bookings
                           </button>
                         </Link>
+                        {/* Boost button — only for active/pending jobs */}
+                        {(job.requestStatus === "Active" || job.requestStatus === "Pending Payment" || job.requestStatus === "Open") && (
+                          <button
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white hirer-grad-bg border-0 hover:opacity-90 transition-opacity"
+                            onClick={() => { setBoostJobId(job.id); setBoostJobTitle(job.description?.slice(0, 50) ?? "Job"); }}
+                          >
+                            <Zap size={12} /> Boost
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -315,6 +327,16 @@ export default function DashJobs() {
           Showing {filtered.length} job{filtered.length !== 1 ? "s" : ""}
           {search ? ` matching "${search}"` : ""}
         </p>
+      )}
+
+      {/* Boost modal */}
+      {boostJobId !== null && (
+        <BoostJobModal
+          jobId={boostJobId}
+          jobTitle={boostJobTitle}
+          open={boostJobId !== null}
+          onClose={() => setBoostJobId(null)}
+        />
       )}
     </div>
   );

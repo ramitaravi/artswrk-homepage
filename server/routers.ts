@@ -3,9 +3,10 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById } from "./db";
 import { invokeLLM } from "./_core/llm";
-import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, getStripe } from "./stripe";
+import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe } from "./stripe";
+import { calcBoostTotal } from "./stripe-products";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import { z } from "zod";
@@ -615,6 +616,67 @@ Fields to extract:
         if (!user) throw new Error("User not found");
         await updateUserOnboarding(user.id, input);
         return { success: true };
+      }),
+  }),
+
+  // ── Boost ────────────────────────────────────────────────────────────────────
+  boost: router({
+    /**
+     * Create a Stripe checkout session for a job boost.
+     */
+    createCheckout: protectedProcedure
+      .input(z.object({
+        jobId: z.number(),
+        dailyBudget: z.number().min(5).max(100),
+        durationDays: z.number().min(1).max(30),
+        origin: z.string(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const job = await getJobById(input.jobId);
+        if (!job) throw new Error("Job not found");
+        const totalAmountCents = calcBoostTotal(input.dailyBudget, input.durationDays);
+        const { url, sessionId } = await createBoostCheckoutSession({
+          email: user.email ?? undefined,
+          userId: user.id,
+          jobId: input.jobId,
+          origin: input.origin,
+          stripeCustomerId: user.clientStripeCustomerId,
+          dailyBudget: input.dailyBudget,
+          durationDays: input.durationDays,
+          totalAmountCents,
+        });
+        return { checkoutUrl: url, sessionId, totalAmountCents };
+      }),
+
+    /**
+     * Verify a completed boost checkout and activate the boost on the job.
+     */
+    verifyCheckout: protectedProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const stripe = getStripe();
+        const session = await stripe.checkout.sessions.retrieve(input.sessionId);
+        if (session.payment_status !== "paid" && session.status !== "complete") {
+          throw new Error("Payment not completed");
+        }
+        const jobId = session.metadata?.job_id ? parseInt(session.metadata.job_id) : null;
+        const dailyBudget = session.metadata?.daily_budget ? parseFloat(session.metadata.daily_budget) : 10;
+        const durationDays = session.metadata?.duration_days ? parseInt(session.metadata.duration_days) : 7;
+        if (jobId) {
+          await activateBoost(jobId, {
+            dailyBudget,
+            durationDays,
+            stripeSessionId: session.id,
+          });
+        }
+        if (session.customer && typeof session.customer === "string" && !user.clientStripeCustomerId) {
+          await saveClientStripeCustomerId(user.id, session.customer);
+        }
+        return { success: true, jobId };
       }),
   }),
 

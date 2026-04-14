@@ -34,6 +34,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
+import BoostJobModal from "@/components/BoostJobModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -864,8 +865,15 @@ function SuccessPage() {
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get("session_id");
   const isPro = params.get("plan") === "pro";
+  const isBoosted = params.get("boosted") === "1";
+  const [boostOpen, setBoostOpen] = useState(false);
+  const [activatedJobId, setActivatedJobId] = useState<number | null>(null);
 
-  const verify = trpc.postJob.verifyCheckout.useMutation();
+  const verify = trpc.postJob.verifyCheckout.useMutation({
+    onSuccess: (data) => {
+      if (data.jobId) setActivatedJobId(data.jobId);
+    },
+  });
 
   useEffect(() => {
     if (sessionId) {
@@ -892,12 +900,38 @@ function SuccessPage() {
             Welcome to Artswrk PRO! Unlimited posts are now active.
           </p>
         )}
+        {isBoosted && (
+          <p className="text-sm text-purple-600 font-semibold mb-2">
+            ⚡ Your job is now boosted for maximum visibility!
+          </p>
+        )}
         {verify.isPending && (
           <p className="text-xs text-gray-400 flex items-center justify-center gap-1.5 mb-4">
             <Loader2 size={12} className="animate-spin" />
             Activating your listing...
           </p>
         )}
+
+        {/* Boost upsell — only show if not already boosted */}
+        {!isBoosted && !verify.isPending && (
+          <div className="mt-5 p-4 rounded-2xl border-2 border-dashed border-orange-200 bg-orange-50">
+            <div className="flex items-center gap-2 justify-center mb-2">
+              <Zap size={16} className="text-[#F25722]" />
+              <span className="font-bold text-[#111] text-sm">Want more applicants faster?</span>
+            </div>
+            <p className="text-xs text-gray-500 mb-3">Boost your job to the top of search results and get 3–5× more views.</p>
+            <Button
+              size="sm"
+              className="hirer-grad-bg border-0 hover:opacity-90 font-bold text-white w-full"
+              onClick={() => setBoostOpen(true)}
+              disabled={!activatedJobId}
+            >
+              <Zap size={14} className="mr-1.5" />
+              Boost This Job
+            </Button>
+          </div>
+        )}
+
         <div className="flex gap-3 justify-center mt-6">
           <Button
             onClick={() => navigate("/dashboard/jobs")}
@@ -913,6 +947,15 @@ function SuccessPage() {
           </Button>
         </div>
       </div>
+
+      {/* Boost modal */}
+      {activatedJobId && (
+        <BoostJobModal
+          jobId={activatedJobId}
+          open={boostOpen}
+          onClose={() => setBoostOpen(false)}
+        />
+      )}
     </div>
   );
 }

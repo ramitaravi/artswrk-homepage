@@ -1010,3 +1010,35 @@ export async function updateUserOnboarding(userId: number, data: {
   if (data.onboardingStep !== undefined) updateData.onboardingStep = data.onboardingStep;
   await db.update(users).set(updateData as any).where(eq(users.id, userId));
 }
+
+/**
+ * Activate a boost on a job after successful Stripe payment.
+ */
+export async function activateBoost(jobId: number, data: {
+  dailyBudget: number;
+  durationDays: number;
+  stripeSessionId: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const now = new Date();
+  const endDate = new Date(now.getTime() + data.durationDays * 24 * 60 * 60 * 1000);
+  await db.update(jobs).set({
+    isBoosted: true,
+    boostDailyBudget: data.dailyBudget,
+    boostDurationDays: data.durationDays,
+    boostStartDate: now,
+    boostEndDate: endDate,
+    boostStripeSessionId: data.stripeSessionId,
+  }).where(eq(jobs.id, jobId));
+}
+
+/**
+ * Get a single job by ID.
+ */
+export async function getJobById(jobId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(jobs).where(eq(jobs.id, jobId)).limit(1);
+  return rows[0] ?? null;
+}

@@ -135,3 +135,58 @@ export async function createSubscriptionCheckoutSession(
   const session = await stripe.checkout.sessions.create(sessionParams);
   return { url: session.url!, sessionId: session.id };
 }
+
+/**
+ * Create a Stripe Checkout Session for a job boost (dynamic pricing).
+ */
+export async function createBoostCheckoutSession(
+  opts: CreateCheckoutOptions & {
+    dailyBudget: number;
+    durationDays: number;
+    totalAmountCents: number;
+  }
+): Promise<{ url: string; sessionId: string }> {
+  const stripe = getStripe();
+  const product = STRIPE_PRODUCTS.BOOST;
+
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
+    mode: "payment",
+    line_items: [
+      {
+        price_data: {
+          currency: product.currency,
+          unit_amount: opts.totalAmountCents,
+          product_data: {
+            name: product.name,
+            description: `$${opts.dailyBudget}/day × ${opts.durationDays} days — ${product.description}`,
+          },
+        },
+        quantity: 1,
+      },
+    ],
+    payment_intent_data: {
+      setup_future_usage: "on_session",
+    },
+    success_url: `${opts.origin}/post-job/success?session_id={CHECKOUT_SESSION_ID}&boosted=1`,
+    cancel_url: `${opts.origin}/post-job?cancelled=1`,
+    allow_promotion_codes: true,
+    client_reference_id: opts.userId?.toString(),
+    metadata: {
+      user_id: opts.userId?.toString() ?? "",
+      job_id: opts.jobId?.toString() ?? "",
+      customer_email: opts.email ?? "",
+      type: "boost",
+      daily_budget: opts.dailyBudget.toString(),
+      duration_days: opts.durationDays.toString(),
+    },
+  };
+
+  if (opts.stripeCustomerId) {
+    sessionParams.customer = opts.stripeCustomerId;
+  } else if (opts.email) {
+    sessionParams.customer_email = opts.email;
+  }
+
+  const session = await stripe.checkout.sessions.create(sessionParams);
+  return { url: session.url!, sessionId: session.id };
+}

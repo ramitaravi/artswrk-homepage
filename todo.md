@@ -173,3 +173,17 @@
 - [x] Show logged-in user banner (name + account) when authenticated
 - [x] Replace Login/Join buttons with logout button when logged in
 - [x] Wire logout button to tRPC auth.logout mutation
+
+## Boost Job Feature
+- [x] Add boostActive, boostDailyBudget, boostDurationDays, boostStartDate, boostEndDate, boostStripeSessionId fields to jobs schema
+- [x] Run pnpm db:push to migrate schema
+- [x] activateBoost and getJobById db helpers
+- [x] BOOST product config in stripe-products.ts with calcBoostTotal helper
+- [x] createBoostCheckoutSession in stripe.ts
+- [x] tRPC boost.createCheckout procedure (creates Stripe checkout for boost)
+- [x] tRPC boost.verifyCheckout procedure (activates boost after payment)
+- [x] BoostJobModal reusable component: daily budget slider ($5–$100), duration selector (3/7/14/30 days), live performance preview panel
+- [x] Performance preview: Expected Views, Expected Applicants, Featured Placements, total cost calculation, tier hints
+- [x] Boost upsell card on PostJob success page (only shown if not already boosted)
+- [x] Boost button on DashJobs expanded job card (Active/Pending/Open jobs only)
+- [x] Stripe webhook handles boost payment via checkout.session.completed with boost metadata

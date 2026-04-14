@@ -168,6 +168,20 @@ export const jobs = mysqlTable("jobs", {
   // ── Client contact ─────────────────────────────────────────────────────────
   clientEmail: varchar("clientEmail", { length: 320 }),
 
+  // ── Boost / Promotion ─────────────────────────────────────────────────────
+  /** Whether this job is currently boosted for higher visibility */
+  isBoosted: boolean("isBoosted").default(false),
+  /** Daily budget in dollars for the boost (e.g. 15 = $15/day) */
+  boostDailyBudget: int("boostDailyBudget"),
+  /** Number of days the boost runs */
+  boostDurationDays: int("boostDurationDays"),
+  /** When the boost started */
+  boostStartDate: timestamp("boostStartDate"),
+  /** When the boost expires */
+  boostEndDate: timestamp("boostEndDate"),
+  /** Stripe checkout session ID for the boost payment */
+  boostStripeSessionId: varchar("boostStripeSessionId", { length: 256 }),
+
   // ── Timestamps ─────────────────────────────────────────────────────────────
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
