@@ -936,13 +936,257 @@ function PaymentsSection() {
   );
 }
 
+// ─── PRO Job Detail Modal ──────────────────────────────────────────────────
+type ProJob = {
+  id: number;
+  company?: string | null;
+  logo?: string | null;
+  serviceType?: string | null;
+  category?: string | null;
+  budget?: string | null;
+  status?: string | null;
+  description?: string | null;
+  location?: string | null;
+  workFromAnywhere?: boolean | null;
+  applyEmail?: string | null;
+  applyLink?: string | null;
+  applyDirect?: boolean | null;
+  featured?: boolean | null;
+  createdAt?: Date | string | null;
+  interestedCount?: number;
+};
+
+function ProJobModal({ job, onClose }: { job: ProJob; onClose: () => void }) {
+  const { data: artists, isLoading } = trpc.admin.premiumJobArtists.useQuery({ jobId: job.id });
+
+  // Close on backdrop click or Escape key
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const logoSrc = job.logo ? (job.logo.startsWith('//') ? `https:${job.logo}` : job.logo) : null;
+  const cleanDesc = job.description ? job.description.replace(/\[.*?\]/g, '').trim() : '';
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Modal */}
+      <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+
+        {/* Header: job details */}
+        <div className="flex-shrink-0 px-6 pt-6 pb-5 border-b border-gray-100">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              {logoSrc ? (
+                <img src={logoSrc} alt={job.company || ''}
+                  className="w-14 h-14 rounded-xl object-cover border border-gray-100 flex-shrink-0"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              ) : (
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-xl font-black flex-shrink-0">
+                  {(job.company || 'P')[0]}
+                </div>
+              )}
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-lg font-black text-[#111]">{job.serviceType || 'PRO Job'}</h2>
+                  {job.featured && (
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-600 border border-yellow-200">Featured</span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-500 font-medium mt-0.5">{job.company || '—'}</p>
+                <div className="flex items-center gap-3 mt-2 flex-wrap">
+                  {job.category && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 font-semibold">{job.category}</span>
+                  )}
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    job.status === 'Active' ? 'bg-green-50 text-green-600'
+                    : job.status === 'Inactive' || job.status === 'Closed' ? 'bg-red-50 text-red-500'
+                    : 'bg-gray-100 text-gray-500'
+                  }`}>{job.status || 'Unknown'}</span>
+                  {job.workFromAnywhere && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-blue-500 font-semibold">
+                      <Globe size={10} /> Remote
+                    </span>
+                  )}
+                  {job.location && !job.workFromAnywhere && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-gray-400">
+                      <MapPin size={10} /> {job.location}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <button onClick={onClose} className="flex-shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Meta row */}
+          <div className="flex items-center gap-5 mt-4 flex-wrap">
+            {job.budget && (
+              <div>
+                <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Budget</p>
+                <p className="text-sm font-bold text-[#111]">{job.budget}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Posted</p>
+              <p className="text-sm font-medium text-gray-600">{fmtDate(job.createdAt)}</p>
+            </div>
+            {job.applyEmail && (
+              <div>
+                <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Apply Email</p>
+                <a href={`mailto:${job.applyEmail}`} className="text-sm font-medium text-[#F25722] hover:underline">{job.applyEmail}</a>
+              </div>
+            )}
+            {job.applyLink && (
+              <div>
+                <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Apply Link</p>
+                <a href={job.applyLink} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-500 hover:underline flex items-center gap-1">
+                  <ExternalLink size={11} /> View
+                </a>
+              </div>
+            )}
+          </div>
+
+          {/* Description */}
+          {cleanDesc && (
+            <div className="mt-4 p-3 bg-gray-50 rounded-xl">
+              <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">
+                {cleanDesc.length > 400 ? cleanDesc.substring(0, 400) + '…' : cleanDesc}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Artist list */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-6 py-4">
+            <h3 className="text-sm font-black text-[#111] mb-4">
+              Interested Artists
+              <span className="ml-2 text-xs font-normal text-gray-400">({(artists as any[])?.length ?? job.interestedCount ?? 0})</span>
+            </h3>
+
+            {isLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <div className="w-5 h-5 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" />
+              </div>
+            ) : !artists || (artists as any[]).length === 0 ? (
+              <div className="text-center py-10">
+                <Users size={32} className="text-gray-200 mx-auto mb-2" />
+                <p className="text-sm text-gray-400">No interested artists recorded yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {(artists as any[]).map((a: any) => {
+                  const fullName = a.artistFirstName && a.artistLastName
+                    ? `${a.artistFirstName} ${a.artistLastName}`
+                    : a.artistName || 'Unknown Artist';
+                  const initials = (a.artistFirstName || a.artistName || '?')[0].toUpperCase();
+                  const profileUrl = a.artistSlug
+                    ? `https://artswrk.com/artists/${a.artistSlug}`
+                    : a.artistEmail ? `mailto:${a.artistEmail}` : null;
+
+                  return (
+                    <div key={a.id} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                      {/* Artist header */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          {a.artistProfilePicture ? (
+                            <img
+                              src={a.artistProfilePicture}
+                              alt={fullName}
+                              className="w-12 h-12 rounded-full object-cover flex-shrink-0 border-2 border-gray-100"
+                              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#ec008c] to-[#ff7171] flex items-center justify-center text-white text-base font-black flex-shrink-0">
+                              {initials}
+                            </div>
+                          )}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-bold text-[#111]">{fullName}</p>
+                              {a.artswrkPro && (
+                                <span className="text-[9px] font-black text-[#F25722] bg-orange-50 px-1.5 py-0.5 rounded-full border border-orange-100">PRO</span>
+                              )}
+                            </div>
+                            {a.artistLocation && (
+                              <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                                <MapPin size={10} /> {a.artistLocation}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {/* Rate badge (inspired by screenshot) */}
+                        {job.budget && (
+                          <div className="flex-shrink-0 px-3 py-1.5 rounded-xl bg-[#fce8e4] text-[#F25722] text-xs font-bold">
+                            {job.budget}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Bio */}
+                      {a.artistBio && (
+                        <p className="mt-3 text-xs text-gray-600 leading-relaxed">
+                          {a.artistBio.length > 200 ? a.artistBio.substring(0, 200) + '…' : a.artistBio}
+                        </p>
+                      )}
+
+                      {/* Disciplines */}
+                      {a.artistDisciplines && (() => {
+                        try {
+                          const discs: string[] = JSON.parse(a.artistDisciplines);
+                          if (discs.length > 0) return (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {discs.slice(0, 4).map((d: string) => (
+                                <span key={d} className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{d}</span>
+                              ))}
+                              {discs.length > 4 && <span className="text-[10px] text-gray-400">+{discs.length - 4} more</span>}
+                            </div>
+                          );
+                        } catch { return null; }
+                        return null;
+                      })()}
+
+                      {/* View Submission link */}
+                      {profileUrl && (
+                        <a
+                          href={profileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-3 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all"
+                        >
+                          View Submission →
+                        </a>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── PRO Jobs Section ───────────────────────────────────────────────────────
 function ProJobsSection() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [selectedJob, setSelectedJob] = useState<ProJob | null>(null);
   const LIMIT = 50;
 
   // Debounce search
@@ -958,16 +1202,13 @@ function ProJobsSection() {
     status: statusFilter || undefined,
   });
 
-  // Fetch interested artists for expanded job
-  const { data: artistsData, isLoading: artistsLoading } = trpc.admin.premiumJobArtists.useQuery(
-    { jobId: expandedId! },
-    { enabled: expandedId !== null }
-  );
-
   const statuses = ["Active", "Inactive", "Draft", "Closed"];
 
   return (
     <div className="space-y-5">
+      {/* Modal */}
+      {selectedJob && <ProJobModal job={selectedJob} onClose={() => setSelectedJob(null)} />}
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-black text-[#111]">
           PRO Jobs
@@ -1023,140 +1264,74 @@ function ProJobsSection() {
               ) : data?.jobs.length === 0 ? (
                 <tr><td colSpan={8} className="px-5 py-10 text-center text-gray-400 text-xs">No PRO jobs found</td></tr>
               ) : data?.jobs.map(job => (
-                <>
-                  <tr
-                    key={job.id}
-                    className={`border-b border-gray-50 hover:bg-orange-50/30 transition-colors cursor-pointer ${
-                      expandedId === job.id ? "bg-orange-50/40" : ""
-                    }`}
-                    onClick={() => setExpandedId(expandedId === job.id ? null : job.id)}
-                  >
-                    {/* Company */}
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2.5">
-                        {job.logo ? (
-                          <img src={job.logo.startsWith('//') ? `https:${job.logo}` : job.logo}
-                            alt={job.company || ''}
-                            className="w-7 h-7 rounded-lg object-cover flex-shrink-0 border border-gray-100"
-                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                          />
-                        ) : (
-                          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
-                            {(job.company || 'P')[0]}
-                          </div>
-                        )}
-                        <span className="font-semibold text-[#111] text-xs">{job.company || '—'}</span>
-                      </div>
-                    </td>
-                    {/* Role */}
-                    <td className="px-4 py-3">
-                      <p className="text-xs font-medium text-[#111] max-w-[180px] truncate">{job.serviceType || '—'}</p>
-                    </td>
-                    {/* Category */}
-                    <td className="px-4 py-3">
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 font-semibold">
-                        {job.category || '—'}
-                      </span>
-                    </td>
-                    {/* Budget */}
-                    <td className="px-4 py-3 text-xs text-gray-600 max-w-[120px] truncate">{job.budget || '—'}</td>
-                    {/* Status */}
-                    <td className="px-4 py-3">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        job.status === 'Active' ? 'bg-green-50 text-green-600'
-                        : job.status === 'Inactive' || job.status === 'Closed' ? 'bg-red-50 text-red-500'
-                        : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        {job.status || '—'}
-                      </span>
-                    </td>
-                    {/* Interested count */}
-                    <td className="px-4 py-3">
-                      {(job as any).interestedCount > 0 ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722]">
-                          <Users size={10} />
-                          {(job as any).interestedCount}
-                        </span>
+                <tr
+                  key={job.id}
+                  className="border-b border-gray-50 hover:bg-orange-50/30 transition-colors cursor-pointer"
+                  onClick={() => setSelectedJob(job as ProJob)}
+                >
+                  {/* Company */}
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-2.5">
+                      {job.logo ? (
+                        <img src={job.logo.startsWith('//') ? `https:${job.logo}` : job.logo}
+                          alt={job.company || ''}
+                          className="w-7 h-7 rounded-lg object-cover flex-shrink-0 border border-gray-100"
+                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
                       ) : (
-                        <span className="text-xs text-gray-300">—</span>
-                      )}
-                    </td>
-                    {/* Remote */}
-                    <td className="px-4 py-3">
-                      {job.workFromAnywhere ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-blue-500 font-semibold">
-                          <Globe size={10} /> Remote
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-300">On-site</span>
-                      )}
-                    </td>
-                    {/* Posted date */}
-                    <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{fmtDate(job.createdAt)}</td>
-                  </tr>
-
-                  {/* Expanded: interested artists */}
-                  {expandedId === job.id && (
-                    <tr key={`${job.id}-expanded`} className="bg-orange-50/20">
-                      <td colSpan={8} className="px-6 py-4">
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <p className="text-xs font-bold text-[#111]">Interested Artists ({(job as any).interestedCount ?? 0})</p>
-                            {job.applyEmail && (
-                              <a href={`mailto:${job.applyEmail}`} className="text-[10px] text-[#F25722] hover:underline flex items-center gap-1">
-                                <ExternalLink size={10} /> {job.applyEmail}
-                              </a>
-                            )}
-                          </div>
-                          {artistsLoading ? (
-                            <p className="text-xs text-gray-400">Loading artists…</p>
-                          ) : !artistsData || artistsData.length === 0 ? (
-                            <p className="text-xs text-gray-400">No interested artists recorded yet.</p>
-                          ) : (
-                            <div className="flex flex-wrap gap-2">
-                              {(artistsData as any[]).map((a: any) => (
-                                <div key={a.id} className="flex items-center gap-2 bg-white rounded-xl px-3 py-2 border border-gray-100 shadow-sm">
-                                  {a.artistProfilePicture ? (
-                                    <img src={a.artistProfilePicture} alt={a.artistName || ''}
-                                      className="w-7 h-7 rounded-full object-cover flex-shrink-0"
-                                      onError={e => { (e.target as HTMLImageElement).style.display='none'; }}
-                                    />
-                                  ) : (
-                                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#ec008c] to-[#ff7171] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
-                                      {(a.artistFirstName || a.artistName || '?')[0]}
-                                    </div>
-                                  )}
-                                  <div>
-                                    <p className="text-xs font-semibold text-[#111]">
-                                      {a.artistFirstName && a.artistLastName
-                                        ? `${a.artistFirstName} ${a.artistLastName}`
-                                        : a.artistName || 'Unknown'}
-                                    </p>
-                                    {a.artistLocation && (
-                                      <p className="text-[10px] text-gray-400">{a.artistLocation}</p>
-                                    )}
-                                  </div>
-                                  {a.artswrkPro && (
-                                    <span className="text-[9px] font-black text-[#F25722] bg-orange-50 px-1.5 py-0.5 rounded-full">PRO</span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {/* Description preview */}
-                          {job.description && (
-                            <details className="mt-2">
-                              <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">View description</summary>
-                              <p className="mt-2 text-xs text-gray-600 leading-relaxed max-h-32 overflow-y-auto whitespace-pre-wrap">
-                                {job.description.replace(/\[.*?\]/g, '').substring(0, 600)}{job.description.length > 600 ? '…' : ''}
-                              </p>
-                            </details>
-                          )}
+                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
+                          {(job.company || 'P')[0]}
                         </div>
-                      </td>
-                    </tr>
-                  )}
-                </>
+                      )}
+                      <span className="font-semibold text-[#111] text-xs">{job.company || '—'}</span>
+                    </div>
+                  </td>
+                  {/* Role */}
+                  <td className="px-4 py-3">
+                    <p className="text-xs font-medium text-[#111] max-w-[180px] truncate">{job.serviceType || '—'}</p>
+                  </td>
+                  {/* Category */}
+                  <td className="px-4 py-3">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 font-semibold">
+                      {job.category || '—'}
+                    </span>
+                  </td>
+                  {/* Budget */}
+                  <td className="px-4 py-3 text-xs text-gray-600 max-w-[120px] truncate">{job.budget || '—'}</td>
+                  {/* Status */}
+                  <td className="px-4 py-3">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      job.status === 'Active' ? 'bg-green-50 text-green-600'
+                      : job.status === 'Inactive' || job.status === 'Closed' ? 'bg-red-50 text-red-500'
+                      : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {job.status || '—'}
+                    </span>
+                  </td>
+                  {/* Interested count */}
+                  <td className="px-4 py-3">
+                    {(job as any).interestedCount > 0 ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722]">
+                        <Users size={10} />
+                        {(job as any).interestedCount}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-300">—</span>
+                    )}
+                  </td>
+                  {/* Remote */}
+                  <td className="px-4 py-3">
+                    {job.workFromAnywhere ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-blue-500 font-semibold">
+                        <Globe size={10} /> Remote
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-300">On-site</span>
+                    )}
+                  </td>
+                  {/* Posted date */}
+                  <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{fmtDate(job.createdAt)}</td>
+                </tr>
               ))}
             </tbody>
           </table>

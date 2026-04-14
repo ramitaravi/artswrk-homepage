@@ -1519,8 +1519,12 @@ export async function getPremiumJobInterestedArtists(premiumJobId: number) {
       artistName: users.name,
       artistFirstName: users.firstName,
       artistLastName: users.lastName,
+      artistEmail: users.email,
       artistProfilePicture: users.profilePicture,
       artistLocation: users.location,
+      artistBio: users.bio,
+      artistDisciplines: users.artistDisciplines,
+      artistSlug: users.slug,
       artswrkPro: users.artswrkPro,
     })
     .from(premiumJobInterestedArtists)

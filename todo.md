@@ -312,3 +312,6 @@
 - [x] Add PRO Jobs nav item to admin sidebar (with Sparkles icon)
 - [x] Build Admin PRO Jobs page (searchable/filterable table with job details + interested artist count badge, expandable rows showing artists)
 - [x] 92 tests passing
+
+## Admin PRO Jobs Modal
+- [x] Replace inline row-expand with a full modal popup (job header + artist cards with photo, name, location, rate, bio, View Submission link)
