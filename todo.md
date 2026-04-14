@@ -322,3 +322,13 @@
 - [x] Update premium_job_interested_artists schema to add message, rate, resumeLink, status, bubbleInterestedArtistId columns
 - [x] Update modal artist cards to show: application message (primary), bio (fallback), per-artist rate badge, View Submission → (dark button linking to resume), Profile (secondary link)
 - [x] 92 tests passing
+
+## Enterprise Clients Seed & Admin Section
+- [x] Seeded 11 enterprise clients from Bubble API (taylor@dancerevel.com, raj@onstageamerica.com, decapartner@gmail.com, juliana@elevationontour.com, alli@journeycompetition.com, tiffany@thunderstruckdance.com, julie@americandanceawards.com, elaine@legacystudios.co, recruiting+corporate@ensembleschools.com, lori@tickettobroadway.com, diana@destinytalentcompetition.com)
+- [x] Linked 63 premium_jobs to enterprise clients by company name match
+- [x] Added getEnterpriseClients DB helper with job + artist counts per client
+- [x] Added admin.enterpriseClients tRPC endpoint (search, paginated)
+- [x] Added Enterprise Clients nav item to admin sidebar (Building2 icon)
+- [x] Built Enterprise Clients card grid (logo, company name, email, hiring category, job count, artist count)
+- [x] Built Enterprise Client modal (header, description, website/instagram links, PRO jobs list)
+- [x] 92 tests passing

@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, bookings, conversations, interestedArtists, jobs, messages, payments, premiumJobInterestedArtists, premiumJobs, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -1606,4 +1606,84 @@ export async function getAdminPayments({
     .offset(offset);
 
   return { payments: rows, total: Number(countRow?.count ?? 0) };
+}
+
+/**
+ * Get all enterprise clients with their job and interested artist counts.
+ */
+export async function getEnterpriseClients(opts: {
+  search?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const db = await getDb();
+  if (!db) return { clients: [], total: 0 };
+
+  const { search, limit = 50, offset = 0 } = opts;
+
+  const conditions = [eq(users.enterprise, true)];
+  if (search) {
+    conditions.push(
+      sql`(${users.name} LIKE ${`%${search}%`} OR ${users.email} LIKE ${`%${search}%`} OR ${users.clientCompanyName} LIKE ${`%${search}%`})`
+    );
+  }
+
+  const where = conditions.length > 1 ? and(...conditions) : conditions[0];
+
+  const countRows = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(users)
+    .where(where);
+  const countRow = countRows[0];
+
+  // Get enterprise clients with job counts
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+      clientCompanyName: users.clientCompanyName,
+      location: users.location,
+      profilePicture: users.profilePicture,
+      enterpriseLogoUrl: users.enterpriseLogoUrl,
+      enterpriseDescription: users.enterpriseDescription,
+      hiringCategory: users.hiringCategory,
+      website: users.website,
+      instagram: users.instagram,
+      bubbleId: users.bubbleId,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .where(where)
+    .orderBy(asc(users.name))
+    .limit(limit)
+    .offset(offset);
+
+  // For each client, get their job count and interested artist count
+  const enriched = await Promise.all(
+    rows.map(async (client) => {
+      const jobCountRows = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(premiumJobs)
+        .where(eq(premiumJobs.createdByUserId, client.id));
+      const jobCount = jobCountRows[0];
+
+      const artistCountRows = await db
+        .select({ count: sql<number>`COUNT(DISTINCT ${premiumJobInterestedArtists.artistUserId})` })
+        .from(premiumJobInterestedArtists)
+        .innerJoin(premiumJobs, eq(premiumJobInterestedArtists.premiumJobId, premiumJobs.id))
+        .where(eq(premiumJobs.createdByUserId, client.id));
+      const artistCount = artistCountRows[0];
+
+      return {
+        ...client,
+        jobCount: Number(jobCount?.count ?? 0),
+        interestedArtistCount: Number(artistCount?.count ?? 0),
+      };
+    })
+  );
+
+  return { clients: enriched, total: Number(countRow?.count ?? 0) };
 }

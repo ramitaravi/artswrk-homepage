@@ -20,7 +20,7 @@ import { ADMIN_SESSION_COOKIE_NAME } from "@shared/const";
 import { Link } from "wouter";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type AdminSection = "dashboard" | "artists" | "clients" | "jobs" | "pro-jobs" | "bookings" | "payments" | "settings";
+type AdminSection = "dashboard" | "artists" | "clients" | "jobs" | "pro-jobs" | "enterprise-clients" | "bookings" | "payments" | "settings";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmt$(cents: number) {
@@ -46,6 +46,7 @@ const NAV_ITEMS: { id: AdminSection; label: string; icon: React.ReactNode }[] = 
   { id: "clients", label: "Clients", icon: <Building2 size={16} /> },
   { id: "jobs", label: "Jobs", icon: <Briefcase size={16} /> },
   { id: "pro-jobs", label: "PRO Jobs", icon: <Sparkles size={16} /> },
+  { id: "enterprise-clients", label: "Enterprise Clients", icon: <Building2 size={16} /> },
   { id: "bookings", label: "Bookings", icon: <BookOpen size={16} /> },
   { id: "payments", label: "Payments", icon: <CreditCard size={16} /> },
   { id: "settings", label: "Settings", icon: <Settings size={16} /> },
@@ -1375,6 +1376,258 @@ function ProJobsSection() {
   );
 }
 
+// ─── Enterprise Clients Section ─────────────────────────────────────────────
+type EnterpriseClient = {
+  id: number;
+  name: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  clientCompanyName: string | null;
+  location: string | null;
+  profilePicture: string | null;
+  enterpriseLogoUrl: string | null;
+  enterpriseDescription: string | null;
+  hiringCategory: string | null;
+  website: string | null;
+  instagram: string | null;
+  bubbleId: string | null;
+  createdAt: Date | null;
+  jobCount: number;
+  interestedArtistCount: number;
+};
+
+function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; onClose: () => void }) {
+  const { data: jobsData, isLoading } = trpc.admin.premiumJobs.useQuery({
+    search: client.clientCompanyName || client.name || "",
+    limit: 50,
+    offset: 0,
+  });
+
+  const logo = client.enterpriseLogoUrl || client.profilePicture;
+  const companyName = client.clientCompanyName || displayName(client);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-start gap-4 p-6 border-b border-gray-100">
+          {logo ? (
+            <img src={logo.startsWith('//') ? 'https:' + logo : logo} alt={companyName} className="w-14 h-14 rounded-xl object-contain bg-gray-50 border border-gray-100 flex-shrink-0" />
+          ) : (
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-xl flex-shrink-0">
+              {companyName[0]}
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <h2 className="text-xl font-black text-[#111] truncate">{companyName}</h2>
+            <p className="text-sm text-gray-500">{client.email}</p>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {client.hiringCategory && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722] font-semibold">{client.hiringCategory}</span>
+              )}
+              {client.location && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 flex items-center gap-1">
+                  <MapPin size={10} /> {client.location}
+                </span>
+              )}
+              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-semibold">{client.jobCount} PRO Jobs</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-600 font-semibold">{client.interestedArtistCount} Interested Artists</span>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Description */}
+        {client.enterpriseDescription && (
+          <div className="px-6 py-3 border-b border-gray-100 bg-gray-50">
+            <p className="text-sm text-gray-600 leading-relaxed">{client.enterpriseDescription}</p>
+          </div>
+        )}
+
+        {/* Links */}
+        {(client.website || client.instagram) && (
+          <div className="px-6 py-3 border-b border-gray-100 flex gap-4">
+            {client.website && (
+              <a href={client.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline">
+                <Globe size={12} /> {client.website.replace(/^https?:\/\//, '')}
+              </a>
+            )}
+            {client.instagram && (
+              <a href={`https://instagram.com/${client.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-pink-600 hover:underline">
+                <ExternalLink size={12} /> @{client.instagram.replace('@', '')}
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* PRO Jobs list */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <h3 className="text-sm font-bold text-gray-700 mb-3">PRO Jobs ({jobsData?.total ?? 0})</h3>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-10 text-gray-400">
+              <div className="w-5 h-5 border-2 border-gray-200 border-t-[#F25722] rounded-full animate-spin mr-2" />
+              Loading jobs…
+            </div>
+          ) : !jobsData?.jobs?.length ? (
+            <p className="text-sm text-gray-400 text-center py-8">No PRO jobs found for this client.</p>
+          ) : (
+            <div className="space-y-3">
+              {jobsData.jobs.map((job: any) => (
+                <div key={job.id} className="border border-gray-100 rounded-xl p-4 bg-gray-50 hover:bg-white transition-colors">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-[#111] text-sm truncate">{job.serviceType || 'Untitled Role'}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{job.category} {job.location ? `· ${job.location}` : ''}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {job.budget && (
+                        <span className="text-xs font-semibold px-2 py-1 rounded-full bg-[#FFF0E6] text-[#F25722]">{job.budget}</span>
+                      )}
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                        job.status === 'Active' ? 'bg-green-50 text-green-600' :
+                        job.status === 'Closed' ? 'bg-red-50 text-red-500' :
+                        'bg-gray-100 text-gray-500'
+                      }`}>{job.status || 'Unknown'}</span>
+                      <span className="text-xs text-gray-400">{job.interestedArtistCount ?? 0} artists</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EnterpriseClientsSection() {
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [selectedClient, setSelectedClient] = useState<EnterpriseClient | null>(null);
+  const LIMIT = 50;
+
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data, isLoading } = trpc.admin.enterpriseClients.useQuery({
+    limit: LIMIT,
+    offset: (page - 1) * LIMIT,
+    search: debouncedSearch || undefined,
+  });
+
+  const totalPages = data ? Math.ceil(data.total / LIMIT) : 1;
+
+  return (
+    <div className="space-y-5">
+      {selectedClient && <EnterpriseClientModal client={selectedClient} onClose={() => setSelectedClient(null)} />}
+
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-black text-[#111]">
+          Enterprise Clients
+          <span className="ml-2 text-sm font-normal text-gray-400">({data?.total?.toLocaleString() ?? "…"} total)</span>
+        </h1>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100">
+          <Building2 size={13} className="text-blue-600" />
+          <span className="text-xs font-semibold text-blue-600">Enterprise / PRO Accounts</span>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search company, name, email…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#F25722] bg-white"
+        />
+      </div>
+
+      {/* Client Cards Grid */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20 text-gray-400">
+          <div className="w-6 h-6 border-2 border-gray-200 border-t-[#F25722] rounded-full animate-spin mr-3" />
+          Loading enterprise clients…
+        </div>
+      ) : !data?.clients?.length ? (
+        <div className="text-center py-20 text-gray-400">No enterprise clients found.</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {data.clients.map((client: EnterpriseClient) => {
+            const logo = client.enterpriseLogoUrl || client.profilePicture;
+            const companyName = client.clientCompanyName || displayName(client);
+            return (
+              <button
+                key={client.id}
+                onClick={() => setSelectedClient(client)}
+                className="text-left bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md hover:border-[#F25722]/30 transition-all group"
+              >
+                <div className="flex items-start gap-3 mb-4">
+                  {logo ? (
+                    <img src={logo.startsWith('//') ? 'https:' + logo : logo} alt={companyName} className="w-12 h-12 rounded-xl object-contain bg-gray-50 border border-gray-100 flex-shrink-0" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-lg flex-shrink-0">
+                      {companyName[0]}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-[#111] text-sm leading-tight truncate group-hover:text-[#F25722] transition-colors">{companyName}</p>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">{client.email}</p>
+                    {client.hiringCategory && (
+                      <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722] font-semibold">{client.hiringCategory}</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 bg-gray-50 rounded-xl p-3 text-center">
+                    <p className="text-lg font-black text-[#111]">{client.jobCount}</p>
+                    <p className="text-xs text-gray-500">PRO Jobs</p>
+                  </div>
+                  <div className="flex-1 bg-gray-50 rounded-xl p-3 text-center">
+                    <p className="text-lg font-black text-[#111]">{client.interestedArtistCount}</p>
+                    <p className="text-xs text-gray-500">Interested Artists</p>
+                  </div>
+                </div>
+
+                {client.location && (
+                  <p className="mt-3 text-xs text-gray-400 flex items-center gap-1">
+                    <MapPin size={10} /> {client.location}
+                  </p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+            className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50">
+            ← Prev
+          </button>
+          <span className="text-sm text-gray-500">Page {page} of {totalPages}</span>
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+            className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50">
+            Next →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Settings Section (password tool) ────────────────────────────────────────
 function SettingsSection({ user }: { user: { email?: string | null } }) {
   const [searchEmail, setSearchEmail] = useState("");
@@ -1515,6 +1768,7 @@ export default function Admin() {
           {section === "clients" && <ClientsSection />}
           {section === "jobs" && <JobsSection />}
           {section === "pro-jobs" && <ProJobsSection />}
+          {section === "enterprise-clients" && <EnterpriseClientsSection />}
           {section === "bookings" && <BookingsSection />}
           {section === "payments" && <PaymentsSection />}
           {section === "settings" && <SettingsSection user={user} />}
