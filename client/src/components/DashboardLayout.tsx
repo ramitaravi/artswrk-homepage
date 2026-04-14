@@ -269,7 +269,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <div className="flex items-center gap-3">
             {/* Post a Job CTA */}
-            <Link href="/dashboard/jobs">
+            <Link href="/post-job">
               <button className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity">
                 + Post a Job
               </button>

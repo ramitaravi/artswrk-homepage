@@ -10,7 +10,7 @@ import {
   Eye, Sparkles, Loader2, Briefcase, CreditCard
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 function formatJobDate(dateStr: string | Date | null | undefined) {
   if (!dateStr) return null;
@@ -37,6 +37,7 @@ function getStatusColor(status: string | null | undefined) {
 }
 
 export default function DashJobs() {
+  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<"active" | "all" | "archived">("active");
   const [expandedJob, setExpandedJob] = useState<number | null>(null);
   const [showPostForm, setShowPostForm] = useState(false);
@@ -97,7 +98,15 @@ export default function DashJobs() {
             <p className="text-xs text-gray-400">We'll parse your description into a clean listing automatically.</p>
             <div className="flex items-center gap-2">
               <button onClick={() => setShowPostForm(false)} className="px-4 py-2 rounded-xl text-xs font-medium text-gray-500 hover:bg-gray-100 transition-colors">Cancel</button>
-              <button className="px-5 py-2 rounded-xl text-xs font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity">
+              <button
+                onClick={() => {
+                  if (jobText.trim()) {
+                    sessionStorage.setItem("postJobPrefill", jobText.trim());
+                  }
+                  navigate("/post-job");
+                }}
+                className="px-5 py-2 rounded-xl text-xs font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity"
+              >
                 Preview & Post →
               </button>
             </div>

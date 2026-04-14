@@ -129,7 +129,15 @@ function Step1({
 }: {
   onNext: (text: string, parsed: ParsedJob) => void;
 }) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState(() => {
+    // Check if there's prefilled text from the dashboard quick-post box
+    const prefill = sessionStorage.getItem("postJobPrefill");
+    if (prefill) {
+      sessionStorage.removeItem("postJobPrefill");
+      return prefill;
+    }
+    return "";
+  });
   const [exampleIdx, setExampleIdx] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
