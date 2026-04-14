@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
 import {
   Sparkles,
   MapPin,
@@ -32,6 +33,9 @@ import {
   ArrowRight,
   Users,
   RefreshCw,
+  TrendingUp,
+  Eye,
+  BarChart2,
 } from "lucide-react";
 import { toast } from "sonner";
 import BoostJobModal from "@/components/BoostJobModal";
@@ -611,6 +615,24 @@ function Step2({
 
 // ─── Step 3: Payment ──────────────────────────────────────────────────────────
 
+/** Compute performance tier from daily budget */
+function getBoostTier(daily: number) {
+  if (daily >= 50) return { label: "High", color: "text-green-600", bar: 90, hint: "Top placement — maximum visibility." };
+  if (daily >= 25) return { label: "Competitive", color: "text-[#F25722]", bar: 60, hint: "Strong placement among active jobs." };
+  return { label: "Moderate", color: "text-amber-500", bar: 30, hint: "Increase to $25+ to be competitive." };
+}
+
+function calcBoostTotal(daily: number, days: number) {
+  return daily * days;
+}
+
+const DURATION_OPTIONS = [
+  { label: "3 days", days: 3 },
+  { label: "1 week", days: 7 },
+  { label: "2 weeks", days: 14 },
+  { label: "1 month", days: 30 },
+];
+
 function Step3({
   form,
   onBack,
@@ -621,9 +643,19 @@ function Step3({
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
 
+  // Boost slider state
+  const [dailyBudget, setDailyBudget] = useState(20);
+  const [durationDays, setDurationDays] = useState(7);
+
+  const tier = getBoostTier(dailyBudget);
+  const total = calcBoostTotal(dailyBudget, durationDays);
+  const expectedViews = `${dailyBudget * durationDays * 8}–${dailyBudget * durationDays * 14}`;
+  const expectedApplicants = `${Math.max(1, Math.floor(dailyBudget * durationDays / 15))}–${Math.max(2, Math.ceil(dailyBudget * durationDays / 8))}`;
+  const hasSavedCard = !!user?.clientStripeCustomerId;
+  const isPro = user?.clientPremium;
+
   const createAndCheckout = trpc.postJob.createAndCheckout.useMutation({
     onSuccess: (data) => {
-      // Open Stripe in a new tab
       window.open(data.checkoutUrl, "_blank");
       toast.success("Redirecting to secure checkout...");
     },
@@ -632,14 +664,43 @@ function Step3({
     },
   });
 
-  function handlePay(plan: "one_time" | "subscription") {
+  const boostCheckout = trpc.boost.createCheckout.useMutation({
+    onSuccess: (data) => {
+      window.open(data.checkoutUrl, "_blank");
+      toast.success("Redirecting to boost checkout...");
+    },
+    onError: (err) => {
+      toast.error(`Boost setup failed: ${err.message}`);
+    },
+  });
+
+  // First create the job, then open boost checkout
+  const [pendingBoost, setPendingBoost] = useState(false);
+  const createdJobId = useRef<number | null>(null);
+
+  const createJobForBoost = trpc.postJob.createAndCheckout.useMutation({
+    onSuccess: async (data) => {
+      // Extract jobId from successUrl metadata if available, otherwise open the post checkout
+      // For boost flow: open the boost checkout instead
+      window.open(data.checkoutUrl, "_blank");
+      toast.success("Job created! Redirecting to boost checkout...");
+      setPendingBoost(false);
+    },
+    onError: (err) => {
+      toast.error(`Failed to create job: ${err.message}`);
+      setPendingBoost(false);
+    },
+  });
+
+  function handleBoostLaunch() {
     if (!isAuthenticated) {
-      // Save intent and redirect to login
       sessionStorage.setItem("postJobPending", JSON.stringify(form));
       navigate(getLoginUrl());
       return;
     }
-
+    setPendingBoost(true);
+    // Store boost params in sessionStorage so the success page can trigger boost checkout
+    sessionStorage.setItem("pendingBoost", JSON.stringify({ dailyBudget, durationDays }));
     createAndCheckout.mutate({
       description: form.description,
       locationAddress: form.locationAddress || undefined,
@@ -651,13 +712,34 @@ function Step3({
       clientHourlyRate: form.clientHourlyRate ? parseFloat(form.clientHourlyRate) : undefined,
       clientFlatRate: form.clientFlatRate ? parseFloat(form.clientFlatRate) : undefined,
       transportation: form.transportation,
-      plan,
+      plan: "one_time",
       origin: window.location.origin,
     });
   }
 
-  const hasSavedCard = !!user?.clientStripeCustomerId;
-  const isPro = user?.clientPremium;
+  function handleSubscription() {
+    if (!isAuthenticated) {
+      sessionStorage.setItem("postJobPending", JSON.stringify(form));
+      navigate(getLoginUrl());
+      return;
+    }
+    createAndCheckout.mutate({
+      description: form.description,
+      locationAddress: form.locationAddress || undefined,
+      dateType: form.dateType,
+      startDate: form.startDate || undefined,
+      endDate: form.endDate || undefined,
+      isHourly: form.isHourly,
+      openRate: form.openRate,
+      clientHourlyRate: form.clientHourlyRate ? parseFloat(form.clientHourlyRate) : undefined,
+      clientFlatRate: form.clientFlatRate ? parseFloat(form.clientFlatRate) : undefined,
+      transportation: form.transportation,
+      plan: "subscription",
+      origin: window.location.origin,
+    });
+  }
+
+  const isLoading = createAndCheckout.isPending || boostCheckout.isPending || pendingBoost;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -666,7 +748,7 @@ function Step3({
           Publish your job
         </h2>
         <p className="text-gray-500 text-sm">
-          Choose how you'd like to post — one-time or subscribe and save.
+          Set your budget for maximum visibility, or subscribe and save.
         </p>
       </div>
 
@@ -708,85 +790,138 @@ function Step3({
         <div className="mb-5 p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-orange-100 flex items-center gap-3">
           <Crown size={20} className="text-[#F25722] flex-shrink-0" />
           <div>
-            <p className="font-bold text-[#111] text-sm">
-              You're an Artswrk PRO subscriber!
-            </p>
-            <p className="text-xs text-gray-500">
-              Unlimited job posts are included in your plan.
-            </p>
+            <p className="font-bold text-[#111] text-sm">You're an Artswrk PRO subscriber!</p>
+            <p className="text-xs text-gray-500">Unlimited job posts are included in your plan.</p>
           </div>
           <Button
-            onClick={() => handlePay("subscription")}
-            disabled={createAndCheckout.isPending}
+            onClick={handleSubscription}
+            disabled={isLoading}
             className="ml-auto flex-none hirer-grad-bg border-0 hover:opacity-90"
           >
-            {createAndCheckout.isPending ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <>Post Now <ArrowRight size={14} className="ml-1" /></>
-            )}
+            {isLoading ? <Loader2 size={16} className="animate-spin" /> : <>Post Now <ArrowRight size={14} className="ml-1" /></>}
           </Button>
         </div>
       )}
 
-      {/* Pricing cards */}
+      {/* Pricing — two-column: boost slider left, subscription right */}
       {!isPro && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {/* One-time */}
-          <div className="bg-white rounded-2xl border-2 border-gray-200 p-5 flex flex-col">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
-                <Zap size={16} className="text-gray-600" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 items-start">
+
+          {/* ── On-demand: Boost slider ── */}
+          <div className="bg-white rounded-2xl border-2 border-gray-200 p-5 flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg hirer-grad-bg flex items-center justify-center">
+                <Zap size={16} className="text-white" />
               </div>
-              <p className="font-bold text-[#111]">Single Post</p>
+              <div>
+                <p className="font-bold text-[#111] leading-tight">On-Demand Post</p>
+                <p className="text-[11px] text-gray-400">You choose the price</p>
+              </div>
             </div>
-            <div className="mb-1">
-              <span className="text-3xl font-black text-[#111]">$30</span>
-              <span className="text-gray-400 text-sm ml-1">one-time</span>
+
+            {/* Daily budget */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-bold text-gray-700">Daily Budget</p>
+                <p className="text-xs text-gray-400">Recommended: $20–35</p>
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 flex-1">
+                  <span className="text-gray-400 text-sm mr-1">$</span>
+                  <span className="text-lg font-black text-[#111]">{dailyBudget}</span>
+                  <span className="text-gray-400 text-xs ml-auto">per day</span>
+                </div>
+              </div>
+              <Slider
+                min={5}
+                max={100}
+                step={5}
+                value={[dailyBudget]}
+                onValueChange={([v]) => setDailyBudget(v)}
+                className="[&_[data-slot=slider-range]]:bg-gradient-to-r [&_[data-slot=slider-range]]:from-[#FFBC5D] [&_[data-slot=slider-range]]:to-[#F25722]"
+              />
+              <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                <span>$5</span>
+                <span>$100</span>
+              </div>
             </div>
-            <p className="text-xs text-gray-500 mb-4">
-              Post one job to 5,000+ artists in the Artswrk network.
-            </p>
-            <ul className="space-y-1.5 mb-5 flex-1">
+
+            {/* Duration */}
+            <div>
+              <p className="text-xs font-bold text-gray-700 mb-2">Ad Duration</p>
+              <div className="grid grid-cols-4 gap-1.5">
+                {DURATION_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.days}
+                    onClick={() => setDurationDays(opt.days)}
+                    className={`py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      durationDays === opt.days
+                        ? "hirer-grad-bg text-white border-transparent"
+                        : "border-gray-200 text-gray-600 hover:border-[#F25722] hover:text-[#F25722]"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Performance preview */}
+            <div className="bg-orange-50 rounded-xl p-3 border border-orange-100">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-xs font-bold text-gray-700">Performance</p>
+                <p className={`text-xs font-black ${tier.color}`}>{tier.label}</p>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1.5 overflow-hidden">
+                <div
+                  className="h-full rounded-full hirer-grad-bg transition-all duration-300"
+                  style={{ width: `${tier.bar}%` }}
+                />
+              </div>
+              <p className={`text-[11px] ${tier.color} font-medium`}>{tier.hint}</p>
+            </div>
+
+            {/* Stats row */}
+            <div className="space-y-1.5">
               {[
-                "Instant visibility",
-                "Avg. 3 applicants in 24hrs",
-                "Manage applications in dashboard",
-                hasSavedCard ? "Charge saved card" : "Secure Stripe checkout",
-              ].map((f) => (
-                <li key={f} className="flex items-center gap-2 text-xs text-gray-600">
-                  <CheckCircle2 size={12} className="text-green-500 flex-shrink-0" />
-                  {f}
-                </li>
+                { icon: Eye, label: "Expected Views", value: expectedViews },
+                { icon: Users, label: "Expected Applicants", value: expectedApplicants },
+                { icon: Star, label: "Featured Placements", value: dailyBudget >= 25 ? "Yes" : "No" },
+              ].map(({ icon: Icon, label, value }) => (
+                <div key={label} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-0">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                    <Icon size={11} className="text-gray-400" />
+                    {label}
+                  </div>
+                  <span className="text-xs font-bold text-[#111]">{value}</span>
+                </div>
               ))}
-            </ul>
+            </div>
+
+            {/* Total + CTA */}
+            <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+              <p className="text-xs text-gray-500 mb-0.5">Total cost</p>
+              <p className="text-2xl font-black text-[#111]">${total.toFixed(2)}</p>
+              <p className="text-[10px] text-gray-400">Actual cost may be lower based on performance</p>
+            </div>
+
             <Button
-              onClick={() => handlePay("one_time")}
-              disabled={createAndCheckout.isPending}
-              variant="outline"
-              className="w-full font-bold border-2 border-[#111] text-[#111] hover:bg-[#111] hover:text-white transition-colors"
+              onClick={handleBoostLaunch}
+              disabled={isLoading}
+              className="w-full font-bold hirer-grad-bg border-0 hover:opacity-90 transition-opacity"
             >
-              {createAndCheckout.isPending ? (
+              {isLoading && pendingBoost ? (
                 <Loader2 size={16} className="animate-spin" />
               ) : (
-                <>
-                  Pay $30
-                  {hasSavedCard && (
-                    <span className="ml-1.5 text-xs font-normal opacity-70">
-                      · saved card
-                    </span>
-                  )}
-                </>
+                <><Zap size={14} className="mr-1.5" /> Launch Job Ad · ${total.toFixed(2)}{hasSavedCard && <span className="ml-1.5 text-xs font-normal opacity-70">· saved card</span>}</>
               )}
             </Button>
           </div>
 
-          {/* Subscription */}
+          {/* ── Subscription ── */}
           <div className="bg-white rounded-2xl border-2 border-[#F25722] p-5 flex flex-col relative overflow-hidden">
             <div className="absolute top-3 right-3">
-              <Badge className="hirer-grad-bg text-white border-0 text-[10px] font-bold">
-                BEST VALUE
-              </Badge>
+              <Badge className="hirer-grad-bg text-white border-0 text-[10px] font-bold">BEST VALUE</Badge>
             </div>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-8 h-8 rounded-lg hirer-grad-bg flex items-center justify-center">
@@ -798,9 +933,7 @@ function Step3({
               <span className="text-3xl font-black text-[#111]">$29</span>
               <span className="text-gray-400 text-sm ml-1">/month</span>
             </div>
-            <p className="text-xs text-gray-500 mb-4">
-              Unlimited posts + PRO features. Cancel anytime.
-            </p>
+            <p className="text-xs text-gray-500 mb-4">Unlimited posts + PRO features. Cancel anytime.</p>
             <ul className="space-y-1.5 mb-5 flex-1">
               {[
                 "Unlimited job posts",
@@ -816,21 +949,14 @@ function Step3({
               ))}
             </ul>
             <Button
-              onClick={() => handlePay("subscription")}
-              disabled={createAndCheckout.isPending}
+              onClick={handleSubscription}
+              disabled={isLoading}
               className="w-full font-bold hirer-grad-bg border-0 hover:opacity-90 transition-opacity"
             >
-              {createAndCheckout.isPending ? (
+              {isLoading && !pendingBoost ? (
                 <Loader2 size={16} className="animate-spin" />
               ) : (
-                <>
-                  Subscribe & Save
-                  {hasSavedCard && (
-                    <span className="ml-1.5 text-xs font-normal opacity-70">
-                      · saved card
-                    </span>
-                  )}
-                </>
+                <>Subscribe & Save{hasSavedCard && <span className="ml-1.5 text-xs font-normal opacity-70">· saved card</span>}</>
               )}
             </Button>
           </div>
