@@ -235,3 +235,11 @@
 - [x] Upserted 38 unique artist users from bookings
 - [x] Back-filled artistUserId FK on 468 bookings
 - [x] Total DB: 236 users, 257 jobs, 692 bookings
+
+## Switch to Live Bubble Data
+- [x] Verified live Bubble API key works (same key, version-live endpoint)
+- [x] Ferrari live ID: 1659533883431x527826980339748400 (same as dev)
+- [x] Wiped all dev-seeded data (kept 2 admin accounts)
+- [x] Updated all 7 seed scripts to use version-live
+- [x] Re-seeded Ferrari from live: 237 jobs, 704 interested artists, 203 bookings, 193 payments, 266 artist users
+- [x] Total DB: 269 users (266 artists, 2 clients), $32,212 revenue

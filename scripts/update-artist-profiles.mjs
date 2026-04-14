@@ -16,7 +16,7 @@ dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const BUBBLE_API_KEY = "12172ddf5b3c42d8a4936d57afe0f029";
-const BUBBLE_BASE = "https://artswrk.com/version-test/api/1.1/obj";
+const BUBBLE_BASE = "https://artswrk.com/version-live/api/1.1/obj";
 
 function fetchJson(url) {
   return new Promise((resolve, reject) => {
