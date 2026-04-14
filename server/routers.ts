@@ -3,7 +3,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
@@ -403,6 +403,26 @@ export const appRouter = router({
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
         return getInterestedArtistsByClientId(user.id, input.limit, input.offset);
+      }),
+
+    /**
+     * Browse all artists from the users table (userRole = 'Artist').
+     * Supports search by name/location and filter by artist type.
+     */
+    browse: publicProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(100).default(48),
+        offset: z.number().min(0).default(0),
+        search: z.string().optional(),
+        artistType: z.string().optional(),
+      }))
+      .query(async ({ input }) => {
+        return getArtistsList({
+          limit: input.limit,
+          offset: input.offset,
+          search: input.search || undefined,
+          artistType: input.artistType || undefined,
+        });
       }),
   }),
 

@@ -199,3 +199,11 @@
 - [x] Define SENDGRID_TEMPLATES constants (Client - Request Posted: d-e2dcf8797ac545d68a03f610a7323fce)
 - [x] Wire job-posted email in Stripe webhook after checkout.session.completed
 - [x] Variables: FirstName, Service, ArtistType, Date, Location, TransportDetails, TransportReimbursed, Description, joblink, subject
+
+## Dashboard Artists Page (Real Data)
+- [x] Add tRPC artists.browse endpoint querying users WHERE userRole = 'Artist'
+- [x] Support search (name/location), filter by artistType, pagination (48/page, prev/next)
+- [x] Wire BrowseArtistsTab to real tRPC data (replaces applicants-based mock data)
+- [x] Wire DiscoverTab to real tRPC data for "Artists on Artswrk" grid
+- [x] Show avatar, name, masterArtistTypes, location, artswrkPro badge, profile link
+- [x] Write 7 vitest tests for artists.browse (69 total passing)

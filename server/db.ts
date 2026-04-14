@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, bookings, conversations, interestedArtists, jobs, messages, payments, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -1041,4 +1041,78 @@ export async function getJobById(jobId: number) {
   if (!db) return null;
   const rows = await db.select().from(jobs).where(eq(jobs.id, jobId)).limit(1);
   return rows[0] ?? null;
+}
+
+/**
+ * Browse all artists (userRole = 'Artist') with optional search and filter.
+ */
+export async function getArtistsList({
+  limit = 50,
+  offset = 0,
+  search,
+  artistType,
+}: {
+  limit?: number;
+  offset?: number;
+  search?: string;
+  artistType?: string;
+}) {
+  const db = await getDb();
+  if (!db) return { artists: [], total: 0 };
+
+  const conditions = [eq(users.userRole, "Artist")];
+
+  if (search) {
+    const q = `%${search}%`;
+    conditions.push(
+      or(
+        like(users.firstName, q),
+        like(users.lastName, q),
+        like(users.name, q),
+        like(users.slug, q),
+        like(users.location, q),
+      )!
+    );
+  }
+
+  if (artistType) {
+    conditions.push(
+      or(
+        like(users.masterArtistTypes, `%${artistType}%`),
+        like(users.artistServices, `%${artistType}%`),
+        like(users.artistDisciplines, `%${artistType}%`),
+      )!
+    );
+  }
+
+  const where = and(...conditions);
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(users)
+    .where(where);
+
+  const artists = await db
+    .select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      name: users.name,
+      slug: users.slug,
+      profilePicture: users.profilePicture,
+      location: users.location,
+      bio: users.bio,
+      masterArtistTypes: users.masterArtistTypes,
+      artistServices: users.artistServices,
+      artistDisciplines: users.artistDisciplines,
+      artswrkPro: users.artswrkPro,
+      instagram: users.instagram,
+    })
+    .from(users)
+    .where(where)
+    .orderBy(desc(users.artswrkPro), desc(users.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return { artists, total: Number(countRow?.count ?? 0) };
 }
