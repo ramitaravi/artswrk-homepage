@@ -762,6 +762,75 @@ Fields to extract:
       }),
   }),
 
+  // ── Enterprise Dashboard ────────────────────────────────────────────────────
+  enterprise: router({
+    /** Jobs posted by this enterprise client */
+    getJobs: publicProcedure
+      .input(z.object({ clientUserId: z.number().optional() }))
+      .query(async ({ input }) => {
+        if (!input.clientUserId) return { jobs: [] };
+        const jobs = await getJobsByUserId(input.clientUserId);
+        return { jobs };
+      }),
+
+    /** Interested artists (applications) across all enterprise jobs */
+    getApplications: publicProcedure
+      .input(z.object({ clientUserId: z.number().optional() }))
+      .query(async ({ input }) => {
+        if (!input.clientUserId) return { applications: [] };
+        const raw = await getInterestedArtistsByClientId(input.clientUserId);
+        const applications = (raw as any[]).map((ia) => ({
+          id: ia.id,
+          artistName: ia.artistFirstName ? `${ia.artistFirstName || ''} ${ia.artistLastName || ''}`.trim() : 'Artist',
+          profilePicture: ia.artistProfilePicture,
+          jobTitle: ia.serviceType || 'Job',
+        }));
+        return { applications };
+      }),
+
+    /** Companies under this enterprise account */
+    getCompanies: publicProcedure
+      .input(z.object({ clientUserId: z.number().optional() }))
+      .query(async ({ input }) => {
+        if (!input.clientUserId) return { companies: [] };
+        const user = await getUserById(input.clientUserId);
+        if (!user) return { companies: [] };
+        const jobs = await getJobsByUserId(input.clientUserId);
+        const openRoles = (jobs as any[]).filter((j) => j.requestStatus === 'Active' || !j.requestStatus).length;
+        const companies = [{
+          id: user.id,
+          name: user.clientCompanyName || user.name || 'Company',
+          logoUrl: user.enterpriseLogoUrl || user.profilePicture,
+          location: user.location,
+          openRoles,
+        }];
+        return { companies };
+      }),
+
+    /** Interested artists for enterprise */
+    getInterestedArtists: publicProcedure
+      .input(z.object({ clientUserId: z.number().optional() }))
+      .query(async ({ input }) => {
+        if (!input.clientUserId) return { artists: [] };
+        const raw = await getInterestedArtistsByClientId(input.clientUserId);
+        const artistIds = Array.from(new Set((raw as any[]).map((ia) => ia.artistUserId).filter(Boolean))) as number[];
+        const artistUsers = await Promise.all(
+          artistIds.slice(0, 50).map((id: number) => getUserById(id))
+        );
+        const artists = artistUsers.filter(Boolean).map((a: any) => ({
+          id: a.id,
+          name: a.name,
+          firstName: a.firstName,
+          lastName: a.lastName,
+          profilePicture: a.profilePicture,
+          masterArtistTypes: a.masterArtistTypes,
+          location: a.location,
+          artswrkPro: a.artswrkPro,
+        }));
+        return { artists };
+      }),
+  }),
+
   // ── Artswrk user queries ────────────────────────────────────────────────────
   artswrkUsers: router({
     getByEmail: publicProcedure

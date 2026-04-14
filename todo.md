@@ -243,3 +243,30 @@
 - [x] Updated all 7 seed scripts to use version-live
 - [x] Re-seeded Ferrari from live: 237 jobs, 704 interested artists, 203 bookings, 193 payments, 266 artist users
 - [x] Total DB: 269 users (266 artists, 2 clients), $32,212 revenue
+
+## Enterprise Dashboard
+- [ ] Audit Bubble enterprise dashboard UI (all sections/tabs)
+- [ ] Add `enterprise` boolean field to users schema + db:push
+- [ ] Seed taylor@dancerevel.com from Bubble live (user data only)
+- [ ] Mark Taylor as enterprise=true in DB
+- [ ] Add tRPC enterprise procedures (overview stats, jobs, bookings, artists)
+- [ ] Build /enterprise dashboard shell with sidebar matching current design
+- [ ] Enterprise Overview page: stat cards + recent activity
+- [ ] Enterprise Jobs page: premium jobs list
+- [ ] Enterprise Artists page: artist roster
+- [ ] Enterprise Bookings page: bookings table
+- [ ] Route enterprise users to /enterprise instead of /dashboard on login
+- [ ] Protect /enterprise route — redirect non-enterprise users
+
+## Enterprise Dashboard (/enterprise)
+- [x] Add `enterprise` boolean field to users schema and run db:push migration
+- [x] Seed taylor@dancerevel.com from Bubble live as enterprise user (enterprise=true)
+- [x] Add enterprise tRPC router (getJobs, getApplications, getCompanies, getInterestedArtists)
+- [x] Build /enterprise page with dark sidebar matching current design language
+- [x] Enterprise header: company logo, company name, "+ Post Job" CTA
+- [x] Jobs tab: job cards with Applications panel on the right (click job to see applicants)
+- [x] Companies tab: company cards grid with open role count
+- [x] Artists tab: Browse All (real artists.browse data) + Interested sub-tabs
+- [x] Route /enterprise registered in App.tsx
+- [x] Non-enterprise users redirected to /dashboard
+- [x] 82 vitest tests passing (no new tests needed)

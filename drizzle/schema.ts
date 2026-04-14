@@ -93,6 +93,14 @@ export const users = mysqlTable("users", {
   /** Hiring category */
   hiringCategory: varchar("hiringCategory", { length: 128 }),
 
+  // ── Enterprise ────────────────────────────────────────────────────────────
+  /** Enterprise client — gets the enterprise dashboard with premium jobs */
+  enterprise: boolean("enterprise").default(false),
+  /** Enterprise company logo URL */
+  enterpriseLogoUrl: text("enterpriseLogoUrl"),
+  /** Enterprise company description */
+  enterpriseDescription: text("enterpriseDescription"),
+
   // ── Onboarding ─────────────────────────────────────────────────────────────
   onboardingStep: int("onboardingStep").default(0),
   userSignedUp: boolean("userSignedUp").default(false),
