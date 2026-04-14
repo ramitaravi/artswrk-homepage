@@ -1116,3 +1116,344 @@ export async function getArtistsList({
 
   return { artists, total: Number(countRow?.count ?? 0) };
 }
+
+// ── Admin Helpers ─────────────────────────────────────────────────────────────
+
+/** Overview stats for the admin dashboard */
+export async function getAdminOverviewStats() {
+  const db = await getDb();
+  if (!db) return null;
+
+  const [totalUsers] = await db.select({ count: sql<number>`count(*)` }).from(users);
+  const [totalArtists] = await db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.userRole, "Artist"));
+  const [totalClients] = await db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.userRole, "Client"));
+  const [proArtists] = await db.select({ count: sql<number>`count(*)` }).from(users).where(and(eq(users.userRole, "Artist"), eq(users.artswrkPro, true)));
+  const [basicArtists] = await db.select({ count: sql<number>`count(*)` }).from(users).where(and(eq(users.userRole, "Artist"), eq(users.artswrkBasic, true)));
+  const [premiumClients] = await db.select({ count: sql<number>`count(*)` }).from(users).where(and(eq(users.userRole, "Client"), eq(users.clientPremium, true)));
+  const [totalBookings] = await db.select({ count: sql<number>`count(*)` }).from(bookings).where(eq(bookings.deleted, false));
+  const [totalJobs] = await db.select({ count: sql<number>`count(*)` }).from(jobs);
+
+  // Revenue = sum of all paid payments
+  const [revenueRow] = await db
+    .select({ total: sql<number>`coalesce(sum(stripeAmount), 0)` })
+    .from(payments)
+    .where(eq(payments.status, "Success"));
+
+  // Commission = sum of application fees
+  const [commissionRow] = await db
+    .select({ total: sql<number>`coalesce(sum(stripeApplicationFeeAmount), 0)` })
+    .from(payments)
+    .where(eq(payments.status, "Success"));
+
+  // Future revenue = sum of confirmed/unpaid bookings clientRate
+  const [futureRevenueRow] = await db
+    .select({ total: sql<number>`coalesce(sum(clientRate), 0)` })
+    .from(bookings)
+    .where(and(eq(bookings.bookingStatus, "Confirmed"), eq(bookings.paymentStatus, "Unpaid"), eq(bookings.deleted, false)));
+
+  return {
+    totalUsers: Number(totalUsers?.count ?? 0),
+    totalArtists: Number(totalArtists?.count ?? 0),
+    totalClients: Number(totalClients?.count ?? 0),
+    proArtists: Number(proArtists?.count ?? 0),
+    basicArtists: Number(basicArtists?.count ?? 0),
+    premiumClients: Number(premiumClients?.count ?? 0),
+    totalBookings: Number(totalBookings?.count ?? 0),
+    totalJobs: Number(totalJobs?.count ?? 0),
+    totalRevenueCents: Number(revenueRow?.total ?? 0),
+    totalCommissionCents: Number(commissionRow?.total ?? 0),
+    futureRevenueCents: Number(futureRevenueRow?.total ?? 0),
+  };
+}
+
+/** Admin: list all artists with search + filters */
+export async function getAdminArtists({
+  search,
+  locationSearch,
+  artistType,
+  state,
+  plan,
+  limit = 50,
+  offset = 0,
+}: {
+  search?: string;
+  locationSearch?: string;
+  artistType?: string;
+  state?: string;
+  plan?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const db = await getDb();
+  if (!db) return { artists: [], total: 0 };
+
+  const conditions = [eq(users.userRole, "Artist")];
+  if (search) conditions.push(or(like(users.name, `%${search}%`), like(users.firstName, `%${search}%`), like(users.lastName, `%${search}%`), like(users.email, `%${search}%`))!);
+  if (locationSearch) conditions.push(like(users.location, `%${locationSearch}%`));
+  if (artistType) conditions.push(like(users.masterArtistTypes, `%${artistType}%`));
+  if (state) conditions.push(like(users.location, `%${state}%`));
+  if (plan === "PRO") conditions.push(eq(users.artswrkPro, true));
+  if (plan === "Basic") conditions.push(eq(users.artswrkBasic, true));
+
+  const where = and(...conditions);
+
+  const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(users).where(where);
+  const artists = await db
+    .select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      name: users.name,
+      email: users.email,
+      slug: users.slug,
+      profilePicture: users.profilePicture,
+      location: users.location,
+      masterArtistTypes: users.masterArtistTypes,
+      artistServices: users.artistServices,
+      artswrkPro: users.artswrkPro,
+      artswrkBasic: users.artswrkBasic,
+      createdAt: users.createdAt,
+      bubbleCreatedAt: users.bubbleCreatedAt,
+    })
+    .from(users)
+    .where(where)
+    .orderBy(desc(users.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return { artists, total: Number(countRow?.count ?? 0) };
+}
+
+/** Admin: list all clients with search + filters */
+export async function getAdminClients({
+  search,
+  companySearch,
+  locationSearch,
+  hiringCategory,
+  state,
+  plan,
+  businessType,
+  limit = 50,
+  offset = 0,
+}: {
+  search?: string;
+  companySearch?: string;
+  locationSearch?: string;
+  hiringCategory?: string;
+  state?: string;
+  plan?: string;
+  businessType?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const db = await getDb();
+  if (!db) return { clients: [], total: 0 };
+
+  const conditions = [eq(users.userRole, "Client")];
+  if (search) conditions.push(or(like(users.name, `%${search}%`), like(users.firstName, `%${search}%`), like(users.lastName, `%${search}%`))!);
+  if (companySearch) conditions.push(like(users.clientCompanyName, `%${companySearch}%`));
+  if (locationSearch) conditions.push(like(users.location, `%${locationSearch}%`));
+  if (hiringCategory) conditions.push(like(users.hiringCategory, `%${hiringCategory}%`));
+  if (state) conditions.push(like(users.location, `%${state}%`));
+  if (plan === "Premium") conditions.push(eq(users.clientPremium, true));
+  if (businessType) conditions.push(eq(users.businessOrIndividual, businessType));
+
+  const where = and(...conditions);
+
+  const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(users).where(where);
+  const clients = await db
+    .select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      name: users.name,
+      email: users.email,
+      slug: users.slug,
+      profilePicture: users.profilePicture,
+      location: users.location,
+      clientCompanyName: users.clientCompanyName,
+      clientPremium: users.clientPremium,
+      hiringCategory: users.hiringCategory,
+      businessOrIndividual: users.businessOrIndividual,
+      createdAt: users.createdAt,
+      bubbleCreatedAt: users.bubbleCreatedAt,
+    })
+    .from(users)
+    .where(where)
+    .orderBy(desc(users.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return { clients, total: Number(countRow?.count ?? 0) };
+}
+
+/** Admin: list all jobs with search + filters */
+export async function getAdminJobs({
+  search,
+  companySearch,
+  artistSearch,
+  locationSearch,
+  service,
+  status,
+  state,
+  limit = 50,
+  offset = 0,
+}: {
+  search?: string;
+  companySearch?: string;
+  artistSearch?: string;
+  locationSearch?: string;
+  service?: string;
+  status?: string;
+  state?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const db = await getDb();
+  if (!db) return { jobs: [], total: 0 };
+
+  const conditions: ReturnType<typeof eq>[] = [];
+  if (search) conditions.push(like(users.name, `%${search}%`) as any);
+  if (companySearch) conditions.push(like(users.clientCompanyName, `%${companySearch}%`) as any);
+  if (locationSearch) conditions.push(like(jobs.locationAddress, `%${locationSearch}%`) as any);
+  if (status) conditions.push(eq(jobs.requestStatus, status) as any);
+  if (state) conditions.push(like(jobs.locationAddress, `%${state}%`) as any);
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(jobs)
+    .leftJoin(users, eq(jobs.clientUserId, users.id))
+    .where(where);
+
+  const rows = await db
+    .select({
+      id: jobs.id,
+      description: jobs.description,
+      locationAddress: jobs.locationAddress,
+      requestStatus: jobs.requestStatus,
+      clientHourlyRate: jobs.clientHourlyRate,
+      isHourly: jobs.isHourly,
+      openRate: jobs.openRate,
+      startDate: jobs.startDate,
+      createdAt: jobs.createdAt,
+      bubbleCreatedAt: jobs.bubbleCreatedAt,
+      clientUserId: jobs.clientUserId,
+      clientEmail: jobs.clientEmail,
+      // client info
+      clientName: users.name,
+      clientFirstName: users.firstName,
+      clientLastName: users.lastName,
+      clientCompanyName: users.clientCompanyName,
+    })
+    .from(jobs)
+    .leftJoin(users, eq(jobs.clientUserId, users.id))
+    .where(where)
+    .orderBy(desc(jobs.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return { jobs: rows, total: Number(countRow?.count ?? 0) };
+}
+
+/** Admin: list all bookings with filters */
+export async function getAdminBookings({
+  upcoming,
+  paymentStatus,
+  bookingStatus,
+  artistSearch,
+  clientSearch,
+  companySearch,
+  limit = 50,
+  offset = 0,
+}: {
+  upcoming?: boolean;
+  paymentStatus?: string;
+  bookingStatus?: string;
+  artistSearch?: string;
+  clientSearch?: string;
+  companySearch?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const db = await getDb();
+  if (!db) return { bookings: [], total: 0 };
+
+  const now = new Date();
+  const conditions = [eq(bookings.deleted, false)];
+  if (upcoming === true) conditions.push(sql`${bookings.startDate} >= ${now}` as any);
+  if (upcoming === false) conditions.push(sql`${bookings.startDate} < ${now}` as any);
+  if (paymentStatus) conditions.push(eq(bookings.paymentStatus, paymentStatus) as any);
+  if (bookingStatus) conditions.push(eq(bookings.bookingStatus, bookingStatus) as any);
+
+  const where = and(...conditions);
+
+  const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(bookings).where(where);
+
+  const rows = await db
+    .select({
+      id: bookings.id,
+      startDate: bookings.startDate,
+      endDate: bookings.endDate,
+      bookingStatus: bookings.bookingStatus,
+      paymentStatus: bookings.paymentStatus,
+      clientRate: bookings.clientRate,
+      artistRate: bookings.artistRate,
+      grossProfit: bookings.grossProfit,
+      stripeFee: bookings.stripeFee,
+      postFeeRevenue: bookings.postFeeRevenue,
+      externalPayment: bookings.externalPayment,
+      clientUserId: bookings.clientUserId,
+      artistUserId: bookings.artistUserId,
+      jobId: bookings.jobId,
+      createdAt: bookings.createdAt,
+    })
+    .from(bookings)
+    .where(where)
+    .orderBy(desc(bookings.startDate))
+    .limit(limit)
+    .offset(offset);
+
+  return { bookings: rows, total: Number(countRow?.count ?? 0) };
+}
+
+/** Admin: recent payments paginated */
+export async function getAdminPayments({
+  limit = 50,
+  offset = 0,
+}: {
+  limit?: number;
+  offset?: number;
+}) {
+  const db = await getDb();
+  if (!db) return { payments: [], total: 0 };
+
+  const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(payments);
+
+  const rows = await db
+    .select({
+      id: payments.id,
+      stripeId: payments.stripeId,
+      status: payments.status,
+      stripeStatus: payments.stripeStatus,
+      stripeAmount: payments.stripeAmount,
+      stripeApplicationFeeAmount: payments.stripeApplicationFeeAmount,
+      paymentDate: payments.paymentDate,
+      createdAt: payments.createdAt,
+      clientUserId: payments.clientUserId,
+      bookingId: payments.bookingId,
+      // client info
+      clientName: users.name,
+      clientFirstName: users.firstName,
+      clientLastName: users.lastName,
+      clientCompanyName: users.clientCompanyName,
+    })
+    .from(payments)
+    .leftJoin(users, eq(payments.clientUserId, users.id))
+    .orderBy(desc(payments.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return { payments: rows, total: Number(countRow?.count ?? 0) };
+}

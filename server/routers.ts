@@ -3,7 +3,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
@@ -86,52 +86,114 @@ export const appRouter = router({
         isTemporary: z.boolean().default(true),
       }))
       .mutation(async ({ input, ctx }) => {
-        // Only the owner can set passwords
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") {
           throw new Error("Forbidden: admin only");
         }
-
         const user = await getUserByEmail(input.email.toLowerCase().trim());
-        if (!user) {
-          throw new Error(`No user found with email: ${input.email}`);
-        }
-
+        if (!user) throw new Error(`No user found with email: ${input.email}`);
         const hash = await bcrypt.hash(input.password, SALT_ROUNDS);
         await setUserPassword(user.id, hash, input.isTemporary);
-
-        return {
-          success: true,
-          message: `Password set for ${user.email} (${user.firstName || user.name || "user"})`,
-          isTemporary: input.isTemporary,
-        };
+        return { success: true, message: `Password set for ${user.email}`, isTemporary: input.isTemporary };
       }),
 
-    /**
-     * List all users — admin only.
-     */
     listUsers: protectedProcedure
-      .input(z.object({
-        limit: z.number().min(1).max(100).default(50),
-        offset: z.number().min(0).default(0),
-        search: z.string().optional(),
-      }))
+      .input(z.object({ limit: z.number().min(1).max(100).default(50), offset: z.number().min(0).default(0), search: z.string().optional() }))
       .query(async ({ input, ctx }) => {
-        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") {
-          throw new Error("Forbidden: admin only");
-        }
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
         return getAllUsers(input.limit, input.offset);
       }),
 
-    /**
-     * Get a single user by ID — admin only.
-     */
     getUser: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input, ctx }) => {
-        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") {
-          throw new Error("Forbidden: admin only");
-        }
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
         return getUserById(input.id);
+      }),
+
+    /** Overview stats for the admin dashboard */
+    overview: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+      return getAdminOverviewStats();
+    }),
+
+    /** All artists with search + filters */
+    artists: protectedProcedure
+      .input(z.object({
+        search: z.string().optional(),
+        locationSearch: z.string().optional(),
+        artistType: z.string().optional(),
+        state: z.string().optional(),
+        plan: z.string().optional(),
+        limit: z.number().min(1).max(200).default(50),
+        offset: z.number().min(0).default(0),
+      }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        return getAdminArtists(input);
+      }),
+
+    /** All clients with search + filters */
+    clients: protectedProcedure
+      .input(z.object({
+        search: z.string().optional(),
+        companySearch: z.string().optional(),
+        locationSearch: z.string().optional(),
+        hiringCategory: z.string().optional(),
+        state: z.string().optional(),
+        plan: z.string().optional(),
+        businessType: z.string().optional(),
+        limit: z.number().min(1).max(200).default(50),
+        offset: z.number().min(0).default(0),
+      }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        return getAdminClients(input);
+      }),
+
+    /** All jobs with search + filters */
+    jobs: protectedProcedure
+      .input(z.object({
+        search: z.string().optional(),
+        companySearch: z.string().optional(),
+        artistSearch: z.string().optional(),
+        locationSearch: z.string().optional(),
+        service: z.string().optional(),
+        status: z.string().optional(),
+        state: z.string().optional(),
+        limit: z.number().min(1).max(200).default(50),
+        offset: z.number().min(0).default(0),
+      }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        return getAdminJobs(input);
+      }),
+
+    /** All bookings with filters */
+    bookings: protectedProcedure
+      .input(z.object({
+        upcoming: z.boolean().optional(),
+        paymentStatus: z.string().optional(),
+        bookingStatus: z.string().optional(),
+        artistSearch: z.string().optional(),
+        clientSearch: z.string().optional(),
+        companySearch: z.string().optional(),
+        limit: z.number().min(1).max(200).default(50),
+        offset: z.number().min(0).default(0),
+      }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        return getAdminBookings(input);
+      }),
+
+    /** Recent payments paginated */
+    payments: protectedProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(200).default(50),
+        offset: z.number().min(0).default(0),
+      }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        return getAdminPayments(input);
       }),
   }),
 

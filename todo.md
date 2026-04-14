@@ -207,3 +207,21 @@
 - [x] Wire DiscoverTab to real tRPC data for "Artists on Artswrk" grid
 - [x] Show avatar, name, masterArtistTypes, location, artswrkPro badge, profile link
 - [x] Write 7 vitest tests for artists.browse (69 total passing)
+
+## Admin Dashboard (/admin)
+- [x] Add admin role check in all admin procedures (ownerOpenId or role=admin)
+- [x] Add admin.overview tRPC endpoint (total users, artists, clients, revenue, bookings, future revenue, commission)
+- [x] Add admin.artists tRPC endpoint (all artists, search, filter by artistType/state/plan, paginated)
+- [x] Add admin.clients tRPC endpoint (all clients, search, filter by hiringCategory/state/plan/businessType, paginated)
+- [x] Add admin.jobs tRPC endpoint (all jobs, filter by service/status/state, search by client/company/artist, paginated)
+- [x] Add admin.bookings tRPC endpoint (all bookings, filter by upcoming/past/paymentStatus/bookingStatus, search, paginated)
+- [x] Add admin.payments tRPC endpoint (recent payments, paginated)
+- [x] Build /admin shell with dark sidebar (Dashboard, Artists, Clients, Jobs, Bookings, Payments, Settings)
+- [x] Admin Overview page: stat cards (Revenue, Commission, Bookings, Future Revenue, Artists breakdown, Clients breakdown) + Recent Payments table
+- [x] Admin Artists page: searchable/filterable table with artistType, state, plan filters + list view
+- [x] Admin Clients page: searchable/filterable table with hiringCategory, state, plan, business type filters
+- [x] Admin Jobs page: searchable/filterable table with service, status, state filters + per-row details
+- [x] Admin Bookings page: upcoming/past toggle, payment/booking status filters, full financial breakdown per row
+- [x] Admin Payments page: paginated payments list (customer, status, amount, date, Stripe ID)
+- [x] Settings section: password management tool preserved from old /admin
+- [x] Write 13 vitest tests for admin procedures (82 total passing)
