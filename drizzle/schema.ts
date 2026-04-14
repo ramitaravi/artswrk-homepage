@@ -468,3 +468,89 @@ export const messages = mysqlTable("messages", {
 
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = typeof messages.$inferInsert;
+
+/**
+ * Premium Jobs table — mirrors the Bubble "premium_jobs" data type.
+ * These are PRO/Enterprise jobs posted by enterprise clients.
+ * Kept separate from regular jobs (requests) intentionally — different data shape,
+ * different pricing tier, always updated independently.
+ */
+export const premiumJobs = mysqlTable("premium_jobs", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Bubble internal record ID */
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+
+  // ── Company / Poster ───────────────────────────────────────────────────────
+  /** Company name (stored directly on the record, not derived from user) */
+  company: varchar("company", { length: 256 }),
+  /** Company logo URL */
+  logo: text("logo"),
+  /** FK → users.id (the enterprise user who created this job) */
+  createdByUserId: int("createdByUserId"),
+  /** Bubble user ID of creator */
+  bubbleCreatedById: varchar("bubbleCreatedById", { length: 64 }),
+  /** Bubble Client-Company relation ID */
+  bubbleClientCompanyId: varchar("bubbleClientCompanyId", { length: 64 }),
+
+  // ── Job Details ────────────────────────────────────────────────────────────
+  /** Free-text job title / service type (e.g. "Judge April 24-26", "Social Media Manager") */
+  serviceType: varchar("serviceType", { length: 256 }),
+  /** Category (e.g. "Dance Competition", "Acrobatic Arts") */
+  category: varchar("category", { length: 128 }),
+  /** Rich text job description */
+  description: text("description"),
+  /** Free-text budget (e.g. "$35/hr + $250/class", "Pitch your rate", "$18/hour (12 hours/week)") */
+  budget: varchar("budget", { length: 256 }),
+  /** Location text */
+  location: varchar("location", { length: 256 }),
+  /** Tag (e.g. "#Judges #MasterClasses") */
+  tag: varchar("tag", { length: 256 }),
+  /** URL slug */
+  slug: varchar("slug", { length: 256 }),
+
+  // ── Application Settings ───────────────────────────────────────────────────
+  /** If true, artists apply directly via email/link rather than through the platform */
+  applyDirect: boolean("applyDirect").default(false),
+  /** Email address for direct applications */
+  applyEmail: varchar("applyEmail", { length: 320 }),
+  /** External link for direct applications */
+  applyLink: text("applyLink"),
+
+  // ── Flags ──────────────────────────────────────────────────────────────────
+  /** Whether this job can be done remotely */
+  workFromAnywhere: boolean("workFromAnywhere").default(false),
+  /** Whether this job is featured/promoted */
+  featured: boolean("featured").default(false),
+
+  // ── Status ─────────────────────────────────────────────────────────────────
+  /** e.g. "Active", "Completed", "Lost - No Revenue", "Closed" */
+  status: varchar("status", { length: 64 }).default("Active"),
+
+  // ── Timestamps ─────────────────────────────────────────────────────────────
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
+});
+export type PremiumJob = typeof premiumJobs.$inferSelect;
+export type InsertPremiumJob = typeof premiumJobs.$inferInsert;
+
+/**
+ * Premium Job Interested Artists — normalized join table.
+ * Bubble stores interested_artists as an array on the premium_jobs record;
+ * we normalize to a proper join table for efficient querying.
+ */
+export const premiumJobInterestedArtists = mysqlTable("premium_job_interested_artists", {
+  id: int("id").autoincrement().primaryKey(),
+  /** FK → premium_jobs.id */
+  premiumJobId: int("premiumJobId").notNull(),
+  /** Bubble premium job ID */
+  bubblePremiumJobId: varchar("bubblePremiumJobId", { length: 64 }),
+  /** FK → users.id (the artist) */
+  artistUserId: int("artistUserId"),
+  /** Bubble artist user ID */
+  bubbleArtistId: varchar("bubbleArtistId", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PremiumJobInterestedArtist = typeof premiumJobInterestedArtists.$inferSelect;
+export type InsertPremiumJobInterestedArtist = typeof premiumJobInterestedArtists.$inferInsert;

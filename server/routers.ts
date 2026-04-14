@@ -3,7 +3,7 @@ import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, ONE_YEAR_MS } from "@shared/con
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
@@ -842,26 +842,34 @@ Fields to extract:
 
   // ── Enterprise Dashboard ────────────────────────────────────────────────────
   enterprise: router({
-    /** Jobs posted by this enterprise client */
+    /**
+     * PRO Jobs posted by this enterprise client — queries premium_jobs table.
+     * Falls back to regular jobs table if no premium jobs found.
+     */
     getJobs: publicProcedure
       .input(z.object({ clientUserId: z.number().optional() }))
       .query(async ({ input }) => {
         if (!input.clientUserId) return { jobs: [] };
-        const jobs = await getJobsByUserId(input.clientUserId);
-        return { jobs };
+        const proJobs = await getPremiumJobsByUserId(input.clientUserId);
+        if ((proJobs as any[]).length > 0) {
+          return { jobs: proJobs as any[] };
+        }
+        // Fallback to regular jobs for non-premium enterprise users
+        const regularJobs = await getJobsByUserId(input.clientUserId);
+        return { jobs: regularJobs as any[] };
       }),
 
-    /** Interested artists (applications) across all enterprise jobs */
+    /** Interested artists (applications) across all enterprise PRO jobs */
     getApplications: publicProcedure
       .input(z.object({ clientUserId: z.number().optional() }))
       .query(async ({ input }) => {
         if (!input.clientUserId) return { applications: [] };
-        const raw = await getInterestedArtistsByClientId(input.clientUserId);
+        const raw = await getPremiumInterestedArtistsByCreatorId(input.clientUserId);
         const applications = (raw as any[]).map((ia) => ({
           id: ia.id,
           artistName: ia.artistFirstName ? `${ia.artistFirstName || ''} ${ia.artistLastName || ''}`.trim() : 'Artist',
           profilePicture: ia.artistProfilePicture,
-          jobTitle: ia.serviceType || 'Job',
+          jobTitle: ia.jobTitle || 'PRO Job',
         }));
         return { applications };
       }),
@@ -873,8 +881,8 @@ Fields to extract:
         if (!input.clientUserId) return { companies: [] };
         const user = await getUserById(input.clientUserId);
         if (!user) return { companies: [] };
-        const jobs = await getJobsByUserId(input.clientUserId);
-        const openRoles = (jobs as any[]).filter((j) => j.requestStatus === 'Active' || !j.requestStatus).length;
+        const proJobs = await getPremiumJobsByUserId(input.clientUserId);
+        const openRoles = (proJobs as any[]).filter((j) => j.status === 'Active' || !j.status).length;
         const companies = [{
           id: user.id,
           name: user.clientCompanyName || user.name || 'Company',
@@ -885,26 +893,30 @@ Fields to extract:
         return { companies };
       }),
 
-    /** Interested artists for enterprise */
+    /** Unique interested artists across all PRO jobs for this enterprise user */
     getInterestedArtists: publicProcedure
       .input(z.object({ clientUserId: z.number().optional() }))
       .query(async ({ input }) => {
         if (!input.clientUserId) return { artists: [] };
-        const raw = await getInterestedArtistsByClientId(input.clientUserId);
-        const artistIds = Array.from(new Set((raw as any[]).map((ia) => ia.artistUserId).filter(Boolean))) as number[];
-        const artistUsers = await Promise.all(
-          artistIds.slice(0, 50).map((id: number) => getUserById(id))
-        );
-        const artists = artistUsers.filter(Boolean).map((a: any) => ({
-          id: a.id,
-          name: a.name,
-          firstName: a.firstName,
-          lastName: a.lastName,
-          profilePicture: a.profilePicture,
-          masterArtistTypes: a.masterArtistTypes,
-          location: a.location,
-          artswrkPro: a.artswrkPro,
-        }));
+        const raw = await getPremiumInterestedArtistsByCreatorId(input.clientUserId);
+        // Deduplicate by artistUserId
+        const seen = new Set<number>();
+        const artists = (raw as any[])
+          .filter((ia) => {
+            if (!ia.artistUserId || seen.has(ia.artistUserId)) return false;
+            seen.add(ia.artistUserId);
+            return true;
+          })
+          .slice(0, 100)
+          .map((a) => ({
+            id: a.artistUserId,
+            name: a.artistName,
+            firstName: a.artistFirstName,
+            lastName: a.artistLastName,
+            profilePicture: a.artistProfilePicture,
+            location: a.artistLocation,
+            artswrkPro: a.artswrkPro,
+          }));
         return { artists };
       }),
   }),

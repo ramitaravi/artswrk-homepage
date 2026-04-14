@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, bookings, conversations, interestedArtists, jobs, messages, payments, users } from "../drizzle/schema";
+import { InsertUser, bookings, conversations, interestedArtists, jobs, messages, payments, premiumJobInterestedArtists, premiumJobs, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -1423,6 +1423,111 @@ export async function getAdminBookings({
 }
 
 /** Admin: recent payments paginated */
+// ── Premium Jobs helpers ────────────────────────────────────────────────────
+
+/**
+ * Get all premium jobs created by a specific user (enterprise client).
+ * Returns full job details ordered by creation date desc.
+ */
+export async function getPremiumJobsByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(premiumJobs)
+    .where(eq(premiumJobs.createdByUserId, userId))
+    .orderBy(desc(premiumJobs.createdAt));
+}
+
+/**
+ * Get all premium jobs (for admin or public browse).
+ */
+export async function getAllPremiumJobs({
+  limit = 50,
+  offset = 0,
+  status,
+}: {
+  limit?: number;
+  offset?: number;
+  status?: string;
+} = {}) {
+  const db = await getDb();
+  if (!db) return { jobs: [], total: 0 };
+
+  const where = status ? eq(premiumJobs.status, status) : undefined;
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(premiumJobs)
+    .where(where);
+
+  const rows = await db
+    .select()
+    .from(premiumJobs)
+    .where(where)
+    .orderBy(desc(premiumJobs.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return { jobs: rows, total: Number(countRow?.count ?? 0) };
+}
+
+/**
+ * Get interested artists for a specific premium job.
+ */
+export async function getPremiumJobInterestedArtists(premiumJobId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: premiumJobInterestedArtists.id,
+      premiumJobId: premiumJobInterestedArtists.premiumJobId,
+      artistUserId: premiumJobInterestedArtists.artistUserId,
+      bubbleArtistId: premiumJobInterestedArtists.bubbleArtistId,
+      createdAt: premiumJobInterestedArtists.createdAt,
+      // artist info
+      artistName: users.name,
+      artistFirstName: users.firstName,
+      artistLastName: users.lastName,
+      artistProfilePicture: users.profilePicture,
+      artistLocation: users.location,
+      artswrkPro: users.artswrkPro,
+    })
+    .from(premiumJobInterestedArtists)
+    .leftJoin(users, eq(premiumJobInterestedArtists.artistUserId, users.id))
+    .where(eq(premiumJobInterestedArtists.premiumJobId, premiumJobId));
+}
+
+/**
+ * Get all interested artists across all premium jobs created by a user.
+ */
+export async function getPremiumInterestedArtistsByCreatorId(creatorUserId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: premiumJobInterestedArtists.id,
+      premiumJobId: premiumJobInterestedArtists.premiumJobId,
+      artistUserId: premiumJobInterestedArtists.artistUserId,
+      bubbleArtistId: premiumJobInterestedArtists.bubbleArtistId,
+      createdAt: premiumJobInterestedArtists.createdAt,
+      // job info
+      jobTitle: premiumJobs.serviceType,
+      jobCompany: premiumJobs.company,
+      // artist info
+      artistName: users.name,
+      artistFirstName: users.firstName,
+      artistLastName: users.lastName,
+      artistProfilePicture: users.profilePicture,
+      artistLocation: users.location,
+      artswrkPro: users.artswrkPro,
+    })
+    .from(premiumJobInterestedArtists)
+    .innerJoin(premiumJobs, eq(premiumJobInterestedArtists.premiumJobId, premiumJobs.id))
+    .leftJoin(users, eq(premiumJobInterestedArtists.artistUserId, users.id))
+    .where(eq(premiumJobs.createdByUserId, creatorUserId))
+    .orderBy(desc(premiumJobInterestedArtists.createdAt));
+}
+
 export async function getAdminPayments({
   limit = 50,
   offset = 0,

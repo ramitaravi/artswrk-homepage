@@ -94,7 +94,16 @@ function JobsTab({ enterpriseUser }: { enterpriseUser: any }) {
 }
 
 function JobCard({ job }: { job: any }) {
-  const applicantCount = job.interestedArtistCount ?? 0;
+  // Support both premium_jobs fields and regular jobs fields
+  const title = job.serviceType || job.description?.slice(0, 60) || "Untitled Job";
+  const company = job.company || job.clientCompanyName || "";
+  const status = job.status || job.requestStatus || "Active";
+  const budget = job.budget || job.compensation || null;
+  const location = job.location || null;
+  const isWorkFromAnywhere = job.workFromAnywhere ?? false;
+  const logo = job.logo || null;
+  const category = job.category || null;
+  const isActive = status === "Active";
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
@@ -103,56 +112,61 @@ function JobCard({ job }: { job: any }) {
       <div className="p-5">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl hirer-grad-bg flex items-center justify-center text-white font-black text-sm flex-shrink-0">
-              <Star size={16} />
-            </div>
+            {logo ? (
+              <img
+                src={logo}
+                alt={company}
+                className="w-10 h-10 rounded-xl object-cover flex-shrink-0 border border-gray-100"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-xl hirer-grad-bg flex items-center justify-center text-white font-black text-sm flex-shrink-0">
+                <Star size={16} />
+              </div>
+            )}
             <div>
               <h3 className="font-black text-[#111] text-base leading-tight">
-                {job.serviceType || job.description?.slice(0, 60) || "Untitled Job"}
+                {title}
               </h3>
-              <p className="text-xs text-gray-400 mt-0.5">{job.clientCompanyName || "REVEL Dance Convention"}</p>
+              {company && <p className="text-xs text-gray-400 mt-0.5">{company}</p>}
+              {category && <p className="text-[10px] text-gray-300 mt-0.5">{category}</p>}
             </div>
           </div>
           <Badge
             variant="outline"
             className={`flex-shrink-0 text-xs font-semibold ${
-              job.requestStatus === "Active"
+              isActive
                 ? "border-green-200 text-green-700 bg-green-50"
                 : "border-gray-200 text-gray-500"
             }`}
           >
-            {job.requestStatus || "Active"}
+            {status}
           </Badge>
         </div>
 
         <div className="space-y-1.5 text-sm text-gray-600 mb-4">
-          {job.location && (
+          {isWorkFromAnywhere ? (
             <div className="flex items-center gap-2">
               <MapPin size={13} className="text-gray-400 flex-shrink-0" />
-              <span>{job.location}</span>
+              <span className="text-green-600 font-medium">Work from anywhere</span>
             </div>
-          )}
-          {(job.startDate || job.dateType) && (
+          ) : location ? (
             <div className="flex items-center gap-2">
-              <Clock size={13} className="text-gray-400 flex-shrink-0" />
-              <span>{job.dateType === "Ongoing" ? "Ongoing / Recurring" : job.startDate ? new Date(job.startDate).toLocaleDateString() : job.dateType}</span>
+              <MapPin size={13} className="text-gray-400 flex-shrink-0" />
+              <span>{location}</span>
             </div>
-          )}
-          {job.compensation && (
+          ) : null}
+          {budget && (
             <div className="flex items-center gap-2">
               <span className="text-gray-400 text-xs font-bold">$</span>
-              <span className="font-semibold text-[#111]">{job.compensation}</span>
+              <span className="font-semibold text-[#111]">{budget}</span>
             </div>
           )}
         </div>
 
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full hirer-grad-bg text-white">
-              <Users size={11} /> +{applicantCount}
-            </span>
-            <span className="text-xs text-gray-500">applicants</span>
-          </div>
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-100">
+            <Crown size={9} /> PRO Job
+          </span>
           <button
             className="text-xs font-semibold text-[#F25722] hover:underline flex items-center gap-1"
             onClick={() => toast.info("Job detail view coming soon!")}

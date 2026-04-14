@@ -280,3 +280,16 @@
 - [ ] Show "Impersonating [Name]" banner when running as another user
 - [ ] Add "Return to Admin" button in the impersonation banner to restore original admin session
 - [ ] Write vitest tests for impersonate procedure
+
+## Premium Jobs (Separate Table)
+- [x] Add premium_jobs table to schema (mirrors Bubble: company, logo, category, description, budget, location, serviceType, status, tag, slug, applyDirect, applyEmail, applyLink, workFromAnywhere, featured, clientCompanyId, createdByUserId, bubbleId)
+- [x] Add premium_job_interested_artists join table
+- [x] Run pnpm db:push to migrate schema
+- [x] Seed all 185 live Bubble premium_jobs records
+- [x] Seed REVEL (taylor@dancerevel.com) jobs specifically and their interested artists (1 job, 13 interested artists)
+- [x] Add getPremiumJobsByUserId, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId DB helpers
+- [x] Wire enterprise.getJobs to premium_jobs table (with fallback to regular jobs)
+- [x] Wire enterprise.getApplications to premium_job_interested_artists
+- [x] Wire enterprise.getInterestedArtists to premium_job_interested_artists (deduplicated)
+- [x] Update Enterprise JobCard component to render premium_jobs fields (serviceType, status, budget, workFromAnywhere, logo, category)
+- [x] Write 10 vitest tests for premium_jobs helpers and enterprise procedure logic (92 total passing)
