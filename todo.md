@@ -295,16 +295,16 @@
 - [x] Write 10 vitest tests for premium_jobs helpers and enterprise procedure logic (92 total passing)
 
 ## REVEL Interested Artists Seed
-- [ ] Fetch REVEL's 13 interested artist Bubble IDs from premium_job_interested_artists
-- [ ] Fetch full user records from Bubble for each artist
-- [ ] Upsert into users table with full profile data (name, photo, slug, location, artistTypes, etc.)
-- [ ] Back-fill artistUserId FK on premium_job_interested_artists for REVEL's job
+- [x] Fetched REVEL's 13 interested artist Bubble IDs from premium_job_interested_artists
+- [x] Fetched full user records from Bubble for each artist
+- [x] Upserted into users table with full profile data (name, photo, slug, location, artistTypes, etc.)
+- [x] Back-filled artistUserId FK on premium_job_interested_artists for REVEL's job
 
 ## Admin PRO Jobs Section
-- [ ] Add admin.premiumJobs tRPC endpoint (all premium_jobs, search, filter by status/company, paginated)
-- [ ] Add PRO Jobs nav item to admin sidebar
-- [ ] Build Admin PRO Jobs page (searchable/filterable table with job details, interested artist count)
-- [ ] Register /admin/pro-jobs route in App.tsx
+- [x] Add admin.premiumJobs tRPC endpoint (all premium_jobs, search, filter by status/company, paginated)
+- [x] Add PRO Jobs nav item to admin sidebar
+- [x] Build Admin PRO Jobs page (searchable/filterable table with job details, interested artist count)
+- [x] Register /admin/pro-jobs route in App.tsx
 
 ## Admin PRO Jobs Page
 - [x] Add admin.premiumJobs tRPC endpoint (all 185 premium_jobs, search by company/serviceType, filter by status, paginated)
@@ -315,3 +315,10 @@
 
 ## Admin PRO Jobs Modal
 - [x] Replace inline row-expand with a full modal popup (job header + artist cards with photo, name, location, rate, bio, View Submission link)
+
+## Interested Artists Full Seed (CSV + Bubble API)
+- [x] Seed all 1,346 interested artist records with message, rate, resume link, and artist user ID
+- [x] Resolved 297 artist user profiles from Bubble by email lookup (567 total users in DB)
+- [x] Update premium_job_interested_artists schema to add message, rate, resumeLink, status, bubbleInterestedArtistId columns
+- [x] Update modal artist cards to show: application message (primary), bio (fallback), per-artist rate badge, View Submission → (dark button linking to resume), Profile (secondary link)
+- [x] 92 tests passing

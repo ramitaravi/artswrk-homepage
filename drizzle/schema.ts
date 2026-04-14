@@ -550,6 +550,16 @@ export const premiumJobInterestedArtists = mysqlTable("premium_job_interested_ar
   artistUserId: int("artistUserId"),
   /** Bubble artist user ID */
   bubbleArtistId: varchar("bubbleArtistId", { length: 64 }),
+  /** Bubble interestedartists record ID */
+  bubbleInterestedArtistId: varchar("bubbleInterestedArtistId", { length: 64 }),
+  /** Artist's application message */
+  message: text("message"),
+  /** Rate the artist quoted for this job */
+  rate: varchar("rate", { length: 255 }),
+  /** Resume/portfolio link */
+  resumeLink: text("resumeLink"),
+  /** Status from Bubble */
+  status: varchar("status", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type PremiumJobInterestedArtist = typeof premiumJobInterestedArtists.$inferSelect;

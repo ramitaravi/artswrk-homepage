@@ -1515,6 +1515,12 @@ export async function getPremiumJobInterestedArtists(premiumJobId: number) {
       artistUserId: premiumJobInterestedArtists.artistUserId,
       bubbleArtistId: premiumJobInterestedArtists.bubbleArtistId,
       createdAt: premiumJobInterestedArtists.createdAt,
+      // application-specific fields
+      message: premiumJobInterestedArtists.message,
+      rate: premiumJobInterestedArtists.rate,
+      resumeLink: premiumJobInterestedArtists.resumeLink,
+      status: premiumJobInterestedArtists.status,
+      bubbleInterestedArtistId: premiumJobInterestedArtists.bubbleInterestedArtistId,
       // artist info
       artistName: users.name,
       artistFirstName: users.firstName,

@@ -85,6 +85,13 @@
       "when": 1776143221736,
       "tag": "0011_marvelous_steel_serpent",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1776147031947,
+      "tag": "0012_condemned_deathbird",
+      "breakpoints": true
     }
   ]
 }
