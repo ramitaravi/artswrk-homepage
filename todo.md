@@ -413,3 +413,12 @@
 - [x] Outreach generation: AI-written personalized DM with magic link placeholder
 - [x] Build Acquisition section in Admin dashboard (Parse input, Jobs queue, Artists queue, Outreach modal, status tracking)
 - [x] Promote admin accounts to role=admin in DB
+
+## Acquisition - All Leads Table
+- [x] Add acquisition.getAllLeads tRPC endpoint (all leads across all sessions, with session info joined)
+- [x] Build All Leads table on Acquisition page: Type, Name, Studio, Location, Disciplines, Contact, Group, Date, Status
+- [x] Expandable row to show full original post text
+- [x] Filter by lead type (job/artist) and status (new/outreach_sent/joined)
+- [x] Inline status update (change status directly from the table)
+- [x] Inline "Generate Outreach" button per row
+- [x] Parse Posts tab auto-switches to All Leads tab after parsing

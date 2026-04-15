@@ -378,4 +378,86 @@ export const acquisitionRouter = router({
         contactInfo: lead.contactInfo,
       };
     }),
+
+  /**
+   * Get all leads across all sessions with session info joined.
+   * Supports filtering by leadType and status.
+   */
+  getAllLeads: protectedProcedure
+    .input(z.object({
+      leadType: z.enum(["job", "artist", "all"]).default("all"),
+      status: z.enum(["new", "outreach_sent", "clicked", "joined", "all"]).default("all"),
+      search: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      adminOnly(ctx.user.role);
+      const db = await getDb();
+      if (!db) return [];
+
+      // Build dynamic WHERE clauses using safe string interpolation
+      // (values are escaped via db.escape or cast to known enum values)
+      const conditions: string[] = [];
+
+      if (input.leadType !== "all") {
+        // leadType is a validated enum — safe to interpolate
+        conditions.push(`l.leadType = '${input.leadType}'`);
+      }
+      if (input.status !== "all") {
+        // status is a validated enum — safe to interpolate
+        conditions.push(`l.status = '${input.status}'`);
+      }
+      if (input.search && input.search.trim()) {
+        // Escape single quotes in search string
+        const safe = input.search.trim().replace(/'/g, "''");
+        conditions.push(`(l.name LIKE '%${safe}%' OR l.studioName LIKE '%${safe}%' OR l.title LIKE '%${safe}%' OR l.location LIKE '%${safe}%' OR l.contactInfo LIKE '%${safe}%')`);
+      }
+
+      const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+      const rows = await db.execute(
+        `SELECT
+          l.id,
+          l.leadType,
+          l.name,
+          l.studioName,
+          l.title,
+          l.location,
+          l.rate,
+          l.contactInfo,
+          l.disciplines,
+          l.description,
+          l.rawPostText,
+          l.status,
+          l.outreachMessage,
+          l.outreachSentAt,
+          l.createdAt,
+          s.groupName,
+          s.groupUrl
+        FROM acquisition_leads l
+        LEFT JOIN acquisition_sessions s ON l.sessionId = s.id
+        ${where}
+        ORDER BY l.createdAt DESC
+        LIMIT 500`
+      ) as any;
+
+      return ((rows as any[])[0] as any[]).map((r: any) => ({
+        id: r.id,
+        leadType: r.leadType as "job" | "artist",
+        name: r.name || "",
+        studioName: r.studioName || "",
+        title: r.title || "",
+        location: r.location || "",
+        rate: r.rate || "",
+        contactInfo: r.contactInfo || "",
+        disciplines: r.disciplines ? JSON.parse(r.disciplines) : [],
+        description: r.description || "",
+        rawPostText: r.rawPostText || "",
+        status: r.status as "new" | "outreach_sent" | "clicked" | "joined",
+        outreachMessage: r.outreachMessage || "",
+        outreachSentAt: r.outreachSentAt ? new Date(r.outreachSentAt) : null,
+        createdAt: new Date(r.createdAt),
+        groupName: r.groupName || "",
+        groupUrl: r.groupUrl || "",
+      }));
+    }),
 });
