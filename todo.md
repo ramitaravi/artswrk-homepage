@@ -422,3 +422,11 @@
 - [x] Inline status update (change status directly from the table)
 - [x] Inline "Generate Outreach" button per row
 - [x] Parse Posts tab auto-switches to All Leads tab after parsing
+
+## Artist Profile Feature
+- [x] Update DB schema: add profile fields to users table (pronouns, bio, workTypes, mediaUrls, resumeUrl, resumeName, isPro, bookingCount, joinedDate, disciplines, services, reviews)
+- [x] Add tRPC procedures: getArtistProfile, updateArtistProfile
+- [x] Build ArtistProfile page: public view matching Artswrk design (header, tabs: About/Services/Reviews/Media/Resume)
+- [x] Build EditProfile modal/page with all fields
+- [x] Wire Profile link in artist dashboard sidebar
+- [x] Seed Ramita's real profile data

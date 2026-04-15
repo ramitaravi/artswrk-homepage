@@ -112,6 +112,22 @@ export const users = mysqlTable("users", {
   /** Flag to force password reset on next login */
   passwordIsTemporary: boolean("passwordIsTemporary").default(true),
 
+  // ── Artist Profile Extended ───────────────────────────────────────────────
+  /** JSON array of photo URLs for the media grid on the profile */
+  mediaPhotos: text("mediaPhotos"),
+  /** JSON array of {url, name} objects for resume files */
+  resumeFiles: text("resumeFiles"),
+  /** Number of completed bookings (displayed on profile) */
+  bookingCount: int("bookingCount").default(0),
+  /** Average rating (0-5, stored as float * 10 for integer storage) */
+  ratingScore: int("ratingScore").default(0),
+  /** Number of reviews */
+  reviewCount: int("reviewCount").default(0),
+  /** JSON array of work type strings shown as chips (e.g. ["Dance Adjudicator", "Dance Educator"]) */
+  workTypes: text("workTypes"),
+  /** Short tagline shown under name */
+  tagline: varchar("tagline", { length: 256 }),
+
   // ── Metadata ───────────────────────────────────────────────────────────────
   bubbleCreatedAt: timestamp("bubbleCreatedAt"),
   bubbleModifiedAt: timestamp("bubbleModifiedAt"),

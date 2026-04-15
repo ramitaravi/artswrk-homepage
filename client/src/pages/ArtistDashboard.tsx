@@ -7,6 +7,7 @@
 
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import ArtistProfilePage from "./artist/ArtistProfilePage";
 import {
   LayoutDashboard,
   Briefcase,
@@ -869,7 +870,7 @@ export default function ArtistDashboard() {
       case "messages":
         return <MessagesTab />;
       case "profile":
-        return <ProfileTab user={user} />;
+        return <ArtistProfilePage />;
       case "pro-jobs":
         return <ProJobsTab />;
       case "companies":

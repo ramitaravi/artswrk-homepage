@@ -106,6 +106,13 @@
       "when": 1776293884295,
       "tag": "0014_previous_scarlet_spider",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "5",
+      "when": 1776297019658,
+      "tag": "0015_daffy_gamma_corps",
+      "breakpoints": true
     }
   ]
 }
