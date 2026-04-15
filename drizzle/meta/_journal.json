@@ -99,6 +99,13 @@
       "when": 1776176817073,
       "tag": "0013_common_blackheart",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1776293884295,
+      "tag": "0014_previous_scarlet_spider",
+      "breakpoints": true
     }
   ]
 }

@@ -3,7 +3,8 @@ import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, ONE_YEAR_MS } from "@shared/con
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createPremiumJob } from "./db";
+import { acquisitionRouter } from "./acquisitionRouter";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
@@ -15,6 +16,7 @@ const SALT_ROUNDS = 12;
 
 export const appRouter = router({
   system: systemRouter,
+  acquisition: acquisitionRouter,
 
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -1027,6 +1029,61 @@ Fields to extract:
       }),
   }),
   // ── Artswrk user queries ─────────────────────────────────────────────────────────────────
+  artistDashboard: router({
+    /** Get public jobs feed for artist dashboard */
+    getJobsFeed: publicProcedure
+      .input(z.object({ limit: z.number().min(1).max(100).default(30), offset: z.number().min(0).default(0) }))
+      .query(async ({ input }) => {
+        return getArtistJobsFeed(input.limit, input.offset);
+      }),
+    /** Get PRO jobs feed for artist dashboard */
+    getProJobsFeed: publicProcedure
+      .input(z.object({ limit: z.number().min(1).max(100).default(20), offset: z.number().min(0).default(0) }))
+      .query(async ({ input }) => {
+        return getArtistProJobsFeed(input.limit, input.offset);
+      }),
+    /** Get PRO job applications for the logged-in artist */
+    getProApplications: protectedProcedure
+      .query(async ({ ctx }) => {
+        return getArtistProApplications(ctx.user.id);
+      }),
+    /** Get bookings for the logged-in artist */
+    getBookings: protectedProcedure
+      .query(async ({ ctx }) => {
+        return getArtistBookings(ctx.user.id);
+      }),
+    /** Get payments for the logged-in artist */
+    getPayments: protectedProcedure
+      .query(async ({ ctx }) => {
+        return getArtistPayments(ctx.user.id);
+      }),
+    /** Apply to a PRO job as artist */
+    applyToProJob: protectedProcedure
+      .input(z.object({ premiumJobId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        // Insert into premium_job_interested_artists
+        const { getDb } = await import('./db');
+        const dbConn = await getDb();
+        if (!dbConn) throw new Error('DB unavailable');
+        const { premiumJobInterestedArtists } = await import('../drizzle/schema');
+        const { eq, and } = await import('drizzle-orm');
+        // Check if already applied
+        const existing = await dbConn.select().from(premiumJobInterestedArtists)
+          .where(and(
+            eq(premiumJobInterestedArtists.artistUserId, ctx.user.id),
+            eq(premiumJobInterestedArtists.premiumJobId, input.premiumJobId)
+          ));
+        if (existing.length > 0) return { success: true, alreadyApplied: true };
+        await dbConn.insert(premiumJobInterestedArtists).values({
+          artistUserId: ctx.user.id,
+          premiumJobId: input.premiumJobId,
+          status: 'Pending',
+          createdAt: new Date(),
+        });
+        return { success: true, alreadyApplied: false };
+      }),
+  }),
+
   artswrkUsers: router({
     getById: publicProcedure
       .input(z.object({ id: z.number() }))

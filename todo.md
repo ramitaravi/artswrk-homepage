@@ -389,3 +389,27 @@
 - [x] Route /artist-dashboard registered in App.tsx
 - [ ] Wire real data from Bubble API (applications, bookings, payments, messages)
 - [ ] Wire "Dashboard" link in top nav to /artist-dashboard for artist users
+
+## Artist Dashboard - Jobs Page
+- [ ] Browse live Bubble artist jobs page design
+- [ ] Check Ramita Ravi's applications data in DB
+- [ ] Build Jobs page with Active / PRO Jobs / Applications sub-tabs
+- [ ] Active tab: available jobs feed with Apply/Applied buttons
+- [ ] PRO Jobs tab: PRO-flagged jobs with Apply/Applied states
+- [ ] Applications tab: jobs the artist has applied to with status badges
+- [ ] Wire real data from DB (premium_jobs for PRO, regular jobs for Active, interested_artists for Applications)
+
+## Artist Dashboard - Jobs / Bookings / Payments / Messages Pages
+- [ ] Build Jobs page: Jobs For You sub-tab (real data from getJobsFeed), PRO Jobs sub-tab (real data from getProJobsFeed), Applications sub-tab (real data from getProApplications)
+- [ ] Build Bookings page: Upcoming / Past sub-tabs with real booking data from getBookings
+- [ ] Build Payments page: payment history with amounts, status, receipt links from getPayments
+- [ ] Build Messages page: conversation list + message thread UI (matching client-side messenger)
+- [ ] Wire Apply button on PRO Jobs to applyToProJob mutation with optimistic update
+
+## Facebook Group Acquisition Tool
+- [x] Add acquisition_sessions and acquisition_leads tables to DB schema and run db:push
+- [x] Build acquisitionRouter with parsePosts (AI parsing), generateOutreach, updateStatus, getSessions, getLeads, getSessionLeads procedures
+- [x] AI parsing: extract poster name, studio name, location (inferred from group name), disciplines, contact info, lead type (job/artist)
+- [x] Outreach generation: AI-written personalized DM with magic link placeholder
+- [x] Build Acquisition section in Admin dashboard (Parse input, Jobs queue, Artists queue, Outreach modal, status tracking)
+- [x] Promote admin accounts to role=admin in DB

@@ -588,3 +588,72 @@ export const clientCompanies = mysqlTable("client_companies", {
 });
 export type ClientCompany = typeof clientCompanies.$inferSelect;
 export type InsertClientCompany = typeof clientCompanies.$inferInsert;
+
+// ─── Facebook Group Acquisition ──────────────────────────────────────────────
+
+/**
+ * A single "parse session" — one paste of Facebook post text by a team member.
+ * Stores the raw input and which group it came from.
+ */
+export const acquisitionSessions = mysqlTable("acquisition_sessions", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Name/URL of the Facebook group (for display) */
+  groupName: varchar("groupName", { length: 256 }),
+  groupUrl: text("groupUrl"),
+  /** Raw pasted text from Facebook */
+  rawText: text("rawText").notNull(),
+  /** Number of jobs parsed from this session */
+  jobCount: int("jobCount").default(0),
+  /** Number of artists parsed from this session */
+  artistCount: int("artistCount").default(0),
+  /** Admin user who created this session */
+  createdByUserId: int("createdByUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type AcquisitionSession = typeof acquisitionSessions.$inferSelect;
+export type InsertAcquisitionSession = typeof acquisitionSessions.$inferInsert;
+
+/**
+ * A single lead (job poster or artist) extracted from a Facebook group post.
+ */
+export const acquisitionLeads = mysqlTable("acquisition_leads", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: int("sessionId").notNull(),
+  /** "job" or "artist" */
+  leadType: mysqlEnum("leadType", ["job", "artist"]).notNull(),
+
+  // ── Parsed fields (populated by AI) ──────────────────────────────────────
+  /** Person or company name */
+  name: varchar("name", { length: 256 }),
+  /** For jobs: role/title. For artists: primary discipline */
+  title: varchar("title", { length: 256 }),
+  /** Location string */
+  location: varchar("location", { length: 256 }),
+  /** Rate/budget string */
+  rate: varchar("rate", { length: 128 }),
+  /** Contact info (email, Instagram handle, etc.) */
+  contactInfo: varchar("contactInfo", { length: 512 }),
+  /** Disciplines / skills (JSON array string) */
+  disciplines: text("disciplines"),
+  /** Full description / original post text excerpt */
+  description: text("description"),
+  /** Raw original post text */
+  rawPostText: text("rawPostText"),
+
+  // ── Outreach ──────────────────────────────────────────────────────────────
+  /** AI-generated DM message */
+  outreachMessage: text("outreachMessage"),
+  /** Magic link token for pre-filled onboarding */
+  magicLinkToken: varchar("magicLinkToken", { length: 128 }),
+
+  // ── Status tracking ───────────────────────────────────────────────────────
+  /** "new" | "outreach_sent" | "clicked" | "joined" */
+  status: mysqlEnum("status", ["new", "outreach_sent", "clicked", "joined"]).default("new").notNull(),
+  outreachSentAt: timestamp("outreachSentAt"),
+  /** FK → users.id if they signed up via magic link */
+  convertedUserId: int("convertedUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type AcquisitionLead = typeof acquisitionLeads.$inferSelect;
+export type InsertAcquisitionLead = typeof acquisitionLeads.$inferInsert;

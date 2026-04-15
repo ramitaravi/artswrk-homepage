@@ -335,53 +335,414 @@ function DashboardTab({ user }: { user: any }) {
 
 // ─── Jobs Tab ─────────────────────────────────────────────────────────────────
 
-function JobsTab() {
+type JobsSubTab = "jobs-for-you" | "pro-jobs" | "applications";
+
+function JobsTab({ user }: { user: any }) {
+  const [subTab, setSubTab] = useState<JobsSubTab>("jobs-for-you");
+  const [appliedIds, setAppliedIds] = useState<Set<number>>(new Set());
+
+  const { data: jobsFeed, isLoading: feedLoading } = trpc.artistDashboard.getJobsFeed.useQuery({ limit: 30, offset: 0 });
+  const { data: proJobs, isLoading: proLoading } = trpc.artistDashboard.getProJobsFeed.useQuery({ limit: 30, offset: 0 });
+  const { data: applications, isLoading: appsLoading } = trpc.artistDashboard.getProApplications.useQuery();
+
+  const applyMutation = trpc.artistDashboard.applyToProJob.useMutation({
+    onSuccess: (data, variables) => {
+      setAppliedIds(prev => { const next = new Set(prev); next.add(variables.premiumJobId); return next; });
+    },
+  });
+
+  const subTabBtn = (tab: JobsSubTab, label: string) => (
+    <button
+      onClick={() => setSubTab(tab)}
+      className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors ${
+        subTab === tab ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"
+      }`}
+    >
+      {label}
+    </button>
+  );
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
-      <Briefcase size={40} className="mx-auto text-gray-300 mb-3" />
-      <h2 className="text-lg font-bold text-gray-900 mb-1">Jobs</h2>
-      <p className="text-sm text-gray-500">Browse all available jobs. Data integration coming soon.</p>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-black text-gray-900">Jobs</h2>
+      </div>
+
+      {/* Sub-tab bar */}
+      <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-full w-fit">
+        {subTabBtn("jobs-for-you", "Jobs For You")}
+        {subTabBtn("pro-jobs", "PRO Jobs ⭐️")}
+        {subTabBtn("applications", "Applications")}
+      </div>
+
+      {/* Jobs For You */}
+      {subTab === "jobs-for-you" && (
+        <div className="bg-white rounded-2xl border border-gray-100">
+          {feedLoading ? (
+            <div className="p-8 text-center"><div className="w-6 h-6 border-2 border-gray-200 border-t-gray-800 rounded-full animate-spin mx-auto" /></div>
+          ) : !jobsFeed?.length ? (
+            <div className="p-8 text-center">
+              <Briefcase size={36} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-sm text-gray-500">No jobs available right now. Check back soon!</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {jobsFeed.map((job: any) => (
+                <div key={job.id} className="flex items-start gap-3 p-4">
+                  <StudioAvatar name={job.studioName || job.creatorName || "Studio"} logo={job.logo} size="md" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-gray-900">{job.studioName || job.creatorName}</p>
+                    <p className="text-sm text-gray-700">{job.serviceType}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {job.location && !job.location.includes("[object") ? job.location : (job.workFromAnywhere ? "Work From Anywhere" : "Location TBD")}
+                      {job.postedAgo ? ` · Posted ${job.postedAgo}` : ""}
+                    </p>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                      {job.rate && <span className="flex items-center gap-1"><CreditCard size={10} /> {job.rate}</span>}
+                    </div>
+                  </div>
+                  <button className="flex-shrink-0 text-xs font-semibold text-white px-3 py-1.5 rounded-full hover:opacity-90 transition-opacity" style={{ background: "#111" }}>
+                    Apply
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* PRO Jobs */}
+      {subTab === "pro-jobs" && (
+        <div className="bg-white rounded-2xl border border-gray-100">
+          {proLoading ? (
+            <div className="p-8 text-center"><div className="w-6 h-6 border-2 border-gray-200 border-t-gray-800 rounded-full animate-spin mx-auto" /></div>
+          ) : !proJobs?.length ? (
+            <div className="p-8 text-center">
+              <Star size={36} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-sm text-gray-500">No PRO jobs available right now.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {proJobs.map((job: any) => {
+                const isApplied = appliedIds.has(job.id) || job.hasApplied;
+                return (
+                  <div key={job.id} className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <StudioAvatar name={job.companyName || "Company"} logo={job.logo} size="sm" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-gray-900 truncate">{job.serviceType}</p>
+                        <p className="text-xs text-gray-500">{job.companyName}</p>
+                        <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                          <MapPin size={10} /> {job.workFromAnywhere ? "Work From Anywhere" : (job.location && !job.location.includes("[object") ? job.location : "Location TBD")}
+                        </p>
+                      </div>
+                    </div>
+                    {isApplied ? (
+                      <span className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
+                        <CheckCircle2 size={11} /> Applied!
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => applyMutation.mutate({ premiumJobId: job.id })}
+                        disabled={applyMutation.isPending}
+                        className="flex-shrink-0 text-xs font-semibold text-gray-700 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50"
+                      >
+                        Apply <ArrowRight size={11} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Applications */}
+      {subTab === "applications" && (
+        <div className="bg-white rounded-2xl border border-gray-100">
+          {appsLoading ? (
+            <div className="p-8 text-center"><div className="w-6 h-6 border-2 border-gray-200 border-t-gray-800 rounded-full animate-spin mx-auto" /></div>
+          ) : !applications?.length ? (
+            <div className="p-8 text-center">
+              <CheckCircle2 size={36} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-sm font-semibold text-gray-700 mb-1">No applications yet</p>
+              <p className="text-sm text-gray-500">Apply to PRO jobs to see your applications here.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {applications.map((app: any) => (
+                <div key={app.id} className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <StudioAvatar name={app.companyName || "Company"} logo={app.logo} size="sm" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-gray-900 truncate">{app.jobTitle}</p>
+                      <p className="text-xs text-gray-500">{app.companyName}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{app.appliedAt ? new Date(app.appliedAt).toLocaleDateString() : ""}</p>
+                    </div>
+                  </div>
+                  <span className={`flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${
+                    app.status === "Accepted" ? "bg-green-50 text-green-700" :
+                    app.status === "Rejected" ? "bg-red-50 text-red-700" :
+                    "bg-amber-50 text-amber-700"
+                  }`}>
+                    {app.status || "Pending"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Bookings Tab ─────────────────────────────────────────────────────────────
+// ─── Bookings Tab ─────────────────────────────────────────────────────────────────
+
+type BookingsSubTab = "mark-complete" | "payment-pending" | "upcoming" | "completed";
+
+const SAMPLE_BOOKINGS = [
+  { id: 1, jobTitle: "Hip Hop Instructor", company: "Elevation on Tour", logo: "", date: "May 1–3, 2025", rate: "$20/hr", location: "Sicklerville, NJ", status: "upcoming" as const },
+  { id: 2, jobTitle: "Event Assistant", company: "Journey Dance Competition", logo: "", date: "Apr 20, 2025", rate: "$20/hr", location: "Chicago, IL", status: "payment-pending" as const },
+  { id: 3, jobTitle: "Dance Judge", company: "REVEL Dance", logo: "", date: "Mar 15, 2025", rate: "$150 flat", location: "Los Angeles, CA", status: "mark-complete" as const },
+  { id: 4, jobTitle: "Ballet Teacher", company: "Artswrk Studio", logo: "", date: "Feb 10, 2025", rate: "$40/hr", location: "New York, NY", status: "completed" as const },
+];
 
 function BookingsTab() {
+  const [subTab, setSubTab] = useState<BookingsSubTab>("upcoming");
+
+  const subTabBtn = (tab: BookingsSubTab, label: string) => (
+    <button
+      onClick={() => setSubTab(tab)}
+      className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors ${
+        subTab === tab ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"
+      }`}
+    >
+      {label}
+    </button>
+  );
+
+  const filtered = SAMPLE_BOOKINGS.filter(b => b.status === subTab);
+
+  const statusBadge = (status: string) => {
+    const map: Record<string, string> = {
+      upcoming: "bg-blue-50 text-blue-700",
+      "payment-pending": "bg-amber-50 text-amber-700",
+      "mark-complete": "bg-orange-50 text-orange-700",
+      completed: "bg-green-50 text-green-700",
+    };
+    const labels: Record<string, string> = {
+      upcoming: "Upcoming",
+      "payment-pending": "Payment Pending",
+      "mark-complete": "Mark Complete",
+      completed: "Completed",
+    };
+    return <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${map[status] || "bg-gray-50 text-gray-600"}`}>{labels[status] || status}</span>;
+  };
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
-      <Calendar size={40} className="mx-auto text-gray-300 mb-3" />
-      <h2 className="text-lg font-bold text-gray-900 mb-1">Bookings</h2>
-      <p className="text-sm text-gray-500">Your confirmed bookings will appear here. Data integration coming soon.</p>
+    <div className="space-y-4">
+      <h2 className="text-xl font-black text-gray-900">Bookings</h2>
+
+      <div className="flex flex-wrap items-center gap-1 bg-gray-100 p-1 rounded-2xl w-fit">
+        {subTabBtn("mark-complete", "Mark as Complete")}
+        {subTabBtn("payment-pending", "Payment Pending")}
+        {subTabBtn("upcoming", "Upcoming")}
+        {subTabBtn("completed", "Completed")}
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-100">
+        {filtered.length === 0 ? (
+          <div className="p-8 text-center">
+            <Calendar size={36} className="mx-auto text-gray-300 mb-3" />
+            <p className="text-sm font-semibold text-gray-700 mb-1">No bookings here</p>
+            <p className="text-sm text-gray-500">Bookings in this category will appear here.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {filtered.map(booking => (
+              <div key={booking.id} className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <StudioAvatar name={booking.company} logo={booking.logo} size="sm" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-gray-900 truncate">{booking.jobTitle}</p>
+                    <p className="text-xs text-gray-500">{booking.company}</p>
+                    <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
+                      <span className="flex items-center gap-1"><Calendar size={10} /> {booking.date}</span>
+                      <span className="flex items-center gap-1"><CreditCard size={10} /> {booking.rate}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {statusBadge(booking.status)}
+                  {booking.status === "mark-complete" && (
+                    <button className="text-xs font-semibold text-white bg-gray-900 px-3 py-1.5 rounded-full hover:bg-gray-700 transition-colors">
+                      Mark Complete
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-// ─── Payments Tab ─────────────────────────────────────────────────────────────
+// ─── Payments Tab ─────────────────────────────────────────────────────────────────
+
+const SAMPLE_PAYMENTS = [
+  { id: 1, jobTitle: "Hip Hop Instructor", company: "Elevation on Tour", amount: "$160.00", date: "May 5, 2025", status: "paid" as const, method: "Direct Deposit" },
+  { id: 2, jobTitle: "Event Assistant", company: "Journey Dance Competition", amount: "$80.00", date: "Apr 22, 2025", status: "pending" as const, method: "Direct Deposit" },
+  { id: 3, jobTitle: "Dance Judge", company: "REVEL Dance", amount: "$150.00", date: "Mar 17, 2025", status: "paid" as const, method: "Direct Deposit" },
+];
 
 function PaymentsTab() {
+  const totalEarned = SAMPLE_PAYMENTS.filter(p => p.status === "paid").reduce((sum, p) => sum + parseFloat(p.amount.replace("$", "").replace(",", "")), 0);
+  const totalPending = SAMPLE_PAYMENTS.filter(p => p.status === "pending").reduce((sum, p) => sum + parseFloat(p.amount.replace("$", "").replace(",", "")), 0);
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
-      <CreditCard size={40} className="mx-auto text-gray-300 mb-3" />
-      <h2 className="text-lg font-bold text-gray-900 mb-1">Payments</h2>
-      <p className="text-sm text-gray-500">Your payment history will appear here. Data integration coming soon.</p>
+    <div className="space-y-4">
+      <h2 className="text-xl font-black text-gray-900">Payments</h2>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+          <p className="text-xs text-gray-500 mb-1">Total Earned</p>
+          <p className="text-2xl font-black text-gray-900">${totalEarned.toFixed(2)}</p>
+          <p className="text-xs text-green-600 mt-1 font-semibold">↑ All time</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+          <p className="text-xs text-gray-500 mb-1">Pending</p>
+          <p className="text-2xl font-black text-gray-900">${totalPending.toFixed(2)}</p>
+          <p className="text-xs text-amber-600 mt-1 font-semibold">Awaiting payment</p>
+        </div>
+      </div>
+
+      {/* Payment history */}
+      <div className="bg-white rounded-2xl border border-gray-100">
+        <div className="px-5 py-4 border-b border-gray-50">
+          <h3 className="text-sm font-bold text-gray-900">Payment History</h3>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {SAMPLE_PAYMENTS.map(payment => (
+            <div key={payment.id} className="flex items-center justify-between p-4">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-gray-900 truncate">{payment.jobTitle}</p>
+                <p className="text-xs text-gray-500">{payment.company}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{payment.date} · {payment.method}</p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <p className="text-sm font-bold text-gray-900">{payment.amount}</p>
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                  payment.status === "paid" ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
+                }`}>
+                  {payment.status === "paid" ? "Paid" : "Pending"}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Connect Stripe CTA */}
+      <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-5 text-white">
+        <h3 className="text-sm font-bold mb-1">Set Up Direct Deposit</h3>
+        <p className="text-xs text-gray-400 mb-3">Connect your bank account to receive payments directly from hirers.</p>
+        <button className="text-xs font-semibold text-gray-900 bg-white px-4 py-2 rounded-full hover:bg-gray-100 transition-colors">
+          Connect Bank Account
+        </button>
+      </div>
     </div>
   );
 }
 
-// ─── Messages Tab ─────────────────────────────────────────────────────────────
+// ─── Messages Tab ─────────────────────────────────────────────────────────────────
+
+const SAMPLE_MESSAGES = [
+  { id: 1, from: "Elevation on Tour", avatar: "", preview: "Hi! We'd love to have you for our May event. Are you available?", time: "2h ago", unread: true },
+  { id: 2, from: "Journey Dance Competition", avatar: "", preview: "Thanks for applying! We'll be in touch soon.", time: "1d ago", unread: false },
+  { id: 3, from: "REVEL Dance", avatar: "", preview: "Your booking has been confirmed for March 15th.", time: "3d ago", unread: false },
+];
 
 function MessagesTab() {
+  const [selected, setSelected] = useState<number | null>(null);
+  const selectedMsg = SAMPLE_MESSAGES.find(m => m.id === selected);
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
-      <MessageSquare size={40} className="mx-auto text-gray-300 mb-3" />
-      <h2 className="text-lg font-bold text-gray-900 mb-1">Messages</h2>
-      <p className="text-sm text-gray-500">Your messages will appear here. Data integration coming soon.</p>
+    <div className="space-y-4">
+      <h2 className="text-xl font-black text-gray-900">Messages</h2>
+
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        {!selected ? (
+          // Inbox list
+          <div className="divide-y divide-gray-50">
+            {SAMPLE_MESSAGES.length === 0 ? (
+              <div className="p-8 text-center">
+                <MessageSquare size={36} className="mx-auto text-gray-300 mb-3" />
+                <p className="text-sm font-semibold text-gray-700 mb-1">No messages yet</p>
+                <p className="text-sm text-gray-500">When hirers message you, they'll appear here.</p>
+              </div>
+            ) : (
+              SAMPLE_MESSAGES.map(msg => (
+                <button
+                  key={msg.id}
+                  onClick={() => setSelected(msg.id)}
+                  className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors text-left"
+                >
+                  <StudioAvatar name={msg.from} logo={msg.avatar} size="md" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className={`text-sm truncate ${msg.unread ? "font-bold text-gray-900" : "font-semibold text-gray-700"}`}>{msg.from}</p>
+                      <p className="text-xs text-gray-400 flex-shrink-0 ml-2">{msg.time}</p>
+                    </div>
+                    <p className={`text-xs truncate mt-0.5 ${msg.unread ? "text-gray-700" : "text-gray-500"}`}>{msg.preview}</p>
+                  </div>
+                  {msg.unread && <div className="w-2 h-2 rounded-full bg-pink-500 flex-shrink-0" />}
+                </button>
+              ))
+            )}
+          </div>
+        ) : (
+          // Conversation view
+          <div className="flex flex-col h-[480px]">
+            <div className="flex items-center gap-3 p-4 border-b border-gray-100">
+              <button onClick={() => setSelected(null)} className="text-gray-500 hover:text-gray-900 transition-colors">
+                <ChevronRight size={18} className="rotate-180" />
+              </button>
+              <StudioAvatar name={selectedMsg?.from || ""} logo={selectedMsg?.avatar} size="sm" />
+              <p className="text-sm font-bold text-gray-900">{selectedMsg?.from}</p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div className="flex justify-start">
+                <div className="max-w-xs bg-gray-100 rounded-2xl rounded-tl-sm px-4 py-2.5">
+                  <p className="text-sm text-gray-800">{selectedMsg?.preview}</p>
+                  <p className="text-xs text-gray-400 mt-1">{selectedMsg?.time}</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t border-gray-100">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Type a message..."
+                  className="flex-1 text-sm px-4 py-2.5 rounded-full border border-gray-200 focus:outline-none focus:border-gray-400 transition-colors"
+                />
+                <button className="w-9 h-9 rounded-full bg-gray-900 text-white flex items-center justify-center hover:bg-gray-700 transition-colors flex-shrink-0">
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-// ─── Profile Tab ─────────────────────────────────────────────────────────────
+// ─── Profile Tab ─────────────────────────────────────────────────────────────────
 
 function ProfileTab({ user }: { user: any }) {
   return (
@@ -500,7 +861,7 @@ export default function ArtistDashboard() {
       case "dashboard":
         return <DashboardTab user={user} />;
       case "jobs":
-        return <JobsTab />;
+        return <JobsTab user={user} />;
       case "bookings":
         return <BookingsTab />;
       case "payments":
