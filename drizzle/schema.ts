@@ -1,5 +1,6 @@
 import {
   boolean,
+  double,
   int,
   mysqlEnum,
   mysqlTable,
@@ -129,6 +130,20 @@ export const users = mysqlTable("users", {
   tagline: varchar("tagline", { length: 256 }),
   /** Priority/featured artist flag from Bubble */
   priorityList: boolean("priorityList").default(false),
+  /** Number of late cancellations (affects reliability score) */
+  lateCancelCount: int("lateCancelCount").default(0),
+  /** Performance/CV credits text (e.g. "Broadway Dance Center, TNT's I Am The Night") */
+  credits: text("credits"),
+
+  // ── Artist Stripe Connect ─────────────────────────────────────────────────
+  /** Stripe Connect account ID for artist payouts (e.g. acct_1PKkRm...) */
+  artistStripeAccountId: varchar("artistStripeAccountId", { length: 64 }),
+  /** OAuth return code from Stripe Connect onboarding flow */
+  artistStripeReturnCode: varchar("artistStripeReturnCode", { length: 256 }),
+  /** Stripe product ID tied to the artist's PRO subscription */
+  artistStripeProductId: varchar("artistStripeProductId", { length: 64 }),
+  /** When the artist's Stripe Connect account was created */
+  artistStripeDateCreated: timestamp("artistStripeDateCreated"),
 
   // ── Metadata ───────────────────────────────────────────────────────────────
   bubbleCreatedAt: timestamp("bubbleCreatedAt"),
@@ -329,8 +344,8 @@ export const bookings = mysqlTable("bookings", {
   stripeFee: int("stripeFee"),
   /** Revenue after Stripe fee */
   postFeeRevenue: int("postFeeRevenue"),
-  /** Number of hours booked */
-  hours: int("hours"),
+  /** Number of hours booked (decimal, e.g. 2.75) */
+  hours: double("hours"),
   /** Whether payment was made outside Stripe */
   externalPayment: boolean("externalPayment").default(false),
 
@@ -602,6 +617,14 @@ export const clientCompanies = mysqlTable("client_companies", {
   website: text("website"),
   /** Description */
   description: text("description"),
+  /** Company location address */
+  locationAddress: text("locationAddress"),
+  locationLat: varchar("locationLat", { length: 32 }),
+  locationLng: varchar("locationLng", { length: 32 }),
+  /** Whether the company reimburses artist transportation */
+  transportReimbursed: boolean("transportReimbursed").default(false),
+  /** Instructions for how artists should get to this studio */
+  transportDetails: text("transportDetails"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type ClientCompany = typeof clientCompanies.$inferSelect;
@@ -710,6 +733,8 @@ export type InsertArtistReview = typeof artistReviews.$inferInsert;
  */
 export const artistServiceCategories = mysqlTable("artist_service_categories", {
   id: int("id").autoincrement().primaryKey(),
+  /** Bubble ArtistService record ID (for migration tracking) */
+  bubbleId: varchar("bubbleId", { length: 64 }),
   /** FK → users.id (the artist) */
   artistUserId: int("artistUserId").notNull(),
   /** Category name (e.g. "Dance Adjudicator", "Dance Educator") */
@@ -730,3 +755,114 @@ export const artistServiceCategories = mysqlTable("artist_service_categories", {
 });
 export type ArtistServiceCategory = typeof artistServiceCategories.$inferSelect;
 export type InsertArtistServiceCategory = typeof artistServiceCategories.$inferInsert;
+
+// ─── Artist Experiences ───────────────────────────────────────────────────────
+
+/**
+ * Teaching/performance experience records for artists.
+ * Maps to Bubble's ArtistExperience type (1,215 records).
+ * Each record represents one experience entry (a style category × age group combination).
+ */
+export const artistExperiences = mysqlTable("artist_experiences", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Bubble ArtistExperience record ID */
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  /** FK → users.id (the artist) */
+  artistUserId: int("artistUserId").notNull(),
+  /** Bubble artist user ID (for cross-referencing during migration) */
+  bubbleArtistId: varchar("bubbleArtistId", { length: 64 }),
+
+  // ── Experience Details ─────────────────────────────────────────────────────
+  /** Artist type (e.g. "Dance Educator", "Choreographer") — Bubble master artist type name */
+  artistType: varchar("artistType", { length: 128 }),
+  /** Bubble master artist type ID */
+  bubbleArtistTypeId: varchar("bubbleArtistTypeId", { length: 64 }),
+  /** Years of experience range (e.g. "5-10 years", "10+ years") */
+  yearsOfExperience: varchar("yearsOfExperience", { length: 64 }),
+  /** JSON array of age group strings (e.g. ["<5", "6-10", "11-14", "15-18", "18+"]) */
+  ageGroups: text("ageGroups"),
+  /** JSON array of style/discipline strings (e.g. ["Ballet", "Jazz", "Hip Hop"]) */
+  styles: text("styles"),
+  /** JSON array of Bubble style IDs (for reference during migration) */
+  bubbleStyleIds: text("bubbleStyleIds"),
+  /** Legacy resume/portfolio link from old Bubble field */
+  legacyResumeLink: text("legacyResumeLink"),
+
+  // ── Timestamps ─────────────────────────────────────────────────────────────
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
+});
+export type ArtistExperience = typeof artistExperiences.$inferSelect;
+export type InsertArtistExperience = typeof artistExperiences.$inferInsert;
+
+// ─── Resumes ──────────────────────────────────────────────────────────────────
+
+/**
+ * Resume file uploads linked to artist profiles.
+ * Maps to Bubble's Resume type (868 records).
+ * An artist can have multiple resume files.
+ */
+export const artistResumes = mysqlTable("artist_resumes", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Bubble Resume record ID */
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  /** FK → users.id (the artist) */
+  artistUserId: int("artistUserId").notNull(),
+  /** Bubble artist user ID (for cross-referencing during migration) */
+  bubbleArtistId: varchar("bubbleArtistId", { length: 64 }),
+
+  // ── File Details ───────────────────────────────────────────────────────────
+  /** Display name / filename (e.g. "2024 Acting - Dance - Business Resume.docx") */
+  title: varchar("title", { length: 512 }),
+  /** File URL (Bubble CDN or migrated S3 URL) */
+  fileUrl: text("fileUrl"),
+
+  // ── Timestamps ─────────────────────────────────────────────────────────────
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
+});
+export type ArtistResume = typeof artistResumes.$inferSelect;
+export type InsertArtistResume = typeof artistResumes.$inferInsert;
+
+// ─── Reimbursements ───────────────────────────────────────────────────────────
+
+/**
+ * Expense reimbursement receipts attached to bookings.
+ * Maps to Bubble's Reimbursement type (2,305 live records).
+ * An artist submits these for transportation or other approved costs.
+ */
+export const reimbursements = mysqlTable("reimbursements", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Bubble Reimbursement record ID */
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  /** FK → bookings.id */
+  bookingId: int("bookingId"),
+  /** Bubble booking ID (for cross-referencing during migration) */
+  bubbleBookingId: varchar("bubbleBookingId", { length: 64 }),
+  /** FK → users.id (the artist who submitted this reimbursement) */
+  artistUserId: int("artistUserId"),
+  /** Bubble artist user ID */
+  bubbleArtistId: varchar("bubbleArtistId", { length: 64 }),
+
+  // ── Reimbursement Details ─────────────────────────────────────────────────
+  /** Dollar value of the reimbursement */
+  value: double("value"),
+  /** Date the expense was incurred */
+  expenseDate: timestamp("expenseDate"),
+  /** Artist's note describing the expense (e.g. "Transport", "Parking") */
+  note: text("note"),
+  /** Receipt file URL (S3 or Bubble CDN) */
+  fileUrl: text("fileUrl"),
+
+  // ── Timestamps ─────────────────────────────────────────────────────────────
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
+});
+export type Reimbursement = typeof reimbursements.$inferSelect;
+export type InsertReimbursement = typeof reimbursements.$inferInsert;
