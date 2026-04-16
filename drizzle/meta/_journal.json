@@ -134,6 +134,13 @@
       "when": 1776300073473,
       "tag": "0018_confused_gauntlet",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1776306217984,
+      "tag": "0019_curved_silver_sable",
+      "breakpoints": true
     }
   ]
 }
