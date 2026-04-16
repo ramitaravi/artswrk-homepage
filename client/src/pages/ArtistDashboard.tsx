@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import ArtistProfilePage from "./artist/ArtistProfilePage";
+import ArtistSettingsPlan from "./artist/ArtistSettingsPlan";
 import {
   LayoutDashboard,
   Briefcase,
@@ -880,7 +881,7 @@ export default function ArtistDashboard() {
       case "community":
         return <ComingSoonTab icon={<Users size={40} />} title="Community" />;
       case "settings":
-        return <ComingSoonTab icon={<Settings size={40} />} title="Settings" />;
+        return <ArtistSettingsPlan />;
       default:
         return <DashboardTab user={user} />;
     }

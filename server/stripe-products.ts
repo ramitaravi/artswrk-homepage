@@ -35,6 +35,28 @@ export const STRIPE_PRODUCTS = {
     currency: "usd",
     mode: "payment" as const,
   },
+  /**
+   * Artist PRO subscription — uses existing Stripe product/prices.
+   * Monthly: price_1O7U0HA91H1fWNkKa9wA0v6X ($X/mo)
+   * Annual:  price_1O7Ts6A91H1fWNkKVlYhqdAi ($X/yr)
+   */
+  ARTIST_PRO: {
+    productId: "prod_OvKXdVHLUpHLCn",
+    name: "Artswrk PRO",
+    description: "PRO jobs, priority placement, profile boost, and advanced analytics.",
+    currency: "usd",
+    mode: "subscription" as const,
+    monthly: {
+      priceId: "price_1O7U0HA91H1fWNkKa9wA0v6X",
+      paymentLinkId: "plink_1OKZtSA91H1fWNkKgr12Dkow",
+      interval: "month" as const,
+    },
+    annual: {
+      priceId: "price_1O7Ts6A91H1fWNkKVlYhqdAi",
+      paymentLinkId: "plink_1RJFokA91H1fWNkKYbrlxLUH",
+      interval: "year" as const,
+    },
+  },
 } as const;
 
 /**

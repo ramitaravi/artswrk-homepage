@@ -513,3 +513,15 @@
 - [x] If email is new → redirect to /join?next=/jobs/:locationSlug/:jobSlug/apply
 - [x] Wire ApplyGateModal to Jobs page Apply button (logged-out state)
 - [x] Wire ApplyGateModal to Job Detail page Apply Now button (logged-out state)
+
+## Artist Subscription Management (Settings / Plan Page)
+- [x] Define PRO artist Stripe products/prices in stripe-products.ts (using existing Stripe IDs)
+- [x] Add db helpers: getArtistSubscriptionInfo, saveArtistProSubscription, cancelArtistProSubscription
+- [x] tRPC artistSubscription.getCurrentPlan — returns current plan (free/basic/pro) + status
+- [x] tRPC artistSubscription.createProCheckout — Stripe Checkout for PRO upgrade (monthly or annual)
+- [x] tRPC artistSubscription.createPortalSession — Stripe Customer Portal for existing subscribers
+- [x] Stripe webhook: handle artist subscription events (created, updated, deleted)
+- [x] Build ArtistSettingsPlan.tsx page with Free/PRO plan cards + monthly/annual toggle
+- [x] Plan cards: current plan highlighted, upgrade CTA, manage billing link for active subs
+- [x] Wire Settings tab in ArtistDashboard.tsx to render ArtistSettingsPlan
+- [x] Write vitest tests for subscription logic (7 tests, 116 total passing)

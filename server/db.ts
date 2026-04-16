@@ -2166,3 +2166,54 @@ export async function applyToJob(params: {
   `);
   return (result[0] as any).insertId;
 }
+
+// ─── Artist Subscription Helpers ─────────────────────────────────────────────
+
+/** Save artist Stripe customer ID */
+export async function saveArtistStripeCustomerId(userId: number, stripeCustomerId: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ stripeCustomerId }).where(eq(users.id, userId));
+}
+
+/** Save artist PRO subscription ID and mark artswrkPro = true */
+export async function saveArtistProSubscription(userId: number, subscriptionId: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ artswrkPro: true, artistStripeProductId: subscriptionId }).where(eq(users.id, userId));
+}
+
+/** Cancel artist PRO subscription (mark artswrkPro = false) */
+export async function cancelArtistProSubscription(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ artswrkPro: false, artistStripeProductId: null }).where(eq(users.id, userId));
+}
+
+/** Get artist subscription fields for plan management */
+export async function getArtistSubscriptionInfo(userId: number): Promise<{
+  artswrkPro: boolean;
+  artswrkBasic: boolean;
+  stripeCustomerId: string | null;
+  artistStripeProductId: string | null;
+} | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select({
+      artswrkPro: users.artswrkPro,
+      artswrkBasic: users.artswrkBasic,
+      stripeCustomerId: users.stripeCustomerId,
+      artistStripeProductId: users.artistStripeProductId,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!rows[0]) return null;
+  return {
+    artswrkPro: rows[0].artswrkPro ?? false,
+    artswrkBasic: rows[0].artswrkBasic ?? false,
+    stripeCustomerId: rows[0].stripeCustomerId,
+    artistStripeProductId: rows[0].artistStripeProductId,
+  };
+}

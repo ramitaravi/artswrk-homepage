@@ -9,7 +9,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { getStripe } from "../stripe";
 import { ENV } from "./env";
-import { activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, getJobById, getUserById } from "../db";
+import { activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, getJobById, getUserById, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription } from "../db";
 import { sendJobPostedEmail } from "../email";
 import { handleBubbleWebhook } from "../bubbleWebhook";
 
@@ -100,7 +100,60 @@ async function startServer() {
         }
 
         if (userId && session.subscription) {
-          await saveClientSubscriptionId(userId, session.subscription);
+          // Check if this is an artist PRO subscription or a client subscription
+          const eventType = session.metadata?.type;
+          if (eventType === "artist_pro_subscription") {
+            await saveArtistProSubscription(userId, session.subscription);
+            if (session.customer) await saveArtistStripeCustomerId(userId, session.customer);
+            console.log(`[Webhook] Activated artist PRO for user ${userId}`);
+          } else {
+            await saveClientSubscriptionId(userId, session.subscription);
+          }
+          if (session.customer && eventType !== "artist_pro_subscription") {
+            await saveClientStripeCustomerId(userId, session.customer);
+          }
+        } else if (userId && session.customer && !session.subscription) {
+          // One-time payment — save customer ID for client
+          await saveClientStripeCustomerId(userId, session.customer);
+        }
+      }
+
+      // Handle artist subscription cancellation / expiry
+      if (event.type === "customer.subscription.deleted") {
+        const subscription = event.data.object as any;
+        const customerId = subscription.customer;
+        // Find user by stripeCustomerId and cancel their PRO status
+        if (customerId) {
+          const { getDb } = await import("../db");
+          const db = await getDb();
+          if (db) {
+            const { users } = await import("../../drizzle/schema");
+            const { eq } = await import("drizzle-orm");
+            await db.update(users).set({ artswrkPro: false, artistStripeProductId: null }).where(eq(users.stripeCustomerId, customerId));
+            console.log(`[Webhook] Cancelled artist PRO for Stripe customer ${customerId}`);
+          }
+        }
+      }
+
+      // Handle artist subscription updates (e.g. reactivation)
+      if (event.type === "customer.subscription.updated") {
+        const subscription = event.data.object as any;
+        const customerId = subscription.customer;
+        const isActive = subscription.status === "active" || subscription.status === "trialing";
+        if (customerId) {
+          const { getDb } = await import("../db");
+          const db = await getDb();
+          if (db) {
+            const { users } = await import("../../drizzle/schema");
+            const { eq } = await import("drizzle-orm");
+            // Only update if this is an artist PRO subscription (check product ID)
+            const productId = subscription.items?.data?.[0]?.price?.product;
+            const { STRIPE_PRODUCTS } = await import("../stripe-products");
+            if (productId === STRIPE_PRODUCTS.ARTIST_PRO.productId) {
+              await db.update(users).set({ artswrkPro: isActive }).where(eq(users.stripeCustomerId, customerId));
+              console.log(`[Webhook] Updated artist PRO status to ${isActive} for customer ${customerId}`);
+            }
+          }
         }
       }
     } catch (err: any) {

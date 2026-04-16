@@ -190,3 +190,57 @@ export async function createBoostCheckoutSession(
   const session = await stripe.checkout.sessions.create(sessionParams);
   return { url: session.url!, sessionId: session.id };
 }
+
+/**
+ * Create a Stripe Checkout Session for an artist PRO subscription.
+ * Uses the existing Stripe product/price IDs.
+ */
+export async function createArtistProCheckoutSession(
+  opts: CreateCheckoutOptions & { interval: "month" | "year" }
+): Promise<{ url: string; sessionId: string }> {
+  const stripe = getStripe();
+  const { ARTIST_PRO } = await import("./stripe-products").then(m => ({ ARTIST_PRO: m.STRIPE_PRODUCTS.ARTIST_PRO }));
+
+  const priceId = opts.interval === "year"
+    ? ARTIST_PRO.annual.priceId
+    : ARTIST_PRO.monthly.priceId;
+
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
+    mode: "subscription",
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: `${opts.origin}/artist-dashboard?plan=pro&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${opts.origin}/subscribe/pro?cancelled=1`,
+    allow_promotion_codes: true,
+    client_reference_id: opts.userId?.toString(),
+    metadata: {
+      user_id: opts.userId?.toString() ?? "",
+      customer_email: opts.email ?? "",
+      type: "artist_pro_subscription",
+      interval: opts.interval,
+    },
+  };
+
+  if (opts.stripeCustomerId) {
+    sessionParams.customer = opts.stripeCustomerId;
+  } else if (opts.email) {
+    sessionParams.customer_email = opts.email;
+  }
+
+  const session = await stripe.checkout.sessions.create(sessionParams);
+  return { url: session.url!, sessionId: session.id };
+}
+
+/**
+ * Create a Stripe Customer Portal session so an artist can manage their subscription.
+ */
+export async function createArtistPortalSession(
+  stripeCustomerId: string,
+  returnUrl: string
+): Promise<{ url: string }> {
+  const stripe = getStripe();
+  const session = await stripe.billingPortal.sessions.create({
+    customer: stripeCustomerId,
+    return_url: returnUrl,
+  });
+  return { url: session.url };
+}

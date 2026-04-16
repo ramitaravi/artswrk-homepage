@@ -6,11 +6,11 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail } from "./email";
 import crypto from "crypto";
-import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe } from "./stripe";
+import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistPortalSession } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
 import { storagePut } from "./storage";
 import { artistResumes } from "../drizzle/schema";
@@ -1328,6 +1328,62 @@ Fields to extract:
           throw new Error("Forbidden: admin only");
         }
         return getAllUsers(input.limit, input.offset);
+      }),
+  }),
+
+  // ── Artist Subscription Management ─────────────────────────────────────────
+  artistSubscription: router({
+    /**
+     * Get the current artist's plan status.
+     * Returns { plan: 'free' | 'basic' | 'pro', stripeCustomerId, subscriptionId }
+     */
+    getCurrentPlan: protectedProcedure.query(async ({ ctx }) => {
+      const info = await getArtistSubscriptionInfo(ctx.user.id);
+      if (!info) return { plan: "free" as const, stripeCustomerId: null, subscriptionId: null };
+      const plan = info.artswrkPro ? "pro" : info.artswrkBasic ? "basic" : "free";
+      return {
+        plan: plan as "free" | "basic" | "pro",
+        stripeCustomerId: info.stripeCustomerId,
+        subscriptionId: info.artistStripeProductId,
+      };
+    }),
+
+    /**
+     * Create a Stripe Checkout session for the artist PRO plan.
+     * interval: 'month' | 'year'
+     */
+    createProCheckout: protectedProcedure
+      .input(z.object({
+        interval: z.enum(["month", "year"]),
+        origin: z.string().url(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const info = await getArtistSubscriptionInfo(ctx.user.id);
+        const { url, sessionId } = await createArtistProCheckoutSession({
+          email: ctx.user.email ?? undefined,
+          userId: ctx.user.id,
+          origin: input.origin,
+          stripeCustomerId: info?.stripeCustomerId ?? null,
+          interval: input.interval,
+        });
+        return { url, sessionId };
+      }),
+
+    /**
+     * Create a Stripe Customer Portal session so the artist can manage their subscription.
+     */
+    createPortalSession: protectedProcedure
+      .input(z.object({ origin: z.string().url() }))
+      .mutation(async ({ input, ctx }) => {
+        const info = await getArtistSubscriptionInfo(ctx.user.id);
+        if (!info?.stripeCustomerId) {
+          throw new Error("No Stripe customer found. Please subscribe first.");
+        }
+        const { url } = await createArtistPortalSession(
+          info.stripeCustomerId,
+          `${input.origin}/artist-dashboard?tab=settings`
+        );
+        return { url };
       }),
   }),
 });
