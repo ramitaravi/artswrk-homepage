@@ -6,7 +6,7 @@
  */
 
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Eye, EyeOff, Sparkles, ArrowRight } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
@@ -111,9 +111,9 @@ export default function Login() {
           </form>
 
           <div className="mt-4 text-center">
-            <a href="#" className="text-xs text-gray-400 hover:text-gray-600 transition-colors underline underline-offset-2">
+            <Link href="/forgot-password" className="text-xs text-gray-400 hover:text-[#F25722] transition-colors underline underline-offset-2">
               Forgot password?
-            </a>
+            </Link>
           </div>
         </div>
 

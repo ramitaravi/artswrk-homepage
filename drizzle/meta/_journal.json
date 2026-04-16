@@ -155,6 +155,13 @@
       "when": 1776310581819,
       "tag": "0021_melted_spirit",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "5",
+      "when": 1776313285783,
+      "tag": "0022_abnormal_glorian",
+      "breakpoints": true
     }
   ]
 }

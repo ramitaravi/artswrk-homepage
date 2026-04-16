@@ -7,6 +7,8 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Jobs from "./pages/Jobs";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import DashboardLayout from "./components/DashboardLayout";
 import Overview from "./pages/dashboard/Overview";
 import DashJobs from "./pages/dashboard/DashJobs";
@@ -47,6 +49,8 @@ function Router() {
       <Route path="/jobs/pro/:companySlug/:jobSlug" component={ProJobDetail} />
       <Route path="/jobs/:locationSlug/:jobSlug" component={JobDetail} />
       <Route path="/login" component={Login} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/post-job/success" component={PostJob} />
       <Route path="/post-job" component={PostJob} />
       <Route path="/signup" component={Signup} />

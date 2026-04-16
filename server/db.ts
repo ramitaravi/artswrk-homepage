@@ -2021,3 +2021,29 @@ export async function getArtistPayments(artistUserId: number): Promise<{
   );
   return (rows[0] as unknown as any[]);
 }
+
+// ─── Password Reset Tokens ────────────────────────────────────────────────────
+
+export async function createPasswordResetToken(userId: number, token: string, expiresAt: Date): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  // Delete any existing tokens for this user first (one active token at a time)
+  await db.execute(`DELETE FROM password_reset_tokens WHERE userId = ${userId}`);
+  const expiresStr = expiresAt.toISOString().slice(0, 19).replace('T', ' ');
+  await db.execute(`INSERT INTO password_reset_tokens (userId, token, expiresAt) VALUES (${userId}, '${token}', '${expiresStr}')`);
+}
+
+export async function getPasswordResetToken(token: string): Promise<{ userId: number; expiresAt: Date } | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.execute(`SELECT userId, expiresAt FROM password_reset_tokens WHERE token = '${token}' LIMIT 1`);
+  const row = (rows[0] as unknown as any[])[0];
+  if (!row) return null;
+  return { userId: row.userId, expiresAt: new Date(row.expiresAt) };
+}
+
+export async function deletePasswordResetToken(token: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.execute(`DELETE FROM password_reset_tokens WHERE token = '${token}'`);
+}

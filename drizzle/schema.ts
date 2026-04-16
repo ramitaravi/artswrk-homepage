@@ -1013,3 +1013,18 @@ export const eoyEmailSnapshots = mysqlTable("eoy_email_snapshots", {
 });
 export type EoyEmailSnapshot = typeof eoyEmailSnapshots.$inferSelect;
 export type InsertEoyEmailSnapshot = typeof eoyEmailSnapshots.$inferInsert;
+
+/**
+ * Password Reset Tokens
+ * Short-lived tokens emailed to users for the forgot-password flow.
+ * Tokens expire after 1 hour and are single-use (deleted on redemption).
+ */
+export const passwordResetTokens = mysqlTable("password_reset_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;
