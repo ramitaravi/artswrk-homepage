@@ -470,6 +470,11 @@
 - [x] Register /artist/profile route in App.tsx
 - [x] 92 vitest tests passing
 
+## Artists Dashboard Grid Improvements
+- [x] Display artist names in "First L." format (e.g. "Ramita R.") in all grid cards
+- [x] Filter out artists with no name data from the grid (267 real artists shown vs 6,646 empty records)
+- [x] Use artist name as color seed fallback for unique colored initials per artist
+
 ## Artist Profile Page Improvements
 - [x] Fix About tab to show Media grid (3 photos) + Resume row + Bio matching the screenshot design
 - [x] Pull real profile photos from Bubble API for imported users (update profilePicture URLs in DB)

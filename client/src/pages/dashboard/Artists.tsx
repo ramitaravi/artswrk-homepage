@@ -33,6 +33,18 @@ function getArtistColor(seed: string | null | undefined) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
+/** Returns "First L." format (e.g. "Ramita R.") */
+function getDisplayName(firstName?: string | null, lastName?: string | null, name?: string | null) {
+  if (firstName && lastName) return `${firstName} ${lastName[0]}.`;
+  if (firstName) return firstName;
+  if (name) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+    return name;
+  }
+  return "Artist";
+}
+
 function getInitials(firstName?: string | null, lastName?: string | null, name?: string | null) {
   if (firstName && lastName) return `${firstName[0]}${lastName[0]}`.toUpperCase();
   if (firstName) return firstName.slice(0, 2).toUpperCase();
@@ -209,9 +221,7 @@ function DiscoverTab({ onBrowse }: { onBrowse: (role?: string) => void }) {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {artists.map((a) => {
-                const displayName = a.firstName && a.lastName
-                  ? `${a.firstName} ${a.lastName}`
-                  : a.name ?? "Artist";
+                const displayName = getDisplayName(a.firstName, a.lastName, a.name);
                 const primaryType = (() => {
                   try { return JSON.parse(a.masterArtistTypes ?? "[]")[0] ?? ""; } catch { return ""; }
                 })();
@@ -233,7 +243,7 @@ function DiscoverTab({ onBrowse }: { onBrowse: (role?: string) => void }) {
                         />
                       ) : null}
                       <div
-                        className={`w-full h-full ${getArtistColor(a.firstName)} flex items-center justify-center text-white text-3xl font-black`}
+                        className={`w-full h-full ${getArtistColor(a.firstName ?? a.name)} flex items-center justify-center text-white text-3xl font-black`}
                         style={{ display: a.profilePicture ? "none" : "flex" }}
                       >
                         {getInitials(a.firstName, a.lastName, a.name)}
@@ -386,9 +396,7 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4">
             {artists.map((a) => {
-              const displayName = a.firstName && a.lastName
-                ? `${a.firstName} ${a.lastName}`
-                : a.name ?? "Artist";
+              const displayName = getDisplayName(a.firstName, a.lastName, a.name);
               const primaryType = (() => {
                 try { return JSON.parse(a.masterArtistTypes ?? "[]")[0] ?? ""; } catch { return ""; }
               })();
@@ -410,7 +418,7 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
                       />
                     ) : null}
                     <div
-                      className={`w-full h-full ${getArtistColor(a.firstName)} flex items-center justify-center text-white text-4xl font-black`}
+                      className={`w-full h-full ${getArtistColor(a.firstName ?? a.name)} flex items-center justify-center text-white text-4xl font-black`}
                       style={{ display: a.profilePicture ? "none" : "flex" }}
                     >
                       {getInitials(a.firstName, a.lastName, a.name)}
@@ -437,9 +445,7 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-100 overflow-hidden">
             {artists.map((a) => {
-              const displayName = a.firstName && a.lastName
-                ? `${a.firstName} ${a.lastName}`
-                : a.name ?? "Artist";
+              const displayName = getDisplayName(a.firstName, a.lastName, a.name);
               const primaryType = (() => {
                 try { return JSON.parse(a.masterArtistTypes ?? "[]")[0] ?? ""; } catch { return ""; }
               })();
@@ -460,7 +466,7 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
                       />
                     ) : null}
                     <div
-                      className={`w-full h-full ${getArtistColor(a.firstName)} flex items-center justify-center text-white text-sm font-black`}
+                      className={`w-full h-full ${getArtistColor(a.firstName ?? a.name)} flex items-center justify-center text-white text-sm font-black`}
                       style={{ display: a.profilePicture ? "none" : "flex" }}
                     >
                       {getInitials(a.firstName, a.lastName, a.name)}

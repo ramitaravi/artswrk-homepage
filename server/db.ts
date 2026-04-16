@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { ClientCompany, InsertClientCompany, InsertUser, bookings, clientCompanies, conversations, interestedArtists, jobs, messages, payments, premiumJobInterestedArtists, premiumJobs, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -1064,7 +1064,14 @@ export async function getArtistsList({
   const db = await getDb();
   if (!db) return { artists: [], total: 0 };
 
-  const conditions = [eq(users.userRole, "Artist")];
+  const conditions = [
+    eq(users.userRole, "Artist"),
+    // Only show artists with at least a name or firstName populated
+    or(
+      and(isNotNull(users.firstName), sql`${users.firstName} != ''`),
+      and(isNotNull(users.name), sql`${users.name} != ''`),
+    )!,
+  ];
 
   if (search) {
     const q = `%${search}%`;
@@ -1191,7 +1198,14 @@ export async function getAdminArtists({
   const db = await getDb();
   if (!db) return { artists: [], total: 0 };
 
-  const conditions = [eq(users.userRole, "Artist")];
+  const conditions = [
+    eq(users.userRole, "Artist"),
+    // Only show artists with at least a name or firstName populated
+    or(
+      and(isNotNull(users.firstName), sql`${users.firstName} != ''`),
+      and(isNotNull(users.name), sql`${users.name} != ''`),
+    )!,
+  ];
   if (search) conditions.push(or(like(users.name, `%${search}%`), like(users.firstName, `%${search}%`), like(users.lastName, `%${search}%`), like(users.email, `%${search}%`))!);
   if (locationSearch) conditions.push(like(users.location, `%${locationSearch}%`));
   if (artistType) conditions.push(like(users.masterArtistTypes, `%${artistType}%`));
