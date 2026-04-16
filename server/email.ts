@@ -117,6 +117,123 @@ export async function sendPasswordResetEmail({
   }
 }
 
+// ─── Typed helper: Application Confirmation (to artist) ─────────────────────
+/**
+ * Sent to the artist who just applied.
+ * NOTE: While not live, all emails are redirected to ramitaravi.94@gmail.com.
+ */
+export async function sendApplicationConfirmationEmail({
+  artistName,
+  jobTitle,
+  jobLocation,
+  jobRate,
+  jobUrl,
+}: {
+  artistName: string;
+  jobTitle: string;
+  jobLocation: string;
+  jobRate: string;
+  jobUrl: string;
+}): Promise<boolean> {
+  // ⚠️  PRE-LAUNCH: always send to test inbox, never to the real artist email
+  const TO = "ramitaravi.94@gmail.com";
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;">
+      <div style="margin-bottom:24px;">
+        <span style="font-weight:900;font-size:22px;color:#F25722;">ARTS</span><span style="font-weight:900;font-size:22px;background:#111;color:#fff;padding:2px 6px;border-radius:4px;margin-left:2px;">WRK</span>
+      </div>
+      <h2 style="font-size:20px;font-weight:700;color:#111;margin-bottom:8px;">You applied! 🎉</h2>
+      <p style="color:#555;font-size:15px;margin-bottom:20px;">Hi ${artistName},<br><br>Your application has been submitted. The hirer will review it and reach out if there's a match. Good luck!</p>
+      <div style="background:#f9f9f9;border-radius:12px;padding:20px;margin-bottom:24px;">
+        <p style="margin:0 0 6px;font-size:13px;color:#999;text-transform:uppercase;letter-spacing:.05em;">Job you applied to</p>
+        <p style="margin:0 0 4px;font-size:17px;font-weight:700;color:#111;">${jobTitle}</p>
+        <p style="margin:0 0 4px;font-size:14px;color:#555;">📍 ${jobLocation}</p>
+        <p style="margin:0;font-size:14px;color:#555;">💰 ${jobRate}</p>
+      </div>
+      <a href="${jobUrl}" style="display:inline-block;background:#F25722;color:#fff;font-weight:700;font-size:15px;padding:14px 28px;border-radius:8px;text-decoration:none;">View Job →</a>
+      <p style="color:#999;font-size:13px;margin-top:24px;">You'll hear from the hirer directly if they'd like to move forward. In the meantime, keep exploring jobs on <a href="https://artswrk.com/jobs" style="color:#F25722;">Artswrk</a>.</p>
+    </div>
+  `;
+
+  if (!process.env.SENDGRID_API_KEY) {
+    console.log(`[email] DEV — application confirmation would send to ${TO}`);
+    return false;
+  }
+  try {
+    await sgMail.send({ to: TO, from: { email: FROM_EMAIL, name: FROM_NAME }, subject: `You applied to: ${jobTitle}`, html });
+    console.log(`[email] Application confirmation sent to ${TO}`);
+    return true;
+  } catch (err: unknown) {
+    console.error("[email] Failed to send application confirmation:", err instanceof Error ? err.message : err);
+    return false;
+  }
+}
+
+// ─── Typed helper: New Applicant Alert (to Artswrk team) ─────────────────────
+/**
+ * Sent to contact@artswrk.com whenever someone applies to any job.
+ * NEVER sent to the actual client — we are not live yet.
+ */
+export async function sendNewApplicantAlertEmail({
+  artistName,
+  artistEmail,
+  jobTitle,
+  jobLocation,
+  jobRate,
+  jobUrl,
+  message,
+  resumeLink,
+}: {
+  artistName: string;
+  artistEmail: string;
+  jobTitle: string;
+  jobLocation: string;
+  jobRate: string;
+  jobUrl: string;
+  message?: string;
+  resumeLink?: string;
+}): Promise<boolean> {
+  // ⚠️  PRE-LAUNCH: always send to team inbox only
+  const TO = "contact@artswrk.com";
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;">
+      <div style="margin-bottom:24px;">
+        <span style="font-weight:900;font-size:22px;color:#F25722;">ARTS</span><span style="font-weight:900;font-size:22px;background:#111;color:#fff;padding:2px 6px;border-radius:4px;margin-left:2px;">WRK</span>
+      </div>
+      <h2 style="font-size:20px;font-weight:700;color:#111;margin-bottom:8px;">New application received 📬</h2>
+      <div style="background:#f9f9f9;border-radius:12px;padding:20px;margin-bottom:20px;">
+        <p style="margin:0 0 6px;font-size:13px;color:#999;text-transform:uppercase;letter-spacing:.05em;">Applicant</p>
+        <p style="margin:0 0 4px;font-size:17px;font-weight:700;color:#111;">${artistName}</p>
+        <p style="margin:0;font-size:14px;color:#555;">${artistEmail}</p>
+        ${resumeLink ? `<p style="margin:8px 0 0;"><a href="${resumeLink}" style="color:#F25722;font-size:14px;">View Resume →</a></p>` : ""}
+      </div>
+      <div style="background:#fff3ee;border-radius:12px;padding:20px;margin-bottom:20px;border:1px solid #ffe0d0;">
+        <p style="margin:0 0 6px;font-size:13px;color:#999;text-transform:uppercase;letter-spacing:.05em;">Job applied to</p>
+        <p style="margin:0 0 4px;font-size:17px;font-weight:700;color:#111;">${jobTitle}</p>
+        <p style="margin:0 0 4px;font-size:14px;color:#555;">📍 ${jobLocation}</p>
+        <p style="margin:0;font-size:14px;color:#555;">💰 ${jobRate}</p>
+      </div>
+      ${message ? `<div style="background:#f9f9f9;border-radius:12px;padding:16px;margin-bottom:20px;"><p style="margin:0 0 6px;font-size:13px;color:#999;text-transform:uppercase;letter-spacing:.05em;">Cover message</p><p style="margin:0;font-size:14px;color:#333;white-space:pre-wrap;">${message}</p></div>` : ""}
+      <a href="${jobUrl}" style="display:inline-block;background:#111;color:#fff;font-weight:700;font-size:15px;padding:14px 28px;border-radius:8px;text-decoration:none;">View Job →</a>
+    </div>
+  `;
+
+  if (!process.env.SENDGRID_API_KEY) {
+    console.log(`[email] DEV — new applicant alert would send to ${TO}`);
+    return false;
+  }
+  try {
+    await sgMail.send({ to: TO, from: { email: FROM_EMAIL, name: FROM_NAME }, subject: `New applicant: ${artistName} → ${jobTitle}`, html });
+    console.log(`[email] New applicant alert sent to ${TO}`);
+    return true;
+  } catch (err: unknown) {
+    console.error("[email] Failed to send new applicant alert:", err instanceof Error ? err.message : err);
+    return false;
+  }
+}
+
 // ─── Typed helper: Job Posted ─────────────────────────────────────────────────
 export async function sendJobPostedEmail(data: JobPostedEmailData): Promise<boolean> {
   return sendTransactionalEmail({

@@ -8,7 +8,7 @@ import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
 import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments } from "./db";
 import { invokeLLM } from "./_core/llm";
-import { sendPasswordResetEmail } from "./email";
+import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail } from "./email";
 import crypto from "crypto";
 import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
@@ -463,6 +463,49 @@ export const appRouter = router({
           isHourlyRate: input.isHourlyRate,
           startDate: input.startDate,
         });
+
+        // Send confirmation + alert emails (non-blocking — never fail the application)
+        try {
+          const job = await getJobDetailById(input.jobId);
+          if (job) {
+            const jobTitle = job.description
+              ? job.description.split("\n")[0].slice(0, 80)
+              : "Open Position";
+            const jobLocation = job.locationAddress ?? "Location TBD";
+            const jobRate = job.openRate
+              ? "Open rate"
+              : job.isHourly
+              ? `$${job.clientHourlyRate ?? job.artistHourlyRate ?? 0}/hr`
+              : `$${job.clientHourlyRate ?? job.artistHourlyRate ?? 0} flat`;
+            const origin = (ctx.req.headers.origin as string) || "https://artswrk.com";
+            const citySlug = (job.locationAddress ?? "remote").split(",")[0].trim().toLowerCase().replace(/\s+/g, "-");
+            const titleSlug = jobTitle.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-");
+            const jobUrl = `${origin}/jobs/${citySlug}/${titleSlug}-${job.id}`;
+
+            await Promise.allSettled([
+              sendApplicationConfirmationEmail({
+                artistName: user.firstName ?? user.name ?? "Artist",
+                jobTitle,
+                jobLocation,
+                jobRate,
+                jobUrl,
+              }),
+              sendNewApplicantAlertEmail({
+                artistName: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.name || user.email || "Unknown",
+                artistEmail: user.email ?? "(no email)",
+                jobTitle,
+                jobLocation,
+                jobRate,
+                jobUrl,
+                message: input.message,
+                resumeLink: input.resumeLink || undefined,
+              }),
+            ]);
+          }
+        } catch (emailErr) {
+          console.error("[submitApplication] Email error (non-fatal):", emailErr);
+        }
+
         return { success: true, applicationId: id };
       }),
 
