@@ -1339,12 +1339,69 @@ Fields to extract:
      */
     getCurrentPlan: protectedProcedure.query(async ({ ctx }) => {
       const info = await getArtistSubscriptionInfo(ctx.user.id);
-      if (!info) return { plan: "free" as const, stripeCustomerId: null, subscriptionId: null };
+      if (!info) return {
+        plan: "free" as const,
+        stripeCustomerId: null,
+        subscriptionId: null,
+        billing: null,
+      };
       const plan = info.artswrkPro ? "pro" : info.artswrkBasic ? "basic" : "free";
+
+      // Fetch live billing details from Stripe if the user has an active subscription
+      let billing: {
+        interval: "month" | "year";
+        intervalLabel: "Monthly" | "Annual";
+        amount: number;
+        currency: string;
+        formattedPrice: string;
+        currentPeriodEnd: number; // Unix timestamp (ms)
+        cancelAtPeriodEnd: boolean;
+      } | null = null;
+
+      if (info.artistStripeProductId && plan !== "free") {
+        try {
+          const { getStripe } = await import("./stripe");
+          const stripe = getStripe();
+          const subscription = await stripe.subscriptions.retrieve(
+            info.artistStripeProductId,
+            { expand: ["items.data.price"] }
+          ) as unknown as {
+            items: { data: Array<{ price: import("stripe").default.Price }> };
+            current_period_end: number;
+            cancel_at_period_end: boolean;
+          };
+          const item = subscription.items.data[0];
+          const price = item?.price;
+          if (price) {
+            const interval = price.recurring?.interval as "month" | "year" | undefined;
+            const amount = price.unit_amount ?? 0;
+            const currency = price.currency ?? "usd";
+            const formattedPrice = (amount / 100).toLocaleString("en-US", {
+              style: "currency",
+              currency: currency.toUpperCase(),
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0,
+            });
+            billing = {
+              interval: interval ?? "month",
+              intervalLabel: interval === "year" ? "Annual" : "Monthly",
+              amount,
+              currency,
+              formattedPrice,
+              currentPeriodEnd: subscription.current_period_end * 1000, // convert to ms
+              cancelAtPeriodEnd: subscription.cancel_at_period_end,
+            };
+          }
+        } catch {
+          // Stripe fetch failed — billing stays null, plan info still returned
+        }
+      }
+
       return {
         plan: plan as "free" | "basic" | "pro",
         stripeCustomerId: info.stripeCustomerId,
         subscriptionId: info.artistStripeProductId,
+        billing,
       };
     }),
 

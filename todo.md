@@ -540,3 +540,7 @@
 - [x] Display real pricing on ArtistSettingsPlan.tsx plan cards (replace $X placeholders)
 - [x] PRO Jobs tab: show inline upsell card/modal for free and Basic artists clicking Apply on a PRO job
 - [x] Post-checkout success banner in artist dashboard when returning with ?plan=basic or ?plan=pro
+
+## Subscription Billing Details
+- [x] Extend getCurrentPlan tRPC query to fetch active subscription from Stripe (interval, price, renewal date)
+- [x] Show billing interval (Monthly / Annual), price amount, and next renewal date on active plan card

@@ -10,7 +10,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import {
   CheckCircle2, Sparkles, Zap, Star, Shield, ChevronRight,
-  ExternalLink, Loader2, Crown, Lock
+  ExternalLink, Loader2, Crown, Lock, Calendar, CreditCard, RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -297,15 +297,49 @@ export default function ArtistSettingsPlan() {
              : currentPlan === "basic" ? "Artswrk Basic"
              : "Free"}
           </p>
-          <p className={`text-sm mt-0.5 ${
-            currentPlan === "pro" ? "text-amber-700"
-            : currentPlan === "basic" ? "text-pink-600"
-            : "text-gray-500"
-          }`}>
-            {currentPlan === "pro" ? "You have full access to all PRO features."
-             : currentPlan === "basic" ? "You can apply to all marketplace jobs."
-             : "Upgrade to apply to jobs and unlock more features."}
-          </p>
+          {/* Live billing details from Stripe */}
+          {planData?.billing ? (
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center gap-1.5 text-sm">
+                <CreditCard size={13} className="text-gray-400 flex-shrink-0" />
+                <span className="font-semibold text-gray-800">
+                  {planData.billing.formattedPrice}
+                </span>
+                <span className="text-gray-500">
+                  / {planData.billing.interval === "year" ? "year" : "month"}
+                </span>
+                <span className={`ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  planData.billing.intervalLabel === "Annual"
+                    ? "bg-green-100 text-green-700"
+                    : "bg-blue-50 text-blue-600"
+                }`}>
+                  {planData.billing.intervalLabel}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-sm text-gray-500">
+                <Calendar size={13} className="text-gray-400 flex-shrink-0" />
+                {planData.billing.cancelAtPeriodEnd ? (
+                  <span className="text-orange-600 font-medium">
+                    Cancels on {new Date(planData.billing.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                  </span>
+                ) : (
+                  <span>
+                    Renews {new Date(planData.billing.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className={`text-sm mt-0.5 ${
+              currentPlan === "pro" ? "text-amber-700"
+              : currentPlan === "basic" ? "text-pink-600"
+              : "text-gray-500"
+            }`}>
+              {currentPlan === "pro" ? "You have full access to all PRO features."
+               : currentPlan === "basic" ? "You can apply to all marketplace jobs."
+               : "Upgrade to apply to jobs and unlock more features."}
+            </p>
+          )}
         </div>
         {isPaid && hasStripeCustomer && (
           <button
