@@ -141,6 +141,13 @@
       "when": 1776306217984,
       "tag": "0019_curved_silver_sable",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1776307218742,
+      "tag": "0020_early_arachne",
+      "breakpoints": true
     }
   ]
 }
