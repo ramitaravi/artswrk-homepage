@@ -8,7 +8,6 @@
  *  - Resume picker (library resumes from DB + upload new)
  *  - Cover message textarea
  *  - Rate pitch (pre-filled, editable if open rate)
- *  - Availability date picker
  *  - Breadcrumbs: Jobs → City → Job Title → Apply
  */
 
@@ -236,7 +235,6 @@ export default function ApplyPage() {
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [rateInput, setRateInput] = useState("");
-  const [startDate, setStartDate] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [localResumes, setLocalResumes] = useState<ResumeItem[]>([]);
@@ -344,7 +342,6 @@ export default function ApplyPage() {
         artistHourlyRate: isHourly ? rateNum : undefined,
         artistFlatRate: !isHourly ? rateNum : undefined,
         isHourlyRate: isHourly,
-        startDate: startDate ? new Date(startDate) : undefined,
       });
       setSubmitted(true);
     } catch (err: any) {
@@ -651,31 +648,6 @@ export default function ApplyPage() {
                   </div>
                 </div>
 
-                {/* ── Availability ── */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                  <h2 className="text-base font-black text-[#111] mb-1">Availability</h2>
-                  <p className="text-xs text-gray-400 mb-3">
-                    When can you start?{" "}
-                    {job.startDate && (
-                      <span className="text-[#111] font-medium">
-                        Job date:{" "}
-                        {new Date(job.startDate).toLocaleDateString("en-US", {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </span>
-                    )}
-                  </p>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    min={new Date().toISOString().split("T")[0]}
-                    className="border-gray-200 focus:border-[#F25722] rounded-xl text-sm"
-                  />
-                </div>
-
                 {/* ── Submit ── */}
                 <Button
                   type="submit"
@@ -768,7 +740,6 @@ export default function ApplyPage() {
                   <ul className="text-xs text-amber-600 space-y-1.5">
                     <li>• Attach a resume to stand out</li>
                     <li>• Mention relevant experience in your message</li>
-                    <li>• Be specific about your availability</li>
                     <li>• Hirers respond fastest within 24 hrs</li>
                   </ul>
                 </div>
