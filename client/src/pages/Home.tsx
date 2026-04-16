@@ -598,7 +598,7 @@ function ForArtists() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest mb-3 artist-grad-text">For Artists</p>
             <h2 className="text-4xl md:text-5xl font-black text-[#111] leading-tight mb-8">
-              Jobs for Arts Workers
+              Jobs for Artists
             </h2>
             <div className="space-y-3">
               {ARTIST_ITEMS.map((item) => (
