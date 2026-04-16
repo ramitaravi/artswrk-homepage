@@ -157,6 +157,9 @@ function Router() {
       <Route path="/app/pro-jobs">
         {() => <AppRoute />}
       </Route>
+      <Route path="/app/settings">
+        {() => <AppRoute />}
+      </Route>
 
       {/* Legacy redirects — old /dashboard/* paths → /app/* */}
       <Route path="/dashboard">
