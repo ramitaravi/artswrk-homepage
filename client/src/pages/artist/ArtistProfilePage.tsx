@@ -12,7 +12,7 @@
  */
 
 import { useState } from "react";
-import { MapPin, Calendar, Share2, Star } from "lucide-react";
+import { MapPin, Calendar, Share2, Star, RefreshCw } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import EditProfileModal from "./EditProfileModal";
 
@@ -258,6 +258,35 @@ export default function ArtistProfilePage() {
 
   const { data: profile, isLoading, refetch } = trpc.artistProfile.getMyProfile.useQuery();
 
+  // Live Bubble data overlay — fetches fresh data from Bubble when bubbleId is available.
+  // Merges on top of DB data so the profile always reflects the latest Bubble state.
+  const bubbleId = (profile as any)?.bubbleId;
+  const { data: bubbleLive, isLoading: bubbleLoading } = trpc.bubble.getArtist.useQuery(
+    { bubbleId: bubbleId! },
+    { enabled: !!bubbleId, staleTime: 5 * 60 * 1000 }
+  );
+
+  // Merge: Bubble data wins for fields it has, DB is the fallback
+  const mergedProfile = profile && bubbleLive
+    ? {
+        ...profile,
+        bio: bubbleLive.bio || profile.bio,
+        location: bubbleLive.location || profile.location,
+        profilePicture: bubbleLive.profilePicture || profile.profilePicture,
+        masterArtistTypes: bubbleLive.masterArtistTypes.length > 0 ? bubbleLive.masterArtistTypes : profile.masterArtistTypes,
+        mediaPhotos: bubbleLive.mediaPhotos.length > 0 ? bubbleLive.mediaPhotos : profile.mediaPhotos,
+        isPro: bubbleLive.artswrkPro ?? profile.isPro,
+        instagram: bubbleLive.instagram || profile.instagram,
+        website: bubbleLive.website || profile.website,
+        pronouns: bubbleLive.pronouns || profile.pronouns,
+        phoneNumber: bubbleLive.phoneNumber || profile.phoneNumber,
+        bookingCount: bubbleLive.totalBookings ?? profile.bookingCount,
+        ratingScore: bubbleLive.ratingAverage ? Math.round(bubbleLive.ratingAverage * 10) : profile.ratingScore,
+      }
+    : profile;
+
+  const activeProfile = mergedProfile ?? profile;
+
   const handleShare = () => {
     const url = window.location.href;
     if (navigator.share) {
@@ -302,17 +331,19 @@ export default function ArtistProfilePage() {
     );
   }
 
+  // Use merged profile (Bubble live data wins where available)
+  const p = (activeProfile ?? profile) as any;
+
   // Server returns these as parsed arrays already
   const workTypes: string[] = [
-    ...((profile as any).masterArtistTypes || []),
-    ...((profile as any).workTypes || []),
-  ].filter((v, i, a) => a.indexOf(v) === i); // dedupe
+    ...(p.masterArtistTypes || []),
+    ...(p.workTypes || []),
+  ].filter((v: string, i: number, a: string[]) => a.indexOf(v) === i); // dedupe
   // ratingScore stored as integer ×10 (e.g. 50 = 5.0 stars)
-  const ratingDisplay = profile.ratingScore ? profile.ratingScore / 10 : 0;
-  const joinDate = (profile as any).bubbleCreatedAt || profile.joinedAt || null;
+  const ratingDisplay = p.ratingScore ? p.ratingScore / 10 : 0;
+  const joinDate = p.bubbleCreatedAt || p.joinedAt || null;
 
   // Display name: "Ramita R." format
-  const p = profile as any;
   const displayName = p.firstName
     ? `${p.firstName} ${p.lastName ? p.lastName[0] + "." : ""}`.trim()
     : p.name ?? "";
@@ -337,16 +368,16 @@ export default function ArtistProfilePage() {
             {/* Photo with name/PRO overlay */}
             <div className="relative">
               <div className="aspect-[3/4] bg-gray-200">
-                {profile.profilePicture ? (
+                {p.profilePicture ? (
                   <img
-                    src={profile.profilePicture}
-                    alt={profile.name ?? "Profile"}
+                    src={p.profilePicture}
+                    alt={p.name ?? "Profile"}
                     className="w-full h-full object-cover"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300">
                     <span className="text-6xl font-black text-gray-400">
-                      {profile.name?.[0] ?? "?"}
+                      {p.name?.[0] ?? "?"}
                     </span>
                   </div>
                 )}
@@ -354,12 +385,12 @@ export default function ArtistProfilePage() {
               {/* Name + pronouns gradient overlay */}
               <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/75 via-black/35 to-transparent">
                 <h2 className="text-xl font-black text-white leading-tight">{displayName}</h2>
-                {profile.pronouns && (
-                  <p className="text-sm text-white/80 mt-0.5">{profile.pronouns}</p>
+                {p.pronouns && (
+                  <p className="text-sm text-white/80 mt-0.5">{p.pronouns}</p>
                 )}
               </div>
               {/* PRO badge */}
-              {(profile as any).isPro && (
+              {p.isPro && (
                 <div className="absolute bottom-4 right-4 bg-[#ec008c] text-white text-xs font-black px-2.5 py-1 rounded-md tracking-wider shadow">
                   PRO
                 </div>
@@ -371,15 +402,15 @@ export default function ArtistProfilePage() {
               {/* Stars + bookings */}
               <div className="flex items-center gap-2">
                 <StarRow rating={ratingDisplay} />
-                <span className="text-sm text-gray-600">({profile.bookingCount ?? 0} Bookings)</span>
+                <span className="text-sm text-gray-600">({p.bookingCount ?? 0} Bookings)</span>
               </div>
 
               {/* Location + Joined */}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
-                {profile.location && (
+                {p.location && (
                   <span className="flex items-center gap-1">
                     <MapPin size={12} className="text-gray-400" />
-                    {profile.location}
+                    {p.location}
                   </span>
                 )}
                 {joinDate && (
@@ -447,7 +478,7 @@ export default function ArtistProfilePage() {
           </div>
 
           {/* Tab content */}
-          {activeTab === "about" && <AboutTab profile={profile} />}
+          {activeTab === "about" && <AboutTab profile={p} />}
           {activeTab === "services" && <ServicesTab />}
           {activeTab === "reviews" && <ReviewsTab />}
         </div>

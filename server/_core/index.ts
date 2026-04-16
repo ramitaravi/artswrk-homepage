@@ -11,6 +11,7 @@ import { getStripe } from "../stripe";
 import { ENV } from "./env";
 import { activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, getJobById, getUserById } from "../db";
 import { sendJobPostedEmail } from "../email";
+import { handleBubbleWebhook } from "../bubbleWebhook";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -108,6 +109,10 @@ async function startServer() {
 
     res.json({ received: true });
   });
+
+  // ── Bubble webhook — receives real-time sync events from Bubble Backend Workflows ──
+  // Must be registered BEFORE the global express.json() middleware
+  app.post("/api/webhooks/bubble", express.json({ limit: "1mb" }), handleBubbleWebhook);
 
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));

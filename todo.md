@@ -479,3 +479,13 @@
 - [x] Fix About tab to show Media grid (3 photos) + Resume row + Bio matching the screenshot design
 - [x] Pull real profile photos from Bubble API for imported users (update profilePicture URLs in DB)
 - [x] Fix left card to show work type chips (Dance Adjudicator, Dance Educator) from DB data
+
+## Bubble API Connector (Live Sync)
+- [x] Build server/bubbleApi.ts — typed Bubble REST API client with 5-min in-memory cache
+- [x] Add tRPC procedures: bubble.getArtist, bubble.getLiveJobs, bubble.getLiveJob, bubble.bustCache
+- [x] Build POST /api/webhooks/bubble — receive Bubble workflow events and upsert into DB
+- [x] Add webhook secret verification (BUBBLE_WEBHOOK_SECRET env var)
+- [x] Wire live Bubble data into ArtistProfilePage (fallback to DB if Bubble unreachable)
+- [ ] Wire live Bubble jobs into Jobs dashboard feed (next step)
+- [x] Write vitest tests for webhook receiver and Bubble proxy (12 tests passing)
+- [x] Document Bubble-side setup steps (delivered to user in result message)

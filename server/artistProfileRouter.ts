@@ -73,6 +73,7 @@ export const artistProfileRouter = router({
       phoneNumber: user.phoneNumber || "",
       joinedAt: user.createdAt,
       bubbleCreatedAt: user.bubbleCreatedAt,
+      bubbleId: user.bubbleId || null,
     };
   }),
 
