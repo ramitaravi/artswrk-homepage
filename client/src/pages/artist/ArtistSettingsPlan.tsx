@@ -52,12 +52,16 @@ interface PlanCardProps {
   onUpgrade: (tier: "basic" | "pro") => void;
   isLoading: boolean;
   loadingTier: "basic" | "pro" | null;
+  pricing?: {
+    basic: { monthly: { dollars: string | null }; annual: { dollars: string | null } };
+    pro: { monthly: { dollars: string | null }; annual: { dollars: string | null } };
+  } | null;
+  pricingLoading?: boolean;
 }
 
-function PlanCard({ tier, currentPlan, billingInterval, onUpgrade, isLoading, loadingTier }: PlanCardProps) {
+function PlanCard({ tier, currentPlan, billingInterval, onUpgrade, isLoading, loadingTier, pricing, pricingLoading }: PlanCardProps) {
   const isCurrent = tier === currentPlan;
   const isDowngrade = (tier === "basic" && currentPlan === "pro") || (tier === "free" && currentPlan !== "free");
-  const canUpgrade = !isCurrent && !isDowngrade && tier !== "free";
 
   const features = tier === "free" ? FREE_FEATURES : tier === "basic" ? BASIC_FEATURES : PRO_FEATURES;
   const isPro = tier === "pro";
@@ -67,10 +71,22 @@ function PlanCard({ tier, currentPlan, billingInterval, onUpgrade, isLoading, lo
   const planDesc = tier === "free"
     ? "Forever free"
     : billingInterval === "year"
-    ? "Billed annually — save 20%"
+    ? "Billed annually — save ~20%"
     : "Billed monthly, cancel anytime";
 
   const isThisLoading = loadingTier === tier;
+
+  // Resolve real price from Stripe
+  function getDisplayPrice(): string {
+    if (tier === "free") return "$0";
+    if (pricingLoading) return "…";
+    if (!pricing) return "—";
+    const planPricing = tier === "basic" ? pricing.basic : pricing.pro;
+    const price = billingInterval === "year" ? planPricing.annual : planPricing.monthly;
+    return price.dollars ?? "—";
+  }
+
+  const displayPrice = getDisplayPrice();
 
   return (
     <div className={`rounded-2xl border-2 p-6 flex flex-col relative overflow-hidden transition-shadow ${
@@ -80,7 +96,7 @@ function PlanCard({ tier, currentPlan, billingInterval, onUpgrade, isLoading, lo
         ? "border-pink-200 bg-gradient-to-b from-pink-50 to-white"
         : "border-gray-100 bg-white"
     }`}>
-      {/* Badge */}
+      {/* Badges */}
       {isPro && (
         <div className="absolute top-0 right-0 bg-amber-400 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl">
           Most Popular
@@ -106,14 +122,20 @@ function PlanCard({ tier, currentPlan, billingInterval, onUpgrade, isLoading, lo
         </p>
       </div>
 
-      <p className="text-3xl font-black text-gray-900 mt-1">
-        {tier === "free" ? "$0" : "$X"}
+      {/* Price */}
+      <div className="flex items-end gap-1 mt-1">
+        <p className={`text-3xl font-black text-gray-900 transition-opacity ${pricingLoading && tier !== "free" ? "opacity-40" : ""}`}>
+          {displayPrice}
+        </p>
         {tier !== "free" && (
-          <span className="text-base font-semibold text-gray-400 ml-1">
+          <span className="text-base font-semibold text-gray-400 mb-0.5">
             /{billingInterval === "month" ? "mo" : "yr"}
           </span>
         )}
-      </p>
+        {pricingLoading && tier !== "free" && (
+          <Loader2 size={14} className="animate-spin text-gray-300 mb-1 ml-1" />
+        )}
+      </div>
       <p className={`text-sm mb-5 ${
         isPro ? "text-amber-600" : isBasic ? "text-pink-500" : "text-gray-400"
       }`}>
@@ -181,6 +203,7 @@ export default function ArtistSettingsPlan() {
   const [loadingTier, setLoadingTier] = useState<"basic" | "pro" | null>(null);
 
   const { data: planData, isLoading: planLoading } = trpc.artistSubscription.getCurrentPlan.useQuery();
+  const { data: pricingData, isLoading: pricingLoading } = trpc.artistSubscription.getPricing.useQuery();
 
   const createBasicCheckout = trpc.artistSubscription.createBasicCheckout.useMutation({
     onSuccess: ({ url }) => {
@@ -299,7 +322,7 @@ export default function ArtistSettingsPlan() {
         )}
       </div>
 
-      {/* Billing toggle — only show if not already on PRO */}
+      {/* Billing toggle */}
       {currentPlan !== "pro" && (
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-gray-700">Billing:</span>
@@ -320,14 +343,14 @@ export default function ArtistSettingsPlan() {
             >
               Annual
               <span className="text-[10px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">
-                Save 20%
+                Save ~20%
               </span>
             </button>
           </div>
         </div>
       )}
 
-      {/* Plan Cards — show all 3 tiers */}
+      {/* Plan Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <PlanCard
           tier="free"
@@ -336,6 +359,8 @@ export default function ArtistSettingsPlan() {
           onUpgrade={handleUpgrade}
           isLoading={isLoading}
           loadingTier={loadingTier}
+          pricing={pricingData}
+          pricingLoading={pricingLoading}
         />
         <PlanCard
           tier="basic"
@@ -344,6 +369,8 @@ export default function ArtistSettingsPlan() {
           onUpgrade={handleUpgrade}
           isLoading={isLoading}
           loadingTier={loadingTier}
+          pricing={pricingData}
+          pricingLoading={pricingLoading}
         />
         <PlanCard
           tier="pro"
@@ -352,6 +379,8 @@ export default function ArtistSettingsPlan() {
           onUpgrade={handleUpgrade}
           isLoading={isLoading}
           loadingTier={loadingTier}
+          pricing={pricingData}
+          pricingLoading={pricingLoading}
         />
       </div>
 

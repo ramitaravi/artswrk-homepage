@@ -5,8 +5,7 @@
  * Hirer gradient: #FFBC5D → #F25722
  */
 
-import { useEffect } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -28,6 +27,9 @@ import {
   Loader2,
   Star,
   User,
+  X,
+  Sparkles,
+  CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
@@ -115,6 +117,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [, navigate] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [checkoutBanner, setCheckoutBanner] = useState<"basic" | "pro" | null>(null);
+
+  // Detect post-Stripe-checkout redirect via ?plan= query param
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const plan = params.get("plan");
+    if (plan === "basic" || plan === "pro") {
+      setCheckoutBanner(plan);
+      // Remove the query param from the URL without a page reload
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, "", cleanUrl);
+    }
+  }, []);
 
   // Fetch the full artswrk user record from DB using the authenticated user's email
   const { data: artswrkUser } = trpc.artswrkUsers.getByEmail.useQuery(
@@ -317,6 +332,36 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
           </div>
         </header>
+
+        {/* Post-checkout success banner */}
+        {checkoutBanner && (
+          <div
+            className="flex items-center gap-3 px-5 py-3 text-sm font-semibold text-white flex-shrink-0"
+            style={{ background: checkoutBanner === "pro" ? "linear-gradient(90deg,#FFBC5D,#F25722)" : "linear-gradient(90deg,#ec008c,#ff7171)" }}
+          >
+            <CheckCircle2 size={18} className="flex-shrink-0" />
+            <div className="flex-1">
+              {checkoutBanner === "pro" ? (
+                <span>
+                  <Sparkles size={14} className="inline mr-1" />
+                  Welcome to <strong>Artswrk PRO</strong>! Your subscription is now active. Enjoy exclusive PRO jobs and premium features.
+                </span>
+              ) : (
+                <span>
+                  <Star size={14} className="inline mr-1 fill-white" />
+                  Welcome to <strong>Artswrk Basic</strong>! Your subscription is now active.
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => setCheckoutBanner(null)}
+              className="flex-shrink-0 p-1 rounded-full hover:bg-white/20 transition-colors"
+              aria-label="Dismiss"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">

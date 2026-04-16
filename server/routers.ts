@@ -1349,6 +1349,52 @@ Fields to extract:
     }),
 
     /**
+     * Fetch real pricing from Stripe for Basic and PRO plans.
+     * Returns formatted price strings (e.g. "$9/mo", "$90/yr").
+     * Public so the plan page can show prices before login.
+     */
+    getPricing: publicProcedure.query(async () => {
+      const { getStripe } = await import("./stripe");
+      const { STRIPE_PRODUCTS } = await import("./stripe-products");
+      const stripe = getStripe();
+
+      async function fetchPrice(priceId: string) {
+        try {
+          const price = await stripe.prices.retrieve(priceId);
+          const amount = price.unit_amount ?? 0;
+          const currency = price.currency ?? "usd";
+          const dollars = (amount / 100).toLocaleString("en-US", {
+            style: "currency",
+            currency: currency.toUpperCase(),
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+          });
+          return { dollars, amount, currency };
+        } catch {
+          return { dollars: null, amount: null, currency: "usd" };
+        }
+      }
+
+      const [basicMonthly, basicAnnual, proMonthly, proAnnual] = await Promise.all([
+        fetchPrice(STRIPE_PRODUCTS.ARTIST_BASIC.monthly.priceId),
+        fetchPrice(STRIPE_PRODUCTS.ARTIST_BASIC.annual.priceId),
+        fetchPrice(STRIPE_PRODUCTS.ARTIST_PRO.monthly.priceId),
+        fetchPrice(STRIPE_PRODUCTS.ARTIST_PRO.annual.priceId),
+      ]);
+
+      return {
+        basic: {
+          monthly: basicMonthly,
+          annual: basicAnnual,
+        },
+        pro: {
+          monthly: proMonthly,
+          annual: proAnnual,
+        },
+      };
+    }),
+
+    /**
      * Create a Stripe Checkout session for the artist Basic plan.
      * interval: 'month' | 'year'
      */

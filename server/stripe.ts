@@ -208,8 +208,8 @@ export async function createArtistProCheckoutSession(
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${opts.origin}/artist-dashboard?plan=pro&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${opts.origin}/subscribe/pro?cancelled=1`,
+    success_url: `${opts.origin}/app?plan=pro&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${opts.origin}/app/settings?cancelled=1`,
     allow_promotion_codes: true,
     client_reference_id: opts.userId?.toString(),
     metadata: {
@@ -246,8 +246,8 @@ export async function createArtistBasicCheckoutSession(
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${opts.origin}/artist-dashboard?plan=basic&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${opts.origin}/subscribe/basic?cancelled=1`,
+    success_url: `${opts.origin}/app?plan=basic&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${opts.origin}/app/settings?cancelled=1`,
     allow_promotion_codes: true,
     client_reference_id: opts.userId?.toString(),
     metadata: {

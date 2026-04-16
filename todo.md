@@ -534,3 +534,9 @@
 - [x] Update webhook to handle Basic subscription events (created, updated, deleted)
 - [x] Update ArtistSettingsPlan.tsx to show Free / Basic / PRO three-tier cards
 - [x] Write/update vitest tests for Basic plan (118 total passing)
+
+## Subscription UX Improvements
+- [x] tRPC artistSubscription.getPricing — fetch real prices from Stripe API (Basic monthly/annual, PRO monthly/annual)
+- [x] Display real pricing on ArtistSettingsPlan.tsx plan cards (replace $X placeholders)
+- [x] PRO Jobs tab: show inline upsell card/modal for free and Basic artists clicking Apply on a PRO job
+- [x] Post-checkout success banner in artist dashboard when returning with ?plan=basic or ?plan=pro

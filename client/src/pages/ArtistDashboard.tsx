@@ -26,6 +26,7 @@ import {
   AlertCircle,
   ExternalLink,
   ArrowRight,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
@@ -703,13 +704,98 @@ function ProfileTab({ user }: { user: any }) {
 
 // ─── PRO Jobs Tab ─────────────────────────────────────────────────────────────
 
-function ProJobsTab() {
+function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
+  const { data: planData, isLoading: planLoading } = trpc.artistSubscription.getCurrentPlan.useQuery();
+  const { data: pricingData } = trpc.artistSubscription.getPricing.useQuery();
+  const isPro = planData?.plan === "pro";
+
+  // PRO upsell card for free and basic users
+  if (!planLoading && !isPro) {
+    const proMonthlyPrice = pricingData?.pro?.monthly?.dollars ?? null;
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
+            PRO Jobs <span className="text-xs font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">⭐️</span>
+          </h2>
+        </div>
+
+        {/* Upsell card */}
+        <div className="rounded-2xl border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-6">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <Star size={22} className="text-amber-600 fill-amber-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-black text-gray-900">Unlock PRO Jobs</p>
+              <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                PRO jobs are exclusive listings from top companies — competitions, touring productions, and enterprise studios. Upgrade to PRO to apply to all of them.
+              </p>
+              <ul className="mt-3 space-y-1.5">
+                {["Access enterprise & competition jobs", "Priority placement in search results", "Profile boost & featured badge", "Advanced application analytics"].map(f => (
+                  <li key={f} className="flex items-center gap-2 text-sm text-gray-700">
+                    <CheckCircle2 size={13} className="text-amber-500 flex-shrink-0" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-5 flex items-center gap-3">
+                <button
+                  onClick={onGoToSettings}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90"
+                  style={{ background: "linear-gradient(90deg,#FFBC5D,#F25722)" }}
+                >
+                  <Sparkles size={15} />
+                  {proMonthlyPrice ? `Upgrade to PRO — from ${proMonthlyPrice}/mo` : "Upgrade to PRO"}
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+              {proMonthlyPrice && (
+                <p className="text-xs text-gray-400 mt-2">Annual billing available — save ~20%</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Blurred teaser of PRO jobs */}
+        <div className="relative">
+          <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50 overflow-hidden">
+            {PRO_JOBS.slice(0, 5).map(job => (
+              <div key={job.id} className="flex items-center justify-between p-4 select-none">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-gray-900 blur-sm">{job.title}</p>
+                  <p className="text-xs text-gray-500 blur-sm">{job.company}</p>
+                  <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5 blur-sm">
+                    <MapPin size={10} /> {job.location}
+                  </p>
+                </div>
+                <button
+                  onClick={onGoToSettings}
+                  className="flex-shrink-0 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full hover:bg-amber-100 transition-colors flex items-center gap-1"
+                >
+                  <Star size={11} className="fill-amber-400" /> PRO Only
+                </button>
+              </div>
+            ))}
+          </div>
+          {/* Gradient fade at bottom */}
+          <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-gray-50 to-transparent rounded-b-2xl pointer-events-none" />
+          <p className="text-center text-xs text-gray-400 mt-2">{PRO_JOBS.length} PRO jobs available — upgrade to see all</p>
+        </div>
+      </div>
+    );
+  }
+
+  // PRO user view — full access
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
           PRO Jobs <span className="text-xs font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">⭐️</span>
         </h2>
+        <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full flex items-center gap-1">
+          <Star size={11} className="fill-amber-400" /> PRO Access
+        </span>
       </div>
       <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
         {PRO_JOBS.map(job => (
@@ -763,7 +849,7 @@ export default function ArtistDashboard() {
     if (location.startsWith("/app/payments")) return <PaymentsTab />;
     if (location.startsWith("/app/messages")) return <MessagesTab />;
     if (location.startsWith("/app/profile")) return <ArtistProfilePage />;
-    if (location.startsWith("/app/pro-jobs")) return <ProJobsTab />;
+    if (location.startsWith("/app/pro-jobs")) return <ProJobsTab onGoToSettings={() => { window.location.href = "/app/settings"; }} />;
     if (location.startsWith("/app/benefits")) return <ComingSoonTab icon={<Gift size={40} />} title="Benefits" />;
     if (location.startsWith("/app/community")) return <ComingSoonTab icon={<Users size={40} />} title="Community" />;
     if (location.startsWith("/app/settings")) return <ArtistSettingsPlan />;
