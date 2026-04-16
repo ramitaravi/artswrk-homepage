@@ -10,14 +10,15 @@ import { fetchAllRecords } from "./bubble-client";
 
 interface BubbleClientCompany {
   _id: string;
-  "Name"?: string;
+  "Company Name"?: string;
   "Logo"?: string;
   "Website"?: string;
   "Description"?: string;
-  "Location"?: { address?: string; lat?: number; lng?: number };
-  "Transport Reimbursed"?: boolean;
-  "Transport Details"?: string;
-  "Owner"?: string;          // Bubble user ID of the enterprise client
+  "Company Location"?: { address?: string; lat?: number; lng?: number };
+  "Transport Reimbursed?"?: boolean;
+  "Company Transport Details"?: string;
+  "Client"?: string[];       // Bubble user IDs of the enterprise clients
+  "Created By"?: string;     // Bubble user ID of creator
   "Created Date"?: string;
   "Modified Date"?: string;
 }
@@ -48,7 +49,10 @@ async function main() {
   let inserted = 0, updated = 0, errors = 0;
 
   for (const r of records) {
-    const ownerUserId = r["Owner"] ? (bubbleToUserId[r["Owner"]] ?? null) : null;
+    // "Client" is an array; take the first entry as owner
+  const clientIds = r["Client"] ?? [];
+  const firstClientId = Array.isArray(clientIds) ? clientIds[0] : clientIds;
+  const ownerUserId = firstClientId ? (bubbleToUserId[firstClientId] ?? null) : null;
 
     try {
       const [result] = await conn.execute(
@@ -71,21 +75,21 @@ async function main() {
         [
           r._id,
           ownerUserId ?? 0,          // ownerUserId is NOT NULL; use 0 as sentinel for unresolved
-          r["Name"] ?? null,
+          r["Company Name"] ?? null,
           fixImageUrl(r["Logo"]),
           r["Website"] ?? null,
           r["Description"] ?? null,
-          r["Location"]?.address ?? null,
-          r["Location"]?.lat?.toString() ?? null,
-          r["Location"]?.lng?.toString() ?? null,
-          r["Transport Reimbursed"] ? 1 : 0,
-          r["Transport Details"] ?? null,
+          r["Company Location"]?.address ?? null,
+          r["Company Location"]?.lat?.toString() ?? null,
+          r["Company Location"]?.lng?.toString() ?? null,
+          r["Transport Reimbursed?"] ? 1 : 0,
+          r["Company Transport Details"] ?? null,
         ]
       ) as any;
       if (result.affectedRows === 1) inserted++;
       else updated++;
     } catch (e: any) {
-      console.error(`\nError on company ${r["Name"]} (${r._id}):`, e.message);
+      console.error(`\nError on company ${r["Company Name"]} (${r._id}):`, e.message);
       errors++;
     }
 
