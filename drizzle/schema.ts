@@ -1028,3 +1028,65 @@ export const passwordResetTokens = mysqlTable("password_reset_tokens", {
 });
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;
+
+// ─── Master Artist Types ──────────────────────────────────────────────────────
+
+/**
+ * Lookup table for the 8 master artist type categories (Dance Educator, Photographer, etc.).
+ * Sourced from Bubble option set — seeded from reference_data.ts, not migrated via API.
+ */
+export const masterArtistTypes = mysqlTable("master_artist_types", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Bubble option set value ID */
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  name: varchar("name", { length: 128 }).notNull(),
+  slug: varchar("slug", { length: 128 }),
+  iconUrl: text("iconUrl"),
+  listingOrder: int("listingOrder"),
+  isPublic: boolean("isPublic").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MasterArtistType = typeof masterArtistTypes.$inferSelect;
+export type InsertMasterArtistType = typeof masterArtistTypes.$inferInsert;
+
+// ─── Master Service Types ─────────────────────────────────────────────────────
+
+/**
+ * Lookup table for the 42 service types grouped under master artist types.
+ * e.g. "Recurring Classes", "Substitute Teacher", "Competition Choreography"
+ * Sourced from Bubble option set — seeded from reference_data.ts.
+ */
+export const masterServiceTypes = mysqlTable("master_service_types", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Bubble option set value ID */
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  name: varchar("name", { length: 128 }).notNull(),
+  slug: varchar("slug", { length: 128 }),
+  /** FK → master_artist_types.id */
+  masterArtistTypeId: int("masterArtistTypeId"),
+  /** Bubble artist type option ID (for cross-referencing) */
+  bubbleArtistTypeId: varchar("bubbleArtistTypeId", { length: 64 }),
+  listingOrder: int("listingOrder"),
+  isPublic: boolean("isPublic").default(true),
+  isMcLandingPage: boolean("isMcLandingPage").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MasterServiceType = typeof masterServiceTypes.$inferSelect;
+export type InsertMasterServiceType = typeof masterServiceTypes.$inferInsert;
+
+// ─── Master Style Types ───────────────────────────────────────────────────────
+
+/**
+ * Lookup table for the 34 dance style/discipline option set values.
+ * e.g. "Ballet", "Jazz", "Hip Hop", "Contemporary"
+ * Sourced from Bubble option set — seeded from reference_data.ts.
+ */
+export const masterStyleTypes = mysqlTable("master_style_types", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Bubble option set value ID */
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  name: varchar("name", { length: 128 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MasterStyleType = typeof masterStyleTypes.$inferSelect;
+export type InsertMasterStyleType = typeof masterStyleTypes.$inferInsert;
