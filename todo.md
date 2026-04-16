@@ -505,3 +505,11 @@
 - [x] Update DanceJudges.tsx to use shared Navbar
 - [x] Update MusicTeachers.tsx to use shared Navbar
 - [x] Update Production.tsx to use shared Navbar
+
+## Apply Gate Modal (Logged-Out Flow)
+- [ ] Build ApplyGateModal component: blurred job teaser (title, location, date, blurred description/budget), email input, submit arrow
+- [ ] tRPC endpoint: checkEmailExists — returns { exists: boolean } for a given email
+- [ ] If email exists → redirect to /login?next=/jobs/:locationSlug/:jobSlug/apply
+- [ ] If email is new → redirect to /join?next=/jobs/:locationSlug/:jobSlug/apply
+- [ ] Wire ApplyGateModal to Jobs page Apply button (logged-out state)
+- [ ] Wire ApplyGateModal to Job Detail page Apply Now button (logged-out state)
