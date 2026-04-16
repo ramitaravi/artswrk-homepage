@@ -30,6 +30,8 @@ import ArtistProfilePage from "./pages/artist/ArtistProfilePage";
 import JobDetail from "./pages/JobDetail";
 import ProJobDetail from "./pages/ProJobDetail";
 import ApplyPage from "./pages/ApplyPage";
+import About from "./pages/About";
+import DanceCompetitions from "./pages/DanceCompetitions";
 
 // DashboardLayout handles auth protection internally (redirects to /login if not authenticated)
 function DashRoute({ component: Component }: { component: React.ComponentType }) {
@@ -57,6 +59,8 @@ function Router() {
       <Route path="/post-job/success" component={PostJob} />
       <Route path="/post-job" component={PostJob} />
       <Route path="/signup" component={Signup} />
+      <Route path="/about" component={About} />
+      <Route path="/dance-competitions" component={DanceCompetitions} />
 
       {/* Dashboard routes — auth protection is inside DashboardLayout */}
       <Route path="/dashboard">

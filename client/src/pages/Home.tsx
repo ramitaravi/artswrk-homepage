@@ -84,7 +84,7 @@ function Navbar() {
 
             <div className="hidden md:flex items-center gap-6">
               <Link href="/jobs" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">Jobs</Link>
-              <a href="#" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">About</a>
+              <Link href="/about" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">About</Link>
 
               <div className="relative" onMouseEnter={() => setHirersOpen(true)} onMouseLeave={() => setHirersOpen(false)}>
                 <button className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-black transition-colors">
@@ -93,7 +93,7 @@ function Navbar() {
                 {hirersOpen && (
                   <div className="absolute top-full left-0 mt-1 w-52 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
                     {["Post a Job", "Browse Artists", "Pricing", "How It Works"].map((item) => (
-                      <a key={item} href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">{item}</a>
+                      <a key={item} href={item === "Post a Job" ? "/post-job" : "#"} className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">{item}</a>
                     ))}
                   </div>
                 )}
@@ -139,8 +139,8 @@ function Navbar() {
 
         {mobileOpen && (
           <div className="md:hidden bg-white border-t border-gray-100 px-5 py-4 space-y-3">
-            {["Jobs", "About", "For Hirers", "For Artists"].map((item) => (
-              <a key={item} href="#" className="block text-sm font-medium text-gray-700 py-1">{item}</a>
+            {(["Jobs", "About", "Dance Competitions", "For Hirers", "For Artists"] as const).map((item) => (
+              <a key={item} href={item === "Jobs" ? "/jobs" : item === "About" ? "/about" : item === "Dance Competitions" ? "/dance-competitions" : "#"} className="block text-sm font-medium text-gray-700 py-1">{item}</a>
             ))}
             <div className="flex gap-3 pt-2">
               {isAuthenticated && user ? (
