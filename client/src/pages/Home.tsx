@@ -440,7 +440,7 @@ function JobPostFlow() {
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 function Hero({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   const [email, setEmail] = useState("");
-  const headline = tab === "hirers" ? "The Hiring Platform for Artists" : "The Jobs Platform for Artists";
+  const headline = tab === "hirers" ? "Hire Artists on Artswrk" : "Jobs for Artists";
   const cta = "Find Work →";
 
   return (
@@ -698,9 +698,8 @@ function JobsForArtists() {
 
 // ─── Logo Ticker ──────────────────────────────────────────────────────────────
 const LOGOS = [
-  "Austen Dance Collective", "Ferrari Dance Center NYC", "Allegra Dance Greenwich",
-  "Armonk Center for Dance", "Broadway Dance Theater", "Steps on Broadway",
-  "Peridance Center", "Broadway Dance Academy",
+  "Susten Dance Collective", "Ferrari Dance Center NYC", "Allegra Dance Greenwich",
+  "Armonk Center for Dance", "Broadway Dance Theater",
 ];
 
 function LogoTicker({ tab }: { tab: Tab }) {
