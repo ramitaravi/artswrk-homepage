@@ -23,6 +23,7 @@ vi.mock("./stripe", async (importOriginal) => {
   return {
     ...actual,
     createArtistProCheckoutSession: vi.fn(),
+    createArtistBasicCheckoutSession: vi.fn(),
     createArtistPortalSession: vi.fn(),
   };
 });
@@ -33,6 +34,7 @@ import {
 } from "./db";
 import {
   createArtistProCheckoutSession,
+  createArtistBasicCheckoutSession,
   createArtistPortalSession,
 } from "./stripe";
 
@@ -141,6 +143,46 @@ describe("createArtistPortalSession helper", () => {
     );
 
     expect(result.url).toContain("billing.stripe.com");
+  });
+});
+
+describe("createArtistBasicCheckoutSession helper", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns a checkout URL and session ID for monthly Basic billing", async () => {
+    vi.mocked(createArtistBasicCheckoutSession).mockResolvedValueOnce({
+      url: "https://checkout.stripe.com/test-basic-monthly",
+      sessionId: "cs_test_basic_monthly_123",
+    });
+
+    const result = await createArtistBasicCheckoutSession({
+      email: "artist@example.com",
+      userId: 42,
+      origin: "https://artswrk.com",
+      stripeCustomerId: null,
+      interval: "month",
+    });
+
+    expect(result.url).toContain("checkout.stripe.com");
+    expect(result.sessionId).toBe("cs_test_basic_monthly_123");
+  });
+
+  it("returns a checkout URL and session ID for annual Basic billing", async () => {
+    vi.mocked(createArtistBasicCheckoutSession).mockResolvedValueOnce({
+      url: "https://checkout.stripe.com/test-basic-annual",
+      sessionId: "cs_test_basic_annual_456",
+    });
+
+    const result = await createArtistBasicCheckoutSession({
+      email: "artist@example.com",
+      userId: 42,
+      origin: "https://artswrk.com",
+      stripeCustomerId: null,
+      interval: "year",
+    });
+
+    expect(result.url).toContain("checkout.stripe.com");
+    expect(result.sessionId).toBe("cs_test_basic_annual_456");
   });
 });
 

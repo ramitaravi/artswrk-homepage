@@ -1,16 +1,37 @@
 /**
  * ARTIST SETTINGS — PLAN MANAGEMENT
- * Shows the artist's current plan (Free / PRO) and lets them upgrade or manage billing.
- * PRO plans: Monthly ($X/mo) or Annual ($X/yr) — uses existing Stripe product/prices.
+ * Three tiers: Free / Basic / PRO
+ * - Free: browse only, no apply
+ * - Basic: apply to all marketplace jobs
+ * - PRO: apply to all jobs including PRO/enterprise + priority placement
  */
 
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { CheckCircle2, Sparkles, Zap, Star, Shield, ChevronRight, ExternalLink, Loader2, Crown } from "lucide-react";
+import {
+  CheckCircle2, Sparkles, Zap, Star, Shield, ChevronRight,
+  ExternalLink, Loader2, Crown, Lock
+} from "lucide-react";
 import { toast } from "sonner";
 
-const PRO_FEATURES = [
+// ─── Plan feature lists ───────────────────────────────────────────────────────
+
+const FREE_FEATURES = [
+  "Browse all job listings",
+  "Build your artist profile",
+  "View job details & requirements",
+];
+
+const BASIC_FEATURES = [
+  "Everything in Free",
   "Apply to all marketplace jobs",
+  "Job application tracking",
+  "Email alerts for new jobs",
+  "Basic profile visibility",
+];
+
+const PRO_FEATURES = [
+  "Everything in Basic",
   "Access PRO & enterprise-only jobs",
   "Priority placement in search results",
   "Profile boost & featured badge",
@@ -19,28 +40,168 @@ const PRO_FEATURES = [
   "Priority support",
 ];
 
-const FREE_FEATURES = [
-  "Browse all job listings",
-  "Build your artist profile",
-  "View job details & requirements",
-];
-
 type BillingInterval = "month" | "year";
+type PlanTier = "free" | "basic" | "pro";
+
+// ─── Plan card component ──────────────────────────────────────────────────────
+
+interface PlanCardProps {
+  tier: PlanTier;
+  currentPlan: PlanTier;
+  billingInterval: BillingInterval;
+  onUpgrade: (tier: "basic" | "pro") => void;
+  isLoading: boolean;
+  loadingTier: "basic" | "pro" | null;
+}
+
+function PlanCard({ tier, currentPlan, billingInterval, onUpgrade, isLoading, loadingTier }: PlanCardProps) {
+  const isCurrent = tier === currentPlan;
+  const isDowngrade = (tier === "basic" && currentPlan === "pro") || (tier === "free" && currentPlan !== "free");
+  const canUpgrade = !isCurrent && !isDowngrade && tier !== "free";
+
+  const features = tier === "free" ? FREE_FEATURES : tier === "basic" ? BASIC_FEATURES : PRO_FEATURES;
+  const isPro = tier === "pro";
+  const isBasic = tier === "basic";
+
+  const planLabel = tier === "free" ? "Free" : tier === "basic" ? "Basic" : "PRO";
+  const planDesc = tier === "free"
+    ? "Forever free"
+    : billingInterval === "year"
+    ? "Billed annually — save 20%"
+    : "Billed monthly, cancel anytime";
+
+  const isThisLoading = loadingTier === tier;
+
+  return (
+    <div className={`rounded-2xl border-2 p-6 flex flex-col relative overflow-hidden transition-shadow ${
+      isPro
+        ? "border-amber-300 bg-gradient-to-b from-amber-50 to-white shadow-md"
+        : isBasic
+        ? "border-pink-200 bg-gradient-to-b from-pink-50 to-white"
+        : "border-gray-100 bg-white"
+    }`}>
+      {/* Badge */}
+      {isPro && (
+        <div className="absolute top-0 right-0 bg-amber-400 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl">
+          Most Popular
+        </div>
+      )}
+      {isCurrent && (
+        <div className={`absolute top-0 ${isPro ? "right-24" : "right-0"} text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl ${
+          isPro ? "bg-amber-600 text-white" : isBasic ? "bg-pink-500 text-white" : "bg-gray-200 text-gray-600"
+        }`}>
+          Current
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-1">
+        {isPro && <Star size={14} className="text-amber-500 fill-amber-500" />}
+        {isBasic && <Zap size={14} className="text-pink-500" />}
+        {tier === "free" && <Shield size={14} className="text-gray-400" />}
+        <p className={`text-sm font-bold uppercase tracking-widest ${
+          isPro ? "text-amber-700" : isBasic ? "text-pink-600" : "text-gray-400"
+        }`}>
+          {planLabel}
+        </p>
+      </div>
+
+      <p className="text-3xl font-black text-gray-900 mt-1">
+        {tier === "free" ? "$0" : "$X"}
+        {tier !== "free" && (
+          <span className="text-base font-semibold text-gray-400 ml-1">
+            /{billingInterval === "month" ? "mo" : "yr"}
+          </span>
+        )}
+      </p>
+      <p className={`text-sm mb-5 ${
+        isPro ? "text-amber-600" : isBasic ? "text-pink-500" : "text-gray-400"
+      }`}>
+        {planDesc}
+      </p>
+
+      {/* Features */}
+      <ul className="space-y-2.5 flex-1">
+        {features.map((f) => (
+          <li key={f} className="flex items-start gap-2 text-sm text-gray-700">
+            <CheckCircle2 size={15} className={`flex-shrink-0 mt-0.5 ${
+              isPro ? "text-amber-500" : isBasic ? "text-pink-400" : "text-gray-400"
+            }`} />
+            {f}
+          </li>
+        ))}
+      </ul>
+
+      {/* CTA */}
+      <div className="mt-6">
+        {isCurrent ? (
+          <div className={`py-2.5 rounded-xl text-sm font-semibold text-center border ${
+            isPro ? "border-amber-200 bg-amber-50 text-amber-700"
+            : isBasic ? "border-pink-200 bg-pink-50 text-pink-600"
+            : "border-gray-100 bg-gray-50 text-gray-400"
+          }`}>
+            Your current plan
+          </div>
+        ) : isDowngrade ? (
+          <div className="py-2.5 rounded-xl text-sm font-semibold text-center border border-gray-100 bg-gray-50 text-gray-400 flex items-center justify-center gap-1.5">
+            <Lock size={13} />
+            Manage via billing portal
+          </div>
+        ) : tier === "free" ? (
+          <div className="py-2.5 rounded-xl text-sm font-semibold text-center border border-gray-100 bg-gray-50 text-gray-400">
+            Always free
+          </div>
+        ) : (
+          <button
+            onClick={() => onUpgrade(tier as "basic" | "pro")}
+            disabled={isLoading}
+            className={`w-full py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-60 ${
+              isPro ? "" : "bg-gradient-to-r from-pink-500 to-rose-500"
+            }`}
+            style={isPro ? { background: "linear-gradient(90deg,#FFBC5D,#F25722)" } : undefined}
+          >
+            {isThisLoading ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Sparkles size={16} />
+            )}
+            {isThisLoading ? "Redirecting…" : `Upgrade to ${planLabel}`}
+            {!isThisLoading && <ChevronRight size={16} />}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ArtistSettingsPlan() {
   const [billingInterval, setBillingInterval] = useState<BillingInterval>("month");
-  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [loadingTier, setLoadingTier] = useState<"basic" | "pro" | null>(null);
 
-  const { data: planData, isLoading: planLoading, refetch } = trpc.artistSubscription.getCurrentPlan.useQuery();
+  const { data: planData, isLoading: planLoading } = trpc.artistSubscription.getCurrentPlan.useQuery();
 
-  const createCheckout = trpc.artistSubscription.createProCheckout.useMutation({
+  const createBasicCheckout = trpc.artistSubscription.createBasicCheckout.useMutation({
     onSuccess: ({ url }) => {
       window.open(url, "_blank");
-      setIsRedirecting(false);
-      toast.success("Redirecting to checkout…", { description: "Complete your subscription in the new tab." });
+      setLoadingTier(null);
+      toast.success("Redirecting to checkout…", { description: "Complete your Basic subscription in the new tab." });
     },
     onError: (err) => {
-      setIsRedirecting(false);
+      setLoadingTier(null);
+      toast.error("Checkout failed", { description: err.message });
+    },
+  });
+
+  const createProCheckout = trpc.artistSubscription.createProCheckout.useMutation({
+    onSuccess: ({ url }) => {
+      window.open(url, "_blank");
+      setLoadingTier(null);
+      toast.success("Redirecting to checkout…", { description: "Complete your PRO subscription in the new tab." });
+    },
+    onError: (err) => {
+      setLoadingTier(null);
       toast.error("Checkout failed", { description: err.message });
     },
   });
@@ -55,12 +216,13 @@ export default function ArtistSettingsPlan() {
     },
   });
 
-  function handleUpgrade() {
-    setIsRedirecting(true);
-    createCheckout.mutate({
-      interval: billingInterval,
-      origin: window.location.origin,
-    });
+  function handleUpgrade(tier: "basic" | "pro") {
+    setLoadingTier(tier);
+    if (tier === "basic") {
+      createBasicCheckout.mutate({ interval: billingInterval, origin: window.location.origin });
+    } else {
+      createProCheckout.mutate({ interval: billingInterval, origin: window.location.origin });
+    }
   }
 
   function handleManageBilling() {
@@ -68,8 +230,9 @@ export default function ArtistSettingsPlan() {
   }
 
   const currentPlan = planData?.plan ?? "free";
-  const isPro = currentPlan === "pro";
+  const isPaid = currentPlan !== "free";
   const hasStripeCustomer = !!planData?.stripeCustomerId;
+  const isLoading = loadingTier !== null;
 
   if (planLoading) {
     return (
@@ -80,7 +243,7 @@ export default function ArtistSettingsPlan() {
   }
 
   return (
-    <div className="space-y-8 max-w-2xl">
+    <div className="space-y-8 max-w-3xl">
       {/* Header */}
       <div>
         <h2 className="text-2xl font-black text-gray-900">Plan & Billing</h2>
@@ -89,154 +252,113 @@ export default function ArtistSettingsPlan() {
 
       {/* Current Plan Badge */}
       <div className={`rounded-2xl border-2 p-5 flex items-center gap-4 ${
-        isPro
+        currentPlan === "pro"
           ? "border-amber-200 bg-amber-50"
+          : currentPlan === "basic"
+          ? "border-pink-200 bg-pink-50"
           : "border-gray-100 bg-gray-50"
       }`}>
         <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-          isPro ? "bg-amber-100" : "bg-gray-100"
+          currentPlan === "pro" ? "bg-amber-100"
+          : currentPlan === "basic" ? "bg-pink-100"
+          : "bg-gray-100"
         }`}>
-          {isPro ? <Crown size={22} className="text-amber-600" /> : <Shield size={22} className="text-gray-400" />}
+          {currentPlan === "pro" ? <Crown size={22} className="text-amber-600" /> :
+           currentPlan === "basic" ? <Zap size={22} className="text-pink-500" /> :
+           <Shield size={22} className="text-gray-400" />}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Current Plan</p>
           <p className="text-xl font-black text-gray-900 mt-0.5">
-            {isPro ? "Artswrk PRO" : currentPlan === "basic" ? "Artswrk Basic" : "Free"}
+            {currentPlan === "pro" ? "Artswrk PRO"
+             : currentPlan === "basic" ? "Artswrk Basic"
+             : "Free"}
           </p>
-          {isPro && (
-            <p className="text-sm text-amber-700 mt-0.5">You have full access to all PRO features.</p>
-          )}
-          {!isPro && (
-            <p className="text-sm text-gray-500 mt-0.5">Upgrade to PRO to unlock all features.</p>
-          )}
+          <p className={`text-sm mt-0.5 ${
+            currentPlan === "pro" ? "text-amber-700"
+            : currentPlan === "basic" ? "text-pink-600"
+            : "text-gray-500"
+          }`}>
+            {currentPlan === "pro" ? "You have full access to all PRO features."
+             : currentPlan === "basic" ? "You can apply to all marketplace jobs."
+             : "Upgrade to apply to jobs and unlock more features."}
+          </p>
         </div>
-        {isPro && hasStripeCustomer && (
+        {isPaid && hasStripeCustomer && (
           <button
             onClick={handleManageBilling}
             disabled={createPortal.isPending}
-            className="flex items-center gap-1.5 text-sm font-semibold text-amber-700 hover:text-amber-900 transition-colors flex-shrink-0"
+            className={`flex items-center gap-1.5 text-sm font-semibold transition-colors flex-shrink-0 ${
+              currentPlan === "pro" ? "text-amber-700 hover:text-amber-900"
+              : "text-pink-600 hover:text-pink-800"
+            }`}
           >
-            {createPortal.isPending ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <ExternalLink size={14} />
-            )}
+            {createPortal.isPending ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
             Manage Billing
           </button>
         )}
       </div>
 
-      {/* Plan Cards */}
-      {!isPro && (
-        <>
-          {/* Billing toggle */}
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-gray-700">Billing:</span>
-            <div className="flex items-center bg-gray-100 rounded-full p-1 gap-1">
-              <button
-                onClick={() => setBillingInterval("month")}
-                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
-                  billingInterval === "month"
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setBillingInterval("year")}
-                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all flex items-center gap-1.5 ${
-                  billingInterval === "year"
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                Annual
-                <span className="text-[10px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">
-                  Save 20%
-                </span>
-              </button>
-            </div>
+      {/* Billing toggle — only show if not already on PRO */}
+      {currentPlan !== "pro" && (
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-gray-700">Billing:</span>
+          <div className="flex items-center bg-gray-100 rounded-full p-1 gap-1">
+            <button
+              onClick={() => setBillingInterval("month")}
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                billingInterval === "month" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setBillingInterval("year")}
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all flex items-center gap-1.5 ${
+                billingInterval === "year" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Annual
+              <span className="text-[10px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">
+                Save 20%
+              </span>
+            </button>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Free Plan */}
-            <div className="rounded-2xl border-2 border-gray-100 bg-white p-6 flex flex-col">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Free</p>
-                <span className="text-xs font-bold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Current</span>
-              </div>
-              <p className="text-3xl font-black text-gray-900 mt-1">$0</p>
-              <p className="text-sm text-gray-400 mb-5">Forever free</p>
-
-              <ul className="space-y-2.5 flex-1">
-                {FREE_FEATURES.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-gray-600">
-                    <CheckCircle2 size={15} className="text-gray-400 flex-shrink-0 mt-0.5" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-
-              <div className="mt-6 py-2.5 rounded-xl text-sm font-semibold text-gray-400 text-center border border-gray-100 bg-gray-50">
-                Your current plan
-              </div>
-            </div>
-
-            {/* PRO Plan */}
-            <div className="rounded-2xl border-2 border-amber-300 bg-gradient-to-b from-amber-50 to-white p-6 flex flex-col relative overflow-hidden">
-              {/* Popular badge */}
-              <div className="absolute top-0 right-0 bg-amber-400 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl">
-                Most Popular
-              </div>
-
-              <div className="flex items-center gap-2 mb-1">
-                <Star size={14} className="text-amber-500 fill-amber-500" />
-                <p className="text-sm font-bold text-amber-700 uppercase tracking-widest">PRO</p>
-              </div>
-              <p className="text-3xl font-black text-gray-900 mt-1">
-                {billingInterval === "month" ? "$X" : "$X"}
-                <span className="text-base font-semibold text-gray-400 ml-1">
-                  /{billingInterval === "month" ? "mo" : "yr"}
-                </span>
-              </p>
-              <p className="text-sm text-amber-600 mb-5">
-                {billingInterval === "year" ? "Billed annually — save 20%" : "Billed monthly, cancel anytime"}
-              </p>
-
-              <ul className="space-y-2.5 flex-1">
-                {PRO_FEATURES.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-gray-700">
-                    <CheckCircle2 size={15} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-
-              <button
-                onClick={handleUpgrade}
-                disabled={isRedirecting || createCheckout.isPending}
-                className="mt-6 w-full py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-60"
-                style={{ background: "linear-gradient(90deg,#FFBC5D,#F25722)" }}
-              >
-                {isRedirecting || createCheckout.isPending ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <Sparkles size={16} />
-                )}
-                {isRedirecting || createCheckout.isPending ? "Redirecting…" : "Upgrade to PRO"}
-                {!isRedirecting && !createCheckout.isPending && <ChevronRight size={16} />}
-              </button>
-              <p className="text-xs text-gray-400 text-center mt-2">No commitment · Cancel anytime</p>
-            </div>
-          </div>
-        </>
+        </div>
       )}
 
-      {/* PRO — already subscribed: manage billing */}
-      {isPro && (
+      {/* Plan Cards — show all 3 tiers */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <PlanCard
+          tier="free"
+          currentPlan={currentPlan}
+          billingInterval={billingInterval}
+          onUpgrade={handleUpgrade}
+          isLoading={isLoading}
+          loadingTier={loadingTier}
+        />
+        <PlanCard
+          tier="basic"
+          currentPlan={currentPlan}
+          billingInterval={billingInterval}
+          onUpgrade={handleUpgrade}
+          isLoading={isLoading}
+          loadingTier={loadingTier}
+        />
+        <PlanCard
+          tier="pro"
+          currentPlan={currentPlan}
+          billingInterval={billingInterval}
+          onUpgrade={handleUpgrade}
+          isLoading={isLoading}
+          loadingTier={loadingTier}
+        />
+      </div>
+
+      {/* PRO — already subscribed: feature list */}
+      {currentPlan === "pro" && (
         <div className="rounded-2xl border border-gray-100 bg-white p-6 space-y-4">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2">
             <Zap size={16} className="text-amber-500" />
             <h3 className="text-base font-bold text-gray-900">PRO Features Unlocked</h3>
           </div>
@@ -248,7 +370,6 @@ export default function ArtistSettingsPlan() {
               </li>
             ))}
           </ul>
-
           {hasStripeCustomer && (
             <div className="pt-2 border-t border-gray-100">
               <button
@@ -256,11 +377,7 @@ export default function ArtistSettingsPlan() {
                 disabled={createPortal.isPending}
                 className="flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors"
               >
-                {createPortal.isPending ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <ExternalLink size={14} />
-                )}
+                {createPortal.isPending ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
                 Manage subscription, invoices & payment method
               </button>
             </div>
@@ -274,15 +391,19 @@ export default function ArtistSettingsPlan() {
         <div className="space-y-4 text-sm text-gray-600">
           <div>
             <p className="font-semibold text-gray-800">Can I cancel anytime?</p>
-            <p className="mt-0.5">Yes. You can cancel your PRO subscription at any time from the billing portal. You'll retain access until the end of your billing period.</p>
+            <p className="mt-0.5">Yes. Cancel your subscription at any time from the billing portal. You'll retain access until the end of your billing period.</p>
           </div>
           <div>
-            <p className="font-semibold text-gray-800">What payment methods are accepted?</p>
-            <p className="mt-0.5">All major credit and debit cards are accepted via Stripe. Your payment info is never stored on our servers.</p>
+            <p className="font-semibold text-gray-800">Can I upgrade from Basic to PRO later?</p>
+            <p className="mt-0.5">Absolutely. You can upgrade at any time and we'll prorate the difference. Manage everything from the billing portal.</p>
           </div>
           <div>
             <p className="font-semibold text-gray-800">What's the difference between monthly and annual?</p>
-            <p className="mt-0.5">Annual billing gives you ~20% off compared to monthly. Both plans include all PRO features.</p>
+            <p className="mt-0.5">Annual billing gives you ~20% off compared to monthly. Both include all plan features.</p>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-800">What payment methods are accepted?</p>
+            <p className="mt-0.5">All major credit and debit cards via Stripe. Your payment info is never stored on our servers.</p>
           </div>
         </div>
       </div>

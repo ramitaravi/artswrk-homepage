@@ -525,3 +525,12 @@
 - [x] Plan cards: current plan highlighted, upgrade CTA, manage billing link for active subs
 - [x] Wire Settings tab in ArtistDashboard.tsx to render ArtistSettingsPlan
 - [x] Write vitest tests for subscription logic (7 tests, 116 total passing)
+
+## Artswrk Basic Plan Addition
+- [x] Add ARTIST_BASIC product/prices to stripe-products.ts (prod_Qcyd0J11o6fNHz)
+- [x] Add saveArtistBasicSubscription db helper
+- [x] Add createArtistBasicCheckoutSession to stripe.ts
+- [x] Add tRPC artistSubscription.createBasicCheckout procedure
+- [x] Update webhook to handle Basic subscription events (created, updated, deleted)
+- [x] Update ArtistSettingsPlan.tsx to show Free / Basic / PRO three-tier cards
+- [x] Write/update vitest tests for Basic plan (118 total passing)

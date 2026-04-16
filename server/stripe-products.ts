@@ -36,6 +36,26 @@ export const STRIPE_PRODUCTS = {
     mode: "payment" as const,
   },
   /**
+   * Artist Basic subscription — uses existing Stripe product/prices.
+   * Monthly: price_1Plig7A91H1fWNkKnH5qb40M
+   * Annual:  price_1PligSA91H1fWNkK56t3L1lZ
+   */
+  ARTIST_BASIC: {
+    productId: "prod_Qcyd0J11o6fNHz",
+    name: "Artswrk Basic",
+    description: "Apply to all marketplace jobs and build your artist profile.",
+    currency: "usd",
+    mode: "subscription" as const,
+    monthly: {
+      priceId: "price_1Plig7A91H1fWNkKnH5qb40M",
+      interval: "month" as const,
+    },
+    annual: {
+      priceId: "price_1PligSA91H1fWNkK56t3L1lZ",
+      interval: "year" as const,
+    },
+  },
+  /**
    * Artist PRO subscription — uses existing Stripe product/prices.
    * Monthly: price_1O7U0HA91H1fWNkKa9wA0v6X ($X/mo)
    * Annual:  price_1O7Ts6A91H1fWNkKVlYhqdAi ($X/yr)

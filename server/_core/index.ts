@@ -9,7 +9,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { getStripe } from "../stripe";
 import { ENV } from "./env";
-import { activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, getJobById, getUserById, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription } from "../db";
+import { activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, getJobById, getUserById, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription } from "../db";
 import { sendJobPostedEmail } from "../email";
 import { handleBubbleWebhook } from "../bubbleWebhook";
 
@@ -106,10 +106,14 @@ async function startServer() {
             await saveArtistProSubscription(userId, session.subscription);
             if (session.customer) await saveArtistStripeCustomerId(userId, session.customer);
             console.log(`[Webhook] Activated artist PRO for user ${userId}`);
+          } else if (eventType === "artist_basic_subscription") {
+            await saveArtistBasicSubscription(userId, session.subscription);
+            if (session.customer) await saveArtistStripeCustomerId(userId, session.customer);
+            console.log(`[Webhook] Activated artist Basic for user ${userId}`);
           } else {
             await saveClientSubscriptionId(userId, session.subscription);
           }
-          if (session.customer && eventType !== "artist_pro_subscription") {
+          if (session.customer && eventType !== "artist_pro_subscription" && eventType !== "artist_basic_subscription") {
             await saveClientStripeCustomerId(userId, session.customer);
           }
         } else if (userId && session.customer && !session.subscription) {
@@ -118,19 +122,25 @@ async function startServer() {
         }
       }
 
-      // Handle artist subscription cancellation / expiry
+      // Handle artist subscription cancellation / expiry (Basic or PRO)
       if (event.type === "customer.subscription.deleted") {
         const subscription = event.data.object as any;
         const customerId = subscription.customer;
-        // Find user by stripeCustomerId and cancel their PRO status
         if (customerId) {
           const { getDb } = await import("../db");
           const db = await getDb();
           if (db) {
             const { users } = await import("../../drizzle/schema");
             const { eq } = await import("drizzle-orm");
-            await db.update(users).set({ artswrkPro: false, artistStripeProductId: null }).where(eq(users.stripeCustomerId, customerId));
-            console.log(`[Webhook] Cancelled artist PRO for Stripe customer ${customerId}`);
+            const { STRIPE_PRODUCTS } = await import("../stripe-products");
+            const productId = subscription.items?.data?.[0]?.price?.product;
+            if (productId === STRIPE_PRODUCTS.ARTIST_PRO.productId) {
+              await db.update(users).set({ artswrkPro: false, artistStripeProductId: null }).where(eq(users.stripeCustomerId, customerId));
+              console.log(`[Webhook] Cancelled artist PRO for Stripe customer ${customerId}`);
+            } else if (productId === STRIPE_PRODUCTS.ARTIST_BASIC.productId) {
+              await db.update(users).set({ artswrkBasic: false, artistStripeProductId: null }).where(eq(users.stripeCustomerId, customerId));
+              console.log(`[Webhook] Cancelled artist Basic for Stripe customer ${customerId}`);
+            }
           }
         }
       }
@@ -152,6 +162,9 @@ async function startServer() {
             if (productId === STRIPE_PRODUCTS.ARTIST_PRO.productId) {
               await db.update(users).set({ artswrkPro: isActive }).where(eq(users.stripeCustomerId, customerId));
               console.log(`[Webhook] Updated artist PRO status to ${isActive} for customer ${customerId}`);
+            } else if (productId === STRIPE_PRODUCTS.ARTIST_BASIC.productId) {
+              await db.update(users).set({ artswrkBasic: isActive }).where(eq(users.stripeCustomerId, customerId));
+              console.log(`[Webhook] Updated artist Basic status to ${isActive} for customer ${customerId}`);
             }
           }
         }

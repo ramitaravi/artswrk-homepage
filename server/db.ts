@@ -2217,3 +2217,10 @@ export async function getArtistSubscriptionInfo(userId: number): Promise<{
     artistStripeProductId: rows[0].artistStripeProductId,
   };
 }
+
+/** Save artist Basic subscription ID and mark artswrkBasic = true */
+export async function saveArtistBasicSubscription(userId: number, subscriptionId: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ artswrkBasic: true, artistStripeProductId: subscriptionId }).where(eq(users.id, userId));
+}
