@@ -15,6 +15,7 @@ import { MapView } from "@/components/Map";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toJobUrl } from "./JobDetail";
 import { toProJobUrl } from "./ProJobDetail";
+import SharedNavbar from "@/components/Navbar";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -282,53 +283,8 @@ function SubscriptionPaywallModal({
   );
 }
 
-// ─── Navbar ───────────────────────────────────────────────────────────────────
-
-function Navbar() {
-  return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-100 h-14">
-      <div className="mx-auto px-5 lg:px-10 max-w-7xl h-full flex items-center justify-between">
-        <Link href="/" className="flex items-center select-none">
-          <span className="font-black text-xl tracking-tight hirer-grad-text">ARTS</span>
-          <span className="font-black text-xl tracking-tight bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">
-            WRK
-          </span>
-        </Link>
-        <div className="hidden md:flex items-center gap-5">
-          <Link
-            href="/jobs"
-            className="text-sm font-semibold text-[#111] border-b-2 border-[#F25722]"
-          >
-            Jobs
-          </Link>
-          <a href="#" className="text-sm font-medium text-gray-500 hover:text-black transition-colors">
-            About
-          </a>
-          <a href="#" className="text-sm font-medium text-gray-500 hover:text-black transition-colors">
-            For Hirers
-          </a>
-          <a href="#" className="text-sm font-medium text-gray-500 hover:text-black transition-colors">
-            For Artists
-          </a>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/login?next=/jobs"
-            className="text-sm font-medium text-gray-700 hover:text-black transition-colors"
-          >
-            Login
-          </Link>
-          <Link
-            href="/join?next=/jobs"
-            className="text-sm font-semibold text-white bg-[#111] px-4 py-1.5 rounded-full hover:bg-gray-800 transition-colors"
-          >
-            Join
-          </Link>
-        </div>
-      </div>
-    </nav>
-  );
-}
+// ─── Navbar: using shared auth-aware component ─────────────────────────────────────────────
+const Navbar = SharedNavbar;
 
 // ─── Job Card (Jobs Near Me) ──────────────────────────────────────────────────
 
@@ -798,7 +754,7 @@ export default function Jobs() {
       />
       <Navbar />
 
-      {/* Page header + tabs */}
+      {/* Page header + tabs — pt accounts for fixed nav (64px) + optional logged-in banner (28px) */}
       <div className="pt-14 flex-shrink-0 bg-white border-b border-gray-100">
         <div className="px-5 lg:px-10 py-4 max-w-full">
           <div className="flex items-end justify-between mb-3">

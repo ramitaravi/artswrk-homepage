@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import Navbar from "@/components/Navbar";
 
 // Competition logos (using the artist strip images already in the app + Bubble CDN logos)
 const COMPETITION_LOGOS = [
@@ -97,7 +98,8 @@ export default function DanceCompetitions() {
 
   return (
     <div className="bg-white min-h-screen font-[Poppins,sans-serif]">
-      {/* ── Hero ───────────────────────────────────────────────────────── */}
+      <Navbar />
+      {/* ── Hero ─────────────────────────────────────────────────────────────────── */}
       <section className="pt-28 pb-20 px-5 lg:px-10 text-center">
         <div className="max-w-3xl mx-auto">
           <p className="text-sm font-semibold hirer-grad-text uppercase tracking-widest mb-4">

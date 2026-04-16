@@ -30,6 +30,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
+import Navbar from "@/components/Navbar";
 import {
   slugify,
   extractIdFromSlug,
@@ -484,22 +485,8 @@ export default function ApplyPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
       />
 
-      {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-100 h-14">
-        <div className="mx-auto px-5 lg:px-10 max-w-4xl h-full flex items-center justify-between">
-          <Link href="/" className="flex items-center select-none">
-            <span className="font-black text-xl tracking-tight hirer-grad-text">ARTS</span>
-            <span className="font-black text-xl tracking-tight bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">
-              WRK
-            </span>
-          </Link>
-          {user && (
-            <span className="text-sm text-gray-500 font-medium hidden sm:block">
-              Applying as <span className="text-[#111] font-semibold">{user.name}</span>
-            </span>
-          )}
-        </div>
-      </nav>
+      {/* Shared auth-aware Navbar */}
+      <Navbar />
 
       <div className="pt-14">
         <div className="max-w-4xl mx-auto px-5 lg:px-10 py-8">

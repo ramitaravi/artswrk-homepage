@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { Mail, Instagram, Linkedin } from "lucide-react";
+import Navbar from "@/components/Navbar";
 
 const NICK_SILVERIO_PHOTO =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/nick-silverio_dcf05567.jpg";
@@ -11,7 +12,8 @@ const RAMITA_PHOTO =
 export default function About() {
   return (
     <div className="bg-white min-h-screen font-[Poppins,sans-serif]">
-      {/* ── Hero ───────────────────────────────────────────────────────── */}
+      <Navbar />
+      {/* ── Hero ─────────────────────────────────────────────────────────────────── */}
       <section className="pt-28 pb-20 px-5 lg:px-10 max-w-7xl mx-auto">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <div>

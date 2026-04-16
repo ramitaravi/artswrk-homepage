@@ -21,6 +21,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { slugify, extractIdFromSlug } from "./JobDetail";
+import Navbar from "@/components/Navbar";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -224,39 +225,8 @@ export default function ProJobDetail() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
       />
 
-      {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-100 h-14">
-        <div className="mx-auto px-5 lg:px-10 max-w-5xl h-full flex items-center justify-between">
-          <Link href="/" className="flex items-center select-none">
-            <span className="font-black text-xl tracking-tight hirer-grad-text">ARTS</span>
-            <span className="font-black text-xl tracking-tight bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">
-              WRK
-            </span>
-          </Link>
-          <div className="flex items-center gap-3">
-            {user ? (
-              <Link
-                href="/artist-dashboard"
-                className="text-sm font-semibold text-white bg-[#111] px-4 py-1.5 rounded-full hover:bg-gray-800 transition-colors"
-              >
-                Dashboard
-              </Link>
-            ) : (
-              <>
-                <Link href="/login" className="text-sm font-medium text-gray-700 hover:text-black">
-                  Login
-                </Link>
-                <Link
-                  href="/login"
-                  className="text-sm font-semibold text-white bg-[#111] px-4 py-1.5 rounded-full hover:bg-gray-800 transition-colors"
-                >
-                  Join
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </nav>
+      {/* Shared auth-aware Navbar */}
+      <Navbar />
 
       <div className="pt-14">
         <div className="max-w-5xl mx-auto px-5 lg:px-10 py-8">

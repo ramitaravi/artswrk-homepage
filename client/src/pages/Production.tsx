@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import Navbar from "@/components/Navbar";
 
 const HOW_IT_WORKS = [
   {
@@ -85,6 +86,7 @@ export default function Production() {
 
   return (
     <div className="bg-white min-h-screen font-[Poppins,sans-serif]">
+      <Navbar />
       {/* ── Hero ── */}
       <section className="pt-28 pb-20 px-5 lg:px-10 text-center">
         <div className="max-w-3xl mx-auto">

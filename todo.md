@@ -489,3 +489,19 @@
 - [ ] Wire live Bubble jobs into Jobs dashboard feed (next step)
 - [x] Write vitest tests for webhook receiver and Bubble proxy (12 tests passing)
 - [x] Document Bubble-side setup steps (delivered to user in result message)
+
+## Shared Auth-Aware Navbar
+- [x] Extract Navbar from Home.tsx into shared client/src/components/Navbar.tsx
+- [x] Navbar shows logged-in banner + Log Out when authenticated, Login/Join when logged out
+- [x] Update Jobs.tsx to use shared Navbar (replaced inline non-auth-aware nav)
+- [x] Update JobDetail.tsx to use shared Navbar
+- [x] Update ProJobDetail.tsx to use shared Navbar
+- [x] Update ApplyPage.tsx to use shared Navbar
+- [x] Update About.tsx to use shared Navbar
+- [x] Update DanceCompetitions.tsx to use shared Navbar
+- [x] Update DanceStudios.tsx to use shared Navbar
+- [x] Update MusicSchools.tsx to use shared Navbar
+- [x] Update DanceTeachers.tsx to use shared Navbar
+- [x] Update DanceJudges.tsx to use shared Navbar
+- [x] Update MusicTeachers.tsx to use shared Navbar
+- [x] Update Production.tsx to use shared Navbar
