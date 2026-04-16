@@ -169,6 +169,13 @@
       "when": 1776353071006,
       "tag": "0023_regular_leper_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1776368978798,
+      "tag": "0024_amused_shinko_yamashiro",
+      "breakpoints": true
     }
   ]
 }
