@@ -2,16 +2,19 @@
  * ARTSWRK JOBS PAGE — ARTIST VIEW
  * Three tabs: Jobs Near Me (map + list) | PRO Jobs | Applications
  * Map: real Google Maps with job pin markers
- * Data: real DB via tRPC publicList
+ * Data: real DB via tRPC (enriched jobs + PRO jobs + artist applications)
  */
 import { useState, useMemo, useRef, useCallback } from "react";
 import {
   Search, MapPin, Clock, ChevronDown, X, Star, Loader2,
   Briefcase, CheckCircle, AlertCircle, Lock, ArrowRight,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { MapView } from "@/components/Map";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { toJobUrl } from "./JobDetail";
+import { toProJobUrl } from "./ProJobDetail";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,6 +31,32 @@ interface DisplayJob {
   lat: number | null;
   lng: number | null;
   isDirect: boolean;
+  clientProfilePicture: string | null;
+  detailUrl: string;
+}
+
+interface DisplayProJob {
+  id: number;
+  title: string;
+  company: string | null;
+  logo: string | null;
+  location: string;
+  budget: string | null;
+  postedAgo: string;
+  workFromAnywhere: boolean;
+  detailUrl: string;
+}
+
+interface DisplayApplication {
+  id: number;
+  title: string;
+  companyName: string | null;
+  location: string;
+  postedAgo: string;
+  datetime: string;    // formatted date/time of the job
+  rate: string | null;
+  status: string | null;
+  jobId: number | null;
   clientProfilePicture: string | null;
 }
 
@@ -230,12 +259,13 @@ function JobCard({
               <p className="text-xs text-gray-500 truncate">{job.companyName}</p>
             )}
           </div>
-          <button
+          <Link
+            href={job.detailUrl}
             className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors"
             onClick={(e) => e.stopPropagation()}
           >
             Apply →
-          </button>
+          </Link>
         </div>
         <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
           <MapPin size={10} className="flex-shrink-0" />
@@ -263,68 +293,64 @@ function JobCard({
 
 // ─── PRO Job Card ─────────────────────────────────────────────────────────────
 
-function ProJobCard({ job }: { job: DisplayJob }) {
+function ProJobCard({ job }: { job: DisplayProJob }) {
   return (
-    <div className="flex items-start gap-3 p-4 rounded-xl border border-yellow-200 bg-amber-50 hover:border-yellow-300 hover:shadow-sm transition-all cursor-pointer">
-      <div className="flex-shrink-0 w-11 h-11 rounded-xl overflow-hidden bg-yellow-100 flex items-center justify-center">
-        {job.clientProfilePicture ? (
-          <img
-            src={job.clientProfilePicture}
-            alt={job.companyName ?? ""}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              const el = e.currentTarget;
-              el.style.display = "none";
-              const fb = el.nextElementSibling as HTMLElement;
-              if (fb) fb.style.display = "flex";
-            }}
-          />
-        ) : null}
-        <div
-          className="w-full h-full flex items-center justify-center text-white text-sm font-black hirer-grad-bg"
-          style={{ display: job.clientProfilePicture ? "none" : "flex" }}
-        >
-          {(job.companyName ?? job.title)[0]?.toUpperCase() ?? "?"}
-        </div>
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <Star size={11} className="text-yellow-500 fill-yellow-500 flex-shrink-0" />
-              <span className="text-[10px] font-bold text-yellow-600 uppercase tracking-wide">PRO</span>
-            </div>
-            <h3 className="font-bold text-[#111] text-sm leading-tight truncate">{job.title}</h3>
-            {job.companyName && (
-              <p className="text-xs text-gray-500 truncate">{job.companyName}</p>
-            )}
-          </div>
-          <button
-            className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity"
-            onClick={(e) => e.stopPropagation()}
+    <Link href={job.detailUrl}>
+      <div className="flex items-start gap-3 p-4 rounded-xl border border-yellow-200 bg-amber-50 hover:border-yellow-300 hover:shadow-sm transition-all cursor-pointer">
+        <div className="flex-shrink-0 w-11 h-11 rounded-xl overflow-hidden bg-yellow-100 flex items-center justify-center">
+          {job.logo ? (
+            <img
+              src={job.logo}
+              alt={job.company ?? ""}
+              className="w-full h-full object-contain p-1"
+              onError={(e) => {
+                const el = e.currentTarget;
+                el.style.display = "none";
+                const fb = el.nextElementSibling as HTMLElement;
+                if (fb) fb.style.display = "flex";
+              }}
+            />
+          ) : null}
+          <div
+            className="w-full h-full flex items-center justify-center text-white text-sm font-black hirer-grad-bg"
+            style={{ display: job.logo ? "none" : "flex" }}
           >
-            Apply →
-          </button>
+            {(job.company ?? job.title)[0]?.toUpperCase() ?? "?"}
+          </div>
         </div>
-        <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
-          <MapPin size={10} className="flex-shrink-0" />
-          <span className="truncate">{job.location}</span>
-          <span className="text-gray-200 mx-1">·</span>
-          <span className="flex-shrink-0">Posted {job.postedAgo}</span>
-        </div>
-        <div className="flex items-center gap-2 text-xs flex-wrap">
-          <span className="flex items-center gap-1 text-[#F25722] font-medium">
-            <Clock size={10} />
-            {job.datetime}
-          </span>
-          {job.rate && (
-            <span className="font-medium border border-yellow-200 rounded-full px-2 py-0.5 bg-white text-gray-600">
-              {job.rate}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Star size={11} className="text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                <span className="text-[10px] font-bold text-yellow-600 uppercase tracking-wide">PRO</span>
+              </div>
+              <h3 className="font-bold text-[#111] text-sm leading-tight truncate">{job.title}</h3>
+              {job.company && (
+                <p className="text-xs text-gray-500 truncate">{job.company}</p>
+              )}
+            </div>
+            <span className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold text-white hirer-grad-bg">
+              View →
+            </span>
+          </div>
+          <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
+            <MapPin size={10} className="flex-shrink-0" />
+            <span className="truncate">{job.location}</span>
+            {job.workFromAnywhere && (
+              <span className="text-green-500 font-medium ml-1">· Remote OK</span>
+            )}
+            <span className="text-gray-200 mx-1">·</span>
+            <span className="flex-shrink-0">Posted {job.postedAgo}</span>
+          </div>
+          {job.budget && (
+            <span className="font-medium border border-yellow-200 rounded-full px-2 py-0.5 bg-white text-gray-600 text-xs">
+              {job.budget}
             </span>
           )}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -353,8 +379,8 @@ const APP_STATUS_CONFIG: Record<
   },
 };
 
-function ApplicationCard({ job, status }: { job: DisplayJob; status: AppStatus }) {
-  const cfg = APP_STATUS_CONFIG[status] ?? APP_STATUS_CONFIG.Interested;
+function ApplicationCard({ job, status }: { job: DisplayApplication; status: AppStatus }) {
+  const cfg = APP_STATUS_CONFIG[status as AppStatus] ?? APP_STATUS_CONFIG.Interested;
   return (
     <div className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-white hover:shadow-sm transition-all">
       <div className="flex-shrink-0 w-11 h-11 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
@@ -513,21 +539,36 @@ function JobsMapPanel({
 type Tab = "near-me" | "pro" | "applications";
 
 export default function Jobs() {
-  const [tab, setTab] = useState<Tab>("near-me");
+  const searchStr = useSearch();
+  const searchParams = new URLSearchParams(searchStr);
+  const initialTab = (searchParams.get("tab") as Tab) ?? "near-me";
+
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [search, setSearch] = useState("");
-  const [location, setLocation] = useState("");
+  const [location, setLocation] = useState(searchParams.get("location") ?? "");
   const [artistType, setArtistType] = useState("");
   const [serviceType, setServiceType] = useState("");
   const [selectedJob, setSelectedJob] = useState<DisplayJob | null>(null);
 
-  const { data: rawJobs, isLoading } = trpc.jobs.publicList.useQuery({ limit: 100 });
+  const { user, isAuthenticated } = useAuth();
 
+  // ── Data fetching ─────────────────────────────────────────────────────────
+  const { data: rawJobs, isLoading: jobsLoading } = trpc.jobs.publicListEnriched.useQuery({ limit: 200 });
+  const { data: rawProJobs, isLoading: proJobsLoading } = trpc.artistDashboard.getProJobsFeed.useQuery({ limit: 50 });
+  const { data: rawApplications, isLoading: appsLoading } = trpc.jobs.myApplications.useQuery(
+    { limit: 50 },
+    { enabled: isAuthenticated }
+  );
+
+  const isLoading = jobsLoading;
+
+  // ── Map regular jobs ──────────────────────────────────────────────────────
   const allJobs: DisplayJob[] = useMemo(() => {
     if (!rawJobs) return [];
-    return rawJobs.map((j) => ({
+    return rawJobs.map((j: any) => ({
       id: j.id,
       title: extractTitle(j.description),
-      companyName: null,
+      companyName: j.clientCompanyName ?? j.clientName ?? null,
       location: j.locationAddress
         ? j.locationAddress.split(",").slice(0, 2).join(",").trim()
         : "Work From Anywhere",
@@ -539,15 +580,45 @@ export default function Jobs() {
       lat: j.locationLat ? parseFloat(j.locationLat) : null,
       lng: j.locationLng ? parseFloat(j.locationLng) : null,
       isDirect: j.direct ?? false,
-      clientProfilePicture: null,
+      clientProfilePicture: j.clientProfilePicture ?? null,
+      detailUrl: toJobUrl({ id: j.id, locationAddress: j.locationAddress, description: j.description }),
     }));
   }, [rawJobs]);
 
-  // PRO jobs: use "direct" flag as proxy
-  const proJobs = useMemo(
-    () => allJobs.filter((j) => j.isDirect),
-    [allJobs]
-  );
+  // ── Map PRO jobs ──────────────────────────────────────────────────────────
+  const proJobs: DisplayProJob[] = useMemo(() => {
+    if (!rawProJobs) return [];
+    return (rawProJobs as any[]).map((j) => ({
+      id: j.id,
+      title: j.serviceType ?? "Open Position",
+      company: j.company ?? null,
+      logo: j.logo ?? null,
+      location: j.workFromAnywhere ? "Work From Anywhere" : (j.location ?? "Location TBD"),
+      budget: j.budget ?? null,
+      postedAgo: timeAgo(j.createdAt),
+      workFromAnywhere: !!j.workFromAnywhere,
+      detailUrl: toProJobUrl({ id: j.id, company: j.company, serviceType: j.serviceType }),
+    }));
+  }, [rawProJobs]);
+
+  // ── Map applications ──────────────────────────────────────────────────────
+  const myApplications: DisplayApplication[] = useMemo(() => {
+    if (!rawApplications) return [];
+    return (rawApplications as any[]).map((a) => ({
+      id: a.id,
+      title: extractTitle(a.description),
+      companyName: a.clientCompanyName ?? null,
+      location: a.locationAddress
+        ? a.locationAddress.split(",").slice(0, 2).join(",").trim()
+        : "Work From Anywhere",
+      postedAgo: timeAgo(a.createdAt),
+      datetime: formatDatetime(a.startDate, a.dateType),
+      rate: formatRate(a.isHourly, a.openRate, a.artistHourlyRate, a.clientHourlyRate),
+      status: a.status ?? null,
+      jobId: a.jobId ?? null,
+      clientProfilePicture: a.clientProfilePicture ?? null,
+    }));
+  }, [rawApplications]);
 
   const filtered = useMemo(() => {
     return allJobs.filter((j) => {
@@ -572,7 +643,7 @@ export default function Jobs() {
   const TABS: { id: Tab; label: string; count?: number }[] = [
     { id: "near-me", label: "Jobs Near Me", count: allJobs.length },
     { id: "pro", label: "PRO Jobs", count: proJobs.length },
-    { id: "applications", label: "Applications" },
+    { id: "applications", label: "Applications", count: isAuthenticated ? myApplications.length : undefined },
   ];
 
   return (
@@ -814,7 +885,7 @@ export default function Jobs() {
                 <div>
                   <p className="text-white font-black text-sm">Artswrk PRO</p>
                   <p className="text-white/60 text-xs">
-                    Exclusive jobs from top studios — only visible to PRO members
+                    Exclusive jobs from top studios and enterprise clients
                   </p>
                 </div>
               </div>
@@ -823,7 +894,7 @@ export default function Jobs() {
               </button>
             </div>
 
-            {isLoading ? (
+            {proJobsLoading ? (
               <div className="flex items-center justify-center py-16 text-gray-400">
                 <Loader2 size={20} className="animate-spin mr-2" />
                 <span className="text-sm">Loading PRO jobs...</span>
@@ -835,64 +906,12 @@ export default function Jobs() {
                 ))}
               </div>
             ) : (
-              /* Locked state — blurred preview */
-              <div className="relative">
-                <div className="space-y-3 pointer-events-none select-none">
-                  {[
-                    {
-                      title: "Competition Choreographer",
-                      company: "Elite Dance Academy",
-                      location: "New York, NY",
-                      rate: "$120/hr",
-                    },
-                    {
-                      title: "Ballet Instructor — Recurring",
-                      company: "Manhattan Dance Center",
-                      location: "New York, NY",
-                      rate: "$85/hr",
-                    },
-                    {
-                      title: "Adjudicator — Spring Showcase",
-                      company: "Regional Dance Alliance",
-                      location: "Newark, NJ",
-                      rate: "$200/event",
-                    },
-                  ].map((item, i) => (
-                    <div
-                      key={i}
-                      className="flex items-start gap-3 p-4 rounded-xl border border-yellow-200 bg-amber-50 blur-sm"
-                    >
-                      <div className="w-11 h-11 rounded-xl hirer-grad-bg flex items-center justify-center text-white font-black flex-shrink-0">
-                        {item.title[0]}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-1.5 mb-0.5">
-                          <Star size={11} className="text-yellow-500 fill-yellow-500" />
-                          <span className="text-[10px] font-bold text-yellow-600 uppercase">
-                            PRO
-                          </span>
-                        </div>
-                        <p className="font-bold text-[#111] text-sm">{item.title}</p>
-                        <p className="text-xs text-gray-500">{item.company}</p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {item.location} · {item.rate}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+              <div className="text-center py-16">
+                <div className="w-12 h-12 rounded-full bg-yellow-50 flex items-center justify-center mx-auto mb-3">
+                  <Star size={20} className="text-yellow-400" />
                 </div>
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/70 backdrop-blur-sm rounded-2xl">
-                  <div className="w-12 h-12 rounded-full bg-[#111] flex items-center justify-center mb-3">
-                    <Lock size={20} className="text-yellow-400" />
-                  </div>
-                  <p className="font-black text-[#111] text-base mb-1">PRO Jobs are locked</p>
-                  <p className="text-xs text-gray-500 mb-4 text-center max-w-xs">
-                    Upgrade to Artswrk PRO to unlock exclusive high-paying jobs from top studios.
-                  </p>
-                  <button className="flex items-center gap-1.5 text-sm font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors px-6 py-2.5 rounded-full">
-                    Upgrade to PRO <ArrowRight size={14} />
-                  </button>
-                </div>
+                <p className="text-sm font-semibold text-gray-400">No PRO jobs right now</p>
+                <p className="text-xs text-gray-300 mt-1">Check back soon — new roles are added regularly</p>
               </div>
             )}
           </div>
@@ -903,49 +922,56 @@ export default function Jobs() {
       {tab === "applications" && (
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-3xl mx-auto px-5 py-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-black text-[#111]">Your Applications</h2>
-              <Link
-                href="/login"
-                className="text-xs font-semibold text-[#F25722] hover:underline"
-              >
-                Login to see all →
-              </Link>
-            </div>
-
-            {isLoading ? (
+            {!isAuthenticated ? (
+              /* Not logged in */
+              <div className="mt-8 p-8 rounded-2xl bg-gray-50 border border-gray-100 text-center">
+                <div className="w-12 h-12 rounded-full bg-[#111] flex items-center justify-center mx-auto mb-4">
+                  <Lock size={20} className="text-white" />
+                </div>
+                <p className="text-base font-black text-[#111] mb-1">Track your applications</p>
+                <p className="text-sm text-gray-400 mb-5">
+                  Log in to see all your job applications and their current status.
+                </p>
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-1.5 text-sm font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors px-5 py-2.5 rounded-full"
+                >
+                  Login to Artswrk <ArrowRight size={14} />
+                </Link>
+              </div>
+            ) : appsLoading ? (
               <div className="flex items-center justify-center py-16 text-gray-400">
                 <Loader2 size={20} className="animate-spin mr-2" />
                 <span className="text-sm">Loading applications...</span>
               </div>
+            ) : myApplications.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                  <Briefcase size={20} className="text-gray-300" />
+                </div>
+                <p className="text-sm font-semibold text-gray-400">No applications yet</p>
+                <p className="text-xs text-gray-300 mt-1 mb-4">Browse jobs and apply to get started</p>
+                <button
+                  onClick={() => setTab("near-me")}
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#F25722] hover:underline"
+                >
+                  Browse jobs <ArrowRight size={13} />
+                </button>
+              </div>
             ) : (
               <div className="space-y-3">
-                {/* Demo: first 3 jobs as sample applications with different statuses */}
-                {allJobs.slice(0, 3).map((job, i) => (
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-sm font-black text-[#111]">
+                    Your Applications ({myApplications.length})
+                  </h2>
+                </div>
+                {myApplications.map((app) => (
                   <ApplicationCard
-                    key={job.id}
-                    job={job}
-                    status={
-                      (["Interested", "Confirmed", "Declined"] as AppStatus[])[i % 3]
-                    }
+                    key={app.id}
+                    job={app}
+                    status={(app.status ?? "Interested") as AppStatus}
                   />
                 ))}
-
-                {/* Login CTA */}
-                <div className="mt-6 p-5 rounded-2xl bg-gray-50 border border-gray-100 text-center">
-                  <p className="text-sm font-semibold text-[#111] mb-1">
-                    See all your applications
-                  </p>
-                  <p className="text-xs text-gray-400 mb-3">
-                    Log in to track your full application history and status updates.
-                  </p>
-                  <Link
-                    href="/login"
-                    className="inline-flex items-center gap-1.5 text-sm font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors px-5 py-2 rounded-full"
-                  >
-                    Login to Artswrk <ArrowRight size={14} />
-                  </Link>
-                </div>
               </div>
             )}
           </div>

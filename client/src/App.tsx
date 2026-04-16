@@ -25,6 +25,8 @@ import Admin from "./pages/Admin";
 import Enterprise from "./pages/Enterprise";
 import ArtistDashboard from "./pages/ArtistDashboard";
 import ArtistProfilePage from "./pages/artist/ArtistProfilePage";
+import JobDetail from "./pages/JobDetail";
+import ProJobDetail from "./pages/ProJobDetail";
 
 // DashboardLayout handles auth protection internally (redirects to /login if not authenticated)
 function DashRoute({ component: Component }: { component: React.ComponentType }) {
@@ -41,6 +43,9 @@ function Router() {
       {/* Public routes */}
       <Route path="/" component={Home} />
       <Route path="/jobs" component={Jobs} />
+      {/* Job detail pages — PRO route MUST come before the generic :locationSlug route */}
+      <Route path="/jobs/pro/:companySlug/:jobSlug" component={ProJobDetail} />
+      <Route path="/jobs/:locationSlug/:jobSlug" component={JobDetail} />
       <Route path="/login" component={Login} />
       <Route path="/post-job/success" component={PostJob} />
       <Route path="/post-job" component={PostJob} />

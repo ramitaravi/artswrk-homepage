@@ -198,6 +198,131 @@ export async function getPublicJobs(limit = 50, offset = 0) {
     .offset(offset);
 }
 
+/**
+ * Public job listings enriched with client info (company name + avatar).
+ * Used by the /jobs listing page and the SEO job detail page.
+ */
+export async function getPublicJobsEnriched(limit = 100, offset = 0): Promise<{
+  id: number;
+  requestStatus: string | null;
+  startDate: Date | null;
+  endDate: Date | null;
+  dateType: string | null;
+  isHourly: boolean | null;
+  openRate: boolean | null;
+  artistHourlyRate: number | null;
+  clientHourlyRate: number | null;
+  locationAddress: string | null;
+  locationLat: string | null;
+  locationLng: string | null;
+  description: string | null;
+  direct: boolean | null;
+  bubbleCreatedAt: Date | null;
+  // joined from users
+  clientCompanyName: string | null;
+  clientName: string | null;
+  clientProfilePicture: string | null;
+}[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(
+    `SELECT j.id, j.requestStatus, j.startDate, j.endDate, j.dateType,
+       j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate,
+       j.locationAddress, j.locationLat, j.locationLng,
+       j.description, j.direct, j.bubbleCreatedAt,
+       u.clientCompanyName, u.name as clientName,
+       COALESCE(u.enterpriseLogoUrl, u.profilePicture) as clientProfilePicture
+     FROM jobs j
+     LEFT JOIN users u ON j.clientUserId = u.id
+     WHERE j.requestStatus IN ('Active', 'Confirmed', 'Submissions Paused')
+     ORDER BY j.bubbleCreatedAt DESC
+     LIMIT ${limit} OFFSET ${offset}`
+  );
+  return (rows[0] as unknown as any[]);
+}
+
+/**
+ * Get a single public job by ID enriched with client info.
+ * Used for the SEO job detail page.
+ */
+export async function getJobDetailById(id: number): Promise<{
+  id: number;
+  requestStatus: string | null;
+  startDate: Date | null;
+  endDate: Date | null;
+  dateType: string | null;
+  isHourly: boolean | null;
+  openRate: boolean | null;
+  artistHourlyRate: number | null;
+  clientHourlyRate: number | null;
+  locationAddress: string | null;
+  locationLat: string | null;
+  locationLng: string | null;
+  description: string | null;
+  direct: boolean | null;
+  bubbleCreatedAt: Date | null;
+  clientUserId: number | null;
+  clientCompanyName: string | null;
+  clientName: string | null;
+  clientProfilePicture: string | null;
+} | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.execute(
+    `SELECT j.id, j.requestStatus, j.startDate, j.endDate, j.dateType,
+       j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate,
+       j.locationAddress, j.locationLat, j.locationLng,
+       j.description, j.direct, j.bubbleCreatedAt, j.clientUserId,
+       u.clientCompanyName, u.name as clientName,
+       COALESCE(u.enterpriseLogoUrl, u.profilePicture) as clientProfilePicture
+     FROM jobs j
+     LEFT JOIN users u ON j.clientUserId = u.id
+     WHERE j.id = ${id}
+     LIMIT 1`
+  );
+  const result = (rows[0] as unknown as any[])[0];
+  return result ?? null;
+}
+
+/**
+ * Get a logged-in artist's applications (interested_artists) with job info.
+ */
+export async function getArtistJobApplications(artistUserId: number, limit = 50, offset = 0): Promise<{
+  id: number;
+  status: string | null;
+  createdAt: Date | null;
+  jobId: number | null;
+  description: string | null;
+  locationAddress: string | null;
+  startDate: Date | null;
+  dateType: string | null;
+  isHourly: boolean | null;
+  openRate: boolean | null;
+  artistHourlyRate: number | null;
+  clientHourlyRate: number | null;
+  requestStatus: string | null;
+  clientCompanyName: string | null;
+  clientProfilePicture: string | null;
+}[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(
+    `SELECT ia.id, ia.status, ia.createdAt, ia.jobId,
+       j.description, j.locationAddress, j.startDate, j.dateType,
+       j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate,
+       j.requestStatus,
+       u.clientCompanyName,
+       COALESCE(u.enterpriseLogoUrl, u.profilePicture) as clientProfilePicture
+     FROM interested_artists ia
+     JOIN jobs j ON ia.jobId = j.id
+     LEFT JOIN users u ON j.clientUserId = u.id
+     WHERE ia.artistUserId = ${artistUserId}
+     ORDER BY ia.createdAt DESC
+     LIMIT ${limit} OFFSET ${offset}`
+  );
+  return (rows[0] as unknown as any[]);
+}
+
 export async function setUserPassword(
   userId: number,
   passwordHash: string,
