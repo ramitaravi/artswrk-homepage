@@ -127,6 +127,8 @@ export const users = mysqlTable("users", {
   workTypes: text("workTypes"),
   /** Short tagline shown under name */
   tagline: varchar("tagline", { length: 256 }),
+  /** Priority/featured artist flag from Bubble */
+  priorityList: boolean("priorityList").default(false),
 
   // ── Metadata ───────────────────────────────────────────────────────────────
   bubbleCreatedAt: timestamp("bubbleCreatedAt"),

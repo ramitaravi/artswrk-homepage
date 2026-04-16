@@ -120,6 +120,13 @@
       "when": 1776297958443,
       "tag": "0016_daffy_firebrand",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1776299071863,
+      "tag": "0017_strange_mysterio",
+      "breakpoints": true
     }
   ]
 }

@@ -440,3 +440,12 @@
 - [x] Reviews tab: full review cards with stars, text, reviewer avatar/name/studio/date
 - [x] Seed real reviews data for Ramita
 - [x] Seed real services with sub-service data
+
+## CSV User Import (Bubble Export)
+- [x] Parse 6,689 users from Bubble CSV export (Bio, Instagram, Location, Pronouns, Profile Picture, Priority List, Transportation, email)
+- [x] Add priorityList column to users schema and run db:push
+- [x] Upsert on email: update existing 309 users, insert 6,379 new artists
+- [x] Fix Bubble CDN URLs to https:// prefix
+- [x] Clean Instagram handles (strip full URLs, keep handle only)
+- [x] Generate synthetic openId (bubble_csv_{email}) for new users without OAuth
+- [x] Total users in DB: 6,957 (6,646 artists, 2,157 with bio, 2,896 with photo, 252 priority)
