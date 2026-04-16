@@ -940,6 +940,8 @@ export type InsertUserAffiliation = typeof userAffiliations.$inferInsert;
 export const rateConversions = mysqlTable("rate_conversions", {
   id: int("id").autoincrement().primaryKey(),
   bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  /** "artist_to_client" = suggest client price from artist rate; "client_to_artist" = reverse */
+  conversionType: mysqlEnum("conversionType", ["artist_to_client", "client_to_artist"]).default("artist_to_client"),
   artistRate: double("artistRate"),
   clientRate: double("clientRate"),
   isHourly: boolean("isHourly").default(false),
@@ -986,3 +988,28 @@ export const benefits = mysqlTable("benefits", {
 });
 export type Benefit = typeof benefits.$inferSelect;
 export type InsertBenefit = typeof benefits.$inferInsert;
+
+// ─── End of Year Email Snapshots ──────────────────────────────────────────────
+
+/**
+ * Annual earnings snapshot sent to artists at year end.
+ * Maps to Bubble's "end_of_year_email" type (144 records).
+ */
+export const eoyEmailSnapshots = mysqlTable("eoy_email_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  artistUserId: int("artistUserId"),
+  bubbleArtistId: varchar("bubbleArtistId", { length: 64 }),
+  name: varchar("name", { length: 256 }),
+  email: varchar("email", { length: 320 }),
+  bookings2023: int("bookings2023"),
+  earnings2023: double("earnings2023"),
+  reimbursements2023: double("reimbursements2023"),
+  bookings2024: int("bookings2024"),
+  earnings2024: double("earnings2024"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
+});
+export type EoyEmailSnapshot = typeof eoyEmailSnapshots.$inferSelect;
+export type InsertEoyEmailSnapshot = typeof eoyEmailSnapshots.$inferInsert;
