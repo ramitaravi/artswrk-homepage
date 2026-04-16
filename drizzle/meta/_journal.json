@@ -127,6 +127,13 @@
       "when": 1776299071863,
       "tag": "0017_strange_mysterio",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1776300073473,
+      "tag": "0018_confused_gauntlet",
+      "breakpoints": true
     }
   ]
 }

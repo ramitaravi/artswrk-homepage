@@ -720,6 +720,12 @@ export const artistServiceCategories = mysqlTable("artist_service_categories", {
   subServices: text("subServices"),
   /** Display order */
   sortOrder: int("sortOrder").default(0),
+  /** Whether this sub-service is listed on the public profile */
+  listOnProfile: boolean("listOnProfile").default(true),
+  /** Whether the artist wants job emails for this service */
+  jobEmailEnabled: boolean("jobEmailEnabled").default(true),
+  /** JSON array of per-sub-service settings: [{name, listOnProfile, jobEmailEnabled}] */
+  subServiceSettings: text("subServiceSettings"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type ArtistServiceCategory = typeof artistServiceCategories.$inferSelect;

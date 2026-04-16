@@ -70,6 +70,7 @@ export const artistProfileRouter = router({
       youtube: user.youtube || "",
       website: user.website || "",
       portfolio: user.portfolio || "",
+      phoneNumber: user.phoneNumber || "",
       joinedAt: user.createdAt,
       bubbleCreatedAt: user.bubbleCreatedAt,
     };
@@ -161,6 +162,73 @@ export const artistProfileRouter = router({
     }));
   }),
 
+  /** Update service categories for the current user */
+  updateMyServiceCategories: protectedProcedure
+    .input(
+      z.object({
+        categories: z.array(
+          z.object({
+            id: z.number().optional(), // existing category id
+            name: z.string(),
+            imageUrl: z.string().optional(),
+            subServices: z.array(z.string()),
+            subServiceSettings: z.array(
+              z.object({
+                name: z.string(),
+                listOnProfile: z.boolean(),
+                jobEmailEnabled: z.boolean(),
+              })
+            ).optional(),
+            sortOrder: z.number().optional(),
+          })
+        ),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+
+      // Delete all existing categories for this user and re-insert
+      await db
+        .delete(artistServiceCategories)
+        .where(eq(artistServiceCategories.artistUserId, ctx.user.id));
+
+      for (let i = 0; i < input.categories.length; i++) {
+        const cat = input.categories[i];
+        await db.insert(artistServiceCategories).values({
+          artistUserId: ctx.user.id,
+          name: cat.name,
+          imageUrl: cat.imageUrl || "",
+          subServices: JSON.stringify(cat.subServices),
+          subServiceSettings: cat.subServiceSettings
+            ? JSON.stringify(cat.subServiceSettings)
+            : null,
+          sortOrder: cat.sortOrder ?? i,
+        });
+      }
+
+      return { success: true };
+    }),
+
+  /** Upload a file to S3 and return the URL */
+  uploadFile: protectedProcedure
+    .input(
+      z.object({
+        base64: z.string(),
+        mimeType: z.string(),
+        fileName: z.string(),
+        folder: z.string().default("profile"),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { storagePut } = await import("./storage");
+      const buffer = Buffer.from(input.base64, "base64");
+      const ext = input.fileName.split(".").pop() || "bin";
+      const key = `${input.folder}/${ctx.user.id}-${Date.now()}.${ext}`;
+      const { url } = await storagePut(key, buffer, input.mimeType);
+      return { url };
+    }),
+
   /** Update the currently authenticated user's profile */
   updateMyProfile: protectedProcedure
     .input(
@@ -186,6 +254,7 @@ export const artistProfileRouter = router({
         youtube: z.string().optional(),
         website: z.string().optional(),
         portfolio: z.string().optional(),
+        phoneNumber: z.string().max(32).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -224,6 +293,7 @@ export const artistProfileRouter = router({
       if (input.youtube !== undefined) updateData.youtube = input.youtube;
       if (input.website !== undefined) updateData.website = input.website;
       if (input.portfolio !== undefined) updateData.portfolio = input.portfolio;
+      if (input.phoneNumber !== undefined) updateData.phoneNumber = input.phoneNumber;
 
       // Update combined name if first/last changed
       if (input.firstName !== undefined || input.lastName !== undefined) {

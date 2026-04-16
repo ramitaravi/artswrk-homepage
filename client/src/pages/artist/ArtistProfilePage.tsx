@@ -311,6 +311,17 @@ export default function ArtistProfilePage() {
     ? `${p.firstName} ${p.lastName ? p.lastName[0] + "." : ""}`.trim()
     : p.name ?? "";
 
+  // If edit mode is open, render the full-page edit view as an overlay
+  if (editOpen) {
+    return (
+      <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
+        <EditProfileModal
+          onClose={() => { setEditOpen(false); refetch(); }}
+        />
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="flex gap-6 p-6 items-start">
@@ -436,17 +447,6 @@ export default function ArtistProfilePage() {
         </div>
       </div>
 
-      {/* Edit Profile Modal */}
-      {editOpen && (
-        <EditProfileModal
-          profile={profile}
-          onClose={() => setEditOpen(false)}
-          onSaved={() => {
-            setEditOpen(false);
-            refetch();
-          }}
-        />
-      )}
     </>
   );
 }

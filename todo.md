@@ -449,3 +449,23 @@
 - [x] Clean Instagram handles (strip full URLs, keep handle only)
 - [x] Generate synthetic openId (bubble_csv_{email}) for new users without OAuth
 - [x] Total users in DB: 6,957 (6,646 artists, 2,157 with bio, 2,896 with photo, 252 priority)
+
+## Edit Profile Redesign (match live Artswrk exactly)
+- [ ] Fix PRO badge: set artswrkPro=true for ramitaravi.94@gmail.com in DB
+- [ ] Edit Profile - About tab: circular photo upload, First/Last name, Pronouns+Phone, Bio, Location+Map, Links (Website+Instagram)
+- [ ] Edit Profile - Services tab: Artist Types toggle chips, Services list with List on Profile + Job Emails toggles per sub-service, email notification banner
+- [ ] Edit Profile - Resume tab: drag & drop upload zone (dashed pink, 50MB), My Resumes list with edit/delete
+- [ ] Edit Profile - Media tab: upload zone with pink icon, My Photos grid with delete buttons
+- [ ] Edit Profile opens as full-page view (not modal), with back arrow + Save / Save & Close buttons
+- [ ] Add serviceEmailEnabled column to artist_service_categories table
+
+## Edit Profile Full-Page View
+- [x] Rebuild EditProfileModal as full-page component with 4 tabs (About, Services, Resume, Media)
+- [x] About tab: circular photo upload (Edit/Remove), First+Last Name, Pronouns+Phone, Bio, Location, Links (Website+Instagram)
+- [x] Services tab: pink toggle chips for artist types, per-service List on Profile + Job Emails toggles, Disable All email banner
+- [x] Resume tab: dashed pink drag-and-drop zone (50MB max), My Resumes list with edit/delete icons
+- [x] Media tab: upload zone, My Photos grid with hover-reveal delete buttons
+- [x] phoneNumber field added to DB schema, getMyProfile, and updateMyProfile
+- [x] Wire Edit Profile as full-page overlay (fixed inset-0 z-50) when editOpen=true
+- [x] Register /artist/profile route in App.tsx
+- [x] 92 vitest tests passing

@@ -24,6 +24,7 @@ import Signup from "./pages/Signup";
 import Admin from "./pages/Admin";
 import Enterprise from "./pages/Enterprise";
 import ArtistDashboard from "./pages/ArtistDashboard";
+import ArtistProfilePage from "./pages/artist/ArtistProfilePage";
 
 // DashboardLayout handles auth protection internally (redirects to /login if not authenticated)
 function DashRoute({ component: Component }: { component: React.ComponentType }) {
@@ -89,6 +90,7 @@ function Router() {
 
       {/* Artist Dashboard */}
       <Route path="/artist-dashboard" component={ArtistDashboard} />
+      <Route path="/artist/profile" component={ArtistProfilePage} />
 
       {/* Admin */}
       <Route path="/admin" component={Admin} />
