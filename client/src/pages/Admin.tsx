@@ -1898,7 +1898,7 @@ function SubscriptionsSection() {
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={8} className="px-5 py-10 text-center text-gray-400 text-xs">No subscriptions found</td></tr>
               ) : filtered.map(s => {
-                const initials = s.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "?";
+                const initials = s.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase() || "?";
                 const isChurned = s.status === "canceled";
                 return (
                   <tr key={s.stripeSubId} className={`border-b border-gray-50 hover:bg-gray-50/50 transition-colors ${isChurned ? "opacity-60" : ""}`}>
