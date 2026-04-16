@@ -866,3 +866,65 @@ export const reimbursements = mysqlTable("reimbursements", {
 });
 export type Reimbursement = typeof reimbursements.$inferSelect;
 export type InsertReimbursement = typeof reimbursements.$inferInsert;
+
+// ─── Ads ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Banner/display ads shown on the platform (admin-managed).
+ * Maps to Bubble's "ads" type (1 live record, but growing).
+ */
+export const ads = mysqlTable("ads", {
+  id: int("id").autoincrement().primaryKey(),
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+
+  name: varchar("name", { length: 256 }),
+  link: text("link"),
+  imageUrl: text("imageUrl"),
+  startDate: timestamp("startDate"),
+  endDate: timestamp("endDate"),
+
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
+});
+export type Ad = typeof ads.$inferSelect;
+export type InsertAd = typeof ads.$inferInsert;
+
+// ─── Affiliations ─────────────────────────────────────────────────────────────
+
+/**
+ * Organizations, schools, or programs artists are affiliated with.
+ * Maps to Bubble's "Affiliations" type (36 live records).
+ * e.g. "CLI Conservatory", "University of Arizona", "Acrobatic Arts"
+ */
+export const affiliations = mysqlTable("affiliations", {
+  id: int("id").autoincrement().primaryKey(),
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+
+  display: varchar("display", { length: 256 }).notNull(),
+  slug: varchar("slug", { length: 256 }),
+  logoUrl: text("logoUrl"),
+  isPublic: boolean("isPublic").default(false),
+
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
+});
+export type Affiliation = typeof affiliations.$inferSelect;
+export type InsertAffiliation = typeof affiliations.$inferInsert;
+
+/**
+ * Join table: which artists belong to which affiliation.
+ */
+export const userAffiliations = mysqlTable("user_affiliations", {
+  id: int("id").autoincrement().primaryKey(),
+  affiliationId: int("affiliationId").notNull(),
+  bubbleAffiliationId: varchar("bubbleAffiliationId", { length: 64 }),
+  artistUserId: int("artistUserId"),
+  bubbleArtistId: varchar("bubbleArtistId", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type UserAffiliation = typeof userAffiliations.$inferSelect;
+export type InsertUserAffiliation = typeof userAffiliations.$inferInsert;

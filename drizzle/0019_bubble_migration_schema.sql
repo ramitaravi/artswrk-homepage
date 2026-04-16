@@ -59,7 +59,46 @@ CREATE TABLE `artist_resumes` (
   `bubbleModifiedAt` timestamp NULL
 );
 
--- ─── 7. Create reimbursements table ──────────────────────────────────────────
+-- ─── 7. Create ads table ─────────────────────────────────────────────────────
+CREATE TABLE `ads` (
+  `id` int AUTO_INCREMENT PRIMARY KEY,
+  `bubbleId` varchar(64) UNIQUE,
+  `name` varchar(256),
+  `link` text,
+  `imageUrl` text,
+  `startDate` timestamp NULL,
+  `endDate` timestamp NULL,
+  `createdAt` timestamp NOT NULL DEFAULT (now()),
+  `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+  `bubbleCreatedAt` timestamp NULL,
+  `bubbleModifiedAt` timestamp NULL
+);
+
+-- ─── 8. Create affiliations table ────────────────────────────────────────────
+CREATE TABLE `affiliations` (
+  `id` int AUTO_INCREMENT PRIMARY KEY,
+  `bubbleId` varchar(64) UNIQUE,
+  `display` varchar(256) NOT NULL,
+  `slug` varchar(256),
+  `logoUrl` text,
+  `isPublic` boolean DEFAULT false,
+  `createdAt` timestamp NOT NULL DEFAULT (now()),
+  `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+  `bubbleCreatedAt` timestamp NULL,
+  `bubbleModifiedAt` timestamp NULL
+);
+
+-- ─── 9. Create user_affiliations join table ───────────────────────────────────
+CREATE TABLE `user_affiliations` (
+  `id` int AUTO_INCREMENT PRIMARY KEY,
+  `affiliationId` int NOT NULL,
+  `bubbleAffiliationId` varchar(64),
+  `artistUserId` int,
+  `bubbleArtistId` varchar(64),
+  `createdAt` timestamp NOT NULL DEFAULT (now())
+);
+
+-- ─── 10. Create reimbursements table ─────────────────────────────────────────
 CREATE TABLE `reimbursements` (
   `id` int AUTO_INCREMENT PRIMARY KEY,
   `bubbleId` varchar(64) UNIQUE,
