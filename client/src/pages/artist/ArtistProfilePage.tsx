@@ -1,516 +1,445 @@
 /**
- * ARTIST PROFILE PAGE
- * Matches the live Artswrk profile tab design at artswrk.com/version-live/app?tab=profile
- * Tabs: About | Services | Reviews | Media | Resume
+ * ArtistProfilePage — matches the live artswrk.com profile design exactly.
+ *
+ * Layout: two-column split
+ *   Left (~35%): sticky card — photo fills top, name/pronouns overlaid bottom-left,
+ *                PRO badge bottom-right, stars + bookings, location + joined,
+ *                work-type chips, black Edit Profile button, Share link
+ *   Right (~65%): 3 tabs — About | Services | Reviews
+ *     About:    Media grid (3 photos) + Resume row + Bio
+ *     Services: category cards (image + title + sub-service chips)
+ *     Reviews:  review cards (stars, text, reviewer avatar/name/studio/date)
  */
 
 import { useState } from "react";
-import {
-  MapPin,
-  Calendar,
-  Share2,
-  Edit3,
-  Star,
-  ExternalLink,
-  Instagram,
-  Youtube,
-  Globe,
-  FileText,
-  Image,
-  ChevronDown,
-  ChevronUp,
-  Loader2,
-  BadgeCheck,
-} from "lucide-react";
+import { MapPin, Calendar, Share2, Star } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import EditProfileModal from "./EditProfileModal";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatJoinDate(date: Date | null | undefined): string {
-  if (!date) return "";
-  return new Intl.DateTimeFormat("en-US", { month: "numeric", day: "2-digit", year: "2-digit" }).format(new Date(date));
+function parseJsonArray(val: string | null | undefined): string[] {
+  try { return JSON.parse(val || "[]"); } catch { return []; }
 }
 
-function Avatar({ src, name, size = "lg" }: { src?: string; name: string; size?: "sm" | "md" | "lg" | "xl" }) {
-  const sizes = { sm: "w-10 h-10 text-sm", md: "w-14 h-14 text-base", lg: "w-24 h-24 text-2xl", xl: "w-32 h-32 text-3xl" };
-  const initials = name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt={name}
-        className={`${sizes[size]} rounded-full object-cover flex-shrink-0 border-2 border-white shadow-md`}
-      />
-    );
-  }
+function parseJsonObjects<T>(val: string | null | undefined): T[] {
+  try { return JSON.parse(val || "[]"); } catch { return []; }
+}
+
+function formatDate(d: Date | null | undefined) {
+  if (!d) return "";
+  return new Date(d).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" });
+}
+
+function formatReviewDate(d: Date | null | undefined) {
+  if (!d) return "";
+  return new Date(d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+
+function StarRow({ rating, size = 16 }: { rating: number; size?: number }) {
+  const full = Math.round(rating);
   return (
-    <div className={`${sizes[size]} rounded-full bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center text-white font-black flex-shrink-0 border-2 border-white shadow-md`}>
-      {initials}
+    <div className="flex">
+      {[1, 2, 3, 4, 5].map(i => (
+        <Star
+          key={i}
+          size={size}
+          className={i <= full ? "fill-amber-400 text-amber-400" : "fill-gray-200 text-gray-200"}
+        />
+      ))}
     </div>
   );
 }
 
-function Chip({ label, variant = "default" }: { label: string; variant?: "default" | "pink" | "orange" | "blue" }) {
-  const styles = {
-    default: "bg-gray-100 text-gray-700",
-    pink: "bg-pink-50 text-pink-700",
-    orange: "bg-orange-50 text-orange-700",
-    blue: "bg-blue-50 text-blue-700",
-  };
-  return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${styles[variant]}`}>
-      {label}
-    </span>
-  );
-}
-
-// ─── Tab: About ───────────────────────────────────────────────────────────────
+// ─── About Tab ────────────────────────────────────────────────────────────────
 
 function AboutTab({ profile }: { profile: any }) {
-  const [bioExpanded, setBioExpanded] = useState(false);
-  const bioWords = (profile.bio || "").split(" ");
-  const isLong = bioWords.length > 80;
-  const displayBio = isLong && !bioExpanded ? bioWords.slice(0, 80).join(" ") + "…" : profile.bio;
+  const mediaPhotos = parseJsonArray(profile.mediaPhotos);
+  const resumeFiles = parseJsonObjects<{ url: string; name: string }>(profile.resumeFiles);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Media */}
+      {mediaPhotos.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800 mb-3">Media</h3>
+          <div className="grid grid-cols-3 gap-3">
+            {mediaPhotos.map((url, i) => (
+              <div key={i} className="aspect-square rounded-xl overflow-hidden bg-gray-100">
+                <img src={url} alt={`Media ${i + 1}`} className="w-full h-full object-cover" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Resume */}
+      {resumeFiles.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800 mb-3">Resume</h3>
+          <div className="space-y-2">
+            {resumeFiles.map((f, i) => (
+              <a
+                key={i}
+                href={f.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors group"
+              >
+                <div className="w-9 h-9 rounded-lg bg-pink-100 flex items-center justify-center flex-shrink-0">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#ec008c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <polyline points="14,2 14,8 20,8" stroke="#ec008c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <span className="text-sm font-medium text-gray-700 flex-1">{f.name}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-gray-400 group-hover:text-gray-600 flex-shrink-0">
+                  <polyline points="9,18 15,12 9,6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Bio */}
       {profile.bio && (
         <div>
-          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Bio</h3>
-          <p className="text-sm text-gray-700 leading-relaxed">{displayBio}</p>
-          {isLong && (
-            <button
-              onClick={() => setBioExpanded(e => !e)}
-              className="mt-2 text-xs font-semibold text-orange-600 flex items-center gap-1 hover:text-orange-700 transition-colors"
-            >
-              {bioExpanded ? <><ChevronUp size={13} /> Show less</> : <><ChevronDown size={13} /> Read more</>}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Work Types */}
-      {profile.workTypes?.length > 0 && (
-        <div>
-          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Work</h3>
-          <div className="flex flex-wrap gap-2">
-            {profile.workTypes.map((w: string) => (
-              <Chip key={w} label={w} variant="orange" />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Disciplines */}
-      {profile.artistDisciplines?.length > 0 && (
-        <div>
-          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Disciplines</h3>
-          <div className="flex flex-wrap gap-2">
-            {profile.artistDisciplines.map((d: string) => (
-              <Chip key={d} label={d} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Styles */}
-      {profile.masterStyles?.length > 0 && (
-        <div>
-          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Styles</h3>
-          <div className="flex flex-wrap gap-2">
-            {profile.masterStyles.map((s: string) => (
-              <Chip key={s} label={s} variant="blue" />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Social Links */}
-      {(profile.instagram || profile.tiktok || profile.youtube || profile.website || profile.portfolio) && (
-        <div>
-          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Links</h3>
-          <div className="flex flex-wrap gap-3">
-            {profile.instagram && (
-              <a
-                href={`https://instagram.com/${profile.instagram.replace("@", "")}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 hover:text-pink-600 transition-colors"
-              >
-                <Instagram size={14} /> @{profile.instagram.replace("@", "")}
-              </a>
-            )}
-            {profile.youtube && (
-              <a
-                href={profile.youtube}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 hover:text-red-600 transition-colors"
-              >
-                <Youtube size={14} /> YouTube
-              </a>
-            )}
-            {profile.website && (
-              <a
-                href={profile.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 hover:text-blue-600 transition-colors"
-              >
-                <Globe size={14} /> Website
-              </a>
-            )}
-            {profile.portfolio && (
-              <a
-                href={profile.portfolio}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 hover:text-orange-600 transition-colors"
-              >
-                <ExternalLink size={14} /> Portfolio
-              </a>
-            )}
-          </div>
+          <h3 className="text-sm font-semibold text-gray-800 mb-3">Bio</h3>
+          <p className="text-sm text-gray-600 leading-relaxed">{profile.bio}</p>
         </div>
       )}
     </div>
   );
 }
 
-// ─── Tab: Services ────────────────────────────────────────────────────────────
+// ─── Services Tab ─────────────────────────────────────────────────────────────
 
-function ServicesTab({ profile }: { profile: any }) {
-  const services = profile.artistServices || [];
-  if (services.length === 0) {
+function ServicesTab() {
+  const { data: categories = [], isLoading } = trpc.artistProfile.getMyServiceCategories.useQuery();
+
+  if (isLoading) {
     return (
-      <div className="text-center py-12">
-        <div className="w-12 h-12 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-3">
-          <Star size={20} className="text-gray-400" />
-        </div>
-        <p className="text-sm text-gray-500">No services listed yet.</p>
+      <div className="space-y-6">
+        {[1, 2].map(i => (
+          <div key={i} className="flex gap-5 animate-pulse">
+            <div className="w-40 h-32 rounded-xl bg-gray-100 flex-shrink-0" />
+            <div className="flex-1 space-y-3 pt-2">
+              <div className="h-4 bg-gray-100 rounded w-1/3" />
+              <div className="flex gap-2 flex-wrap">
+                {[1,2,3].map(j => <div key={j} className="h-8 w-28 bg-gray-100 rounded-full" />)}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
+
+  if (categories.length === 0) {
+    return (
+      <div className="text-center py-12 text-gray-400 text-sm">
+        No services added yet.
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {services.map((service: string) => (
-        <div key={service} className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center flex-shrink-0">
-            <Star size={14} className="text-white" />
+    <div className="space-y-6">
+      {categories.map((cat, i) => (
+        <div key={cat.id}>
+          <div className="flex gap-5 items-start">
+            {cat.imageUrl && (
+              <div className="w-40 h-32 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                <img src={cat.imageUrl} alt={cat.name} className="w-full h-full object-cover" />
+              </div>
+            )}
+            <div className="flex-1 pt-1">
+              <h3 className="text-base font-semibold text-gray-900 mb-3">{cat.name}</h3>
+              <div className="flex flex-wrap gap-2">
+                {cat.subServices.map((sub, j) => (
+                  <span
+                    key={j}
+                    className="px-4 py-1.5 rounded-full border border-gray-200 text-sm text-gray-700 bg-white"
+                  >
+                    {sub}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
-          <span className="text-sm font-semibold text-gray-800">{service}</span>
+          {i < categories.length - 1 && <div className="border-b border-gray-100 mt-6" />}
         </div>
       ))}
     </div>
   );
 }
 
-// ─── Tab: Reviews ─────────────────────────────────────────────────────────────
+// ─── Reviews Tab ──────────────────────────────────────────────────────────────
 
-function ReviewsTab({ profile }: { profile: any }) {
-  return (
-    <div className="text-center py-12">
-      <div className="flex items-center justify-center gap-1 mb-2">
-        {[1, 2, 3, 4, 5].map(i => (
-          <Star key={i} size={20} className={i <= Math.round((profile.ratingScore || 0) / 10) ? "text-amber-400 fill-amber-400" : "text-gray-200 fill-gray-200"} />
+function ReviewsTab() {
+  const { data: reviews = [], isLoading } = trpc.artistProfile.getMyReviews.useQuery();
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="p-5 rounded-xl border border-gray-100 animate-pulse">
+            <div className="flex gap-1 mb-3">
+              {[1,2,3,4,5].map(j => <div key={j} className="w-4 h-4 rounded bg-gray-100" />)}
+            </div>
+            <div className="h-4 bg-gray-100 rounded w-3/4 mb-2" />
+            <div className="h-4 bg-gray-100 rounded w-1/2 mb-4" />
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-gray-100" />
+              <div className="space-y-1.5">
+                <div className="h-3 bg-gray-100 rounded w-24" />
+                <div className="h-3 bg-gray-100 rounded w-16" />
+              </div>
+            </div>
+          </div>
         ))}
       </div>
-      {profile.reviewCount > 0 ? (
-        <p className="text-sm text-gray-500">{profile.reviewCount} review{profile.reviewCount !== 1 ? "s" : ""}</p>
-      ) : (
-        <p className="text-sm text-gray-500">No reviews yet.</p>
-      )}
-    </div>
-  );
-}
+    );
+  }
 
-// ─── Tab: Media ───────────────────────────────────────────────────────────────
-
-function MediaTab({ profile }: { profile: any }) {
-  const photos = profile.mediaPhotos || [];
-  const videos = profile.videos || [];
-
-  if (photos.length === 0 && videos.length === 0) {
+  if (reviews.length === 0) {
     return (
-      <div className="text-center py-12">
-        <div className="w-12 h-12 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-3">
-          <Image size={20} className="text-gray-400" />
-        </div>
-        <p className="text-sm text-gray-500">No media uploaded yet.</p>
+      <div className="text-center py-12 text-gray-400 text-sm">
+        No reviews yet.
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {photos.length > 0 && (
-        <div>
-          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Photos</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {photos.map((url: string, i: number) => (
-              <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                <img
-                  src={url}
-                  alt={`Media ${i + 1}`}
-                  className="w-full aspect-square object-cover rounded-xl hover:opacity-90 transition-opacity"
-                />
-              </a>
-            ))}
+      {reviews.map(review => (
+        <div key={review.id} className="p-5 rounded-xl border border-gray-100">
+          <StarRow rating={review.rating} />
+          <p className="text-sm text-gray-700 leading-relaxed my-3">{review.body}</p>
+          <div className="flex items-center gap-3">
+            {review.reviewerAvatar ? (
+              <img
+                src={review.reviewerAvatar}
+                alt={review.reviewerName}
+                className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-semibold text-gray-500">
+                  {review.reviewerName?.[0] ?? "?"}
+                </span>
+              </div>
+            )}
+            <div>
+              <p className="text-sm font-semibold text-gray-900 leading-tight">{review.reviewerName}</p>
+              {review.reviewerStudio && (
+                <p className="text-xs text-gray-500">{review.reviewerStudio}</p>
+              )}
+              {review.reviewDate && (
+                <p className="text-xs text-gray-400">{formatReviewDate(review.reviewDate)}</p>
+              )}
+            </div>
           </div>
         </div>
-      )}
-      {videos.length > 0 && (
-        <div>
-          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Videos</h3>
-          <div className="space-y-2">
-            {videos.map((url: string, i: number) => (
-              <a
-                key={i}
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
-              >
-                <Youtube size={16} className="text-red-500 flex-shrink-0" />
-                Video {i + 1}
-                <ExternalLink size={12} className="ml-auto text-gray-400" />
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Tab: Resume ──────────────────────────────────────────────────────────────
-
-function ResumeTab({ profile }: { profile: any }) {
-  const resumeFiles = profile.resumeFiles || [];
-  const resumes = profile.resumes || [];
-
-  // Combine both formats
-  const allResumes: { url: string; name: string }[] = [
-    ...resumeFiles,
-    ...resumes.map((url: string, i: number) => ({ url, name: `Resume ${i + 1}` })),
-  ];
-
-  if (allResumes.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <div className="w-12 h-12 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-3">
-          <FileText size={20} className="text-gray-400" />
-        </div>
-        <p className="text-sm text-gray-500">No resume uploaded yet.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {allResumes.map((r, i) => (
-        <a
-          key={i}
-          href={r.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100 hover:bg-orange-50 hover:border-orange-100 transition-colors group"
-        >
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center flex-shrink-0">
-            <FileText size={16} className="text-white" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-800 truncate">{r.name}</p>
-            <p className="text-xs text-gray-400">Click to view</p>
-          </div>
-          <ExternalLink size={14} className="text-gray-400 group-hover:text-orange-500 transition-colors flex-shrink-0" />
-        </a>
       ))}
     </div>
   );
 }
 
-// ─── Main Profile Page ────────────────────────────────────────────────────────
+// ─── Main Component ───────────────────────────────────────────────────────────
 
-type ProfileTab = "about" | "services" | "reviews" | "media" | "resume";
+type Tab = "about" | "services" | "reviews";
 
 export default function ArtistProfilePage() {
-  const [activeTab, setActiveTab] = useState<ProfileTab>("about");
+  const [activeTab, setActiveTab] = useState<Tab>("about");
   const [editOpen, setEditOpen] = useState(false);
 
-  const { data: profile, isLoading, error, refetch } = trpc.artistProfile.getMyProfile.useQuery();
+  const { data: profile, isLoading, refetch } = trpc.artistProfile.getMyProfile.useQuery();
+
+  const handleShare = () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      navigator.share({ title: profile?.name ?? "Artist Profile", url });
+    } else {
+      navigator.clipboard.writeText(url);
+    }
+  };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 size={28} className="animate-spin text-orange-500" />
+      <div className="flex gap-6 p-6 animate-pulse">
+        <div className="w-72 flex-shrink-0">
+          <div className="rounded-2xl overflow-hidden border border-gray-100">
+            <div className="aspect-[3/4] bg-gray-200" />
+            <div className="p-4 space-y-3">
+              <div className="h-4 bg-gray-100 rounded w-1/2" />
+              <div className="h-3 bg-gray-100 rounded w-1/3" />
+              <div className="h-10 bg-gray-100 rounded-xl" />
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 space-y-4 pt-2">
+          <div className="flex gap-8 border-b border-gray-100 pb-3">
+            {["About","Services","Reviews"].map(t => (
+              <div key={t} className="h-4 w-14 bg-gray-100 rounded" />
+            ))}
+          </div>
+          <div className="space-y-3">
+            {[1,2,3].map(i => <div key={i} className="h-4 bg-gray-100 rounded" />)}
+          </div>
+        </div>
       </div>
     );
   }
 
-  if (error || !profile) {
+  if (!profile) {
     return (
-      <div className="text-center py-20">
-        <p className="text-sm text-gray-500">Could not load profile. Please try again.</p>
+      <div className="flex items-center justify-center h-64 text-gray-400 text-sm">
+        Profile not found.
       </div>
     );
   }
 
-  const tabs: { id: ProfileTab; label: string }[] = [
-    { id: "about", label: "About" },
-    { id: "services", label: "Services" },
-    { id: "reviews", label: "Reviews" },
-    { id: "media", label: "Media" },
-    { id: "resume", label: "Resume" },
-  ];
+  const workTypes = parseJsonArray((profile as any).workTypes);
+  const ratingDisplay = profile.ratingScore ? profile.ratingScore / 10 : 5;
+  const joinDate = (profile as any).bubbleCreatedAt || null;
 
-  const joinDate = profile.bubbleCreatedAt || profile.joinedAt;
-
-  function handleShare() {
-    if (navigator.share) {
-      navigator.share({ title: profile?.name ?? "", url: window.location.href });
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-    }
-  }
+  // Display name: "Ramita R." format
+  const p = profile as any;
+  const displayName = p.firstName
+    ? `${p.firstName} ${p.lastName ? p.lastName[0] + "." : ""}`.trim()
+    : p.name ?? "";
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4 pb-10">
-      {/* ── Profile Card ── */}
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        {/* Cover gradient */}
-        <div className="h-20 bg-gradient-to-r from-orange-400 via-pink-400 to-rose-500" />
-
-        {/* Avatar + actions row */}
-        <div className="px-5 pb-5">
-          <div className="flex items-end justify-between -mt-12 mb-4">
+    <>
+      <div className="flex gap-6 p-6 items-start">
+        {/* ── Left: Profile Card ────────────────────────────────────────────── */}
+        <div className="w-72 flex-shrink-0 sticky top-6">
+          <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white">
+            {/* Photo with name/PRO overlay */}
             <div className="relative">
-              <Avatar src={profile.profilePicture} name={profile.name} size="xl" />
-              {profile.isPro && (
-                <span className="absolute -bottom-1 -right-1 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full shadow-sm">
+              <div className="aspect-[3/4] bg-gray-200">
+                {profile.profilePicture ? (
+                  <img
+                    src={profile.profilePicture}
+                    alt={profile.name ?? "Profile"}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300">
+                    <span className="text-6xl font-black text-gray-400">
+                      {profile.name?.[0] ?? "?"}
+                    </span>
+                  </div>
+                )}
+              </div>
+              {/* Name + pronouns gradient overlay */}
+              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/75 via-black/35 to-transparent">
+                <h2 className="text-xl font-black text-white leading-tight">{displayName}</h2>
+                {profile.pronouns && (
+                  <p className="text-sm text-white/80 mt-0.5">{profile.pronouns}</p>
+                )}
+              </div>
+              {/* PRO badge */}
+              {(profile as any).artswrkPro && (
+                <div className="absolute bottom-4 right-4 bg-[#ec008c] text-white text-xs font-black px-2.5 py-1 rounded-md tracking-wider shadow">
                   PRO
-                </span>
+                </div>
               )}
             </div>
-            <div className="flex items-center gap-2 pb-1">
-              <button
-                onClick={handleShare}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-gray-700 border border-gray-200 hover:bg-gray-50 transition-colors"
-              >
-                <Share2 size={13} /> Share
-              </button>
+
+            {/* Card body */}
+            <div className="p-4 space-y-3">
+              {/* Stars + bookings */}
+              <div className="flex items-center gap-2">
+                <StarRow rating={ratingDisplay} />
+                <span className="text-sm text-gray-600">({profile.bookingCount ?? 0} Bookings)</span>
+              </div>
+
+              {/* Location + Joined */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                {profile.location && (
+                  <span className="flex items-center gap-1">
+                    <MapPin size={12} className="text-gray-400" />
+                    {profile.location}
+                  </span>
+                )}
+                {joinDate && (
+                  <span className="flex items-center gap-1">
+                    <Calendar size={12} className="text-gray-400" />
+                    Joined {formatDate(joinDate)}
+                  </span>
+                )}
+              </div>
+
+              {/* Work type chips */}
+              {workTypes.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {workTypes.map(wt => (
+                    <span
+                      key={wt}
+                      className="px-3 py-1.5 rounded-full border border-gray-200 text-xs font-medium text-gray-700 bg-white"
+                    >
+                      {wt}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Edit Profile button */}
               <button
                 onClick={() => setEditOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white transition-opacity hover:opacity-90"
-                style={{ background: "linear-gradient(90deg,#FFBC5D,#F25722)" }}
+                className="w-full py-3 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors"
               >
-                <Edit3 size={13} /> Edit Profile
+                Edit Profile
+              </button>
+
+              {/* Share */}
+              <button
+                onClick={handleShare}
+                className="w-full flex items-center justify-center gap-2 py-1.5 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <Share2 size={15} />
+                Share
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Name + meta */}
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-black text-gray-900">
-                {profile.name || `${profile.firstName} ${profile.lastName}`.trim() || "Your Name"}
-              </h1>
-              {profile.pronouns && (
-                <span className="text-xs text-gray-400 font-medium">({profile.pronouns})</span>
-              )}
-              {profile.isPro && (
-                <BadgeCheck size={18} className="text-amber-500" />
-              )}
-            </div>
-
-            {/* Booking count */}
-            {profile.bookingCount > 0 && (
-              <p className="text-xs text-gray-500 mt-0.5">({profile.bookingCount} Bookings)</p>
-            )}
-
-            {/* Work types */}
-            {profile.workTypes?.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {profile.workTypes.map((w: string) => (
-                  <span key={w} className="text-xs font-semibold text-gray-700">{w}</span>
-                )).reduce((acc: React.ReactNode[], el: React.ReactNode, i: number) => {
-                  if (i > 0) acc.push(<span key={`sep-${i}`} className="text-gray-300 text-xs">·</span>);
-                  acc.push(el);
-                  return acc;
-                }, [])}
-              </div>
-            )}
-
-            {/* Location + Join date */}
-            <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
-              {profile.location && (
-                <span className="flex items-center gap-1">
-                  <MapPin size={11} /> {profile.location}
-                </span>
-              )}
-              {joinDate && (
-                <span className="flex items-center gap-1">
-                  <Calendar size={11} /> Joined {formatJoinDate(joinDate)}
-                </span>
-              )}
-            </div>
+        {/* ── Right: Tabs ───────────────────────────────────────────────────── */}
+        <div className="flex-1 min-w-0">
+          {/* Tab bar */}
+          <div className="flex border-b border-gray-200 mb-6">
+            {(["about", "services", "reviews"] as Tab[]).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`pb-3 mr-8 text-sm font-medium capitalize transition-colors relative ${
+                  activeTab === tab
+                    ? "text-[#ec008c]"
+                    : "text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {activeTab === tab && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#ec008c] rounded-full" />
+                )}
+              </button>
+            ))}
           </div>
-        </div>
-      </div>
 
-      {/* ── Resume quick link (if available) ── */}
-      {(profile.resumeFiles?.length > 0 || profile.resumes?.length > 0) && (
-        <div className="bg-white rounded-2xl border border-gray-100 px-5 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-            <FileText size={15} className="text-orange-500" />
-            {profile.resumeFiles?.[0]?.name || "Resume"}
-          </div>
-          <a
-            href={profile.resumeFiles?.[0]?.url || profile.resumes?.[0]}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1"
-          >
-            View <ExternalLink size={11} />
-          </a>
-        </div>
-      )}
-
-      {/* ── Tabs ── */}
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        {/* Tab bar */}
-        <div className="flex border-b border-gray-100 overflow-x-auto">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 min-w-0 px-4 py-3 text-xs font-bold whitespace-nowrap transition-colors ${
-                activeTab === tab.id
-                  ? "text-orange-600 border-b-2 border-orange-500"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Tab content */}
-        <div className="p-5">
+          {/* Tab content */}
           {activeTab === "about" && <AboutTab profile={profile} />}
-          {activeTab === "services" && <ServicesTab profile={profile} />}
-          {activeTab === "reviews" && <ReviewsTab profile={profile} />}
-          {activeTab === "media" && <MediaTab profile={profile} />}
-          {activeTab === "resume" && <ResumeTab profile={profile} />}
+          {activeTab === "services" && <ServicesTab />}
+          {activeTab === "reviews" && <ReviewsTab />}
         </div>
       </div>
 
       {/* Edit Profile Modal */}
       {editOpen && (
         <EditProfileModal
-          profile={profile!}
+          profile={profile}
           onClose={() => setEditOpen(false)}
           onSaved={() => {
             setEditOpen(false);
@@ -518,6 +447,6 @@ export default function ArtistProfilePage() {
           }}
         />
       )}
-    </div>
+    </>
   );
 }

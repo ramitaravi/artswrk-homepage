@@ -2,7 +2,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
-import { users } from "../drizzle/schema";
+import { users, artistReviews, artistServiceCategories } from "../drizzle/schema";
 
 // ─── Helper: parse JSON array safely ──────────────────────────────────────────
 function parseJsonArray(val: string | null | undefined): string[] {
@@ -122,6 +122,44 @@ export const artistProfileRouter = router({
         bubbleCreatedAt: user.bubbleCreatedAt,
       };
     }),
+
+  /** Get reviews for the current user's profile */
+  getMyReviews: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new Error("Database unavailable");
+    const reviews = await db
+      .select()
+      .from(artistReviews)
+      .where(eq(artistReviews.artistUserId, ctx.user.id))
+      .orderBy(artistReviews.reviewDate);
+    return reviews.map(r => ({
+      id: r.id,
+      reviewerName: r.reviewerName || "",
+      reviewerStudio: r.reviewerStudio || "",
+      reviewerAvatar: r.reviewerAvatar || "",
+      rating: r.rating ?? 5,
+      body: r.body || "",
+      reviewDate: r.reviewDate,
+    }));
+  }),
+
+  /** Get service categories for the current user's profile */
+  getMyServiceCategories: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new Error("Database unavailable");
+    const cats = await db
+      .select()
+      .from(artistServiceCategories)
+      .where(eq(artistServiceCategories.artistUserId, ctx.user.id))
+      .orderBy(artistServiceCategories.sortOrder);
+    return cats.map(c => ({
+      id: c.id,
+      name: c.name,
+      imageUrl: c.imageUrl || "",
+      subServices: parseJsonArray(c.subServices),
+      sortOrder: c.sortOrder ?? 0,
+    }));
+  }),
 
   /** Update the currently authenticated user's profile */
   updateMyProfile: protectedProcedure

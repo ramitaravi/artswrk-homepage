@@ -430,3 +430,13 @@
 - [x] Build EditProfile modal/page with all fields
 - [x] Wire Profile link in artist dashboard sidebar
 - [x] Seed Ramita's real profile data
+
+## Artist Profile Redesign (match live Artswrk exactly)
+- [x] Two-column layout: left photo card, right tabs panel
+- [x] Left card: full-bleed photo, name+pronouns overlaid, pink PRO badge, stars+bookings, location+joined, work type chips, black Edit Profile button, Share link
+- [x] Right panel: 3 tabs only (About / Services / Reviews), pink active underline
+- [x] About tab: Media section (3 photos grid) + Resume section + Bio section
+- [x] Services tab: each service has category image + title + sub-service chips
+- [x] Reviews tab: full review cards with stars, text, reviewer avatar/name/studio/date
+- [x] Seed real reviews data for Ramita
+- [x] Seed real services with sub-service data

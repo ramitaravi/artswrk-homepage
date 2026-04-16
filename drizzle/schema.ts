@@ -673,3 +673,52 @@ export const acquisitionLeads = mysqlTable("acquisition_leads", {
 });
 export type AcquisitionLead = typeof acquisitionLeads.$inferSelect;
 export type InsertAcquisitionLead = typeof acquisitionLeads.$inferInsert;
+
+// ─── Artist Reviews ───────────────────────────────────────────────────────────
+
+/**
+ * Reviews left by hirers for artists after completed bookings.
+ */
+export const artistReviews = mysqlTable("artist_reviews", {
+  id: int("id").autoincrement().primaryKey(),
+  /** FK → users.id (the artist being reviewed) */
+  artistUserId: int("artistUserId").notNull(),
+  /** Reviewer name (hirer/studio name) */
+  reviewerName: varchar("reviewerName", { length: 256 }),
+  /** Reviewer studio/company name */
+  reviewerStudio: varchar("reviewerStudio", { length: 256 }),
+  /** Reviewer avatar URL */
+  reviewerAvatar: text("reviewerAvatar"),
+  /** Star rating (1-5) */
+  rating: int("rating").default(5),
+  /** Review text */
+  body: text("body"),
+  /** Date of the review (displayed on profile) */
+  reviewDate: timestamp("reviewDate"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ArtistReview = typeof artistReviews.$inferSelect;
+export type InsertArtistReview = typeof artistReviews.$inferInsert;
+
+// ─── Artist Service Categories ────────────────────────────────────────────────
+
+/**
+ * Service categories for an artist profile.
+ * Each category has a name, an image, and a list of sub-services (chips).
+ */
+export const artistServiceCategories = mysqlTable("artist_service_categories", {
+  id: int("id").autoincrement().primaryKey(),
+  /** FK → users.id (the artist) */
+  artistUserId: int("artistUserId").notNull(),
+  /** Category name (e.g. "Dance Adjudicator", "Dance Educator") */
+  name: varchar("name", { length: 256 }).notNull(),
+  /** Category image URL */
+  imageUrl: text("imageUrl"),
+  /** JSON array of sub-service chip strings */
+  subServices: text("subServices"),
+  /** Display order */
+  sortOrder: int("sortOrder").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ArtistServiceCategory = typeof artistServiceCategories.$inferSelect;
+export type InsertArtistServiceCategory = typeof artistServiceCategories.$inferInsert;

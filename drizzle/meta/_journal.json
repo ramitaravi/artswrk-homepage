@@ -113,6 +113,13 @@
       "when": 1776297019658,
       "tag": "0015_daffy_gamma_corps",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1776297958443,
+      "tag": "0016_daffy_firebrand",
+      "breakpoints": true
     }
   ]
 }
