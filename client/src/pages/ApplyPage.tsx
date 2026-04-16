@@ -332,7 +332,7 @@ export default function ApplyPage() {
 
     const selectedResume = allResumes.find((r) => r.id === selectedResumeId);
     const rateNum = rateInput ? parseInt(rateInput.replace(/[^0-9]/g, ""), 10) : undefined;
-    const isHourly = job?.isHourly ?? true;
+    const isHourly = !!(job?.isHourly ?? true);
 
     try {
       await applyMutation.mutateAsync({

@@ -447,7 +447,7 @@ export const appRouter = router({
         resumeLink: z.string().url().optional().or(z.literal("")),
         artistHourlyRate: z.number().min(0).optional(),
         artistFlatRate: z.number().min(0).optional(),
-        isHourlyRate: z.boolean().optional(),
+        isHourlyRate: z.union([z.boolean(), z.number()]).transform(v => !!v).optional(),
         startDate: z.date().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
