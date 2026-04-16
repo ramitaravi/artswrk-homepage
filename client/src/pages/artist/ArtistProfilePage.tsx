@@ -54,8 +54,9 @@ function StarRow({ rating, size = 16 }: { rating: number; size?: number }) {
 // ─── About Tab ────────────────────────────────────────────────────────────────
 
 function AboutTab({ profile }: { profile: any }) {
-  const mediaPhotos = parseJsonArray(profile.mediaPhotos);
-  const resumeFiles = parseJsonObjects<{ url: string; name: string }>(profile.resumeFiles);
+  // Server already returns these as parsed arrays — no need to re-parse
+  const mediaPhotos: string[] = Array.isArray(profile.mediaPhotos) ? profile.mediaPhotos : [];
+  const resumeFiles: { url: string; name: string }[] = Array.isArray(profile.resumeFiles) ? profile.resumeFiles : [];
 
   return (
     <div className="space-y-8">
@@ -301,9 +302,14 @@ export default function ArtistProfilePage() {
     );
   }
 
-  const workTypes = parseJsonArray((profile as any).workTypes);
-  const ratingDisplay = profile.ratingScore ? profile.ratingScore / 10 : 5;
-  const joinDate = (profile as any).bubbleCreatedAt || null;
+  // Server returns these as parsed arrays already
+  const workTypes: string[] = [
+    ...((profile as any).masterArtistTypes || []),
+    ...((profile as any).workTypes || []),
+  ].filter((v, i, a) => a.indexOf(v) === i); // dedupe
+  // ratingScore stored as integer ×10 (e.g. 50 = 5.0 stars)
+  const ratingDisplay = profile.ratingScore ? profile.ratingScore / 10 : 0;
+  const joinDate = (profile as any).bubbleCreatedAt || profile.joinedAt || null;
 
   // Display name: "Ramita R." format
   const p = profile as any;
@@ -353,7 +359,7 @@ export default function ArtistProfilePage() {
                 )}
               </div>
               {/* PRO badge */}
-              {(profile as any).artswrkPro && (
+              {(profile as any).isPro && (
                 <div className="absolute bottom-4 right-4 bg-[#ec008c] text-white text-xs font-black px-2.5 py-1 rounded-md tracking-wider shadow">
                   PRO
                 </div>

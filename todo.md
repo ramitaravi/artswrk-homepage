@@ -469,3 +469,8 @@
 - [x] Wire Edit Profile as full-page overlay (fixed inset-0 z-50) when editOpen=true
 - [x] Register /artist/profile route in App.tsx
 - [x] 92 vitest tests passing
+
+## Artist Profile Page Improvements
+- [x] Fix About tab to show Media grid (3 photos) + Resume row + Bio matching the screenshot design
+- [x] Pull real profile photos from Bubble API for imported users (update profilePicture URLs in DB)
+- [x] Fix left card to show work type chips (Dance Adjudicator, Dance Educator) from DB data
