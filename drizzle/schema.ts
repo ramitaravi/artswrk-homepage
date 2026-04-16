@@ -928,3 +928,61 @@ export const userAffiliations = mysqlTable("user_affiliations", {
 });
 export type UserAffiliation = typeof userAffiliations.$inferSelect;
 export type InsertUserAffiliation = typeof userAffiliations.$inferInsert;
+
+// ─── Rate Conversion Table ────────────────────────────────────────────────────
+
+/**
+ * Artist-to-client rate conversion lookup table.
+ * Maps artist rates → client rates (the Artswrk markup).
+ * Used when suggesting client pricing for a given artist rate.
+ * Maps to Bubble's "ArtistToClientRateConversion" type (1,986 records).
+ */
+export const rateConversions = mysqlTable("rate_conversions", {
+  id: int("id").autoincrement().primaryKey(),
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  artistRate: double("artistRate"),
+  clientRate: double("clientRate"),
+  isHourly: boolean("isHourly").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+});
+export type RateConversion = typeof rateConversions.$inferSelect;
+export type InsertRateConversion = typeof rateConversions.$inferInsert;
+
+// ─── Benefits (Partner Perks) ─────────────────────────────────────────────────
+
+/**
+ * Partner benefits / perks shown to artists and clients.
+ * e.g. discounts from dance software, conventions, curriculum providers.
+ * Maps to Bubble's "Benefits" type (27 records).
+ */
+export const benefits = mysqlTable("benefits", {
+  id: int("id").autoincrement().primaryKey(),
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+
+  companyName: varchar("companyName", { length: 256 }),
+  slug: varchar("slug", { length: 256 }),
+  logoUrl: text("logoUrl"),
+  url: text("url"),
+  businessDescription: text("businessDescription"),
+  discountOffering: text("discountOffering"),
+  howToRedeem: text("howToRedeem"),
+  contactName: varchar("contactName", { length: 256 }),
+  contactEmail: varchar("contactEmail", { length: 320 }),
+
+  /** JSON array: ["Artist"] | ["Client"] | ["Artist", "Client"] */
+  audienceTypes: text("audienceTypes"),
+  /** JSON array: ["Dance Studio", "Dance Competition", ...] */
+  businessTypes: text("businessTypes"),
+  /** JSON array: ["Dance Educator", "Dance Adjudicator", ...] */
+  artistTypes: text("artistTypes"),
+  /** JSON array: ["Software", "Convention", "Curriculum", ...] */
+  categories: text("categories"),
+
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
+});
+export type Benefit = typeof benefits.$inferSelect;
+export type InsertBenefit = typeof benefits.$inferInsert;
