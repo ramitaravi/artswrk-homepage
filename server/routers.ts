@@ -125,6 +125,18 @@ export const appRouter = router({
         await deletePasswordResetToken(input.token);
         return { success: true };
       }),
+
+    /**
+     * Check if an email address belongs to an existing user.
+     * Used by the Apply Gate modal to route to login vs. join.
+     * Deliberately returns only { exists } — no PII leaked.
+     */
+    checkEmailExists: publicProcedure
+      .input(z.object({ email: z.string().email() }))
+      .mutation(async ({ input }) => {
+        const user = await getUserByEmail(input.email.toLowerCase().trim());
+        return { exists: !!user };
+      }),
   }),
 
   // ── Admin procedures ────────────────────────────────────────────────────────

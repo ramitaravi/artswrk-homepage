@@ -13,7 +13,7 @@
  *   - Full job details: rate, dates, location, description
  *   - Apply CTA (opens login if not authenticated)
  */
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import {
   MapPin, Clock, Calendar, DollarSign, Building2, ArrowLeft,
@@ -22,6 +22,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import Navbar from "@/components/Navbar";
+import ApplyGateModal from "@/components/ApplyGateModal";
 
 // ─── Slug helpers ─────────────────────────────────────────────────────────────
 
@@ -317,8 +318,25 @@ export default function JobDetail() {
     breadcrumbs.map((b) => ({ name: b.label, url: b.href ?? "" }))
   );
 
+  const applyUrl = `${toJobUrl(job)}/apply`;
+  const [gateOpen, setGateOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-gray-50" style={{ fontFamily: "Poppins, sans-serif" }}>
+      {gateOpen && (
+        <ApplyGateModal
+          job={{
+            title,
+            companyName: company,
+            location: cityDisplay,
+            datetime: job.dateType === "Ongoing" ? "Ongoing" : job.dateType === "Recurring" ? "Recurring" : (job.startDate ? new Date(job.startDate).toLocaleDateString() : undefined),
+            rate,
+            description: job.description,
+            applyUrl,
+          }}
+          onClose={() => setGateOpen(false)}
+        />
+      )}
       {/* JSON-LD */}
       <script
         type="application/ld+json"
@@ -445,26 +463,18 @@ export default function JobDetail() {
                 </p>
                 {user ? (
                   <Link
-                    href={`${toJobUrl(job)}/apply`}
+                    href={applyUrl}
                     className="block w-full text-center py-3 rounded-xl text-sm font-bold text-white bg-[#F25722] hover:bg-[#d44a1a] transition-colors"
                   >
                     Apply Now →
                   </Link>
                 ) : (
-                  <>
-                    <Link
-                      href={`${toJobUrl(job)}/apply`}
-                      className="block w-full text-center py-3 rounded-xl text-sm font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors"
-                    >
-                      Login to Apply
-                    </Link>
-                    <Link
-                      href="/signup"
-                      className="block w-full text-center py-2.5 rounded-xl text-sm font-semibold text-[#111] border border-gray-200 hover:bg-gray-50 transition-colors mt-2"
-                    >
-                      Create Free Account
-                    </Link>
-                  </>
+                  <button
+                    onClick={() => setGateOpen(true)}
+                    className="block w-full text-center py-3 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity"
+                  >
+                    Apply Now →
+                  </button>
                 )}
               </div>
 

@@ -16,6 +16,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { toJobUrl } from "./JobDetail";
 import { toProJobUrl } from "./ProJobDetail";
 import SharedNavbar from "@/components/Navbar";
+import ApplyGateModal, { type ApplyGateJob } from "@/components/ApplyGateModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -644,6 +645,7 @@ export default function Jobs() {
 
   const { user, isAuthenticated } = useAuth();
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const [gateJob, setGateJob] = useState<ApplyGateJob | null>(null);
 
   // Subscription access checks
   const isBasic = !!(user as any)?.artswrkBasic;
@@ -745,6 +747,20 @@ export default function Jobs() {
     { id: "applications", label: "Applications", count: isAuthenticated ? myApplications.length : undefined },
   ];
 
+  // Build an ApplyGateJob from a DisplayJob
+  function openGate(job: DisplayJob) {
+    const applyUrl = job.detailUrl + "/apply";
+    setGateJob({
+      title: job.title,
+      companyName: job.companyName,
+      location: job.location,
+      datetime: job.datetime,
+      rate: job.rate,
+      description: job.description,
+      applyUrl,
+    });
+  }
+
   return (
     <div className="h-screen flex flex-col bg-white overflow-hidden" style={{ fontFamily: "Poppins, sans-serif" }}>
       <SubscriptionPaywallModal
@@ -752,6 +768,12 @@ export default function Jobs() {
         onClose={() => setPaywallOpen(false)}
         isLoggedIn={isAuthenticated}
       />
+      {gateJob && (
+        <ApplyGateModal
+          job={gateJob}
+          onClose={() => setGateJob(null)}
+        />
+      )}
       <Navbar />
 
       {/* Page header + tabs — pt accounts for fixed nav (64px) + optional logged-in banner (28px) */}
@@ -934,8 +956,8 @@ export default function Jobs() {
                     onClick={() =>
                       setSelectedJob(selectedJob?.id === job.id ? null : job)
                     }
-                    canApply={canApplyToJobs}
-                    onPaywall={() => setPaywallOpen(true)}
+                    canApply={isAuthenticated ? canApplyToJobs : false}
+                    onPaywall={() => isAuthenticated ? setPaywallOpen(true) : openGate(job)}
                   />
                 ))
               )}
@@ -986,7 +1008,14 @@ export default function Jobs() {
                     <X size={16} />
                   </button>
                 </div>
-                {canApplyToJobs ? (
+                {!isAuthenticated ? (
+                  <button
+                    onClick={() => openGate(selectedJob)}
+                    className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity"
+                  >
+                    Apply Now →
+                  </button>
+                ) : canApplyToJobs ? (
                   <Link
                     href={selectedJob.detailUrl}
                     className="mt-3 block w-full py-2 rounded-xl text-xs font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors text-center"
