@@ -21,7 +21,7 @@ import { ADMIN_SESSION_COOKIE_NAME } from "@shared/const";
 import { Link } from "wouter";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type AdminSection = "dashboard" | "artists" | "clients" | "jobs" | "pro-jobs" | "enterprise-clients" | "bookings" | "payments" | "acquisition" | "settings";
+type AdminSection = "dashboard" | "artists" | "clients" | "jobs" | "pro-jobs" | "enterprise-clients" | "bookings" | "payments" | "subscriptions" | "acquisition" | "settings";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmt$(cents: number) {
@@ -50,6 +50,7 @@ const NAV_ITEMS: { id: AdminSection; label: string; icon: React.ReactNode }[] = 
   { id: "enterprise-clients", label: "Enterprise Clients", icon: <Building2 size={16} /> },
   { id: "bookings", label: "Bookings", icon: <BookOpen size={16} /> },
   { id: "payments", label: "Payments", icon: <CreditCard size={16} /> },
+  { id: "subscriptions", label: "Subscriptions", icon: <TrendingUp size={16} /> },
   { id: "acquisition", label: "Acquisition", icon: <Megaphone size={16} /> },
   { id: "settings", label: "Settings", icon: <Settings size={16} /> },
 ];
@@ -1722,6 +1723,251 @@ function EnterpriseClientsSection() {
   );
 }
 
+// ─── Subscriptions Section ────────────────────────────────────────────────────
+function SubscriptionsSection() {
+  const [planFilter, setPlanFilter] = useState<"all" | "basic" | "pro">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "at_risk" | "canceled">("all");
+  const [search, setSearch] = useState("");
+
+  const { data, isLoading } = trpc.admin.subscriptions.useQuery();
+
+  const subs = data?.subscriptions ?? [];
+  const summary = data?.summary;
+
+  // Apply filters
+  const filtered = subs.filter(s => {
+    if (planFilter !== "all" && s.plan !== planFilter) return false;
+    if (statusFilter !== "all") {
+      if (statusFilter === "active" && s.status !== "active" && s.status !== "trialing") return false;
+      if (statusFilter === "at_risk" && s.status !== "at_risk") return false;
+      if (statusFilter === "canceled" && s.status !== "canceled") return false;
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      if (!s.name.toLowerCase().includes(q) && !s.email.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  function fmt$(cents: number) {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(cents / 100);
+  }
+  function fmtShort(iso: string | null | undefined) {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  const statusBadge = (status: string) => {
+    const map: Record<string, string> = {
+      active: "bg-green-50 text-green-700",
+      trialing: "bg-blue-50 text-blue-700",
+      at_risk: "bg-amber-50 text-amber-700",
+      canceled: "bg-red-50 text-red-600",
+      past_due: "bg-orange-50 text-orange-700",
+    };
+    const labels: Record<string, string> = {
+      active: "Active",
+      trialing: "Trialing",
+      at_risk: "At Risk",
+      canceled: "Churned",
+      past_due: "Past Due",
+    };
+    return (
+      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${map[status] ?? "bg-gray-100 text-gray-500"}`}>
+        {status === "active" && <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />}
+        {status === "at_risk" && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />}
+        {status === "canceled" && <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />}
+        {labels[status] ?? status}
+      </span>
+    );
+  };
+
+  const planBadge = (plan: string) => (
+    plan === "pro"
+      ? <span className="inline-flex items-center gap-0.5 text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-700"><Star size={9} className="fill-amber-600" /> PRO</span>
+      : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-50 text-pink-600">Basic</span>
+  );
+
+  const StatCard = ({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent: string }) => (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <p className="text-xs text-gray-500 mb-1">{label}</p>
+      <p className={`text-2xl font-black ${accent}`}>{value}</p>
+      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-[#111]">Subscriptions</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Live from Stripe · Basic &amp; PRO artist plans</p>
+        </div>
+        <a
+          href="https://dashboard.stripe.com/subscriptions"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-[#F25722] transition-colors border border-gray-200 px-3 py-1.5 rounded-lg"
+        >
+          <ExternalLink size={12} /> Stripe Dashboard
+        </a>
+      </div>
+
+      {/* Summary stats */}
+      {isLoading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 h-20 animate-pulse bg-gray-50" />
+          ))}
+        </div>
+      ) : summary && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <StatCard label="MRR" value={fmt$(summary.mrrCents)} sub="Active subs / mo" accent="text-green-700" />
+          <StatCard label="ARR" value={fmt$(summary.arrCents)} sub="Annualized" accent="text-green-600" />
+          <StatCard label="Active" value={summary.activeCount.toString()} sub="Total subscribers" accent="text-[#111]" />
+          <StatCard label="Basic" value={summary.basicActiveCount.toString()} sub="Active Basic plan" accent="text-pink-600" />
+          <StatCard label="PRO" value={summary.proActiveCount.toString()} sub="Active PRO plan" accent="text-amber-600" />
+          <StatCard label="At Risk" value={summary.atRiskCount.toString()} sub="Canceling or past due" accent="text-amber-600" />
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Plan tabs */}
+        <div className="flex items-center bg-gray-100 rounded-full p-1 gap-0.5">
+          {(["all", "basic", "pro"] as const).map(p => (
+            <button
+              key={p}
+              onClick={() => setPlanFilter(p)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${planFilter === p ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+            >
+              {p === "all" ? "All Plans" : p === "basic" ? "Basic" : "PRO"}
+            </button>
+          ))}
+        </div>
+
+        {/* Status tabs */}
+        <div className="flex items-center bg-gray-100 rounded-full p-1 gap-0.5">
+          {(["all", "active", "at_risk", "canceled"] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${statusFilter === s ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+            >
+              {s === "all" ? "All" : s === "active" ? "Active" : s === "at_risk" ? "At Risk" : "Churned"}
+              {s !== "all" && summary && (
+                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">
+                  ({s === "active" ? summary.activeCount : s === "at_risk" ? summary.atRiskCount : summary.canceledCount})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1.5 ml-auto">
+          <Search size={13} className="text-gray-400" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search name or email…"
+            className="text-xs outline-none w-44 placeholder-gray-300"
+          />
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50/70">
+                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Artist</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Plan</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Billing</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Amount</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Started</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Renews / Ended</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Stripe</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-gray-400 text-xs">Loading subscriptions from Stripe…</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-gray-400 text-xs">No subscriptions found</td></tr>
+              ) : filtered.map(s => {
+                const initials = s.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "?";
+                const isChurned = s.status === "canceled";
+                return (
+                  <tr key={s.stripeSubId} className={`border-b border-gray-50 hover:bg-gray-50/50 transition-colors ${isChurned ? "opacity-60" : ""}`}>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-full hirer-grad-bg flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
+                          {initials}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-[#111] text-xs truncate max-w-[150px]">{s.name || "—"}</p>
+                          <p className="text-[10px] text-gray-400 truncate max-w-[150px]">{s.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">{planBadge(s.plan)}</td>
+                    <td className="px-4 py-3 text-xs text-gray-600 capitalize">{s.interval === "year" ? "Annual" : "Monthly"}</td>
+                    <td className="px-4 py-3">
+                      <p className="text-xs font-semibold text-[#111]">{fmt$(s.amountCents)}<span className="font-normal text-gray-400">/{s.interval === "year" ? "yr" : "mo"}</span></p>
+                      {s.interval === "year" && (
+                        <p className="text-[10px] text-gray-400">{fmt$(s.monthlyAmountCents)}/mo</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {statusBadge(s.status)}
+                      {s.status === "at_risk" && s.cancelAtPeriodEnd && (
+                        <p className="text-[10px] text-amber-600 mt-0.5">Cancels {fmtShort(s.currentPeriodEnd)}</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtShort(s.createdAt)}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                      {isChurned ? (
+                        <span className="text-red-400">{fmtShort(s.canceledAt)}</span>
+                      ) : (
+                        fmtShort(s.currentPeriodEnd)
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {s.customerId && (
+                        <a
+                          href={`https://dashboard.stripe.com/customers/${s.customerId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-gray-400 hover:text-[#F25722] transition-colors flex items-center gap-1"
+                        >
+                          <ExternalLink size={10} /> View
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {filtered.length > 0 && (
+          <div className="px-5 py-3 border-t border-gray-50 flex items-center justify-between">
+            <p className="text-xs text-gray-400">
+              Showing {filtered.length} of {subs.length} subscriptions
+            </p>
+            <p className="text-xs text-gray-400">
+              Filtered MRR: <span className="font-semibold text-gray-700">{fmt$(filtered.reduce((acc, s) => s.status !== "canceled" ? acc + s.monthlyAmountCents : acc, 0))}/mo</span>
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Settings Section (password tool) ────────────────────────────────────────
 function SettingsSection({ user }: { user: { email?: string | null } }) {
   const [searchEmail, setSearchEmail] = useState("");
@@ -1865,6 +2111,7 @@ export default function Admin() {
           {section === "enterprise-clients" && <EnterpriseClientsSection />}
           {section === "bookings" && <BookingsSection />}
           {section === "payments" && <PaymentsSection />}
+          {section === "subscriptions" && <SubscriptionsSection />}
           {section === "acquisition" && <AcquisitionSection />}
           {section === "settings" && <SettingsSection user={user} />}
         </div>

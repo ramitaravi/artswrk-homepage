@@ -262,6 +262,158 @@ export const appRouter = router({
         return getAdminPayments(input);
       }),
 
+    /**
+     * Live Stripe subscription data for artist Basic + PRO plans.
+     * Fetches all subscriptions across both plans and both billing intervals,
+     * joins with local DB users by stripeCustomerId, and computes MRR/ARR.
+     */
+    subscriptions: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") {
+        throw new Error("Forbidden: admin only");
+      }
+
+      const stripe = getStripe();
+      const { STRIPE_PRODUCTS } = await import("./stripe-products");
+
+      // Fetch all subscriptions for each of our 4 price IDs in parallel
+      const [bmRes, baRes, pmRes, paRes] = await Promise.all([
+        stripe.subscriptions.list({ price: STRIPE_PRODUCTS.ARTIST_BASIC.monthly.priceId, status: "all", limit: 100, expand: ["data.customer"] }),
+        stripe.subscriptions.list({ price: STRIPE_PRODUCTS.ARTIST_BASIC.annual.priceId,  status: "all", limit: 100, expand: ["data.customer"] }),
+        stripe.subscriptions.list({ price: STRIPE_PRODUCTS.ARTIST_PRO.monthly.priceId,   status: "all", limit: 100, expand: ["data.customer"] }),
+        stripe.subscriptions.list({ price: STRIPE_PRODUCTS.ARTIST_PRO.annual.priceId,    status: "all", limit: 100, expand: ["data.customer"] }),
+      ]);
+
+      type RawSub = { sub: any; plan: "basic" | "pro"; interval: "month" | "year" };
+      const tagged: RawSub[] = [
+        ...bmRes.data.map(s => ({ sub: s, plan: "basic" as const, interval: "month" as const })),
+        ...baRes.data.map(s => ({ sub: s, plan: "basic" as const, interval: "year" as const })),
+        ...pmRes.data.map(s => ({ sub: s, plan: "pro"   as const, interval: "month" as const })),
+        ...paRes.data.map(s => ({ sub: s, plan: "pro"   as const, interval: "year" as const })),
+      ];
+
+      // Deduplicate by Stripe subscription ID
+      const seen = new Set<string>();
+      const unique = tagged.filter(({ sub }) => {
+        if (seen.has(sub.id)) return false;
+        seen.add(sub.id);
+        return true;
+      });
+
+      // Collect all Stripe customer IDs so we can batch-look up DB users
+      const customerIds: string[] = unique
+        .map(({ sub }) => (typeof sub.customer === "string" ? sub.customer : sub.customer?.id))
+        .filter(Boolean) as string[];
+
+      const { getDb } = await import("./db");
+      const { users: usersTable } = await import("../drizzle/schema");
+      const { inArray } = await import("drizzle-orm");
+      const db = await getDb();
+
+      // Look up DB users by stripeCustomerId
+      const dbUsers: Array<{
+        id: number;
+        firstName: string | null;
+        lastName: string | null;
+        name: string | null;
+        email: string | null;
+        profilePicture: string | null;
+        stripeCustomerId: string | null;
+      }> = db && customerIds.length > 0
+        ? await db
+            .select({
+              id: usersTable.id,
+              firstName: usersTable.firstName,
+              lastName: usersTable.lastName,
+              name: usersTable.name,
+              email: usersTable.email,
+              profilePicture: usersTable.profilePicture,
+              stripeCustomerId: usersTable.stripeCustomerId,
+            })
+            .from(usersTable)
+            .where(inArray(usersTable.stripeCustomerId, customerIds))
+        : [];
+
+      const userByCustomerId = new Map<string, typeof dbUsers[0]>();
+      for (const u of dbUsers) {
+        if (u.stripeCustomerId) userByCustomerId.set(u.stripeCustomerId, u);
+      }
+
+      let mrrCents = 0;
+
+      const subscriptions = unique.map(({ sub, plan, interval }) => {
+        const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
+        const customerObj = typeof sub.customer === "object" && sub.customer !== null ? sub.customer : null;
+
+        const dbUser = customerId ? userByCustomerId.get(customerId) : null;
+        const email = dbUser?.email ?? customerObj?.email ?? "";
+        const fullName = dbUser
+          ? (`${dbUser.firstName ?? ""} ${dbUser.lastName ?? ""}`.trim() || dbUser.name || email)
+          : (customerObj?.name || email);
+
+        // Amount from Stripe item
+        const item = sub.items?.data?.[0];
+        const amountCents: number = item?.price?.unit_amount ?? 0;
+        const monthlyAmountCents = interval === "year" ? Math.round(amountCents / 12) : amountCents;
+
+        // Derived status
+        const isAtRisk = (sub.status === "active" && sub.cancel_at_period_end) || sub.status === "past_due" || sub.status === "unpaid";
+        const isCanceled = sub.status === "canceled";
+        const isActive = sub.status === "active" && !sub.cancel_at_period_end && !isAtRisk;
+        const isTrialing = sub.status === "trialing";
+
+        const derivedStatus: "active" | "at_risk" | "canceled" | "trialing" | "past_due" =
+          isCanceled ? "canceled"
+          : isTrialing ? "trialing"
+          : isAtRisk ? "at_risk"
+          : "active";
+
+        if (isActive || isTrialing) mrrCents += monthlyAmountCents;
+
+        return {
+          stripeSubId: sub.id as string,
+          customerId: customerId as string | null,
+          userId: dbUser?.id ?? null,
+          name: fullName,
+          email,
+          plan,
+          interval,
+          amountCents,
+          monthlyAmountCents,
+          status: derivedStatus,
+          cancelAtPeriodEnd: sub.cancel_at_period_end as boolean,
+          currentPeriodEnd: new Date(sub.current_period_end * 1000).toISOString(),
+          canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null,
+          createdAt: new Date(sub.created * 1000).toISOString(),
+        };
+      });
+
+      // Sort: active first, then at_risk, then trialing, then canceled; within each by createdAt desc
+      const ORDER = { active: 0, trialing: 1, at_risk: 2, past_due: 3, canceled: 4 };
+      subscriptions.sort((a, b) =>
+        (ORDER[a.status] - ORDER[b.status]) || (b.createdAt > a.createdAt ? 1 : -1)
+      );
+
+      const activeCount = subscriptions.filter(s => s.status === "active" || s.status === "trialing").length;
+      const basicActiveCount = subscriptions.filter(s => (s.status === "active" || s.status === "trialing") && s.plan === "basic").length;
+      const proActiveCount = subscriptions.filter(s => (s.status === "active" || s.status === "trialing") && s.plan === "pro").length;
+      const atRiskCount = subscriptions.filter(s => s.status === "at_risk").length;
+      const canceledCount = subscriptions.filter(s => s.status === "canceled").length;
+
+      return {
+        subscriptions,
+        summary: {
+          mrrCents,
+          arrCents: mrrCents * 12,
+          activeCount,
+          basicActiveCount,
+          proActiveCount,
+          atRiskCount,
+          canceledCount,
+          totalCount: subscriptions.length,
+        },
+      };
+    }),
+
     /** Interested artists for a specific PRO job (admin view) */
     premiumJobArtists: protectedProcedure
       .input(z.object({ jobId: z.number() }))
