@@ -417,6 +417,83 @@ function ApplicationsPanel({ applications }: { applications: any[] }) {
   );
 }
 
+// ── Plan Status Card ────────────────────────────────────────────────────────
+
+function PlanStatusCard() {
+  const { data: billing, isLoading } = trpc.enterprise.getBillingInfo.useQuery(undefined, {
+    retry: false,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mt-4">
+        <div className="animate-pulse space-y-2">
+          <div className="h-3 bg-gray-100 rounded w-1/2" />
+          <div className="h-6 bg-gray-100 rounded w-3/4" />
+          <div className="h-3 bg-gray-100 rounded w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!billing) return null;
+
+  const plan = billing.enterprisePlan;
+  const status = billing.subscriptionStatus;
+  const interval = billing.subscriptionInterval;
+  const renewsAt = billing.currentPeriodEnd;
+  const cancelAtEnd = billing.cancelAtPeriodEnd;
+
+  const planLabel =
+    plan === "subscriber" ? "Enterprise Subscriber"
+    : plan === "on_demand" ? "On-Demand"
+    : "Free";
+
+  const planColor =
+    plan === "subscriber" ? "from-purple-500 to-indigo-600"
+    : plan === "on_demand" ? "from-[#FFBC5D] to-[#F25722]"
+    : "from-gray-400 to-gray-500";
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mt-4">
+      <h3 className="font-bold text-[#111] text-base mb-3">Your Plan</h3>
+
+      <div className={`bg-gradient-to-br ${planColor} rounded-xl p-4 text-white mb-3`}>
+        <p className="text-xs font-semibold uppercase tracking-wider opacity-80 mb-1">Current Plan</p>
+        <p className="text-lg font-black">{planLabel}</p>
+        {interval && (
+          <p className="text-xs opacity-80 mt-0.5 capitalize">{interval === "month" ? "Monthly" : "Annual"} billing</p>
+        )}
+      </div>
+
+      {status && (
+        <div className="flex items-center gap-2 mb-2">
+          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+            status === "active" ? "bg-green-400" :
+            status === "past_due" ? "bg-amber-400" :
+            "bg-red-400"
+          }`} />
+          <span className="text-xs text-gray-600 capitalize">
+            {status === "active" ? "Active" :
+             status === "past_due" ? "Payment past due" :
+             status}
+          </span>
+        </div>
+      )}
+
+      {renewsAt && (
+        <p className="text-xs text-gray-400">
+          {cancelAtEnd ? "Cancels" : "Renews"} {new Date(renewsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+        </p>
+      )}
+
+      {!plan && (
+        <p className="text-xs text-gray-400">Contact us to upgrade your plan.</p>
+      )}
+    </div>
+  );
+}
+
 // ── Post Job Modal ───────────────────────────────────────────────────────────────────────────────────
 
 const JOB_CATEGORIES = [
@@ -899,9 +976,10 @@ function MasterView({
           )}
         </div>
 
-        {/* Applications panel (right column) */}
+        {/* Applications panel + Plan Status (right column) */}
         <div className="lg:col-span-1">
           <ApplicationsPanel applications={applications} />
+          <PlanStatusCard />
         </div>
       </div>
     </div>

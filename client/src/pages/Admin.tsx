@@ -1767,6 +1767,16 @@ function EnterpriseClientsSection() {
                     <MapPin size={10} /> {client.location}
                   </p>
                 )}
+
+                {/* Run As button */}
+                <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end" onClick={e => e.stopPropagation()}>
+                  <RunAsButton
+                    userId={client.id}
+                    userName={client.clientCompanyName || displayName(client)}
+                    userRole="Client"
+                    enterprise={true}
+                  />
+                </div>
               </button>
             );
           })}

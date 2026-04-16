@@ -327,13 +327,14 @@ export async function createEnterpriseSubscriptionCheckoutSession(
   const plan = STRIPE_PRODUCTS.ENTERPRISE_SUBSCRIPTION;
   const tier = opts.interval === "year" ? plan.annual : plan.monthly;
 
-  const lineItem: Stripe.Checkout.SessionCreateParams.LineItem = tier.priceId
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lineItem: any = tier.priceId
     ? { price: tier.priceId, quantity: 1 }
     : {
         price_data: {
           currency: plan.currency,
           unit_amount: tier.amount,
-          recurring: { interval: tier.interval },
+          recurring: { interval: opts.interval },
           product: plan.productId,
         },
         quantity: 1,

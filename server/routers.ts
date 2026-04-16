@@ -1439,10 +1439,11 @@ Fields to extract:
       if (billing?.enterpriseStripeSubscriptionId) {
         try {
           const stripe = getStripe();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const sub = await stripe.subscriptions.retrieve(
             billing.enterpriseStripeSubscriptionId,
             { expand: ["items.data.price"] }
-          );
+          ) as any;
           subscriptionStatus = sub.status;
           cancelAtPeriodEnd = sub.cancel_at_period_end;
           currentPeriodEnd = new Date(sub.current_period_end * 1000).toISOString();

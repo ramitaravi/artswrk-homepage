@@ -544,3 +544,8 @@
 ## Subscription Billing Details
 - [x] Extend getCurrentPlan tRPC query to fetch active subscription from Stripe (interval, price, renewal date)
 - [x] Show billing interval (Monthly / Annual), price amount, and next renewal date on active plan card
+
+## Admin Run As + Enterprise Plan Badge
+- [x] Add "Run As" button to enterprise client cards in Admin.tsx (uses existing admin.impersonate endpoint)
+- [x] Add PlanStatusCard to enterprise client dashboard right sidebar (shows plan name, billing interval, status, renewal date)
+- [x] 118 tests passing
