@@ -269,6 +269,102 @@ export async function createArtistBasicCheckoutSession(
 }
 
 /**
+ * Create a Stripe Checkout Session for an enterprise on-demand job unlock ($100).
+ */
+export async function createEnterpriseJobUnlockCheckoutSession(
+  opts: CreateCheckoutOptions & { jobId: number; jobTitle?: string }
+): Promise<{ url: string; sessionId: string }> {
+  const stripe = getStripe();
+  const { STRIPE_PRODUCTS } = await import("./stripe-products");
+  const product = STRIPE_PRODUCTS.ENTERPRISE_ON_DEMAND;
+
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
+    mode: "payment",
+    line_items: [
+      {
+        price_data: {
+          currency: product.currency,
+          unit_amount: product.amount,
+          product_data: {
+            name: opts.jobTitle ? `View Candidates — ${opts.jobTitle}` : product.name,
+            description: product.description,
+          },
+        },
+        quantity: 1,
+      },
+    ],
+    payment_intent_data: { setup_future_usage: "on_session" },
+    success_url: `${opts.origin}/enterprise?unlock_job=${opts.jobId}&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${opts.origin}/enterprise`,
+    allow_promotion_codes: true,
+    client_reference_id: opts.userId?.toString(),
+    metadata: {
+      user_id: opts.userId?.toString() ?? "",
+      job_id: opts.jobId.toString(),
+      customer_email: opts.email ?? "",
+      type: "enterprise_job_unlock",
+    },
+  };
+
+  if (opts.stripeCustomerId) {
+    sessionParams.customer = opts.stripeCustomerId;
+  } else if (opts.email) {
+    sessionParams.customer_email = opts.email;
+  }
+
+  const session = await stripe.checkout.sessions.create(sessionParams);
+  return { url: session.url!, sessionId: session.id };
+}
+
+/**
+ * Create a Stripe Checkout Session for an enterprise subscription ($250/mo or $2500/yr).
+ */
+export async function createEnterpriseSubscriptionCheckoutSession(
+  opts: CreateCheckoutOptions & { interval: "month" | "year" }
+): Promise<{ url: string; sessionId: string }> {
+  const stripe = getStripe();
+  const { STRIPE_PRODUCTS } = await import("./stripe-products");
+  const plan = STRIPE_PRODUCTS.ENTERPRISE_SUBSCRIPTION;
+  const tier = opts.interval === "year" ? plan.annual : plan.monthly;
+
+  const lineItem: Stripe.Checkout.SessionCreateParams.LineItem = tier.priceId
+    ? { price: tier.priceId, quantity: 1 }
+    : {
+        price_data: {
+          currency: plan.currency,
+          unit_amount: tier.amount,
+          recurring: { interval: tier.interval },
+          product: plan.productId,
+        },
+        quantity: 1,
+      };
+
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
+    mode: "subscription",
+    line_items: [lineItem],
+    success_url: `${opts.origin}/enterprise?subscribed=1&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${opts.origin}/enterprise`,
+    allow_promotion_codes: true,
+    client_reference_id: opts.userId?.toString(),
+    metadata: {
+      user_id: opts.userId?.toString() ?? "",
+      customer_email: opts.email ?? "",
+      type: "enterprise_subscription",
+      interval: opts.interval,
+    },
+  };
+
+  if (opts.stripeCustomerId) {
+    sessionParams.customer = opts.stripeCustomerId;
+  } else if (opts.email) {
+    sessionParams.customer_email = opts.email;
+  }
+
+  const session = await stripe.checkout.sessions.create(sessionParams);
+  return { url: session.url!, sessionId: session.id };
+}
+
+/**
  * Create a Stripe Customer Portal session so an artist can manage their subscription.
  */
 export async function createArtistPortalSession(

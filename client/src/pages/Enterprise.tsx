@@ -5,7 +5,7 @@
  * Job detail view: breadcrumb → Applicants + Details tabs
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -21,6 +21,8 @@ import {
   CheckCircle2,
   Home,
   Archive,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -920,6 +922,8 @@ function JobDetailView({
   onBack: () => void;
 }) {
   const [tab, setTab] = useState<DetailTab>("applicants");
+  const [checkingOut, setCheckingOut] = useState(false);
+  const utils = trpc.useUtils();
 
   const { data: applicantsData, isLoading } =
     trpc.enterprise.getJobApplicants.useQuery(
@@ -927,7 +931,32 @@ function JobDetailView({
       { enabled: !!job.id }
     );
 
+  const checkoutJobUnlock = trpc.enterprise.checkoutJobUnlock.useMutation();
+
   const applicants = applicantsData?.applicants || [];
+  const isLocked = applicantsData?.locked ?? false;
+  const applicantCount = applicantsData?.applicantCount ?? applicants.length;
+
+  async function handleUnlockCheckout() {
+    setCheckingOut(true);
+    try {
+      const result = await checkoutJobUnlock.mutateAsync({
+        jobId: job.id,
+        jobTitle: job.serviceType || job.title,
+        origin: window.location.origin,
+      });
+      if (result.alreadyUnlocked) {
+        utils.enterprise.getJobApplicants.invalidate({ jobId: job.id });
+        return;
+      }
+      if (result.url) {
+        window.location.href = result.url;
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Checkout failed");
+      setCheckingOut(false);
+    }
+  }
 
   const rawLogo = job.logo || job.enterpriseLogoUrl || user?.enterpriseLogoUrl;
   const logoUrl = fixUrl(rawLogo);
@@ -1028,6 +1057,32 @@ function JobDetailView({
           {isLoading ? (
             <div className="text-center py-12 text-gray-400 text-sm">
               Loading applicants…
+            </div>
+          ) : isLocked ? (
+            /* On-demand paywall */
+            <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center mb-4">
+                <Lock size={28} className="text-amber-500" />
+              </div>
+              <h3 className="text-lg font-black text-[#111] mb-2">
+                {applicantCount > 0 ? `${applicantCount} Candidate${applicantCount !== 1 ? "s" : ""} Applied` : "Candidates Available"}
+              </h3>
+              <p className="text-sm text-gray-500 max-w-sm mb-6 leading-relaxed">
+                Unlock the full candidate list for this job for a one-time fee of <strong>$100</strong>. You'll get full access to view, contact, and message all applicants.
+              </p>
+              <button
+                onClick={handleUnlockCheckout}
+                disabled={checkingOut}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#F25722] text-white font-bold text-sm hover:bg-[#d94d1e] transition-colors disabled:opacity-60"
+              >
+                {checkingOut ? (
+                  <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Unlock size={16} />
+                )}
+                {checkingOut ? "Redirecting to checkout…" : "Unlock Candidates — $100"}
+              </button>
+              <p className="text-xs text-gray-400 mt-3">One-time payment · Secure checkout via Stripe</p>
             </div>
           ) : applicants.length === 0 ? (
             <div className="text-center py-12 text-gray-400 text-sm">
@@ -1179,6 +1234,7 @@ export default function Enterprise() {
   const { user, loading } = useAuth();
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [activeSection] = useState("dashboard");
+  const utils = trpc.useUtils();
 
   // Fetch the enterprise user data from DB (by ID to get full profile)
   const { data: userById } = trpc.artswrkUsers.getById.useQuery(
@@ -1188,6 +1244,25 @@ export default function Enterprise() {
 
   // userById returns { user: {...} }, auth user already has full fields
   const enterpriseUser = (userById as any)?.user || user;
+
+  // Handle post-checkout redirects
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const unlockJobId = params.get("unlock_job");
+    const subscribed = params.get("subscribed");
+    if (unlockJobId) {
+      utils.enterprise.getJobApplicants.invalidate({ jobId: parseInt(unlockJobId) });
+      utils.enterprise.getUnlockedJobs.invalidate();
+      toast.success("Job unlocked! You can now view all candidates.");
+      // Clean up URL
+      window.history.replaceState({}, "", "/enterprise");
+    }
+    if (subscribed) {
+      utils.enterprise.getBillingInfo.invalidate();
+      toast.success("Subscription activated! You now have unlimited candidate access.");
+      window.history.replaceState({}, "", "/enterprise");
+    }
+  }, []);
 
   if (loading) {
     return (

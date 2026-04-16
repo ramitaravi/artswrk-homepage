@@ -101,6 +101,17 @@ export const users = mysqlTable("users", {
   enterpriseLogoUrl: text("enterpriseLogoUrl"),
   /** Enterprise company description */
   enterpriseDescription: text("enterpriseDescription"),
+  /**
+   * Enterprise billing plan:
+   *   on_demand  — pay $100 per job to unlock candidate list
+   *   subscriber — monthly ($250/mo) or annual ($2500/yr) subscription
+   * Null = not yet assigned (admin sets this)
+   */
+  enterprisePlan: mysqlEnum("enterprisePlan", ["on_demand", "subscriber"]),
+  /** Stripe customer ID for enterprise billing */
+  enterpriseStripeCustomerId: varchar("enterpriseStripeCustomerId", { length: 64 }),
+  /** Active Stripe subscription ID (subscriber plan only) */
+  enterpriseStripeSubscriptionId: varchar("enterpriseStripeSubscriptionId", { length: 64 }),
 
   // ── Onboarding ─────────────────────────────────────────────────────────────
   onboardingStep: int("onboardingStep").default(0),
@@ -629,6 +640,27 @@ export const clientCompanies = mysqlTable("client_companies", {
 });
 export type ClientCompany = typeof clientCompanies.$inferSelect;
 export type InsertClientCompany = typeof clientCompanies.$inferInsert;
+
+/**
+ * Enterprise Job Unlocks — tracks which on-demand enterprise jobs have been
+ * paid for (at $100 each) so the client can view the candidate list.
+ */
+export const enterpriseJobUnlocks = mysqlTable("enterprise_job_unlocks", {
+  id: int("id").autoincrement().primaryKey(),
+  /** FK → users.id (the enterprise client who paid) */
+  clientUserId: int("clientUserId").notNull(),
+  /** FK → premium_jobs.id */
+  jobId: int("jobId").notNull(),
+  /** Stripe Checkout Session ID for this payment */
+  stripeSessionId: varchar("stripeSessionId", { length: 128 }),
+  /** Stripe Payment Intent ID */
+  stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 128 }),
+  /** Amount paid in cents (should be 10000 = $100) */
+  amountCents: int("amountCents").default(10000),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type EnterpriseJobUnlock = typeof enterpriseJobUnlocks.$inferSelect;
+export type InsertEnterpriseJobUnlock = typeof enterpriseJobUnlocks.$inferInsert;
 
 // ─── Facebook Group Acquisition ──────────────────────────────────────────────
 

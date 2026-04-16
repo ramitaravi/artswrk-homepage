@@ -77,6 +77,45 @@ export const STRIPE_PRODUCTS = {
       interval: "year" as const,
     },
   },
+  /**
+   * Enterprise On-Demand — $100 per job to unlock candidate list.
+   * Product: prod_TxJ7FkYDtKrFS1
+   * Uses price_data at checkout (no recurring price ID needed).
+   */
+  ENTERPRISE_ON_DEMAND: {
+    productId: "prod_TxJ7FkYDtKrFS1",
+    name: "Artswrk Enterprise — View Candidates",
+    description: "Unlock candidate list for one PRO job posting.",
+    amount: 10000, // $100 in cents
+    currency: "usd",
+    mode: "payment" as const,
+  },
+  /**
+   * Enterprise Subscription — $250/mo or $2500/yr (50% off $500/$5000).
+   * Product: prod_Tmmk8mzn4uw8G8
+   * Price IDs must be created in the Stripe dashboard for this product.
+   * Monthly: create a $250/month recurring price → set ENTERPRISE_SUB_MONTHLY_PRICE_ID
+   * Annual:  create a $2500/year  recurring price → set ENTERPRISE_SUB_ANNUAL_PRICE_ID
+   */
+  ENTERPRISE_SUBSCRIPTION: {
+    productId: "prod_Tmmk8mzn4uw8G8",
+    name: "Artswrk Enterprise Subscription",
+    description: "Unlimited PRO job postings and candidate access.",
+    currency: "usd",
+    mode: "subscription" as const,
+    monthly: {
+      // TODO: replace with real price ID from Stripe dashboard ($250/mo)
+      priceId: process.env.ENTERPRISE_SUB_MONTHLY_PRICE_ID ?? "",
+      amount: 25000, // $250 in cents (fallback for price_data)
+      interval: "month" as const,
+    },
+    annual: {
+      // TODO: replace with real price ID from Stripe dashboard ($2500/yr)
+      priceId: process.env.ENTERPRISE_SUB_ANNUAL_PRICE_ID ?? "",
+      amount: 250000, // $2500 in cents (fallback for price_data)
+      interval: "year" as const,
+    },
+  },
 } as const;
 
 /**

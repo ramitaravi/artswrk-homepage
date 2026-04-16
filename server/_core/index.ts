@@ -9,7 +9,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { getStripe } from "../stripe";
 import { ENV } from "./env";
-import { activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, getJobById, getUserById, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription } from "../db";
+import { activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, getJobById, getUserById, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, recordEnterpriseJobUnlock, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription } from "../db";
 import { sendJobPostedEmail } from "../email";
 import { handleBubbleWebhook } from "../bubbleWebhook";
 
@@ -99,9 +99,10 @@ async function startServer() {
           await saveClientStripeCustomerId(userId, session.customer);
         }
 
+        const eventType = session.metadata?.type;
+
         if (userId && session.subscription) {
           // Check if this is an artist PRO subscription or a client subscription
-          const eventType = session.metadata?.type;
           if (eventType === "artist_pro_subscription") {
             await saveArtistProSubscription(userId, session.subscription);
             if (session.customer) await saveArtistStripeCustomerId(userId, session.customer);
@@ -110,19 +111,39 @@ async function startServer() {
             await saveArtistBasicSubscription(userId, session.subscription);
             if (session.customer) await saveArtistStripeCustomerId(userId, session.customer);
             console.log(`[Webhook] Activated artist Basic for user ${userId}`);
+          } else if (eventType === "enterprise_subscription") {
+            await saveEnterpriseSubscription(userId, session.subscription);
+            if (session.customer) await saveEnterpriseStripeCustomerId(userId, session.customer);
+            console.log(`[Webhook] Activated enterprise subscription for user ${userId}`);
           } else {
             await saveClientSubscriptionId(userId, session.subscription);
           }
-          if (session.customer && eventType !== "artist_pro_subscription" && eventType !== "artist_basic_subscription") {
+          if (session.customer && !["artist_pro_subscription", "artist_basic_subscription", "enterprise_subscription"].includes(eventType)) {
             await saveClientStripeCustomerId(userId, session.customer);
           }
         } else if (userId && session.customer && !session.subscription) {
-          // One-time payment — save customer ID for client
-          await saveClientStripeCustomerId(userId, session.customer);
+          if (eventType === "enterprise_job_unlock") {
+            // Record the job unlock
+            const unlockJobId = session.metadata?.job_id ? parseInt(session.metadata.job_id) : null;
+            if (unlockJobId) {
+              await recordEnterpriseJobUnlock({
+                clientUserId: userId,
+                jobId: unlockJobId,
+                stripeSessionId: session.id,
+                stripePaymentIntentId: session.payment_intent ?? null,
+                amountCents: session.amount_total ?? 10000,
+              });
+              await saveEnterpriseStripeCustomerId(userId, session.customer);
+              console.log(`[Webhook] Unlocked enterprise job ${unlockJobId} for user ${userId}`);
+            }
+          } else {
+            // One-time payment — save customer ID for client
+            await saveClientStripeCustomerId(userId, session.customer);
+          }
         }
       }
 
-      // Handle artist subscription cancellation / expiry (Basic or PRO)
+      // Handle subscription cancellation / expiry (Basic, PRO, or Enterprise)
       if (event.type === "customer.subscription.deleted") {
         const subscription = event.data.object as any;
         const customerId = subscription.customer;
@@ -140,6 +161,9 @@ async function startServer() {
             } else if (productId === STRIPE_PRODUCTS.ARTIST_BASIC.productId) {
               await db.update(users).set({ artswrkBasic: false, artistStripeProductId: null }).where(eq(users.stripeCustomerId, customerId));
               console.log(`[Webhook] Cancelled artist Basic for Stripe customer ${customerId}`);
+            } else if (productId === STRIPE_PRODUCTS.ENTERPRISE_SUBSCRIPTION.productId) {
+              await db.update(users).set({ enterpriseStripeSubscriptionId: null }).where(eq(users.enterpriseStripeCustomerId, customerId));
+              console.log(`[Webhook] Cancelled enterprise subscription for customer ${customerId}`);
             }
           }
         }

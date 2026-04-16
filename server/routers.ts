@@ -6,11 +6,11 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail } from "./email";
 import crypto from "crypto";
-import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistBasicCheckoutSession, createArtistPortalSession } from "./stripe";
+import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistBasicCheckoutSession, createArtistPortalSession, createEnterpriseJobUnlockCheckoutSession, createEnterpriseSubscriptionCheckoutSession } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
 import { storagePut } from "./storage";
 import { artistResumes } from "../drizzle/schema";
@@ -432,6 +432,18 @@ export const appRouter = router({
       .query(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
         return getEnterpriseClients(input);
+      }),
+
+    /** Set the enterprise billing plan for a client (on_demand | subscriber | null) */
+    setEnterprisePlan: protectedProcedure
+      .input(z.object({
+        userId: z.number(),
+        plan: z.enum(["on_demand", "subscriber"]).nullable(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        await setEnterprisePlan(input.userId, input.plan);
+        return { success: true };
       }),
 
     /** All PRO jobs with search + filters */
@@ -1333,9 +1345,25 @@ Fields to extract:
         return { job };
       }),
     /** Get applicants (interested artists) for a specific premium job */
-    getJobApplicants: publicProcedure
+    getJobApplicants: protectedProcedure
       .input(z.object({ jobId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
+        // Check if this is an on-demand enterprise client who hasn't unlocked this job
+        const user = await getUserById(ctx.user.id);
+        const isOnDemand = user?.enterprise && user.enterprisePlan === "on_demand";
+        const isSubscriber = user?.enterprise && user.enterprisePlan === "subscriber";
+        // Admin and subscriber: full access. On-demand: check unlock. No plan: show count only.
+        const isAdmin = ctx.user.openId === ENV.ownerOpenId || ctx.user.role === "admin";
+
+        if (!isAdmin && isOnDemand) {
+          const unlocked = await isJobUnlocked(ctx.user.id, input.jobId);
+          if (!unlocked) {
+            // Return count only — frontend shows paywall
+            const raw = await getPremiumJobInterestedArtists(input.jobId);
+            return { applicants: [], applicantCount: (raw as any[]).length, locked: true, plan: "on_demand" as const };
+          }
+        }
+
         const raw = await getPremiumJobInterestedArtists(input.jobId);
         const applicants = (raw as any[]).map((ia) => ({
           id: ia.id,
@@ -1357,7 +1385,7 @@ Fields to extract:
           createdAt: ia.createdAt,
           artswrkPro: ia.artswrkPro,
         }));
-        return { applicants };
+        return { applicants, applicantCount: applicants.length, locked: false, plan: (isOnDemand ? "on_demand" : isSubscriber ? "subscriber" : null) as "on_demand" | "subscriber" | null };
       }),
 
     /** Get client companies for this enterprise user */
@@ -1396,6 +1424,101 @@ Fields to extract:
           bubbleClientCompanyId: input.bubbleClientCompanyId || null,
         });
         return { success: true, jobId };
+      }),
+
+    /** Get enterprise billing info for the logged-in client */
+    getBillingInfo: protectedProcedure.query(async ({ ctx }) => {
+      const user = await getUserById(ctx.user.id);
+      if (!user?.enterprise) throw new Error("Not an enterprise account");
+      const billing = await getEnterpriseBillingInfo(ctx.user.id);
+      // Fetch live subscription status from Stripe if subscriber
+      let subscriptionStatus: string | null = null;
+      let subscriptionInterval: string | null = null;
+      let currentPeriodEnd: string | null = null;
+      let cancelAtPeriodEnd = false;
+      if (billing?.enterpriseStripeSubscriptionId) {
+        try {
+          const stripe = getStripe();
+          const sub = await stripe.subscriptions.retrieve(
+            billing.enterpriseStripeSubscriptionId,
+            { expand: ["items.data.price"] }
+          );
+          subscriptionStatus = sub.status;
+          cancelAtPeriodEnd = sub.cancel_at_period_end;
+          currentPeriodEnd = new Date(sub.current_period_end * 1000).toISOString();
+          const price = sub.items?.data?.[0]?.price;
+          subscriptionInterval = price?.recurring?.interval ?? null;
+        } catch {
+          // sub may have been deleted in Stripe
+        }
+      }
+      return {
+        enterprisePlan: billing?.enterprisePlan ?? null,
+        enterpriseStripeCustomerId: billing?.enterpriseStripeCustomerId ?? null,
+        enterpriseStripeSubscriptionId: billing?.enterpriseStripeSubscriptionId ?? null,
+        subscriptionStatus,
+        subscriptionInterval,
+        currentPeriodEnd,
+        cancelAtPeriodEnd,
+      };
+    }),
+
+    /** Get which job IDs this enterprise client has unlocked (on-demand) */
+    getUnlockedJobs: protectedProcedure.query(async ({ ctx }) => {
+      const unlockedJobIds = await getUnlockedJobIds(ctx.user.id);
+      return { unlockedJobIds };
+    }),
+
+    /** Start a Stripe checkout to unlock a single job ($100, on-demand plan) */
+    checkoutJobUnlock: protectedProcedure
+      .input(z.object({ jobId: z.number(), jobTitle: z.string().optional(), origin: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserById(ctx.user.id);
+        if (!user?.enterprise) throw new Error("Not an enterprise account");
+        if (user.enterprisePlan !== "on_demand") throw new Error("Job unlock is only for on-demand plan");
+        // Prevent double-paying
+        const alreadyUnlocked = await isJobUnlocked(ctx.user.id, input.jobId);
+        if (alreadyUnlocked) return { alreadyUnlocked: true, url: null };
+        const { url, sessionId } = await createEnterpriseJobUnlockCheckoutSession({
+          email: user.email ?? undefined,
+          userId: ctx.user.id,
+          jobId: input.jobId,
+          jobTitle: input.jobTitle,
+          origin: input.origin,
+          stripeCustomerId: user.enterpriseStripeCustomerId ?? null,
+        });
+        return { alreadyUnlocked: false, url, sessionId };
+      }),
+
+    /** Start a Stripe checkout for enterprise subscription (monthly or annual) */
+    checkoutSubscription: protectedProcedure
+      .input(z.object({ interval: z.enum(["month", "year"]), origin: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserById(ctx.user.id);
+        if (!user?.enterprise) throw new Error("Not an enterprise account");
+        if (user.enterprisePlan !== "subscriber") throw new Error("Subscription checkout is only for subscriber plan");
+        const { url, sessionId } = await createEnterpriseSubscriptionCheckoutSession({
+          email: user.email ?? undefined,
+          userId: ctx.user.id,
+          interval: input.interval,
+          origin: input.origin,
+          stripeCustomerId: user.enterpriseStripeCustomerId ?? null,
+        });
+        return { url, sessionId };
+      }),
+
+    /** Open Stripe Customer Portal for enterprise subscription management */
+    billingPortal: protectedProcedure
+      .input(z.object({ returnUrl: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        const billing = await getEnterpriseBillingInfo(ctx.user.id);
+        if (!billing?.enterpriseStripeCustomerId) throw new Error("No Stripe customer found");
+        const stripe = getStripe();
+        const session = await stripe.billingPortal.sessions.create({
+          customer: billing.enterpriseStripeCustomerId,
+          return_url: input.returnUrl,
+        });
+        return { url: session.url };
       }),
   }),
   // ── Artswrk user queries ─────────────────────────────────────────────────────────────────

@@ -1380,6 +1380,8 @@ function ProJobsSection() {
 }
 
 // ─── Enterprise Clients Section ─────────────────────────────────────────────
+type EnterprisePlan = "on_demand" | "subscriber" | null;
+
 type EnterpriseClient = {
   id: number;
   name: string | null;
@@ -1391,6 +1393,7 @@ type EnterpriseClient = {
   profilePicture: string | null;
   enterpriseLogoUrl: string | null;
   enterpriseDescription: string | null;
+  enterprisePlan?: EnterprisePlan;
   hiringCategory: string | null;
   website: string | null;
   instagram: string | null;
@@ -1400,8 +1403,16 @@ type EnterpriseClient = {
   interestedArtistCount: number;
 };
 
+function EnterprisePlanBadge({ plan }: { plan: EnterprisePlan }) {
+  if (!plan) return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 font-semibold">No Plan</span>;
+  if (plan === "on_demand") return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 font-semibold">On-Demand</span>;
+  return <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 font-semibold">Subscriber</span>;
+}
+
 function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; onClose: () => void }) {
   const [expandedJobId, setExpandedJobId] = useState<number | null>(null);
+  const [localPlan, setLocalPlan] = useState<EnterprisePlan>(client.enterprisePlan ?? null);
+  const utils = trpc.useUtils();
 
   const { data: jobsData, isLoading } = trpc.admin.premiumJobs.useQuery({
     clientUserId: client.id,
@@ -1413,6 +1424,15 @@ function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; 
     { jobId: expandedJobId! },
     { enabled: expandedJobId !== null }
   );
+
+  const setPlan = trpc.admin.setEnterprisePlan.useMutation({
+    onSuccess: () => utils.admin.enterpriseClients.invalidate(),
+  });
+
+  async function handlePlanChange(plan: EnterprisePlan) {
+    setLocalPlan(plan);
+    await setPlan.mutateAsync({ userId: client.id, plan });
+  }
 
   const logo = client.enterpriseLogoUrl || client.profilePicture;
   const companyName = client.clientCompanyName || displayName(client);
@@ -1456,6 +1476,51 @@ function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; 
             <p className="text-sm text-gray-600 leading-relaxed">{client.enterpriseDescription}</p>
           </div>
         )}
+
+        {/* Enterprise Plan Toggle */}
+        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-0.5">Billing Plan</p>
+              <p className="text-xs text-gray-500">Controls how this client pays to access candidate lists.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handlePlanChange(null)}
+                disabled={setPlan.isPending}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${localPlan === null ? "bg-gray-200 border-gray-300 text-gray-700" : "bg-white border-gray-200 text-gray-400 hover:bg-gray-50"}`}
+              >
+                None
+              </button>
+              <button
+                onClick={() => handlePlanChange("on_demand")}
+                disabled={setPlan.isPending}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${localPlan === "on_demand" ? "bg-amber-100 border-amber-300 text-amber-700" : "bg-white border-gray-200 text-gray-400 hover:bg-amber-50"}`}
+              >
+                On-Demand ($100/job)
+              </button>
+              <button
+                onClick={() => handlePlanChange("subscriber")}
+                disabled={setPlan.isPending}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${localPlan === "subscriber" ? "bg-purple-100 border-purple-300 text-purple-700" : "bg-white border-gray-200 text-gray-400 hover:bg-purple-50"}`}
+              >
+                Subscriber
+              </button>
+              {setPlan.isPending && <div className="w-4 h-4 border-2 border-gray-300 border-t-[#F25722] rounded-full animate-spin" />}
+              {setPlan.isSuccess && <span className="text-xs text-green-600 font-semibold">Saved ✓</span>}
+            </div>
+          </div>
+          {localPlan === "on_demand" && (
+            <p className="mt-2 text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+              This client pays <strong>$100 per job</strong> to unlock the candidate list. Each payment is tracked individually.
+            </p>
+          )}
+          {localPlan === "subscriber" && (
+            <p className="mt-2 text-xs text-purple-600 bg-purple-50 rounded-lg px-3 py-2">
+              This client has a <strong>subscription</strong> — $250/month or $2,500/year — with unlimited candidate access.
+            </p>
+          )}
+        </div>
 
         {/* Links */}
         {(client.website || client.instagram) && (
@@ -1676,9 +1741,12 @@ function EnterpriseClientsSection() {
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-[#111] text-sm leading-tight truncate group-hover:text-[#F25722] transition-colors">{companyName}</p>
                     <p className="text-xs text-gray-500 truncate mt-0.5">{client.email}</p>
-                    {client.hiringCategory && (
-                      <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722] font-semibold">{client.hiringCategory}</span>
-                    )}
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {client.hiringCategory && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722] font-semibold">{client.hiringCategory}</span>
+                      )}
+                      <EnterprisePlanBadge plan={client.enterprisePlan ?? null} />
+                    </div>
                   </div>
                 </div>
 

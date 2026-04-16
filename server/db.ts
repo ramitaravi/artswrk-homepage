@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, isNotNull, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { ClientCompany, InsertClientCompany, InsertUser, bookings, clientCompanies, conversations, interestedArtists, jobs, messages, payments, premiumJobInterestedArtists, premiumJobs, users } from "../drizzle/schema";
+import { ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, messages, payments, premiumJobInterestedArtists, premiumJobs, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -1805,6 +1805,9 @@ export async function getEnterpriseClients(opts: {
       profilePicture: users.profilePicture,
       enterpriseLogoUrl: users.enterpriseLogoUrl,
       enterpriseDescription: users.enterpriseDescription,
+      enterprisePlan: users.enterprisePlan,
+      enterpriseStripeCustomerId: users.enterpriseStripeCustomerId,
+      enterpriseStripeSubscriptionId: users.enterpriseStripeSubscriptionId,
       hiringCategory: users.hiringCategory,
       website: users.website,
       instagram: users.instagram,
@@ -2223,4 +2226,95 @@ export async function saveArtistBasicSubscription(userId: number, subscriptionId
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(users).set({ artswrkBasic: true, artistStripeProductId: subscriptionId }).where(eq(users.id, userId));
+}
+
+// ── Enterprise Billing ────────────────────────────────────────────────────────
+
+/** Set the enterprise plan type for a user (admin action) */
+export async function setEnterprisePlan(
+  userId: number,
+  plan: "on_demand" | "subscriber" | null
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ enterprisePlan: plan as any }).where(eq(users.id, userId));
+}
+
+/** Save enterprise Stripe customer ID */
+export async function saveEnterpriseStripeCustomerId(userId: number, customerId: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ enterpriseStripeCustomerId: customerId }).where(eq(users.id, userId));
+}
+
+/** Save enterprise subscription ID after successful checkout */
+export async function saveEnterpriseSubscription(userId: number, subscriptionId: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ enterpriseStripeSubscriptionId: subscriptionId }).where(eq(users.id, userId));
+}
+
+/** Cancel enterprise subscription (clear subscription ID) */
+export async function cancelEnterpriseSubscription(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ enterpriseStripeSubscriptionId: null }).where(eq(users.id, userId));
+}
+
+/** Get enterprise billing fields for a user */
+export async function getEnterpriseBillingInfo(userId: number): Promise<{
+  enterprisePlan: "on_demand" | "subscriber" | null;
+  enterpriseStripeCustomerId: string | null;
+  enterpriseStripeSubscriptionId: string | null;
+} | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select({
+      enterprisePlan: users.enterprisePlan,
+      enterpriseStripeCustomerId: users.enterpriseStripeCustomerId,
+      enterpriseStripeSubscriptionId: users.enterpriseStripeSubscriptionId,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!rows[0]) return null;
+  return {
+    enterprisePlan: rows[0].enterprisePlan ?? null,
+    enterpriseStripeCustomerId: rows[0].enterpriseStripeCustomerId ?? null,
+    enterpriseStripeSubscriptionId: rows[0].enterpriseStripeSubscriptionId ?? null,
+  };
+}
+
+/** Record an on-demand job unlock after successful Stripe payment */
+export async function recordEnterpriseJobUnlock(unlock: InsertEnterpriseJobUnlock): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(enterpriseJobUnlocks).values(unlock);
+}
+
+/** Get all unlocked job IDs for an enterprise client */
+export async function getUnlockedJobIds(clientUserId: number): Promise<number[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({ jobId: enterpriseJobUnlocks.jobId })
+    .from(enterpriseJobUnlocks)
+    .where(eq(enterpriseJobUnlocks.clientUserId, clientUserId));
+  return rows.map(r => r.jobId);
+}
+
+/** Check if a specific job is unlocked for a client */
+export async function isJobUnlocked(clientUserId: number, jobId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const rows = await db
+    .select({ id: enterpriseJobUnlocks.id })
+    .from(enterpriseJobUnlocks)
+    .where(and(
+      eq(enterpriseJobUnlocks.clientUserId, clientUserId),
+      eq(enterpriseJobUnlocks.jobId, jobId)
+    ))
+    .limit(1);
+  return rows.length > 0;
 }
