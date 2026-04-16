@@ -39,12 +39,36 @@ import DanceTeachers from "./pages/DanceTeachers";
 import DanceJudges from "./pages/DanceJudges";
 import MusicTeachers from "./pages/MusicTeachers";
 import Production from "./pages/Production";
+import { useAuth } from "./_core/hooks/useAuth";
+import { trpc } from "./lib/trpc";
 
 // DashboardLayout handles auth protection internally (redirects to /login if not authenticated)
 function DashRoute({ component: Component }: { component: React.ComponentType }) {
   return (
     <DashboardLayout>
       <Component />
+    </DashboardLayout>
+  );
+}
+
+/**
+ * Role-aware /app route dispatcher.
+ * Artists see ArtistDashboard (URL-driven content); clients see their dedicated pages.
+ * Accepts an optional clientComponent override — falls back to Overview for the home route.
+ */
+function AppRoute({ clientComponent: ClientComponent = Overview }: { clientComponent?: React.ComponentType }) {
+  const { user } = useAuth();
+  const { data: artswrkUser } = trpc.artswrkUsers.getByEmail.useQuery(
+    { email: user?.email ?? "" },
+    { enabled: !!user?.email }
+  );
+
+  // While loading, render the layout skeleton (DashboardLayout shows its own spinner)
+  const isArtist = artswrkUser?.userRole === "Artist";
+
+  return (
+    <DashboardLayout>
+      {isArtist ? <ArtistDashboard /> : <ClientComponent />}
     </DashboardLayout>
   );
 }
@@ -76,54 +100,88 @@ function Router() {
       <Route path="/music-teachers" component={MusicTeachers} />
       <Route path="/production" component={Production} />
 
-      {/* Dashboard routes — auth protection is inside DashboardLayout */}
-      <Route path="/dashboard">
-        {() => <DashRoute component={Overview} />}
+      {/* ── /app/* — shared path for all logged-in users (artist + client) ── */}
+      {/* Home: artists see their overview, clients see hiring stats */}
+      <Route path="/app">
+        {() => <AppRoute clientComponent={Overview} />}
       </Route>
-      <Route path="/dashboard/jobs">
-        {() => <DashRoute component={DashJobs} />}
+
+      {/* Jobs: artists see job feed + applications, clients see their postings */}
+      <Route path="/app/jobs">
+        {() => <AppRoute clientComponent={DashJobs} />}
       </Route>
-      <Route path="/dashboard/bookings">
-        {() => <DashRoute component={Bookings} />}
+
+      {/* Bookings: artists see their engagements, clients see confirmed bookings */}
+      <Route path="/app/bookings">
+        {() => <AppRoute clientComponent={Bookings} />}
       </Route>
-      <Route path="/dashboard/payments">
-        {() => <DashRoute component={Payments} />}
+
+      {/* Payments: artists see earnings, clients see billing */}
+      <Route path="/app/payments">
+        {() => <AppRoute clientComponent={Payments} />}
       </Route>
-      <Route path="/dashboard/artists">
+
+      {/* Messages: shared inbox — same component works for both roles */}
+      <Route path="/app/messages">
+        {() => <AppRoute clientComponent={Messages} />}
+      </Route>
+
+      {/* Client-only routes */}
+      <Route path="/app/artists">
         {() => <DashRoute component={Artists} />}
       </Route>
-      <Route path="/dashboard/artists/:artistId">
-        {(params) => (
+      <Route path="/app/artists/:artistId">
+        {() => (
           <DashboardLayout>
             <ArtistProfile />
           </DashboardLayout>
         )}
       </Route>
-      <Route path="/dashboard/messages">
-        {() => <DashRoute component={Messages} />}
-      </Route>
-      <Route path="/dashboard/company">
+      <Route path="/app/company">
         {() => <DashRoute component={CompanyPage} />}
       </Route>
-      <Route path="/dashboard/sublists">
+      <Route path="/app/lists">
         {() => <DashRoute component={SubLists} />}
       </Route>
-      <Route path="/dashboard/community">
-        {() => <DashRoute component={Community} />}
+      <Route path="/app/community">
+        {() => <AppRoute clientComponent={Community} />}
       </Route>
-      <Route path="/dashboard/benefits">
-        {() => <DashRoute component={Benefits} />}
+      <Route path="/app/benefits">
+        {() => <AppRoute clientComponent={Benefits} />}
       </Route>
 
-      {/* Enterprise Dashboard */}
+      {/* Artist-only routes (rendered inside ArtistDashboard via URL matching) */}
+      <Route path="/app/profile">
+        {() => <AppRoute />}
+      </Route>
+      <Route path="/app/pro-jobs">
+        {() => <AppRoute />}
+      </Route>
+
+      {/* Legacy redirects — old /dashboard/* paths → /app/* */}
+      <Route path="/dashboard">
+        {() => { window.location.replace("/app"); return null; }}
+      </Route>
+      <Route path="/dashboard/:rest*">
+        {(params) => {
+          const rest = (params as any).rest || "";
+          window.location.replace(`/app/${rest}`);
+          return null;
+        }}
+      </Route>
+      <Route path="/artist-dashboard">
+        {() => { window.location.replace("/app"); return null; }}
+      </Route>
+
+      {/* Enterprise landing page */}
       <Route path="/enterprise" component={Enterprise} />
 
-      {/* Artist Dashboard */}
-      <Route path="/artist-dashboard" component={ArtistDashboard} />
-      <Route path="/artist/profile" component={ArtistProfilePage} />
-
-      {/* Admin */}
-      <Route path="/admin" component={Admin} />
+      {/* Admin — separate path, admin-only */}
+      <Route path="/admin-dashboard" component={Admin} />
+      {/* Legacy /admin redirect */}
+      <Route path="/admin">
+        {() => { window.location.replace("/admin-dashboard"); return null; }}
+      </Route>
 
       {/* Fallback */}
       <Route path="/404" component={NotFound} />

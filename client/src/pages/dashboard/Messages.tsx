@@ -299,7 +299,7 @@ export default function Messages() {
               <div>
                 <p
                   className={`text-sm font-bold text-[#111] ${activeConvo.artistUserId ? 'cursor-pointer hover:text-[#F25722] transition-colors' : ''}`}
-                  onClick={() => activeConvo.artistUserId && navigate(`/dashboard/artists/${activeConvo.artistUserId}`)}
+                  onClick={() => activeConvo.artistUserId && navigate(`/app/artists/${activeConvo.artistUserId}`)}
                 >{artistDisplayName}</p>
                 {activeConvo.artistSlug && (
                   <p className="text-xs text-gray-400">@{activeConvo.artistSlug}</p>

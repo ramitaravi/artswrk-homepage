@@ -82,7 +82,7 @@ function BookingRow({ booking }: { booking: Booking }) {
     : artistName ?? `Artist #${artistId.slice(-6) || "—"}`;
 
   function handleArtistClick() {
-    if (artistUserId) navigate(`/dashboard/artists/${artistUserId}`);
+    if (artistUserId) navigate(`/app/artists/${artistUserId}`);
   }
 
   return (

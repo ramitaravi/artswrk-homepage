@@ -17,7 +17,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [, navigate] = useLocation();
   const searchStr = useSearch();
-  const next = new URLSearchParams(searchStr).get("next") ?? "/dashboard";
+  const next = new URLSearchParams(searchStr).get("next") ?? "/app";
 
   const passwordLogin = trpc.auth.passwordLogin.useMutation({
     onSuccess: () => {
@@ -150,7 +150,7 @@ export default function Login() {
         <p className="text-center text-xs text-gray-400 mt-6">
           Don't have an account?{" "}
           <a
-            href={`/join${next !== "/dashboard" ? `?next=${encodeURIComponent(next)}` : ""}`}
+            href={`/join${next !== "/app" ? `?next=${encodeURIComponent(next)}` : ""}`}
             className="font-semibold text-[#F25722] hover:opacity-70 transition-opacity"
           >
             Join free

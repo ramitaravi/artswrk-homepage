@@ -26,6 +26,8 @@ import {
   Crown,
   ChevronRight,
   Loader2,
+  Star,
+  User,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
@@ -38,25 +40,42 @@ interface NavItem {
   badge?: number;
 }
 
-const CORE_NAV: NavItem[] = [
-  { label: "Dashboard", icon: <LayoutDashboard size={18} />, href: "/dashboard" },
-  { label: "My Jobs", icon: <Briefcase size={18} />, href: "/dashboard/jobs" },
-  { label: "Bookings", icon: <Calendar size={18} />, href: "/dashboard/bookings" },
-  { label: "Payments", icon: <CreditCard size={18} />, href: "/dashboard/payments" },
-  { label: "Artists", icon: <Users size={18} />, href: "/dashboard/artists" },
-  { label: "Messages", icon: <MessageSquare size={18} />, href: "/dashboard/messages", badge: 3 },
+// Client (hirer) nav
+const CLIENT_CORE_NAV: NavItem[] = [
+  { label: "Dashboard", icon: <LayoutDashboard size={18} />, href: "/app" },
+  { label: "My Jobs", icon: <Briefcase size={18} />, href: "/app/jobs" },
+  { label: "Bookings", icon: <Calendar size={18} />, href: "/app/bookings" },
+  { label: "Payments", icon: <CreditCard size={18} />, href: "/app/payments" },
+  { label: "Artists", icon: <Users size={18} />, href: "/app/artists" },
+  { label: "Messages", icon: <MessageSquare size={18} />, href: "/app/messages", badge: 3 },
 ];
 
-const PREMIUM_NAV: NavItem[] = [
-  { label: "Company Page", icon: <Building2 size={18} />, href: "/dashboard/company", premium: true },
-  { label: "Sub Lists", icon: <List size={18} />, href: "/dashboard/sublists", premium: true },
-  { label: "Community", icon: <Users2 size={18} />, href: "/dashboard/community", premium: true },
-  { label: "Benefits", icon: <Gift size={18} />, href: "/dashboard/benefits", premium: true },
+const CLIENT_PREMIUM_NAV: NavItem[] = [
+  { label: "Company Page", icon: <Building2 size={18} />, href: "/app/company", premium: true },
+  { label: "Sub Lists", icon: <List size={18} />, href: "/app/lists", premium: true },
+  { label: "Community", icon: <Users2 size={18} />, href: "/app/community", premium: true },
+  { label: "Benefits", icon: <Gift size={18} />, href: "/app/benefits", premium: true },
+];
+
+// Artist nav
+const ARTIST_CORE_NAV: NavItem[] = [
+  { label: "Dashboard", icon: <LayoutDashboard size={18} />, href: "/app" },
+  { label: "Jobs", icon: <Briefcase size={18} />, href: "/app/jobs" },
+  { label: "Bookings", icon: <Calendar size={18} />, href: "/app/bookings" },
+  { label: "Payments", icon: <CreditCard size={18} />, href: "/app/payments" },
+  { label: "Messages", icon: <MessageSquare size={18} />, href: "/app/messages" },
+  { label: "Profile", icon: <User size={18} />, href: "/app/profile" },
+];
+
+const ARTIST_PREMIUM_NAV: NavItem[] = [
+  { label: "PRO Jobs", icon: <Star size={18} />, href: "/app/pro-jobs", premium: true },
+  { label: "Benefits", icon: <Gift size={18} />, href: "/app/benefits", premium: true },
+  { label: "Community", icon: <Users2 size={18} />, href: "/app/community", premium: true },
 ];
 
 function NavLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   const [location] = useLocation();
-  const isActive = location === item.href || (item.href !== "/dashboard" && location.startsWith(item.href));
+  const isActive = location === item.href || (item.href !== "/app" && location.startsWith(item.href));
 
   return (
     <Link href={item.href}>
@@ -123,6 +142,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const displayStudio = artswrkUser?.clientCompanyName || "Artswrk";
   const displayLocation = ""; // location fields not yet in schema
   const isPremium = artswrkUser?.clientPremium ?? false;
+  const isArtist = artswrkUser?.userRole === "Artist";
+  const coreNav = isArtist ? ARTIST_CORE_NAV : CLIENT_CORE_NAV;
+  const premiumNav = isArtist ? ARTIST_PREMIUM_NAV : CLIENT_PREMIUM_NAV;
 
   const avatarInitials = displayName
     .split(" ")
@@ -189,7 +211,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Core nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {CORE_NAV.map((item) => (
+        {coreNav.map((item) => (
           <NavLink key={item.href} item={item} collapsed={collapsed} />
         ))}
 
@@ -202,14 +224,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         )}
         {collapsed && <div className="pt-3 border-t border-white/10 my-2" />}
-        {PREMIUM_NAV.map((item) => (
+        {premiumNav.map((item) => (
           <NavLink key={item.href} item={item} collapsed={collapsed} />
         ))}
       </nav>
 
       {/* Bottom actions */}
       <div className="px-3 py-4 border-t border-white/10 space-y-0.5">
-        <Link href="/dashboard/settings">
+        <Link href="/app/settings">
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white transition-all cursor-pointer">
             <Settings size={18} className="flex-shrink-0" />
             {!collapsed && <span className="text-sm font-medium">Settings</span>}

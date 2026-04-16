@@ -1,6 +1,6 @@
 /*
  * ARTSWRK DASHBOARD — ARTIST PROFILE
- * Route: /dashboard/artists/:artistId
+ * Route: /app/artists/:artistId
  * Layout: Two-column (portrait photo + name overlay on left, tabs on right)
  * Tabs: About | History | Resume
  */
@@ -397,7 +397,7 @@ function HistoryTab({ artistId }: { artistId: number }) {
                   )}
                 </div>
                 <Link
-                  href="/dashboard/messages"
+                  href="/app/messages"
                   className="text-xs font-semibold text-[#ec008c] hover:underline flex items-center gap-1"
                 >
                   View <ChevronRight size={12} />
@@ -513,7 +513,7 @@ export default function ArtistProfile() {
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
         <AlertCircle size={32} className="text-red-400" />
         <p className="text-sm text-gray-500">Artist not found.</p>
-        <Link href="/dashboard/artists" className="text-sm text-[#F25722] font-semibold hover:underline">
+        <Link href="/app/artists" className="text-sm text-[#F25722] font-semibold hover:underline">
           ← Back to Artists
         </Link>
       </div>
@@ -537,7 +537,7 @@ export default function ArtistProfile() {
     <div className="max-w-5xl mx-auto">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm text-gray-400 mb-6">
-        <Link href="/dashboard/artists" className="hover:text-gray-600 transition-colors">
+        <Link href="/app/artists" className="hover:text-gray-600 transition-colors">
           Artists
         </Link>
         <ChevronRight size={14} />
@@ -648,7 +648,7 @@ export default function ArtistProfile() {
           {/* Back button (mobile) */}
           <div className="mt-4 lg:hidden">
             <Link
-              href="/dashboard/artists"
+              href="/app/artists"
               className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
               <ArrowLeft size={14} />

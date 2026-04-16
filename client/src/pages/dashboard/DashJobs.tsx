@@ -292,12 +292,12 @@ export default function DashJobs() {
                         <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-100 transition-colors">
                           <Eye size={12} /> View on site
                         </button>
-                        <Link href="/dashboard/artists">
+                        <Link href="/app/artists">
                           <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-100 transition-colors">
                             <Users size={12} /> View applicants
                           </button>
                         </Link>
-                        <Link href="/dashboard/bookings">
+                        <Link href="/app/bookings">
                           <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-100 transition-colors">
                             <CreditCard size={12} /> View bookings
                           </button>

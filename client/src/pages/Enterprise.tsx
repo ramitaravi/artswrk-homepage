@@ -185,7 +185,7 @@ function Sidebar({
     {
       icon: <Users size={18} />,
       label: "Browse Artists",
-      onClick: () => navigate("/dashboard/artists"),
+      onClick: () => navigate("/app/artists"),
       active: false,
     },
   ];

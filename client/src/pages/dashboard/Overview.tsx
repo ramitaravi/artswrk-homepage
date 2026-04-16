@@ -187,7 +187,7 @@ export default function Overview() {
                 <button className="flex items-center gap-1.5 text-xs font-medium text-gray-600 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
                   <Search size={13} /> Browse Artists
                 </button>
-                <Link href="/dashboard/jobs">
+                <Link href="/app/jobs">
                   <button className="flex items-center gap-1.5 text-xs font-bold text-white px-4 py-1.5 rounded-lg hirer-grad-bg hover:opacity-90 transition-opacity">
                     <Plus size={13} /> Post Job
                   </button>
@@ -242,7 +242,7 @@ export default function Overview() {
                   <div className="flex flex-col items-center justify-center py-12 text-gray-400">
                     <Briefcase size={32} className="mb-3 opacity-30" />
                     <p className="text-sm font-medium">No {jobFilter === "active" ? "active " : ""}jobs found</p>
-                    <Link href="/dashboard/jobs">
+                    <Link href="/app/jobs">
                       <button className="mt-3 text-xs font-semibold text-[#F25722] hover:opacity-70 transition-opacity">
                         Post your first job →
                       </button>
@@ -300,7 +300,7 @@ export default function Overview() {
                 )}
 
                 <div className="p-4 border-t border-gray-100">
-                  <Link href="/dashboard/jobs">
+                  <Link href="/app/jobs">
                     <button className="w-full text-xs font-semibold text-[#F25722] hover:opacity-70 transition-opacity flex items-center justify-center gap-1">
                       View all jobs <ChevronRight size={14} />
                     </button>
@@ -313,7 +313,7 @@ export default function Overview() {
               <div className="p-6 text-center text-gray-400 text-sm">
                 <Users size={32} className="mx-auto mb-3 opacity-30" />
                 <p className="font-medium">Your saved artists will appear here</p>
-                <Link href="/dashboard/artists">
+                <Link href="/app/artists">
                   <button className="mt-3 text-xs font-semibold text-[#F25722] hover:opacity-70 transition-opacity">
                     Browse Artists →
                   </button>
@@ -325,7 +325,7 @@ export default function Overview() {
               <div className="p-6 text-center text-gray-400 text-sm">
                 <Briefcase size={32} className="mx-auto mb-3 opacity-30" />
                 <p className="font-medium">Manage your company profiles</p>
-                <Link href="/dashboard/company">
+                <Link href="/app/company">
                   <button className="mt-3 text-xs font-semibold text-[#F25722] hover:opacity-70 transition-opacity">
                     Set Up Company Page →
                   </button>
@@ -401,7 +401,7 @@ export default function Overview() {
               )}
             </div>
             <div className="p-4 border-t border-gray-100">
-              <Link href="/dashboard/artists">
+              <Link href="/app/artists">
                 <button className="w-full text-xs font-semibold text-[#F25722] hover:opacity-70 transition-opacity flex items-center justify-center gap-1">
                   View all artists <ChevronRight size={14} />
                 </button>

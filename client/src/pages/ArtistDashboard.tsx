@@ -6,34 +6,29 @@
  */
 
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import ArtistProfilePage from "./artist/ArtistProfilePage";
 import ArtistSettingsPlan from "./artist/ArtistSettingsPlan";
 import {
-  LayoutDashboard,
   Briefcase,
   Calendar,
   CreditCard,
   MessageSquare,
-  User,
   Star,
   Building2,
   Gift,
   Users,
   Settings,
-  LogOut,
   MapPin,
   Clock,
   ChevronRight,
   CheckCircle2,
   AlertCircle,
   ExternalLink,
-  Sparkles,
   ArrowRight,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { getLoginUrl } from "@/const";
 
 // ─── Placeholder data (to be replaced with real API data) ─────────────────────
 
@@ -79,86 +74,7 @@ const JOBS_FOR_YOU = [
   { id: 10, studio: "Artistry Dance Complex", serviceType: "Recurring Classes", location: "Massapequa, NY", postedAgo: "a year ago", date: "Thu, 8/07/25, 7:30 pm", rate: "Open rate", applied: false, logo: null },
 ];
 
-// ─── Sidebar ──────────────────────────────────────────────────────────────────
-
-type SidebarTab = "dashboard" | "jobs" | "bookings" | "payments" | "messages" | "profile" | "pro-jobs" | "companies" | "benefits" | "community" | "settings";
-
-interface SidebarProps {
-  activeTab: SidebarTab;
-  onTabChange: (tab: SidebarTab) => void;
-  onLogout: () => void;
-}
-
-function Sidebar({ activeTab, onTabChange, onLogout }: SidebarProps) {
-  const navItem = (tab: SidebarTab, icon: React.ReactNode, label: string, pro = false) => (
-    <button
-      key={tab}
-      onClick={() => onTabChange(tab)}
-      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
-        activeTab === tab
-          ? "bg-gray-100 text-gray-900"
-          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-      }`}
-    >
-      <span className="w-5 h-5 flex-shrink-0">{icon}</span>
-      <span>{label}</span>
-      {pro && (
-        <span className="ml-auto text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">PRO</span>
-      )}
-    </button>
-  );
-
-  return (
-    <aside className="w-56 flex-shrink-0 bg-white border-r border-gray-100 flex flex-col h-full">
-      {/* Logo */}
-      <div className="px-5 py-5 border-b border-gray-100">
-        <Link href="/" className="flex items-center select-none">
-          <span className="font-black text-xl tracking-tight" style={{ background: "linear-gradient(90deg,#FFBC5D,#F25722)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>ARTS</span>
-          <span className="font-black text-xl tracking-tight bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">WRK</span>
-        </Link>
-      </div>
-
-      {/* Main nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {navItem("dashboard", <LayoutDashboard size={16} />, "Dashboard")}
-        {navItem("jobs", <Briefcase size={16} />, "Jobs")}
-        {navItem("bookings", <Calendar size={16} />, "Bookings")}
-        {navItem("payments", <CreditCard size={16} />, "Payments")}
-        {navItem("messages", <MessageSquare size={16} />, "Messages")}
-        {navItem("profile", <User size={16} />, "Profile")}
-
-        {/* PRO section */}
-        <div className="pt-4 pb-1">
-          <p className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Premium Features</p>
-        </div>
-        {navItem("pro-jobs", <Star size={16} />, "PRO Jobs", true)}
-        {navItem("companies", <Building2 size={16} />, "Companies", true)}
-        {navItem("benefits", <Gift size={16} />, "Benefits", true)}
-        {navItem("community", <Users size={16} />, "Community", true)}
-      </nav>
-
-      {/* Bottom nav */}
-      <div className="px-3 py-3 border-t border-gray-100 space-y-0.5">
-        {navItem("settings", <Settings size={16} />, "Settings")}
-        <button
-          onClick={onLogout}
-          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors text-left"
-        >
-          <LogOut size={16} className="w-5 h-5 flex-shrink-0" />
-          <span>Logout</span>
-        </button>
-      </div>
-
-      {/* Footer */}
-      <div className="px-5 py-3 border-t border-gray-100">
-        <p className="text-[10px] text-gray-400">
-          <a href="#" className="hover:underline">Terms</a> · <a href="#" className="hover:underline">Privacy</a>
-        </p>
-        <p className="text-[10px] text-gray-400 mt-0.5">Artswrk 2026 ©</p>
-      </div>
-    </aside>
-  );
-}
+// (Sidebar removed — DashboardLayout now handles navigation)
 
 // ─── Studio Logo Avatar ───────────────────────────────────────────────────────
 
@@ -834,67 +750,30 @@ function ComingSoonTab({ icon, title }: { icon: React.ReactNode; title: string }
 }
 
 // ─── Main Artist Dashboard ────────────────────────────────────────────────────
+// Renders inside DashboardLayout — no sidebar of its own.
+// Content is driven by the current URL path (/app, /app/jobs, etc.)
 
 export default function ArtistDashboard() {
-  const { user, loading, isAuthenticated, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<SidebarTab>("dashboard");
-  const [, navigate] = useLocation();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-gray-200 border-t-gray-800 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    window.location.href = getLoginUrl();
-    return null;
-  }
-
-  function handleLogout() {
-    logout();
-    navigate("/");
-  }
+  const { user } = useAuth();
+  const [location] = useLocation();
 
   function renderContent() {
-    switch (activeTab) {
-      case "dashboard":
-        return <DashboardTab user={user} />;
-      case "jobs":
-        return <JobsTab user={user} />;
-      case "bookings":
-        return <BookingsTab />;
-      case "payments":
-        return <PaymentsTab />;
-      case "messages":
-        return <MessagesTab />;
-      case "profile":
-        return <ArtistProfilePage />;
-      case "pro-jobs":
-        return <ProJobsTab />;
-      case "companies":
-        return <ComingSoonTab icon={<Building2 size={40} />} title="Companies" />;
-      case "benefits":
-        return <ComingSoonTab icon={<Gift size={40} />} title="Benefits" />;
-      case "community":
-        return <ComingSoonTab icon={<Users size={40} />} title="Community" />;
-      case "settings":
-        return <ArtistSettingsPlan />;
-      default:
-        return <DashboardTab user={user} />;
-    }
+    if (location.startsWith("/app/jobs")) return <JobsTab user={user} />;
+    if (location.startsWith("/app/bookings")) return <BookingsTab />;
+    if (location.startsWith("/app/payments")) return <PaymentsTab />;
+    if (location.startsWith("/app/messages")) return <MessagesTab />;
+    if (location.startsWith("/app/profile")) return <ArtistProfilePage />;
+    if (location.startsWith("/app/pro-jobs")) return <ProJobsTab />;
+    if (location.startsWith("/app/benefits")) return <ComingSoonTab icon={<Gift size={40} />} title="Benefits" />;
+    if (location.startsWith("/app/community")) return <ComingSoonTab icon={<Users size={40} />} title="Community" />;
+    if (location.startsWith("/app/settings")) return <ArtistSettingsPlan />;
+    // Default: /app overview
+    return <DashboardTab user={user} />;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} onLogout={handleLogout} />
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-6 py-8">
-          {renderContent()}
-        </div>
-      </main>
+    <div className="max-w-3xl mx-auto px-6 py-8">
+      {renderContent()}
     </div>
   );
 }

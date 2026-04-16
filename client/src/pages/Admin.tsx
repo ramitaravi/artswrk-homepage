@@ -97,10 +97,10 @@ function Sidebar({ active, onSelect, collapsed, onToggle }: {
       {/* Bottom: link to client dashboard */}
       {!collapsed && (
         <div className="p-3 border-t border-white/10">
-          <Link href="/dashboard">
+          <Link href="/app">
             <button className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-white/40 hover:text-white hover:bg-white/10 transition-colors">
               <ArrowUpRight size={13} />
-              Client Dashboard
+              App Dashboard
             </button>
           </Link>
         </div>
@@ -182,9 +182,9 @@ function RunAsButton({ userId, userName, userRole, enterprise }: {
       if (data.targetUser.enterprise) {
         window.location.href = "/enterprise";
       } else if (data.targetUser.userRole === "Artist") {
-        window.location.href = "/dashboard";
+        window.location.href = "/app";
       } else {
-        window.location.href = "/dashboard";
+        window.location.href = "/app";
       }
     },
     onError: (err) => {

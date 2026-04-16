@@ -42,7 +42,7 @@ export default function Navbar() {
             Logged in as <span className="font-bold">{displayName}</span>
             {accountLabel ? <span className="text-white/60"> · {accountLabel}</span> : null}
           </span>
-          <Link href="/dashboard" className="ml-3 flex items-center gap-1 text-white/70 hover:text-white transition-colors underline underline-offset-2">
+          <Link href="/app" className="ml-3 flex items-center gap-1 text-white/70 hover:text-white transition-colors underline underline-offset-2">
             <LayoutDashboard size={11} /> Dashboard
           </Link>
         </div>

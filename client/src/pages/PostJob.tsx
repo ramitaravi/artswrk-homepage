@@ -1065,7 +1065,7 @@ function SuccessPage() {
 
         <div className="flex gap-3 justify-center mt-6">
           <Button
-            onClick={() => navigate("/dashboard/jobs")}
+            onClick={() => navigate("/app/jobs")}
             className="hirer-grad-bg border-0 hover:opacity-90 font-bold"
           >
             View My Jobs
@@ -1127,7 +1127,7 @@ export default function PostJob() {
                 Browse Jobs
               </Link>
               <Link
-                href="/dashboard"
+                href="/app"
                 className="text-sm font-medium text-gray-600 hover:text-black transition-colors"
               >
                 Dashboard
@@ -1172,7 +1172,7 @@ export default function PostJob() {
 
         {step === 4 && (
           <Step4
-            onSkip={() => navigate("/dashboard/jobs")}
+            onSkip={() => navigate("/app/jobs")}
           />
         )}
       </div>

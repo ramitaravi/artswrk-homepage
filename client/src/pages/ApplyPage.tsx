@@ -439,7 +439,7 @@ export default function ApplyPage() {
           </p>
           <div className="space-y-2">
             <Link
-              href="/artist-dashboard"
+              href="/app/jobs"
               className="block w-full py-3 rounded-xl text-sm font-bold text-white bg-[#F25722] hover:bg-[#d44a1a] transition-colors"
             >
               View My Applications

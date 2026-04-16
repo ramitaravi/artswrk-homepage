@@ -86,36 +86,48 @@
 | `/post-job` | `PostJob.tsx` | AI-assisted job posting → Stripe checkout |
 | `/post-job/success` | `PostJob.tsx` | Post-checkout confirmation (same component, different state) |
 
-### Client Dashboard (`/dashboard/*`)
+### `/app/*` — Unified logged-in area (artist + client)
 
-All routes wrapped in `DashboardLayout` (sidebar nav, auth-protected).
+All routes wrapped in `DashboardLayout`. Role-aware: the sidebar nav and page content adapt based on `userRole`.
+
+> **URL design mirrors original Bubble app**: `artswrk.com/app?tab=bookings` → `artswrk.com/app/bookings`
+> Legacy `/dashboard/*` and `/artist-dashboard` redirect automatically to `/app/*`.
+
+#### Shared routes (role-aware content)
+
+| Route | Artist renders | Client renders |
+|---|---|---|
+| `/app` | Artist overview (jobs feed, bookings, affiliations) | `Overview.tsx` (stats, applicants) |
+| `/app/jobs` | Job feed + PRO jobs + applications | `DashJobs.tsx` (manage job postings) |
+| `/app/bookings` | Booking list (upcoming, complete, payment pending) | `Bookings.tsx` (confirmed bookings) |
+| `/app/payments` | Earnings history + pending | `Payments.tsx` (billing + wallet) |
+| `/app/messages` | Inbox (artist ↔ hirer) | `Messages.tsx` (client ↔ artist) |
+| `/app/community` | Community features | Community features |
+| `/app/benefits` | Partner perks | Partner perks |
+
+#### Client-only routes
 
 | Route | Component | Description |
 |---|---|---|
-| `/dashboard` | `Overview.tsx` | Stats overview: jobs, applicants, bookings |
-| `/dashboard/jobs` | `DashJobs.tsx` | Manage job postings, boost jobs |
-| `/dashboard/bookings` | `Bookings.tsx` | Confirmed bookings management |
-| `/dashboard/payments` | `Payments.tsx` | Payment history + wallet |
-| `/dashboard/artists` | `Artists.tsx` | Browse + search artist directory |
-| `/dashboard/artists/:artistId` | `ArtistProfile.tsx` | Individual artist detail |
-| `/dashboard/messages` | `Messages.tsx` | Client ↔ artist messaging |
-| `/dashboard/company` | `CompanyPage.tsx` | Edit company profile |
-| `/dashboard/sublists` | `SubLists.tsx` | Saved artist shortlists |
-| `/dashboard/community` | `Community.tsx` | Community / network features |
-| `/dashboard/benefits` | `Benefits.tsx` | Partner perks & discounts |
+| `/app/artists` | `Artists.tsx` | Browse + search artist directory |
+| `/app/artists/:artistId` | `ArtistProfile.tsx` | Individual artist detail |
+| `/app/company` | `CompanyPage.tsx` | Edit company profile |
+| `/app/lists` | `SubLists.tsx` | Saved artist shortlists |
 
-### Artist Dashboard
+#### Artist-only routes
 
-| Route | Component | Description |
-|---|---|---|
-| `/artist-dashboard` | `ArtistDashboard.tsx` | Artist's own dashboard: jobs, applications, bookings |
-| `/artist/profile` | `ArtistProfilePage.tsx` | View + edit public artist profile |
+| Route | Description |
+|---|---|
+| `/app/profile` | Artist's public profile (view + edit) |
+| `/app/pro-jobs` | PRO / enterprise job board |
 
 ### Admin
 
 | Route | Component | Description |
 |---|---|---|
-| `/admin` | `Admin.tsx` | Internal admin panel — users, jobs, payments, overview |
+| `/admin-dashboard` | `Admin.tsx` | Internal admin panel — users, jobs, payments, overview |
+
+> Legacy `/admin` redirects to `/admin-dashboard`.
 
 ---
 
@@ -324,17 +336,25 @@ Full shadcn/Radix UI library — 59 components including Button, Dialog, Select,
 - Login → `/login?next=/jobs`
 - Join → `/join?next=/jobs`
 
-### Client Dashboard Sidebar
-- Overview
-- Jobs
-- Bookings
-- Payments
-- Artists
-- Messages
-- Company
-- Sub Lists
-- Community
-- Benefits
+### App Sidebar (`/app/*`) — role-aware
+
+**Client nav:**
+- Dashboard → `/app`
+- My Jobs → `/app/jobs`
+- Bookings → `/app/bookings`
+- Payments → `/app/payments`
+- Artists → `/app/artists`
+- Messages → `/app/messages`
+- _Premium:_ Company Page, Sub Lists, Community, Benefits
+
+**Artist nav:**
+- Dashboard → `/app`
+- Jobs → `/app/jobs`
+- Bookings → `/app/bookings`
+- Payments → `/app/payments`
+- Messages → `/app/messages`
+- Profile → `/app/profile`
+- _Premium:_ PRO Jobs, Benefits, Community
 
 ---
 
@@ -355,4 +375,4 @@ Full shadcn/Radix UI library — 59 components including Button, Dialog, Select,
 
 ### Auth redirect chain
 - Any `?next=` param on `/login` or `/join` is preserved and used post-auth
-- Default redirect: login → `/dashboard`, join → `/jobs`
+- Default redirect: login → `/app`, join → `/jobs`

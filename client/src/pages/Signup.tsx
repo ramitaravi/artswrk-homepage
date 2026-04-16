@@ -275,7 +275,7 @@ export default function Signup() {
   }
 
   function handleGoToDashboard() {
-    navigate("/dashboard");
+    navigate("/app");
   }
 
   // ─── Render ──────────────────────────────────────────────────────────────
