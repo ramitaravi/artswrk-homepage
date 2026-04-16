@@ -91,10 +91,12 @@ function Navbar() {
                   For Hirers <ChevronDown size={14} className={`transition-transform ${hirersOpen ? "rotate-180" : ""}`} />
                 </button>
                 {hirersOpen && (
-                  <div className="absolute top-full left-0 mt-1 w-52 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
-                    {["Post a Job", "Browse Artists", "Pricing", "How It Works"].map((item) => (
-                      <a key={item} href={item === "Post a Job" ? "/post-job" : "#"} className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">{item}</a>
-                    ))}
+                  <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
+                    <a href="/post-job" className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">Post a Job</a>
+                    <a href="/jobs" className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">Browse Artists</a>
+                    <a href="/dance-competitions" className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">Dance Competitions</a>
+                    <a href="/dance-studios" className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">Dance Studios</a>
+                    <a href="/music-schools" className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">Music Schools</a>
                   </div>
                 )}
               </div>
@@ -104,10 +106,13 @@ function Navbar() {
                   For Artists <ChevronDown size={14} className={`transition-transform ${artistsOpen ? "rotate-180" : ""}`} />
                 </button>
                 {artistsOpen && (
-                  <div className="absolute top-full left-0 mt-1 w-52 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
-                    {["Create Profile", "Find Jobs", "Get Paid", "Resources"].map((item) => (
-                      <a key={item} href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">{item}</a>
-                    ))}
+                  <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
+                    <a href="/login" className="block px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">Create Profile</a>
+                    <a href="/jobs" className="block px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">Find Jobs</a>
+                    <a href="/dance-teachers" className="block px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">Dance Teachers</a>
+                    <a href="/dance-judges" className="block px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">Dance Judges</a>
+                    <a href="/music-teachers" className="block px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">Music Teachers</a>
+                    <a href="/production" className="block px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">Production</a>
                   </div>
                 )}
               </div>
