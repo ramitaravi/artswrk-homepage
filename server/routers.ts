@@ -6,12 +6,14 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail } from "./email";
 import crypto from "crypto";
 import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
+import { storagePut } from "./storage";
+import { artistResumes } from "../drizzle/schema";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import { z } from "zod";
@@ -426,6 +428,45 @@ export const appRouter = router({
       }),
 
     /**
+     * Get the logged-in artist's saved resumes for the apply page resume picker.
+     */
+    myResumes: protectedProcedure
+      .query(async ({ ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) return [];
+        return getArtistResumes(user.id);
+      }),
+
+    /**
+     * Submit a job application (creates an interested_artists record).
+     */
+    submitApplication: protectedProcedure
+      .input(z.object({
+        jobId: z.number(),
+        message: z.string().max(2000).optional(),
+        resumeLink: z.string().url().optional().or(z.literal("")),
+        artistHourlyRate: z.number().min(0).optional(),
+        artistFlatRate: z.number().min(0).optional(),
+        isHourlyRate: z.boolean().optional(),
+        startDate: z.date().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const id = await applyToJob({
+          jobId: input.jobId,
+          artistUserId: user.id,
+          message: input.message,
+          resumeLink: input.resumeLink || undefined,
+          artistHourlyRate: input.artistHourlyRate,
+          artistFlatRate: input.artistFlatRate,
+          isHourlyRate: input.isHourlyRate,
+          startDate: input.startDate,
+        });
+        return { success: true, applicationId: id };
+      }),
+
+    /**
      * An artist's own job applications.
      * Protected — only returns applications for the logged-in user.
      */
@@ -689,6 +730,38 @@ export const appRouter = router({
           search: input.search || undefined,
           artistType: input.artistType || undefined,
         });
+      }),
+
+    /**
+     * Upload a resume file (base64) to S3 and save it to artist_resumes table.
+     * Returns the CDN URL and new resume record.
+     */
+    uploadResume: protectedProcedure
+      .input(z.object({
+        fileName: z.string().max(256),
+        mimeType: z.string().max(128),
+        base64: z.string().max(10 * 1024 * 1024), // ~7.5 MB file limit
+        title: z.string().max(256).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const db = await (await import("./db")).getDb();
+        if (!db) throw new Error("DB unavailable");
+
+        const buffer = Buffer.from(input.base64, "base64");
+        const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const key = `resumes/${user.id}/${Date.now()}-${safeName}`;
+        const { url } = await storagePut(key, buffer, input.mimeType);
+
+        const title = input.title || input.fileName;
+        const [result] = await db.insert(artistResumes).values({
+          artistUserId: user.id,
+          title,
+          fileUrl: url,
+        });
+        const insertId = (result as any).insertId;
+        return { id: `lib-${insertId}`, title, fileUrl: url, source: "library" as const };
       }),
   }),
 

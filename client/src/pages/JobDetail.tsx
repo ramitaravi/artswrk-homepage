@@ -474,16 +474,16 @@ export default function JobDetail() {
                   Sign up or log in to send your application in seconds.
                 </p>
                 {user ? (
-                  <a
-                    href="/artist-dashboard"
+                  <Link
+                    href={`${toJobUrl(job)}/apply`}
                     className="block w-full text-center py-3 rounded-xl text-sm font-bold text-white bg-[#F25722] hover:bg-[#d44a1a] transition-colors"
                   >
                     Apply Now →
-                  </a>
+                  </Link>
                 ) : (
                   <>
                     <Link
-                      href="/login"
+                      href={`${toJobUrl(job)}/apply`}
                       className="block w-full text-center py-3 rounded-xl text-sm font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors"
                     >
                       Login to Apply

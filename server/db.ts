@@ -2047,3 +2047,122 @@ export async function deletePasswordResetToken(token: string): Promise<void> {
   if (!db) return;
   await db.execute(`DELETE FROM password_reset_tokens WHERE token = '${token}'`);
 }
+
+
+// ─── Artist Resumes ───────────────────────────────────────────────────────────
+/**
+ * Returns all resumes for an artist from the artist_resumes table,
+ * plus any legacy resume URLs stored in users.resumeFiles (JSON array).
+ */
+export async function getArtistResumes(artistUserId: number): Promise<{ id: string; title: string; fileUrl: string; source: "library" | "profile" }[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  // 1. From artist_resumes table
+  const rows = await db.execute(
+    `SELECT id, title, fileUrl FROM artist_resumes WHERE artistUserId = ${artistUserId} AND fileUrl IS NOT NULL ORDER BY createdAt DESC LIMIT 20`
+  );
+  const libraryResumes: { id: string; title: string; fileUrl: string; source: "library" | "profile" }[] =
+    (rows[0] as unknown as any[]).map((r: any) => ({
+      id: `lib-${r.id}`,
+      title: r.title || "Resume",
+      fileUrl: r.fileUrl,
+      source: "library" as const,
+    }));
+
+  // 2. From users.resumeFiles (JSON array of {url, name} or plain strings)
+  const userRows = await db.execute(
+    `SELECT resumeFiles, resumes FROM users WHERE id = ${artistUserId} LIMIT 1`
+  );
+  const userRow = (userRows[0] as unknown as any[])[0];
+  const profileResumes: { id: string; title: string; fileUrl: string; source: "library" | "profile" }[] = [];
+  if (userRow?.resumeFiles) {
+    try {
+      const parsed = JSON.parse(userRow.resumeFiles);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((item: any, i: number) => {
+          const url = typeof item === "string" ? item : item?.url;
+          const name = typeof item === "object" ? (item?.name || item?.title || `Resume ${i + 1}`) : `Resume ${i + 1}`;
+          if (url) profileResumes.push({ id: `profile-${i}`, title: name, fileUrl: url, source: "profile" });
+        });
+      }
+    } catch {}
+  }
+  // Also check legacy resumes field
+  if (userRow?.resumes) {
+    try {
+      const parsed = JSON.parse(userRow.resumes);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((url: string, i: number) => {
+          if (url && !profileResumes.some((r: any) => r.fileUrl === url)) {
+            profileResumes.push({ id: `legacy-${i}`, title: `Resume ${i + 1}`, fileUrl: url, source: "profile" });
+          }
+        });
+      }
+    } catch {}
+  }
+
+  // Deduplicate by fileUrl, library takes precedence
+  const seen = new Set<string>();
+  const all = [...libraryResumes, ...profileResumes].filter(r => {
+    if (seen.has(r.fileUrl)) return false;
+    seen.add(r.fileUrl);
+    return true;
+  });
+  return all;
+}
+
+// ─── Apply to Job ─────────────────────────────────────────────────────────────
+/**
+ * Creates an interested_artists record (i.e. a job application).
+ * Returns the new record's ID.
+ */
+export async function applyToJob(params: {
+  jobId: number;
+  artistUserId: number;
+  message?: string;
+  resumeLink?: string;
+  artistHourlyRate?: number;
+  artistFlatRate?: number;
+  isHourlyRate?: boolean;
+  startDate?: Date;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+
+  // Check for duplicate application
+  const existing = await db.execute(
+    `SELECT id FROM interested_artists WHERE jobId = ${params.jobId} AND artistUserId = ${params.artistUserId} LIMIT 1`
+  );
+  if ((existing[0] as unknown as any[]).length > 0) {
+    throw new Error("You have already applied to this job.");
+  }
+
+  // Fetch job to get client info
+  const jobRows = await db.execute(
+    `SELECT clientUserId FROM jobs WHERE id = ${params.jobId} LIMIT 1`
+  );
+  const jobRow = (jobRows[0] as unknown as any[])[0];
+  const clientUserId = jobRow?.clientUserId ?? null;
+
+  const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const message = params.message ? params.message.replace(/'/g, "''") : null;
+  const resumeLink = params.resumeLink ? params.resumeLink.replace(/'/g, "''") : null;
+  const startDate = params.startDate ? params.startDate.toISOString().slice(0, 19).replace("T", " ") : null;
+
+  const result = await db.execute(`
+    INSERT INTO interested_artists
+      (jobId, artistUserId, clientUserId, status, message, resumeLink,
+       artistHourlyRate, artistFlatRate, isHourlyRate, startDate, createdAt, updatedAt)
+    VALUES
+      (${params.jobId}, ${params.artistUserId}, ${clientUserId ?? "NULL"}, 'Interested',
+       ${message ? `'${message}'` : "NULL"},
+       ${resumeLink ? `'${resumeLink}'` : "NULL"},
+       ${params.artistHourlyRate != null ? params.artistHourlyRate : "NULL"},
+       ${params.artistFlatRate != null ? params.artistFlatRate : "NULL"},
+       ${params.isHourlyRate !== false ? 1 : 0},
+       ${startDate ? `'${startDate}'` : "NULL"},
+       '${now}', '${now}')
+  `);
+  return (result[0] as any).insertId;
+}
