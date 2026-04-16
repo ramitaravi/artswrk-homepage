@@ -232,7 +232,7 @@ function SubscriptionPaywallModal({
                 </li>
               </ul>
               <Link
-                href={isLoggedIn ? "/subscribe/basic" : "/login?next=/subscribe/basic"}
+                href={isLoggedIn ? "/subscribe/basic" : "/join?next=/subscribe/basic"}
                 className="block w-full text-center text-xs font-bold text-white bg-[#F25722] hover:bg-[#d44a1a] transition-colors py-2.5 rounded-xl"
               >
                 Get Basic <ArrowRight size={12} className="inline ml-1" />
@@ -262,7 +262,7 @@ function SubscriptionPaywallModal({
                 </li>
               </ul>
               <Link
-                href={isLoggedIn ? "/subscribe/pro" : "/login?next=/subscribe/pro"}
+                href={isLoggedIn ? "/subscribe/pro" : "/join?next=/subscribe/pro"}
                 className="block w-full text-center text-xs font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors py-2.5 rounded-xl"
               >
                 Get PRO <ArrowRight size={12} className="inline ml-1" />
@@ -313,13 +313,13 @@ function Navbar() {
         </div>
         <div className="flex items-center gap-3">
           <Link
-            href="/login"
+            href="/login?next=/jobs"
             className="text-sm font-medium text-gray-700 hover:text-black transition-colors"
           >
             Login
           </Link>
           <Link
-            href="/login"
+            href="/join?next=/jobs"
             className="text-sm font-semibold text-white bg-[#111] px-4 py-1.5 rounded-full hover:bg-gray-800 transition-colors"
           >
             Join
@@ -1070,7 +1070,7 @@ export default function Jobs() {
                   </div>
                 </div>
                 <Link
-                  href={isAuthenticated ? "/subscribe/pro" : "/login?next=/subscribe/pro"}
+                  href={isAuthenticated ? "/subscribe/pro" : "/join?next=/subscribe/pro"}
                   className="flex-shrink-0 flex items-center gap-1.5 text-xs font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors px-4 py-2 rounded-full"
                 >
                   Upgrade <ArrowRight size={12} />

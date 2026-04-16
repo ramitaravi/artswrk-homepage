@@ -6,7 +6,7 @@
  */
 
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { Eye, EyeOff, Sparkles, ArrowRight } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
@@ -16,10 +16,12 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [, navigate] = useLocation();
+  const searchStr = useSearch();
+  const next = new URLSearchParams(searchStr).get("next") ?? "/dashboard";
 
   const passwordLogin = trpc.auth.passwordLogin.useMutation({
     onSuccess: () => {
-      navigate("/dashboard");
+      navigate(next);
     },
     onError: (err: { message?: string }) => {
       setError(err.message || "Invalid email or password.");
@@ -147,8 +149,11 @@ export default function Login() {
 
         <p className="text-center text-xs text-gray-400 mt-6">
           Don't have an account?{" "}
-          <a href="/signup" className="font-semibold text-[#F25722] hover:opacity-70 transition-opacity">
-            Sign up free
+          <a
+            href={`/join${next !== "/dashboard" ? `?next=${encodeURIComponent(next)}` : ""}`}
+            className="font-semibold text-[#F25722] hover:opacity-70 transition-opacity"
+          >
+            Join free
           </a>
         </p>
       </div>
