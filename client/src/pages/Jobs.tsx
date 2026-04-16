@@ -7,7 +7,7 @@
 import { useState, useMemo, useRef, useCallback } from "react";
 import {
   Search, MapPin, Clock, ChevronDown, X, Star, Loader2,
-  Briefcase, CheckCircle, AlertCircle, Lock, ArrowRight,
+  Briefcase, CheckCircle, AlertCircle, Lock, ArrowRight, Zap,
 } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -159,6 +159,129 @@ const ARTIST_TYPES = [
   "Videographer",
 ];
 
+// ─── Subscription Paywall Modal ───────────────────────────────────────────────
+
+function SubscriptionPaywallModal({
+  isOpen,
+  onClose,
+  isLoggedIn,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  isLoggedIn: boolean;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+      onClick={onClose}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+
+      {/* Modal */}
+      <div
+        className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Top accent bar */}
+        <div className="h-1.5 w-full bg-gradient-to-r from-[#F25722] to-[#FF8C42]" />
+
+        <div className="p-7">
+          {/* Icon + heading */}
+          <div className="flex flex-col items-center text-center mb-6">
+            <div className="w-14 h-14 rounded-2xl bg-[#FFF3EE] flex items-center justify-center mb-4">
+              <Lock size={24} className="text-[#F25722]" />
+            </div>
+            <h2 className="text-xl font-black text-[#111] leading-tight mb-1.5">
+              Subscribe to Apply
+            </h2>
+            <p className="text-sm text-gray-500 leading-relaxed">
+              Join Artswrk to unlock job applications and connect with top clients in the performing arts.
+            </p>
+          </div>
+
+          {/* Plan cards */}
+          <div className="space-y-3 mb-6">
+            {/* Basic plan */}
+            <div className="rounded-2xl border-2 border-[#F25722] bg-[#FFF8F5] p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-[#F25722] flex items-center justify-center">
+                    <Zap size={13} className="text-white fill-white" />
+                  </div>
+                  <span className="font-black text-[#111] text-sm">Artswrk Basic</span>
+                </div>
+                <span className="text-xs font-bold text-[#F25722] bg-white border border-[#F25722]/20 px-2.5 py-1 rounded-full">
+                  Most Popular
+                </span>
+              </div>
+              <ul className="text-xs text-gray-600 space-y-1.5 mb-3">
+                <li className="flex items-center gap-1.5">
+                  <CheckCircle size={11} className="text-[#F25722] flex-shrink-0" />
+                  Apply to all marketplace jobs
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <CheckCircle size={11} className="text-[#F25722] flex-shrink-0" />
+                  Get discovered by hirers
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <CheckCircle size={11} className="text-[#F25722] flex-shrink-0" />
+                  Public artist profile
+                </li>
+              </ul>
+              <Link
+                href={isLoggedIn ? "/subscribe/basic" : "/login?next=/subscribe/basic"}
+                className="block w-full text-center text-xs font-bold text-white bg-[#F25722] hover:bg-[#d44a1a] transition-colors py-2.5 rounded-xl"
+              >
+                Get Basic <ArrowRight size={12} className="inline ml-1" />
+              </Link>
+            </div>
+
+            {/* PRO plan */}
+            <div className="rounded-2xl border border-gray-200 bg-[#111] p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-7 h-7 rounded-lg bg-yellow-400/20 flex items-center justify-center">
+                  <Star size={13} className="text-yellow-400 fill-yellow-400" />
+                </div>
+                <span className="font-black text-white text-sm">Artswrk PRO</span>
+              </div>
+              <ul className="text-xs text-white/70 space-y-1.5 mb-3">
+                <li className="flex items-center gap-1.5">
+                  <CheckCircle size={11} className="text-yellow-400 flex-shrink-0" />
+                  Everything in Basic
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <CheckCircle size={11} className="text-yellow-400 flex-shrink-0" />
+                  Access PRO &amp; enterprise jobs
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <CheckCircle size={11} className="text-yellow-400 flex-shrink-0" />
+                  Priority in search results
+                </li>
+              </ul>
+              <Link
+                href={isLoggedIn ? "/subscribe/pro" : "/login?next=/subscribe/pro"}
+                className="block w-full text-center text-xs font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors py-2.5 rounded-xl"
+              >
+                Get PRO <ArrowRight size={12} className="inline ml-1" />
+              </Link>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="w-full text-xs text-gray-400 hover:text-gray-600 transition-colors py-1"
+          >
+            Maybe later
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Navbar ───────────────────────────────────────────────────────────────────
 
 function Navbar() {
@@ -213,10 +336,14 @@ function JobCard({
   job,
   isSelected,
   onClick,
+  canApply,
+  onPaywall,
 }: {
   job: DisplayJob;
   isSelected: boolean;
   onClick: () => void;
+  canApply: boolean;
+  onPaywall: () => void;
 }) {
   return (
     <div
@@ -259,13 +386,22 @@ function JobCard({
               <p className="text-xs text-gray-500 truncate">{job.companyName}</p>
             )}
           </div>
-          <Link
-            href={job.detailUrl}
-            className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors"
-            onClick={(e) => e.stopPropagation()}
-          >
-            Apply →
-          </Link>
+          {canApply ? (
+            <Link
+              href={job.detailUrl}
+              className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Apply →
+            </Link>
+          ) : (
+            <button
+              className="flex-shrink-0 flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold text-white bg-[#F25722] hover:bg-[#d44a1a] transition-colors"
+              onClick={(e) => { e.stopPropagation(); onPaywall(); }}
+            >
+              <Lock size={10} /> Apply
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
           <MapPin size={10} className="flex-shrink-0" />
@@ -551,6 +687,13 @@ export default function Jobs() {
   const [selectedJob, setSelectedJob] = useState<DisplayJob | null>(null);
 
   const { user, isAuthenticated } = useAuth();
+  const [paywallOpen, setPaywallOpen] = useState(false);
+
+  // Subscription access checks
+  const isBasic = !!(user as any)?.artswrkBasic;
+  const isPro = !!(user as any)?.artswrkPro;
+  const canApplyToJobs = isBasic || isPro;   // Basic OR PRO can apply to regular jobs
+  const canApplyToProJobs = isPro;            // Only PRO can apply to PRO jobs
 
   // ── Data fetching ─────────────────────────────────────────────────────────
   const { data: rawJobs, isLoading: jobsLoading } = trpc.jobs.publicListEnriched.useQuery({ limit: 200 });
@@ -648,6 +791,11 @@ export default function Jobs() {
 
   return (
     <div className="h-screen flex flex-col bg-white overflow-hidden" style={{ fontFamily: "Poppins, sans-serif" }}>
+      <SubscriptionPaywallModal
+        isOpen={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        isLoggedIn={isAuthenticated}
+      />
       <Navbar />
 
       {/* Page header + tabs */}
@@ -791,6 +939,23 @@ export default function Jobs() {
 
             {/* Job list */}
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+              {/* Subscription banner for non-subscribers */}
+              {isAuthenticated && !canApplyToJobs && (
+                <button
+                  onClick={() => setPaywallOpen(true)}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-[#FFF3EE] to-[#FFF8F5] border border-[#F25722]/20 hover:border-[#F25722]/40 transition-all text-left"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-[#F25722] flex items-center justify-center flex-shrink-0">
+                    <Zap size={14} className="text-white fill-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-[#111]">Subscribe to apply to jobs</p>
+                    <p className="text-[11px] text-gray-500">Get Basic or PRO to unlock applications</p>
+                  </div>
+                  <ArrowRight size={14} className="text-[#F25722] flex-shrink-0" />
+                </button>
+              )}
+
               {isLoading ? (
                 <div className="flex items-center justify-center py-16 text-gray-400">
                   <Loader2 size={20} className="animate-spin mr-2" />
@@ -813,6 +978,8 @@ export default function Jobs() {
                     onClick={() =>
                       setSelectedJob(selectedJob?.id === job.id ? null : job)
                     }
+                    canApply={canApplyToJobs}
+                    onPaywall={() => setPaywallOpen(true)}
                   />
                 ))
               )}
@@ -863,9 +1030,21 @@ export default function Jobs() {
                     <X size={16} />
                   </button>
                 </div>
-                <button className="mt-3 w-full py-2 rounded-xl text-xs font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors">
-                  Apply →
-                </button>
+                {canApplyToJobs ? (
+                  <Link
+                    href={selectedJob.detailUrl}
+                    className="mt-3 block w-full py-2 rounded-xl text-xs font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors text-center"
+                  >
+                    Apply →
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => setPaywallOpen(true)}
+                    className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-white bg-[#F25722] hover:bg-[#d44a1a] transition-colors"
+                  >
+                    <Lock size={11} /> Subscribe to Apply
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -876,23 +1055,28 @@ export default function Jobs() {
       {tab === "pro" && (
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-3xl mx-auto px-5 py-6">
-            {/* PRO upsell banner */}
-            <div className="rounded-2xl bg-[#111] p-5 mb-6 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-yellow-400/20 flex items-center justify-center flex-shrink-0">
-                  <Star size={20} className="text-yellow-400 fill-yellow-400" />
+            {/* PRO upsell banner — only show if not already PRO */}
+            {!canApplyToProJobs && (
+              <div className="rounded-2xl bg-[#111] p-5 mb-6 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-yellow-400/20 flex items-center justify-center flex-shrink-0">
+                    <Star size={20} className="text-yellow-400 fill-yellow-400" />
+                  </div>
+                  <div>
+                    <p className="text-white font-black text-sm">Artswrk PRO</p>
+                    <p className="text-white/60 text-xs">
+                      Exclusive jobs from top studios and enterprise clients
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-white font-black text-sm">Artswrk PRO</p>
-                  <p className="text-white/60 text-xs">
-                    Exclusive jobs from top studios and enterprise clients
-                  </p>
-                </div>
+                <Link
+                  href={isAuthenticated ? "/subscribe/pro" : "/login?next=/subscribe/pro"}
+                  className="flex-shrink-0 flex items-center gap-1.5 text-xs font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors px-4 py-2 rounded-full"
+                >
+                  Upgrade <ArrowRight size={12} />
+                </Link>
               </div>
-              <button className="flex-shrink-0 flex items-center gap-1.5 text-xs font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors px-4 py-2 rounded-full">
-                Upgrade <ArrowRight size={12} />
-              </button>
-            </div>
+            )}
 
             {proJobsLoading ? (
               <div className="flex items-center justify-center py-16 text-gray-400">
