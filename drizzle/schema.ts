@@ -706,9 +706,21 @@ export type InsertAcquisitionLead = typeof acquisitionLeads.$inferInsert;
  */
 export const artistReviews = mysqlTable("artist_reviews", {
   id: int("id").autoincrement().primaryKey(),
+  /** Bubble internal record ID — used for idempotent migration */
+  bubbleId: varchar("bubbleId", { length: 64 }).unique(),
   /** FK → users.id (the artist being reviewed) */
   artistUserId: int("artistUserId").notNull(),
-  /** Reviewer name (hirer/studio name) */
+  /** FK → users.id (the client who left the review) */
+  clientUserId: int("clientUserId"),
+  /** Bubble artist user ID */
+  bubbleArtistId: varchar("bubbleArtistId", { length: 64 }),
+  /** Bubble client user ID */
+  bubbleClientId: varchar("bubbleClientId", { length: 64 }),
+  /** FK → bookings.id */
+  bookingId: int("bookingId"),
+  /** Bubble booking ID */
+  bubbleBookingId: varchar("bubbleBookingId", { length: 64 }),
+  /** Reviewer name (hirer/studio name) — resolved from client user at migration time */
   reviewerName: varchar("reviewerName", { length: 256 }),
   /** Reviewer studio/company name */
   reviewerStudio: varchar("reviewerStudio", { length: 256 }),
@@ -721,6 +733,8 @@ export const artistReviews = mysqlTable("artist_reviews", {
   /** Date of the review (displayed on profile) */
   reviewDate: timestamp("reviewDate"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
 });
 export type ArtistReview = typeof artistReviews.$inferSelect;
 export type InsertArtistReview = typeof artistReviews.$inferInsert;

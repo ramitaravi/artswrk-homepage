@@ -19,11 +19,12 @@
 
 import mysql from "mysql2/promise";
 import { fetchAllRecords } from "./bubble-client";
-import { MASTER_ARTIST_TYPES, MASTER_SERVICE_TYPES } from "../../drizzle/seeds/reference_data";
+import { MASTER_ARTIST_TYPES, MASTER_SERVICE_TYPES, DANCE_STYLES } from "../../drizzle/seeds/reference_data";
 
 // ── Reference lookups ──────────────────────────────────────────────────────────
 const artistTypeById = Object.fromEntries(MASTER_ARTIST_TYPES.map((t) => [t.bubbleId, t.name]));
 const serviceTypeById = Object.fromEntries(MASTER_SERVICE_TYPES.map((s) => [s.bubbleId, s.name]));
+const danceStyleById: Record<string, string> = DANCE_STYLES;
 
 function resolveIds(ids: string[], lookup: Record<string, string>): string[] {
   return ids.map((id) => lookup[id] ?? id).filter(Boolean);
@@ -62,6 +63,7 @@ interface BubbleUser {
   "Master Artist Types"?: string[];
   "List of Master Services"?: string[];
   "Artist Transportation Accesses"?: string[];
+  "List of Master Styles"?: string[];
   "Artswrk PRO - Artists"?: boolean;
   "Artswrk Basic"?: boolean;
   "Priority List"?: boolean;
@@ -122,6 +124,7 @@ async function main() {
     // Resolve array fields
     const masterArtistTypeNames = resolveIds(u["Master Artist Types"] ?? [], artistTypeById);
     const masterServiceNames = resolveIds(u["List of Master Services"] ?? [], serviceTypeById);
+    const masterStyleNames = resolveIds(u["List of Master Styles"] ?? [], danceStyleById);
     const hiringCategoryName = u["Hiring Category"]
       ? (artistTypeById[u["Hiring Category"]] ?? null)
       : null;
@@ -151,6 +154,7 @@ async function main() {
       credits: u["Credits"] ?? null,
       website: u["Website"] ?? null,
       masterArtistTypes: masterArtistTypeNames.length ? JSON.stringify(masterArtistTypeNames) : null,
+      masterStyles: masterStyleNames.length ? JSON.stringify(masterStyleNames) : null,
       artistServices: masterServiceNames.length ? JSON.stringify(masterServiceNames) : null,
       artistTransportationAccommodation: transportation,
       artswrkPro: u["Artswrk PRO - Artists"] ? 1 : 0,
@@ -184,7 +188,7 @@ async function main() {
             phoneNumber=?, userRole=?, optionAvailability=?, location=?,
             businessOrIndividual=?, businessType=?, clientCompanyName=?, hiringCategory=?,
             bio=?, pronouns=?, instagram=?, tiktok=?, youtube=?, credits=?, website=?,
-            masterArtistTypes=?, artistServices=?, artistTransportationAccommodation=?,
+            masterArtistTypes=?, masterStyles=?, artistServices=?, artistTransportationAccommodation=?,
             artswrkPro=?, artswrkBasic=?, priorityList=?, lateCancelCount=?,
             onboardingStep=?, userSignedUp=?, beta=?,
             stripeCustomerId=?, artistStripeAccountId=?, artistStripeReturnCode=?,
@@ -199,7 +203,7 @@ async function main() {
             fields.businessType, fields.clientCompanyName, fields.hiringCategory,
             fields.bio, fields.pronouns, fields.instagram, fields.tiktok,
             fields.youtube, fields.credits, fields.website,
-            fields.masterArtistTypes, fields.artistServices,
+            fields.masterArtistTypes, fields.masterStyles, fields.artistServices,
             fields.artistTransportationAccommodation,
             fields.artswrkPro, fields.artswrkBasic, fields.priorityList,
             fields.lateCancelCount, fields.onboardingStep, fields.userSignedUp,
@@ -220,7 +224,7 @@ async function main() {
             phoneNumber, userRole, optionAvailability, location,
             businessOrIndividual, businessType, clientCompanyName, hiringCategory,
             bio, pronouns, instagram, tiktok, youtube, credits, website,
-            masterArtistTypes, artistServices, artistTransportationAccommodation,
+            masterArtistTypes, masterStyles, artistServices, artistTransportationAccommodation,
             artswrkPro, artswrkBasic, priorityList, lateCancelCount,
             onboardingStep, userSignedUp, beta,
             stripeCustomerId, artistStripeAccountId, artistStripeReturnCode,
@@ -232,7 +236,7 @@ async function main() {
             ?, ?, ?, ?,
             ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?,
+            ?, ?, ?, ?,
             ?, ?, ?, ?,
             ?, ?, ?,
             ?, ?, ?,
@@ -248,7 +252,7 @@ async function main() {
             fields.businessOrIndividual, fields.businessType, fields.clientCompanyName,
             fields.hiringCategory, fields.bio, fields.pronouns, fields.instagram,
             fields.tiktok, fields.youtube, fields.credits, fields.website,
-            fields.masterArtistTypes, fields.artistServices,
+            fields.masterArtistTypes, fields.masterStyles, fields.artistServices,
             fields.artistTransportationAccommodation,
             fields.artswrkPro, fields.artswrkBasic, fields.priorityList,
             fields.lateCancelCount, fields.onboardingStep, fields.userSignedUp,
