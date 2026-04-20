@@ -230,6 +230,7 @@ export async function getPublicJobsEnriched(limit = 100, offset = 0): Promise<{
        j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate,
        j.locationAddress, j.locationLat, j.locationLng,
        j.description, j.direct, j.bubbleCreatedAt,
+       j.masterServiceTypeId,
        u.clientCompanyName, u.name as clientName,
        COALESCE(u.enterpriseLogoUrl, u.profilePicture) as clientProfilePicture
      FROM jobs j
