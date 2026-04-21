@@ -137,6 +137,60 @@ export const appRouter = router({
         const user = await getUserByEmail(input.email.toLowerCase().trim());
         return { exists: !!user };
       }),
+
+    /**
+     * Smart email lookup for the login branching flow.
+     * Returns enough info to show a personalised welcome state without leaking PII.
+     */
+    lookupEmail: publicProcedure
+      .input(z.object({ email: z.string().email() }))
+      .mutation(async ({ input }) => {
+        const user = await getUserByEmail(input.email.toLowerCase().trim());
+        if (!user) return { exists: false as const, hasPassword: false, userRole: null, firstName: null, profilePicture: null, clientCompanyName: null };
+        return {
+          exists: true as const,
+          hasPassword: !!user.passwordHash,
+          userRole: user.userRole ?? null,
+          firstName: user.firstName ?? user.name ?? null,
+          profilePicture: user.profilePicture ?? null,
+          clientCompanyName: user.clientCompanyName ?? null,
+        };
+      }),
+
+    /**
+     * Set a password for a user who has never had one (imported from Bubble).
+     * Auto-logs them in after setting the password.
+     */
+    setInitialPassword: publicProcedure
+      .input(z.object({
+        email: z.string().email(),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByEmail(input.email.toLowerCase().trim());
+        if (!user) throw new Error("No account found.");
+        if (user.passwordHash) throw new Error("This account already has a password. Please log in normally.");
+
+        const hash = await bcrypt.hash(input.password, SALT_ROUNDS);
+        await setUserPassword(user.id, hash, false);
+
+        const sessionToken = await sdk.createSessionToken(user.openId, {
+          name: user.name || user.firstName || "User",
+          expiresInMs: ONE_YEAR_MS,
+        });
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+
+        return {
+          success: true,
+          user: {
+            id: user.id,
+            email: user.email,
+            userRole: user.userRole,
+            onboardingStep: user.onboardingStep,
+          },
+        };
+      }),
   }),
 
   // ── Admin procedures ────────────────────────────────────────────────────────
