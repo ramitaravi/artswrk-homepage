@@ -1,8 +1,11 @@
 /**
- * Post a Job — 3-step flow
+ * Post a Job — 3-step flow (redesigned)
  * Step 1: Natural language input
- * Step 2: AI-autofilled summary form (editable)
- * Step 3: Payment ($30 one-time or Subscribe & Save)
+ * Step 2: AI-autofilled summary form (editable) → "Post Job Free"
+ * Step 3: Job is live! + Connect/Boost/PRO pricing (pay to UNLOCK candidates)
+ *
+ * Model: Free to post. $30 to connect with candidates (unlock applicants).
+ * Optional +$15 boost for priority placement. Or $29/mo PRO for unlimited.
  */
 
 import { useState, useRef, useEffect } from "react";
@@ -14,8 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Slider } from "@/components/ui/slider";
 import {
   Sparkles,
   MapPin,
@@ -32,13 +33,13 @@ import {
   Star,
   ArrowRight,
   Users,
-  RefreshCw,
-  TrendingUp,
   Eye,
-  BarChart2,
+  EyeOff,
+  Lock,
+  Unlock,
+  TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
-import BoostJobModal from "@/components/BoostJobModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -84,12 +85,11 @@ const EXAMPLES = [
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
-function StepIndicator({ step }: { step: 1 | 2 | 3 | 4 }) {
+function StepIndicator({ step }: { step: 1 | 2 | 3 }) {
   const steps = [
     { n: 1, label: "Describe" },
     { n: 2, label: "Review" },
-    { n: 3, label: "Publish" },
-    { n: 4, label: "Boost" },
+    { n: 3, label: "Connect" },
   ];
   return (
     <div className="flex items-center justify-center gap-0 mb-8">
@@ -136,7 +136,6 @@ function Step1({
   onNext: (text: string, parsed: ParsedJob) => void;
 }) {
   const [text, setText] = useState(() => {
-    // Check if there's prefilled text from the dashboard quick-post box
     const prefill = sessionStorage.getItem("postJobPrefill");
     if (prefill) {
       sessionStorage.removeItem("postJobPrefill");
@@ -247,7 +246,7 @@ function Step1({
         <span className="w-1 h-1 rounded-full bg-gray-300" />
         <span className="flex items-center gap-1.5">
           <CheckCircle2 size={12} />
-          $30 to post
+          Free to post
         </span>
       </div>
     </div>
@@ -267,7 +266,7 @@ function Step2({
   onNext: (form: FormData) => void;
   onBack: () => void;
 }) {
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
 
   const [form, setForm] = useState<FormData>({
     description: parsed.description || rawText,
@@ -289,7 +288,6 @@ function Step2({
     serviceType: parsed.serviceType || "",
   });
 
-  // Update studio name when user loads
   useEffect(() => {
     if (user?.clientCompanyName && !form.studioName) {
       setForm((f) => ({ ...f, studioName: user.clientCompanyName || "" }));
@@ -306,197 +304,186 @@ function Step2({
       <div className="text-center mb-6">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 text-green-600 text-xs font-semibold mb-3">
           <CheckCircle2 size={12} />
-          AI autofilled your job details
+          Looking good! Review and confirm.
         </div>
         <h2 className="text-2xl font-black text-[#111] mb-1">
-          Review & confirm your listing
+          Review your listing
         </h2>
         <p className="text-gray-500 text-sm">
-          We've filled in the details — edit anything before posting.
+          We filled in the details — edit anything that looks off.
         </p>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-100">
-        {/* Job title */}
+        {/* Title */}
         <div className="p-5">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
             Job Title
           </label>
           <Input
             value={form.title}
             onChange={(e) => set("title", e.target.value)}
-            placeholder="e.g. Ballet Substitute Teacher"
-            className="text-base font-semibold"
+            placeholder="e.g. Hip Hop Sub Teacher"
+            className="border-gray-200 focus:border-[#F25722]"
+          />
+        </div>
+
+        {/* Studio / Company */}
+        <div className="p-5">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
+            Studio / Company Name
+          </label>
+          <Input
+            value={form.studioName}
+            onChange={(e) => set("studioName", e.target.value)}
+            placeholder="Your studio or company name"
+            className="border-gray-200 focus:border-[#F25722]"
           />
         </div>
 
         {/* Description */}
         <div className="p-5">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            Description
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
+            Job Description
           </label>
           <Textarea
             value={form.description}
             onChange={(e) => set("description", e.target.value)}
-            className="min-h-[100px] text-sm resize-none"
+            className="min-h-[100px] border-gray-200 focus:border-[#F25722] resize-none"
           />
         </div>
 
-        {/* Studio + Location */}
-        <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-              <span className="flex items-center gap-1">
-                Studio / Company Name
-                {user?.clientCompanyName && (
-                  <Badge variant="secondary" className="text-[10px] py-0 px-1.5 ml-1">
-                    from account
-                  </Badge>
-                )}
-              </span>
-            </label>
-            <Input
-              value={form.studioName}
-              onChange={(e) => set("studioName", e.target.value)}
-              placeholder="Your studio or company name"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-              <span className="flex items-center gap-1">
-                <MapPin size={11} className="text-gray-400" />
-                Location
-              </span>
-            </label>
-            <Input
-              value={form.locationAddress}
-              onChange={(e) => set("locationAddress", e.target.value)}
-              placeholder="City, State or full address"
-            />
-          </div>
+        {/* Location */}
+        <div className="p-5">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
+            <MapPin size={11} className="inline mr-1" />
+            Location
+          </label>
+          <Input
+            value={form.locationAddress}
+            onChange={(e) => set("locationAddress", e.target.value)}
+            placeholder="City, State or full address"
+            className="border-gray-200 focus:border-[#F25722]"
+          />
         </div>
 
         {/* Date type */}
         <div className="p-5">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            <span className="flex items-center gap-1">
-              <Calendar size={11} className="text-gray-400" />
-              Schedule Type
-            </span>
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
+            <Calendar size={11} className="inline mr-1" />
+            Date Type
           </label>
           <div className="flex gap-2 flex-wrap">
-            {(["Single Date", "Ongoing", "Recurring"] as const).map((dt) => (
+            {(["Single Date", "Recurring", "Ongoing"] as const).map((dt) => (
               <button
                 key={dt}
                 onClick={() => set("dateType", dt)}
-                className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                   form.dateType === dt
-                    ? "bg-[#111] text-white border-[#111]"
-                    : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                    ? "hirer-grad-bg text-white border-transparent"
+                    : "border-gray-200 text-gray-600 hover:border-[#F25722] hover:text-[#F25722]"
                 }`}
               >
                 {dt}
               </button>
             ))}
           </div>
-
-          {/* Date fields */}
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1.5">
-                {isOngoing ? "Start Date" : "Start Date & Time"}
-              </label>
-              <Input
-                type={isOngoing ? "date" : "datetime-local"}
-                value={form.startDate}
-                onChange={(e) => set("startDate", e.target.value)}
-              />
-            </div>
-            {!isOngoing && (
+          {!isOngoing && (
+            <div className="grid grid-cols-2 gap-3 mt-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1.5">
-                  End Date & Time
+                <label className="text-xs text-gray-400 block mb-1">
+                  Start
+                </label>
+                <Input
+                  type="datetime-local"
+                  value={form.startDate}
+                  onChange={(e) => set("startDate", e.target.value)}
+                  className="border-gray-200 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  End (optional)
                 </label>
                 <Input
                   type="datetime-local"
                   value={form.endDate}
                   onChange={(e) => set("endDate", e.target.value)}
+                  className="border-gray-200 text-sm"
                 />
               </div>
-            )}
-            {isOngoing && (
-              <div className="flex items-end pb-1">
-                <p className="text-sm text-gray-400 italic">
-                  Dates flexible — ongoing or recurring schedule
-                </p>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Rate */}
         <div className="p-5">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            <span className="flex items-center gap-1">
-              <DollarSign size={11} className="text-gray-400" />
-              Compensation
-            </span>
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
+            <DollarSign size={11} className="inline mr-1" />
+            Rate
           </label>
-
-          {/* Rate type toggle */}
-          <div className="flex gap-2 mb-4 flex-wrap">
-            <button
-              onClick={() => set("isHourly", true)}
-              className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
-                form.isHourly
-                  ? "bg-[#111] text-white border-[#111]"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
-              }`}
-            >
-              Hourly Rate
-            </button>
-            <button
-              onClick={() => set("isHourly", false)}
-              className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
-                !form.isHourly && !form.openRate
-                  ? "bg-[#111] text-white border-[#111]"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
-              }`}
-            >
-              Flat Rate
-            </button>
-            <button
-              onClick={() => set("openRate", !form.openRate)}
-              className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
-                form.openRate
-                  ? "bg-[#111] text-white border-[#111]"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
-              }`}
-            >
-              Open Rate
-            </button>
+          <div className="flex gap-2 mb-3 flex-wrap">
+            {[
+              { key: "isHourly", label: "Hourly", active: form.isHourly && !form.openRate },
+              { key: "flat", label: "Flat Rate", active: !form.isHourly && !form.openRate },
+              { key: "openRate", label: "Open Rate", active: form.openRate },
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => {
+                  if (opt.key === "openRate") {
+                    set("openRate", true);
+                    set("isHourly", false);
+                  } else if (opt.key === "isHourly") {
+                    set("isHourly", true);
+                    set("openRate", false);
+                  } else {
+                    set("isHourly", false);
+                    set("openRate", false);
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                  opt.active
+                    ? "hirer-grad-bg text-white border-transparent"
+                    : "border-gray-200 text-gray-600 hover:border-[#F25722] hover:text-[#F25722]"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
-
-          {!form.openRate && (
-            <div className="flex items-center gap-3 max-w-xs">
-              <span className="text-gray-400 font-bold text-lg">$</span>
+          {!form.openRate && form.isHourly && (
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                $
+              </span>
               <Input
                 type="number"
-                min="0"
-                step="1"
-                value={form.isHourly ? form.clientHourlyRate : form.clientFlatRate}
-                onChange={(e) =>
-                  set(
-                    form.isHourly ? "clientHourlyRate" : "clientFlatRate",
-                    e.target.value
-                  )
-                }
-                placeholder={form.isHourly ? "e.g. 50" : "e.g. 200"}
-                className="text-lg font-semibold"
+                value={form.clientHourlyRate}
+                onChange={(e) => set("clientHourlyRate", e.target.value)}
+                placeholder="0.00"
+                className="pl-7 border-gray-200"
               />
-              {form.isHourly && (
-                <span className="text-gray-400 text-sm whitespace-nowrap">/hr</span>
-              )}
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                /hr
+              </span>
+            </div>
+          )}
+          {!form.openRate && !form.isHourly && (
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                $
+              </span>
+              <Input
+                type="number"
+                value={form.clientFlatRate}
+                onChange={(e) => set("clientFlatRate", e.target.value)}
+                placeholder="0.00"
+                className="pl-7 border-gray-200"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                flat
+              </span>
             </div>
           )}
           {form.openRate && (
@@ -588,11 +575,7 @@ function Step2({
       </div>
 
       <div className="flex gap-3 mt-5">
-        <Button
-          variant="outline"
-          onClick={onBack}
-          className="flex-none px-5"
-        >
+        <Button variant="outline" onClick={onBack} className="flex-none px-5">
           <ChevronLeft size={16} className="mr-1" />
           Back
         </Button>
@@ -606,28 +589,52 @@ function Step2({
           }}
           className="flex-1 py-5 font-bold rounded-xl hirer-grad-bg border-0 hover:opacity-90 transition-opacity"
         >
-          Continue to Payment
+          <CheckCircle2 size={18} className="mr-2" />
+          Post Job Free
           <ChevronRight size={18} className="ml-2" />
         </Button>
       </div>
+
+      <p className="text-center text-xs text-gray-400 mt-3">
+        Free to post · No credit card required
+      </p>
     </div>
   );
 }
 
-// ─── Step 3: Payment ──────────────────────────────────────────────────────────
+// ─── Step 3: Job Live + Connect Pricing ───────────────────────────────────────
+
+// Simulated applicant count that increments over time for social proof
+function useSimulatedApplicants() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    // Simulate 1-4 applicants arriving over 8 seconds
+    const target = Math.floor(Math.random() * 3) + 1;
+    let current = 0;
+    const interval = setInterval(() => {
+      if (current < target) {
+        current++;
+        setCount(current);
+      } else {
+        clearInterval(interval);
+      }
+    }, 2200);
+    return () => clearInterval(interval);
+  }, []);
+  return count;
+}
 
 function Step3({
   form,
   onBack,
-  onNext,
 }: {
   form: FormData;
   onBack: () => void;
-  onNext: (plan: "one_time" | "subscription") => void;
 }) {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
-  const hasSavedCard = !!user?.clientStripeCustomerId;
+  const [boostEnabled, setBoostEnabled] = useState(false);
+  const applicantCount = useSimulatedApplicants();
   const isPro = user?.clientPremium;
 
   const createAndCheckout = trpc.postJob.createAndCheckout.useMutation({
@@ -636,11 +643,11 @@ function Step3({
       toast.success("Redirecting to secure checkout...");
     },
     onError: (err) => {
-      toast.error(`Payment setup failed: ${err.message}`);
+      toast.error(`Checkout failed: ${err.message}`);
     },
   });
 
-  function handlePlan(plan: "one_time" | "subscription") {
+  function handleConnect(plan: "one_time" | "subscription") {
     if (!isAuthenticated) {
       sessionStorage.setItem("postJobPending", JSON.stringify(form));
       navigate(getLoginUrl());
@@ -660,330 +667,275 @@ function Step3({
       plan,
       origin: window.location.origin,
     });
-    // Advance to boost step
-    onNext(plan);
   }
 
   const isLoading = createAndCheckout.isPending;
+  const connectPrice = boostEnabled ? 45 : 30;
+
+  // Fake blurred applicant profiles for the locked preview
+  const fakeApplicants = [
+    { initials: "AK", color: "bg-pink-400" },
+    { initials: "MJ", color: "bg-purple-400" },
+    { initials: "TL", color: "bg-blue-400" },
+    { initials: "SR", color: "bg-green-400" },
+    { initials: "DN", color: "bg-amber-400" },
+  ];
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="text-center mb-6">
-        <h2 className="text-2xl font-black text-[#111] mb-1">Publish your job</h2>
-        <p className="text-gray-500 text-sm">Choose how you'd like to post. You can boost visibility in the next step.</p>
+
+      {/* ── Job Live Banner ── */}
+      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-5 mb-6 text-center">
+        <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
+          <CheckCircle2 size={28} className="text-green-600" />
+        </div>
+        <h2 className="text-xl font-black text-[#111] mb-1">Your job is live! 🎉</h2>
+        <p className="text-sm text-gray-500 mb-3">
+          <span className="font-bold text-[#111]">{form.title || "Your listing"}</span> is now visible to 5,000+ artists in the Artswrk network.
+        </p>
+        {applicantCount > 0 && (
+          <div className="inline-flex items-center gap-2 bg-white border border-green-200 rounded-full px-4 py-1.5 text-sm font-semibold text-green-700 shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            {applicantCount} artist{applicantCount !== 1 ? "s" : ""} already applied
+          </div>
+        )}
       </div>
 
-      {/* Job summary */}
-      <div className="bg-gray-50 rounded-2xl border border-gray-200 p-4 mb-6">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Your listing</p>
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl hirer-grad-bg flex items-center justify-center text-white font-black text-sm flex-shrink-0">
-            {(form.studioName || form.title || "J")[0].toUpperCase()}
+      {/* ── Locked Applicants Preview ── */}
+      <div className="bg-white border-2 border-gray-100 rounded-2xl overflow-hidden mb-6">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users size={16} className="text-gray-400" />
+            <span className="text-sm font-bold text-[#111]">Applicants</span>
+            {applicantCount > 0 && (
+              <span className="bg-[#F25722] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {applicantCount}
+              </span>
+            )}
           </div>
-          <div>
-            <p className="font-bold text-[#111] text-sm">
-              {form.title || form.description.slice(0, 60) + "..."}
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1 flex-wrap">
-              {form.studioName && <span>{form.studioName}</span>}
-              {form.locationAddress && (<><span>·</span><MapPin size={10} /><span>{form.locationAddress}</span></>)}
-              {form.dateType && (<><span>·</span><span>{form.dateType}</span></>)}
+          <div className="flex items-center gap-1.5 text-xs text-gray-400">
+            <Lock size={12} />
+            Locked
+          </div>
+        </div>
+
+        {/* Blurred applicant rows */}
+        <div className="relative">
+          <div className="divide-y divide-gray-50">
+            {fakeApplicants.map((a, i) => (
+              <div key={i} className="px-5 py-3 flex items-center gap-3 select-none">
+                <div className={`w-9 h-9 rounded-full ${a.color} flex items-center justify-center text-white text-xs font-bold flex-shrink-0 blur-[3px]`}>
+                  {a.initials}
+                </div>
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 bg-gray-200 rounded-full w-32 blur-[3px]" />
+                  <div className="h-2.5 bg-gray-100 rounded-full w-48 blur-[3px]" />
+                </div>
+                <div className="h-6 w-16 bg-gray-100 rounded-lg blur-[3px]" />
+              </div>
+            ))}
+          </div>
+
+          {/* Lock overlay */}
+          <div className="absolute inset-0 bg-gradient-to-b from-white/30 via-white/70 to-white flex flex-col items-center justify-end pb-5 px-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Lock size={16} className="text-gray-400" />
+              <p className="text-sm font-semibold text-gray-600">
+                Unlock to see who applied
+              </p>
+            </div>
+            <p className="text-xs text-gray-400 text-center">
+              Pay only when you're ready to connect with candidates.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Already PRO — just post */}
+      {/* ── Headline ── */}
+      <div className="text-center mb-5">
+        <p className="text-lg font-black text-[#111]">Ready to connect with your artists?</p>
+        <p className="text-sm text-gray-500 mt-1">Pay only when you want to unlock candidates. No rush.</p>
+      </div>
+
+      {/* ── PRO subscriber fast-track ── */}
       {isPro && (
         <div className="mb-5 p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-orange-100 flex items-center gap-3">
           <Crown size={20} className="text-[#F25722] flex-shrink-0" />
           <div>
             <p className="font-bold text-[#111] text-sm">You're an Artswrk PRO subscriber!</p>
-            <p className="text-xs text-gray-500">Unlimited job posts are included in your plan.</p>
+            <p className="text-xs text-gray-500">Unlimited candidate unlocks are included in your plan.</p>
           </div>
           <Button
-            onClick={() => handlePlan("subscription")}
+            onClick={() => handleConnect("subscription")}
             disabled={isLoading}
-            className="ml-auto flex-none hirer-grad-bg border-0 hover:opacity-90"
+            className="ml-auto flex-none hirer-grad-bg border-0 hover:opacity-90 text-sm"
           >
-            {isLoading ? <Loader2 size={16} className="animate-spin" /> : <>Post Now <ArrowRight size={14} className="ml-1" /></>}
+            {isLoading ? <Loader2 size={16} className="animate-spin" /> : <>Unlock Now <Unlock size={14} className="ml-1" /></>}
           </Button>
         </div>
       )}
 
-      {/* Pricing — two cards */}
+      {/* ── Pricing Cards ── */}
       {!isPro && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 items-start">
+        <div className="space-y-4 mb-6">
 
-          {/* ── Pay per post ── */}
-          <div className="bg-white rounded-2xl border-2 border-gray-200 p-5 flex flex-col gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-[#111] flex items-center justify-center">
-                <DollarSign size={16} className="text-white" />
+          {/* ── Connect card (primary) ── */}
+          <div className="bg-white rounded-2xl border-2 border-[#F25722] p-5 relative overflow-hidden shadow-sm">
+            <div className="absolute top-3 right-3">
+              <Badge className="hirer-grad-bg text-white border-0 text-[10px] font-bold px-2">MOST POPULAR</Badge>
+            </div>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl hirer-grad-bg flex items-center justify-center">
+                <Unlock size={18} className="text-white" />
               </div>
               <div>
-                <p className="font-bold text-[#111] leading-tight">Pay Per Post</p>
-                <p className="text-[11px] text-gray-400">One-time · no commitment</p>
+                <p className="font-black text-[#111] text-base leading-tight">Connect with Candidates</p>
+                <p className="text-xs text-gray-400">One-time · this job only · no commitment</p>
               </div>
             </div>
-            <div>
-              <span className="text-3xl font-black text-[#111]">$30</span>
-              <span className="text-gray-400 text-sm ml-1">/post</span>
+
+            <div className="flex items-baseline gap-1 mb-1">
+              <span className="text-4xl font-black text-[#111]">${connectPrice}</span>
+              <span className="text-gray-400 text-sm">one-time</span>
+              {boostEnabled && (
+                <span className="text-xs text-gray-400 ml-1">($30 + $15 boost)</span>
+              )}
             </div>
-            <ul className="space-y-1.5 flex-1">
+            <p className="text-xs text-gray-500 mb-4">
+              Pay only when you're ready. Unlock all applicants for this job.
+            </p>
+
+            <ul className="space-y-2 mb-5">
               {[
-                "Single job listing",
-                "Visible to 5,000+ artists",
-                "Manage applicants in dashboard",
-                hasSavedCard ? "Charge saved card" : "Secure Stripe checkout",
+                "Unlock all applicants for this job",
+                "Message candidates directly",
+                "Manage in your dashboard",
+                "No subscription required",
               ].map((f) => (
-                <li key={f} className="flex items-center gap-2 text-xs text-gray-600">
-                  <CheckCircle2 size={12} className="text-gray-400 flex-shrink-0" />
+                <li key={f} className="flex items-center gap-2 text-sm text-gray-700">
+                  <CheckCircle2 size={14} className="text-[#F25722] flex-shrink-0" />
                   {f}
                 </li>
               ))}
             </ul>
+
+            {/* Boost toggle */}
+            <div
+              onClick={() => setBoostEnabled(!boostEnabled)}
+              className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all mb-4 ${
+                boostEnabled
+                  ? "border-[#F25722] bg-orange-50"
+                  : "border-dashed border-gray-200 hover:border-gray-300 bg-gray-50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${boostEnabled ? "hirer-grad-bg" : "bg-gray-200"}`}>
+                  <Zap size={13} className={boostEnabled ? "text-white" : "text-gray-400"} />
+                </div>
+                <div>
+                  <p className={`text-sm font-bold leading-tight ${boostEnabled ? "text-[#111]" : "text-gray-600"}`}>
+                    Boost this post
+                  </p>
+                  <p className="text-[11px] text-gray-400">Priority placement for 7 days · +$15</p>
+                </div>
+              </div>
+              <div className={`w-10 h-5 rounded-full transition-all relative flex-shrink-0 ${boostEnabled ? "hirer-grad-bg" : "bg-gray-200"}`}>
+                <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${boostEnabled ? "left-5" : "left-0.5"}`} />
+              </div>
+            </div>
+
             <Button
-              onClick={() => handlePlan("one_time")}
+              onClick={() => handleConnect("one_time")}
+              disabled={isLoading}
+              className="w-full py-5 font-bold text-base hirer-grad-bg border-0 hover:opacity-90 transition-opacity"
+            >
+              {isLoading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <>
+                  <Unlock size={16} className="mr-2" />
+                  Unlock Candidates · ${connectPrice}
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* ── PRO subscription card ── */}
+          <div className="bg-white rounded-2xl border-2 border-gray-200 p-5 flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#111] flex items-center justify-center">
+                <Crown size={18} className="text-white" />
+              </div>
+              <div>
+                <p className="font-black text-[#111] text-base leading-tight">PRO Subscription</p>
+                <p className="text-xs text-gray-400">Unlimited unlocks · cancel anytime</p>
+              </div>
+            </div>
+
+            <div className="flex items-baseline gap-1">
+              <span className="text-3xl font-black text-[#111]">$29</span>
+              <span className="text-gray-400 text-sm">/month</span>
+            </div>
+
+            <ul className="space-y-2">
+              {[
+                "Unlimited candidate unlocks",
+                "Priority placement in search",
+                "PRO badge on all your listings",
+                "Advanced applicant filters",
+                "Don't pay anything until you get candidates",
+              ].map((f) => (
+                <li key={f} className="flex items-center gap-2 text-sm text-gray-700">
+                  <CheckCircle2 size={14} className="text-gray-400 flex-shrink-0" />
+                  {f}
+                </li>
+              ))}
+            </ul>
+
+            <Button
+              onClick={() => handleConnect("subscription")}
               disabled={isLoading}
               variant="outline"
-              className="w-full font-bold border-2 border-[#111] text-[#111] hover:bg-[#111] hover:text-white transition-colors bg-transparent"
+              className="w-full font-bold border-2 border-[#111] text-[#111] hover:bg-[#111] hover:text-white transition-colors bg-transparent py-4"
             >
-              {isLoading ? <Loader2 size={16} className="animate-spin" /> : <>Post for $30{hasSavedCard && <span className="ml-1.5 text-xs font-normal opacity-60">· saved card</span>}</>}
+              {isLoading ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <>Subscribe & Save — $29/mo</>
+              )}
             </Button>
           </div>
 
-          {/* ── Subscription ── */}
-          <div className="bg-white rounded-2xl border-2 border-[#F25722] p-5 flex flex-col relative overflow-hidden">
-            <div className="absolute top-3 right-3">
-              <Badge className="hirer-grad-bg text-white border-0 text-[10px] font-bold">BEST VALUE</Badge>
-            </div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg hirer-grad-bg flex items-center justify-center">
-                <Crown size={16} className="text-white" />
-              </div>
-              <p className="font-bold text-[#111]">PRO Subscription</p>
-            </div>
-            <div className="mb-1">
-              <span className="text-3xl font-black text-[#111]">$29</span>
-              <span className="text-gray-400 text-sm ml-1">/month</span>
-            </div>
-            <p className="text-xs text-gray-500 mb-4">Unlimited posts + PRO features. Cancel anytime.</p>
-            <ul className="space-y-1.5 mb-5 flex-1">
-              {[
-                "Unlimited job posts",
-                "PRO badge on your listings",
-                "Priority placement in search",
-                "Advanced applicant filters",
-                hasSavedCard ? "Charge saved card" : "Secure Stripe checkout",
-              ].map((f) => (
-                <li key={f} className="flex items-center gap-2 text-xs text-gray-600">
-                  <CheckCircle2 size={12} className="text-[#F25722] flex-shrink-0" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <Button
-              onClick={() => handlePlan("subscription")}
-              disabled={isLoading}
-              className="w-full font-bold hirer-grad-bg border-0 hover:opacity-90 transition-opacity"
+          {/* ── Stay free option ── */}
+          <div className="text-center py-2">
+            <button
+              onClick={() => navigate("/app/jobs")}
+              className="text-sm text-gray-400 hover:text-gray-600 transition-colors underline underline-offset-2"
             >
-              {isLoading ? <Loader2 size={16} className="animate-spin" /> : <>Subscribe & Save{hasSavedCard && <span className="ml-1.5 text-xs font-normal opacity-70">· saved card</span>}</>}
-            </Button>
+              Stay free for now — I'll unlock candidates later
+            </button>
+            <p className="text-xs text-gray-300 mt-1">Your job stays live. You can unlock anytime from your dashboard.</p>
           </div>
         </div>
       )}
 
-      {/* Not logged in warning */}
+      {/* Not logged in note */}
       {!isAuthenticated && (
         <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-2 text-sm text-amber-800">
-          <span className="text-amber-500">⚠️</span>
-          You'll be asked to log in or create an account before payment.
+          <span>⚠️</span>
+          You'll be asked to log in or create a free account before checkout.
         </div>
       )}
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 mt-2">
         <Button variant="outline" onClick={onBack} className="flex-none px-5">
           <ChevronLeft size={16} className="mr-1" />
-          Back
+          Edit listing
         </Button>
         <p className="text-xs text-gray-400 flex-1 text-center">
-          🔒 Secure payment via Stripe · Test card: 4242 4242 4242 4242
+          🔒 Secure payment via Stripe
         </p>
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 4: Boost (optional) ─────────────────────────────────────────────────
-
-function getBoostTier(daily: number) {
-  if (daily >= 50) return { label: "High", color: "text-green-600", bar: 90, hint: "Top placement — maximum visibility." };
-  if (daily >= 25) return { label: "Competitive", color: "text-[#F25722]", bar: 60, hint: "Strong placement among active jobs." };
-  return { label: "Moderate", color: "text-amber-500", bar: 30, hint: "Increase to $25+ to be competitive." };
-}
-
-const DURATION_OPTIONS = [
-  { label: "3 days", days: 3 },
-  { label: "1 week", days: 7 },
-  { label: "2 weeks", days: 14 },
-  { label: "1 month", days: 30 },
-];
-
-function Step4({
-  onSkip,
-}: {
-  onSkip: () => void;
-}) {
-  const { user } = useAuth();
-  const [dailyBudget, setDailyBudget] = useState(20);
-  const [durationDays, setDurationDays] = useState(7);
-
-  const tier = getBoostTier(dailyBudget);
-  const total = dailyBudget * durationDays;
-  const expectedViews = `${dailyBudget * durationDays * 8}–${dailyBudget * durationDays * 14}`;
-  const expectedApplicants = `${Math.max(1, Math.floor(dailyBudget * durationDays / 15))}–${Math.max(2, Math.ceil(dailyBudget * durationDays / 8))}`;
-  const hasSavedCard = !!user?.clientStripeCustomerId;
-
-  const boostCheckout = trpc.boost.createCheckout.useMutation({
-    onSuccess: (data) => {
-      window.open(data.checkoutUrl, "_blank");
-      toast.success("Redirecting to boost checkout...");
-    },
-    onError: (err) => {
-      toast.error(`Boost setup failed: ${err.message}`);
-    },
-  });
-
-  // We don't have a jobId yet (job is created on Stripe success), so we open boost checkout
-  // with a placeholder — the webhook will link them. For now, store params in sessionStorage.
-  function handleLaunchBoost() {
-    sessionStorage.setItem("pendingBoost", JSON.stringify({ dailyBudget, durationDays }));
-    toast.success("Boost queued! Complete your job payment first, then boost will be applied.");
-    onSkip(); // Navigate to success/dashboard after queuing
-  }
-
-  return (
-    <div className="max-w-2xl mx-auto">
-      <div className="text-center mb-6">
-        <div className="inline-flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-full px-4 py-1.5 mb-3">
-          <Zap size={14} className="text-[#F25722]" />
-          <span className="text-xs font-bold text-[#F25722]">Optional — skip anytime</span>
-        </div>
-        <h2 className="text-2xl font-black text-[#111] mb-1">Boost your job for top visibility</h2>
-        <p className="text-gray-500 text-sm">Set a daily budget and duration. Available to all plans — even PRO subscribers.</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 items-start">
-        {/* Left: controls */}
-        <div className="space-y-5">
-          {/* Daily budget */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-bold text-gray-800">Daily Ad Budget</p>
-              <p className="text-xs text-gray-400">Recommended: $20–35</p>
-            </div>
-            <div className="flex items-center border border-gray-200 rounded-xl px-4 py-3 bg-gray-50 mb-3">
-              <span className="text-gray-400 text-base mr-2">$</span>
-              <span className="text-2xl font-black text-[#111]">{dailyBudget}</span>
-              <span className="text-gray-400 text-sm ml-auto">per day</span>
-            </div>
-            <Slider
-              min={5}
-              max={100}
-              step={5}
-              value={[dailyBudget]}
-              onValueChange={([v]) => setDailyBudget(v)}
-              className="[&_[data-slot=slider-range]]:bg-gradient-to-r [&_[data-slot=slider-range]]:from-[#FFBC5D] [&_[data-slot=slider-range]]:to-[#F25722]"
-            />
-            <div className="flex justify-between text-[11px] text-gray-400 mt-1">
-              <span>$5</span>
-              <span>$100</span>
-            </div>
-          </div>
-
-          {/* Duration */}
-          <div>
-            <p className="text-sm font-bold text-gray-800 mb-2">Ad Duration</p>
-            <div className="grid grid-cols-4 gap-2">
-              {DURATION_OPTIONS.map((opt) => (
-                <button
-                  key={opt.days}
-                  onClick={() => setDurationDays(opt.days)}
-                  className={`py-2 rounded-xl text-xs font-semibold border transition-all ${
-                    durationDays === opt.days
-                      ? "hirer-grad-bg text-white border-transparent shadow-sm"
-                      : "border-gray-200 text-gray-600 hover:border-[#F25722] hover:text-[#F25722]"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-gray-400 mt-2">You can pause or close your boost at any time.</p>
-          </div>
-
-          {/* Total */}
-          <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
-            <p className="text-xs text-gray-500 mb-0.5">Total budget</p>
-            <p className="text-3xl font-black text-[#111]">${total.toFixed(2)}</p>
-            <p className="text-[11px] text-gray-400">Actual cost may be lower based on performance</p>
-          </div>
-        </div>
-
-        {/* Right: performance preview */}
-        <div className="space-y-3">
-          <p className="text-sm font-bold text-gray-800">Ad Performance Preview</p>
-
-          {/* Tier card */}
-          <div className="bg-orange-50 rounded-2xl p-4 border border-orange-100">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-gray-700">Performance:</p>
-              <p className={`text-sm font-black ${tier.color}`}>{tier.label}</p>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-2 overflow-hidden">
-              <div
-                className="h-full rounded-full hirer-grad-bg transition-all duration-300"
-                style={{ width: `${tier.bar}%` }}
-              />
-            </div>
-            <p className={`text-xs ${tier.color} font-medium`}>{tier.hint}</p>
-          </div>
-
-          {/* Stats */}
-          {[
-            { label: "Expected Views", value: expectedViews },
-            { label: "Expected Applicants", value: expectedApplicants },
-            { label: "Featured Placements", value: dailyBudget >= 25 ? "Yes" : "No" },
-          ].map(({ label, value }) => (
-            <div key={label} className="flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-gray-200">
-              <span className="text-sm text-gray-600">{label}</span>
-              <span className="text-sm font-bold text-[#111]">{value}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* CTAs */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <Button
-          variant="outline"
-          onClick={onSkip}
-          className="flex-1 font-semibold text-gray-600 border-gray-300"
-        >
-          Skip for now
-        </Button>
-        <Button
-          onClick={handleLaunchBoost}
-          disabled={boostCheckout.isPending}
-          className="flex-1 font-bold hirer-grad-bg border-0 hover:opacity-90 transition-opacity"
-        >
-          {boostCheckout.isPending ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <><Zap size={14} className="mr-1.5" /> Launch Boost · ${total.toFixed(2)}{hasSavedCard && <span className="ml-1.5 text-xs font-normal opacity-70">· saved card</span>}</>
-          )}
-        </Button>
       </div>
     </div>
   );
@@ -997,14 +949,8 @@ function SuccessPage() {
   const sessionId = params.get("session_id");
   const isPro = params.get("plan") === "pro";
   const isBoosted = params.get("boosted") === "1";
-  const [boostOpen, setBoostOpen] = useState(false);
-  const [activatedJobId, setActivatedJobId] = useState<number | null>(null);
 
-  const verify = trpc.postJob.verifyCheckout.useMutation({
-    onSuccess: (data) => {
-      if (data.jobId) setActivatedJobId(data.jobId);
-    },
-  });
+  const verify = trpc.postJob.verifyCheckout.useMutation({});
 
   useEffect(() => {
     if (sessionId) {
@@ -1016,19 +962,18 @@ function SuccessPage() {
     <div className="min-h-screen bg-white flex items-center justify-center px-5">
       <div className="max-w-md text-center">
         <div className="w-20 h-20 rounded-full hirer-grad-bg flex items-center justify-center mx-auto mb-6 shadow-lg">
-          <CheckCircle2 size={40} className="text-white" />
+          <Unlock size={36} className="text-white" />
         </div>
         <h1 className="text-3xl font-black text-[#111] mb-3">
-          Your job is live! 🎉
+          Candidates unlocked! 🎉
         </h1>
         <p className="text-gray-500 mb-2">
-          Your listing has been sent to{" "}
-          <span className="font-bold text-[#111]">5,000+ artists</span> in the
-          Artswrk network.
+          You can now view and message all applicants for this job from your{" "}
+          <span className="font-bold text-[#111]">dashboard</span>.
         </p>
         {isPro && (
           <p className="text-sm text-[#F25722] font-semibold mb-2">
-            Welcome to Artswrk PRO! Unlimited posts are now active.
+            Welcome to Artswrk PRO! Unlimited unlocks are now active.
           </p>
         )}
         {isBoosted && (
@@ -1039,28 +984,8 @@ function SuccessPage() {
         {verify.isPending && (
           <p className="text-xs text-gray-400 flex items-center justify-center gap-1.5 mb-4">
             <Loader2 size={12} className="animate-spin" />
-            Activating your listing...
+            Activating your access...
           </p>
-        )}
-
-        {/* Boost upsell — only show if not already boosted */}
-        {!isBoosted && !verify.isPending && (
-          <div className="mt-5 p-4 rounded-2xl border-2 border-dashed border-orange-200 bg-orange-50">
-            <div className="flex items-center gap-2 justify-center mb-2">
-              <Zap size={16} className="text-[#F25722]" />
-              <span className="font-bold text-[#111] text-sm">Want more applicants faster?</span>
-            </div>
-            <p className="text-xs text-gray-500 mb-3">Boost your job to the top of search results and get 3–5× more views.</p>
-            <Button
-              size="sm"
-              className="hirer-grad-bg border-0 hover:opacity-90 font-bold text-white w-full"
-              onClick={() => setBoostOpen(true)}
-              disabled={!activatedJobId}
-            >
-              <Zap size={14} className="mr-1.5" />
-              Boost This Job
-            </Button>
-          </div>
         )}
 
         <div className="flex gap-3 justify-center mt-6">
@@ -1078,15 +1003,6 @@ function SuccessPage() {
           </Button>
         </div>
       </div>
-
-      {/* Boost modal */}
-      {activatedJobId && (
-        <BoostJobModal
-          jobId={activatedJobId}
-          open={boostOpen}
-          onClose={() => setBoostOpen(false)}
-        />
-      )}
     </div>
   );
 }
@@ -1094,12 +1010,11 @@ function SuccessPage() {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function PostJob() {
-  const params = new URLSearchParams(window.location.search);
   const isSuccess = window.location.pathname.includes("/success");
 
   if (isSuccess) return <SuccessPage />;
 
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [rawText, setRawText] = useState("");
   const [parsed, setParsed] = useState<ParsedJob | null>(null);
   const [form, setForm] = useState<FormData | null>(null);
@@ -1166,13 +1081,6 @@ export default function PostJob() {
           <Step3
             form={form}
             onBack={() => setStep(2)}
-            onNext={() => setStep(4)}
-          />
-        )}
-
-        {step === 4 && (
-          <Step4
-            onSkip={() => navigate("/app/jobs")}
           />
         )}
       </div>

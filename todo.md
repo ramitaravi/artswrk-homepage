@@ -566,3 +566,24 @@
 - [x] Fix field name casing: Bubble returns "Request Status" (capital S), not "Request status"
 - [x] Status changes now sync correctly (Completed, Deleted by Client, Lost - No Revenue, etc.)
 - [x] Backfill missing job 1776728324832x534583996376416260 (Active, created Apr 20 11:38pm)
+
+## Post-Job Flow Redesign
+- [ ] Rebuild post-job page with "free to post, pay to connect" model
+- [ ] Step 1: Job description input (existing textarea flow)
+- [ ] Step 2: Job live confirmation screen ("Your job is live! X artists already applied")
+- [ ] Step 3: Pricing — Free tier (job live, applicants hidden), $30 Connect (unlock candidates), +$15 Boost add-on toggle, $29/mo PRO subscription
+- [ ] Clear messaging: "Post free. Pay only when you're ready to connect."
+- [ ] Boost toggle on Connect card (+$15 for priority placement 7 days)
+- [ ] PRO subscription card with "unlimited unlocks" value prop
+
+## Post-Job Flow Redesign (Apr 21 — Free to Post, Pay to Connect)
+- [x] Rebuild post-job page: 3-step flow (Describe → Review → Connect)
+- [x] Remove old pay-to-post model (Step 3 was payment wall)
+- [x] Job posts free — no payment required to go live
+- [x] Step 3: "Your job is live!" green success banner with simulated applicant counter
+- [x] Step 3: Blurred/locked applicants preview panel to create unlock urgency
+- [x] Step 3: "Connect with Candidates" card — $30 one-time to unlock all applicants for this job
+- [x] Step 3: Boost toggle inline on Connect card (+$15 for priority placement 7 days)
+- [x] Step 3: PRO Subscription card — $29/mo for unlimited unlocks
+- [x] Step 3: "Stay free for now" escape route with clear messaging
+- [x] Step 2 CTA changed to "Post Job Free" with "Free to post · No credit card required" subtext
