@@ -1047,6 +1047,47 @@ Fields to extract:
       }),
 
     /**
+     * Create a free job (no payment required) — job goes live immediately as Active.
+     * Returns the jobId so the frontend can optionally create a boost checkout.
+     */
+    createFreeJob: protectedProcedure
+      .input(z.object({
+        description: z.string().min(10),
+        locationAddress: z.string().optional(),
+        locationLat: z.string().optional(),
+        locationLng: z.string().optional(),
+        dateType: z.enum(["Single Date", "Ongoing", "Recurring"]).default("Single Date"),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        isHourly: z.boolean().default(true),
+        openRate: z.boolean().default(false),
+        clientHourlyRate: z.number().optional(),
+        clientFlatRate: z.number().optional(),
+        transportation: z.boolean().default(false),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const job = await createJob({
+          clientUserId: user.id,
+          clientEmail: user.email ?? undefined,
+          description: input.description,
+          locationAddress: input.locationAddress,
+          locationLat: input.locationLat,
+          locationLng: input.locationLng,
+          dateType: input.dateType,
+          startDate: input.startDate ? new Date(input.startDate) : undefined,
+          endDate: input.endDate ? new Date(input.endDate) : undefined,
+          isHourly: input.isHourly,
+          openRate: input.openRate,
+          clientHourlyRate: input.clientHourlyRate,
+          transportation: input.transportation,
+          requestStatus: "Active",
+        });
+        return { jobId: job.id };
+      }),
+
+    /**
      * Create a draft job and return the job ID + Stripe checkout URL.
      * Requires authentication.
      */

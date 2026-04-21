@@ -596,3 +596,9 @@
 - [x] "Switch to plans" link → PRO subscription option
 - [x] "No thanks" + "Back" + "Save and continue" bottom buttons
 - [x] "Your job is almost ready" pre-boost screen (Indeed pattern)
+
+## Dynamic Stripe Sponsor Checkout (Post-Job Step 3)
+- [ ] tRPC postJob.createSponsorCheckout — creates Stripe Checkout session with total = dailyBudget × durationDays
+- [ ] Wire "Save and continue" button to call createSponsorCheckout and redirect to Stripe
+- [ ] Success page handles sponsor activation (set boostActive, boostDailyBudget, boostDurationDays, boostEndDate)
+- [ ] Webhook handles checkout.session.completed for sponsor payments

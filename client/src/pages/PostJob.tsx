@@ -263,7 +263,7 @@ function Step2({
 }: {
   rawText: string;
   parsed: ParsedJob;
-  onNext: (form: FormData) => void;
+  onNext: (form: FormData, jobId: number) => void;
   onBack: () => void;
 }) {
   const { user } = useAuth();
@@ -296,6 +296,41 @@ function Step2({
 
   const set = (key: keyof FormData, value: string | boolean) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  const { isAuthenticated } = useAuth();
+
+  const createFreeJob = trpc.postJob.createFreeJob.useMutation({
+    onSuccess: (data) => {
+      onNext(form, data.jobId);
+    },
+    onError: (err) => {
+      toast.error(`Failed to post job: ${err.message}`);
+    },
+  });
+
+  function handlePostFree() {
+    if (!form.description.trim()) {
+      toast.error("Please add a job description.");
+      return;
+    }
+    if (!isAuthenticated) {
+      sessionStorage.setItem("postJobPending", JSON.stringify(form));
+      window.location.href = getLoginUrl();
+      return;
+    }
+    createFreeJob.mutate({
+      description: form.description,
+      locationAddress: form.locationAddress || undefined,
+      dateType: form.dateType,
+      startDate: form.startDate || undefined,
+      endDate: form.endDate || undefined,
+      isHourly: form.isHourly,
+      openRate: form.openRate,
+      clientHourlyRate: form.clientHourlyRate ? parseFloat(form.clientHourlyRate) : undefined,
+      clientFlatRate: form.clientFlatRate ? parseFloat(form.clientFlatRate) : undefined,
+      transportation: form.transportation,
+    });
+  }
 
   const isOngoing = form.dateType === "Ongoing" || form.dateType === "Recurring";
 
@@ -580,18 +615,15 @@ function Step2({
           Back
         </Button>
         <Button
-          onClick={() => {
-            if (!form.description.trim()) {
-              toast.error("Please add a job description.");
-              return;
-            }
-            onNext(form);
-          }}
+          onClick={handlePostFree}
+          disabled={createFreeJob.isPending}
           className="flex-1 py-5 font-bold rounded-xl hirer-grad-bg border-0 hover:opacity-90 transition-opacity"
         >
-          <CheckCircle2 size={18} className="mr-2" />
-          Post Job Free
-          <ChevronRight size={18} className="ml-2" />
+          {createFreeJob.isPending ? (
+            <><Loader2 size={18} className="animate-spin mr-2" />Posting your job...</>
+          ) : (
+            <><CheckCircle2 size={18} className="mr-2" />Post Job Free<ChevronRight size={18} className="ml-2" /></>
+          )}
         </Button>
       </div>
 
@@ -657,9 +689,11 @@ function Gauge({ needleDeg }: { needleDeg: number }) {
 
 function Step3({
   form,
+  jobId,
   onBack,
 }: {
   form: FormData;
+  jobId: number | null;
   onBack: () => void;
 }) {
   const { user, isAuthenticated } = useAuth();
@@ -670,7 +704,7 @@ function Step3({
   const [dailyBudget, setDailyBudget] = useState(5);
   const [duration, setDuration] = useState<"7" | "14" | "30" | "continuous">("7");
 
-  const createAndCheckout = trpc.postJob.createAndCheckout.useMutation({
+  const boostCheckout = trpc.boost.createCheckout.useMutation({
     onSuccess: (data) => {
       window.open(data.checkoutUrl, "_blank");
       toast.success("Redirecting to secure checkout...");
@@ -680,29 +714,21 @@ function Step3({
     },
   });
 
-  function handleConnect(plan: "one_time" | "subscription") {
-    if (!isAuthenticated) {
-      sessionStorage.setItem("postJobPending", JSON.stringify(form));
-      window.location.href = getLoginUrl();
+  function handleSponsor() {
+    if (!jobId) {
+      toast.error("Job not found. Please go back and try again.");
       return;
     }
-    createAndCheckout.mutate({
-      description: form.description,
-      locationAddress: form.locationAddress || undefined,
-      dateType: form.dateType,
-      startDate: form.startDate || undefined,
-      endDate: form.endDate || undefined,
-      isHourly: form.isHourly,
-      openRate: form.openRate,
-      clientHourlyRate: form.clientHourlyRate ? parseFloat(form.clientHourlyRate) : undefined,
-      clientFlatRate: form.clientFlatRate ? parseFloat(form.clientFlatRate) : undefined,
-      transportation: form.transportation,
-      plan,
+    const days = duration === "continuous" ? 30 : parseInt(duration);
+    boostCheckout.mutate({
+      jobId,
+      dailyBudget,
+      durationDays: days,
       origin: window.location.origin,
     });
   }
 
-  const isLoading = createAndCheckout.isPending;
+  const isLoading = boostCheckout.isPending;
   const tier = getTierForBudget(dailyBudget);
   const durationDays = duration === "continuous" ? null : parseInt(duration);
   const totalCost = durationDays ? dailyBudget * durationDays : null;
@@ -746,7 +772,7 @@ function Step3({
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-black text-[#111]">Sponsor job</h1>
         <button
-          onClick={() => handleConnect("subscription")}
+          onClick={() => navigate("/pricing")}
           className="text-sm text-[#F25722] font-semibold flex items-center gap-1 hover:underline"
         >
           <TrendingUp size={14} /> Switch to plans
@@ -887,7 +913,7 @@ function Step3({
             Back
           </button>
           <Button
-            onClick={() => handleConnect("one_time")}
+            onClick={handleSponsor}
             disabled={isLoading}
             className="hirer-grad-bg border-0 hover:opacity-90 font-bold px-8 py-5 rounded-xl text-base"
           >
@@ -980,6 +1006,7 @@ export default function PostJob() {
   const [rawText, setRawText] = useState("");
   const [parsed, setParsed] = useState<ParsedJob | null>(null);
   const [form, setForm] = useState<FormData | null>(null);
+  const [jobId, setJobId] = useState<number | null>(null);
   const [, navigate] = useLocation();
 
   return (
@@ -1031,8 +1058,9 @@ export default function PostJob() {
           <Step2
             rawText={rawText}
             parsed={parsed}
-            onNext={(formData) => {
+            onNext={(formData, newJobId) => {
               setForm(formData);
+              setJobId(newJobId);
               setStep(3);
             }}
             onBack={() => setStep(1)}
@@ -1042,6 +1070,7 @@ export default function PostJob() {
         {step === 3 && form && (
           <Step3
             form={form}
+            jobId={jobId}
             onBack={() => setStep(2)}
           />
         )}
