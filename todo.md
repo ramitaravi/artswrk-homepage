@@ -602,3 +602,15 @@
 - [ ] Wire "Save and continue" button to call createSponsorCheckout and redirect to Stripe
 - [ ] Success page handles sponsor activation (set boostActive, boostDailyBudget, boostDurationDays, boostEndDate)
 - [ ] Webhook handles checkout.session.completed for sponsor payments
+
+## Smart Login / Signup Page (/login) — Apr 21
+- [ ] tRPC auth.checkEmail — look up email in synced users table, return {found, hasPassword, name, userType, avatarUrl}
+- [ ] tRPC auth.loginWithPassword — verify bcrypt hash, issue JWT session cookie
+- [ ] tRPC auth.setFirstPassword — for no-pw users: set password for first time
+- [ ] tRPC auth.registerUser — create new user (artist or client) in DB
+- [ ] Build /login page: email entry screen (split layout, mobile-first, fast-loading)
+- [ ] Build /login page: welcome back screen with Artist/Client badge, password field
+- [ ] Build /login page: no-pw screen (create your password, first-time setup)
+- [ ] Build /login page: join screen (Artist or Client choice cards)
+- [ ] Update navbar Login button to point to /login
+- [ ] Register /login route in App.tsx
