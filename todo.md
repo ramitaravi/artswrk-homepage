@@ -549,3 +549,14 @@
 - [x] Add "Run As" button to enterprise client cards in Admin.tsx (uses existing admin.impersonate endpoint)
 - [x] Add PlanStatusCard to enterprise client dashboard right sidebar (shows plan name, billing interval, status, renewal date)
 - [x] 118 tests passing
+
+## Bubble→DB Auto-Sync System
+- [x] Add sync_runs log table to schema and run db:push
+- [x] Build scripts/sync-all.mjs: --mode=frequent (incremental sync — only records modified in last 20 min)
+- [x] Build scripts/sync-all.mjs: --mode=daily (full sync of all tables including users)
+- [x] Fix premium_jobs Location geo-object bug (extract .address string from dict)
+- [x] Test both modes manually (frequent: ~4s, daily: ~20min, 48k+ records)
+- [x] Add SendGrid email summary after each sync run (to ramita@artswrk.com)
+- [x] Schedule cron: every 15 min for frequent mode (incremental)
+- [x] Schedule cron: daily 2am for daily mode (full sync)
+- [ ] Add sync history view to admin dashboard

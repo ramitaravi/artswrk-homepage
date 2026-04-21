@@ -1136,3 +1136,27 @@ export const masterStyleTypes = mysqlTable("master_style_types", {
 });
 export type MasterStyleType = typeof masterStyleTypes.$inferSelect;
 export type InsertMasterStyleType = typeof masterStyleTypes.$inferInsert;
+
+// ─── Sync Runs Log ────────────────────────────────────────────────────────────
+
+/**
+ * Tracks each Bubble→DB sync run for monitoring and debugging.
+ * Visible in the admin dashboard to confirm sync health.
+ */
+export const syncRuns = mysqlTable("sync_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  /** "frequent" | "daily" */
+  mode: mysqlEnum("mode", ["frequent", "daily"]).notNull(),
+  /** "running" | "success" | "error" */
+  status: mysqlEnum("status", ["running", "success", "error"]).notNull().default("running"),
+  /** Summary of records upserted per table (JSON) */
+  summary: text("summary"),
+  /** Error message if status = 'error' */
+  errorMessage: text("errorMessage"),
+  /** How long the sync took in milliseconds */
+  durationMs: int("durationMs"),
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  finishedAt: timestamp("finishedAt"),
+});
+export type SyncRun = typeof syncRuns.$inferSelect;
+export type InsertSyncRun = typeof syncRuns.$inferInsert;

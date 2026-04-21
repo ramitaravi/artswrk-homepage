@@ -176,6 +176,13 @@
       "when": 1776368978798,
       "tag": "0024_amused_shinko_yamashiro",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1776709382934,
+      "tag": "0025_long_vulcan",
+      "breakpoints": true
     }
   ]
 }
