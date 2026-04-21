@@ -602,26 +602,57 @@ function Step2({
   );
 }
 
-// ─── Step 3: Job Live + Connect Pricing ───────────────────────────────────────
+// ─── Step 3: Indeed-style "almost ready" + sponsor flow ──────────────────────
 
-// Simulated applicant count that increments over time for social proof
-function useSimulatedApplicants() {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    // Simulate 1-4 applicants arriving over 8 seconds
-    const target = Math.floor(Math.random() * 3) + 1;
-    let current = 0;
-    const interval = setInterval(() => {
-      if (current < target) {
-        current++;
-        setCount(current);
-      } else {
-        clearInterval(interval);
-      }
-    }, 2200);
-    return () => clearInterval(interval);
-  }, []);
-  return count;
+// Budget tier config
+const BUDGET_TIERS = [
+  { daily: 0,  label: "Free",        days: 0,  performance: "Standard",    perfColor: "text-gray-500",   needle: 5 },
+  { daily: 5,  label: "$5/day",      days: 7,  performance: "Good",         perfColor: "text-yellow-600", needle: 30 },
+  { daily: 10, label: "$10/day",     days: 14, performance: "Strong",       perfColor: "text-orange-500", needle: 60 },
+  { daily: 20, label: "$20/day",     days: 21, performance: "Very Strong",  perfColor: "text-green-600",  needle: 85 },
+];
+
+function getTierForBudget(daily: number) {
+  if (daily <= 0) return BUDGET_TIERS[0];
+  if (daily < 10) return BUDGET_TIERS[1];
+  if (daily < 20) return BUDGET_TIERS[2];
+  return BUDGET_TIERS[3];
+}
+
+// SVG Speedometer gauge
+function Gauge({ needleDeg }: { needleDeg: number }) {
+  // Arc from 180° to 0° (left to right), needle rotates from -90 to +90
+  const r = 70;
+  const cx = 90;
+  const cy = 90;
+  // Arc segments: red (0-33%), yellow (33-66%), green (66-100%)
+  function arcPath(startDeg: number, endDeg: number) {
+    const toRad = (d: number) => ((d - 180) * Math.PI) / 180;
+    const x1 = cx + r * Math.cos(toRad(startDeg));
+    const y1 = cy + r * Math.sin(toRad(startDeg));
+    const x2 = cx + r * Math.cos(toRad(endDeg));
+    const y2 = cy + r * Math.sin(toRad(endDeg));
+    return `M ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2}`;
+  }
+  // Needle: needleDeg is 0-100 mapped to -90 to +90 degrees from top
+  const needleAngle = -90 + (needleDeg / 100) * 180;
+  const needleRad = (needleAngle * Math.PI) / 180;
+  const nx = cx + 55 * Math.sin(needleRad);
+  const ny = cy - 55 * Math.cos(needleRad);
+  return (
+    <svg width="180" height="100" viewBox="0 0 180 100">
+      <path d={arcPath(0, 60)} fill="none" stroke="#fca5a5" strokeWidth="12" strokeLinecap="round" />
+      <path d={arcPath(60, 120)} fill="none" stroke="#fcd34d" strokeWidth="12" strokeLinecap="round" />
+      <path d={arcPath(120, 180)} fill="none" stroke="#86efac" strokeWidth="12" strokeLinecap="round" />
+      <line
+        x1={cx} y1={cy}
+        x2={nx} y2={ny}
+        stroke="#111" strokeWidth="3" strokeLinecap="round"
+        style={{ transition: "all 0.5s ease" }}
+      />
+      <circle cx={cx} cy={cy} r="5" fill="#111" />
+    </svg>
+  );
 }
 
 function Step3({
@@ -633,9 +664,11 @@ function Step3({
 }) {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
-  const [boostEnabled, setBoostEnabled] = useState(false);
-  const applicantCount = useSimulatedApplicants();
   const isPro = user?.clientPremium;
+  // sub-step: "almost_ready" → "sponsor"
+  const [subStep, setSubStep] = useState<"almost_ready" | "sponsor">("almost_ready");
+  const [dailyBudget, setDailyBudget] = useState(5);
+  const [duration, setDuration] = useState<"7" | "14" | "30" | "continuous">("7");
 
   const createAndCheckout = trpc.postJob.createAndCheckout.useMutation({
     onSuccess: (data) => {
@@ -650,7 +683,7 @@ function Step3({
   function handleConnect(plan: "one_time" | "subscription") {
     if (!isAuthenticated) {
       sessionStorage.setItem("postJobPending", JSON.stringify(form));
-      navigate(getLoginUrl());
+      window.location.href = getLoginUrl();
       return;
     }
     createAndCheckout.mutate({
@@ -670,257 +703,167 @@ function Step3({
   }
 
   const isLoading = createAndCheckout.isPending;
-  const connectPrice = boostEnabled ? 45 : 30;
+  const tier = getTierForBudget(dailyBudget);
+  const durationDays = duration === "continuous" ? null : parseInt(duration);
+  const totalCost = durationDays ? dailyBudget * durationDays : null;
 
-  // Fake blurred applicant profiles for the locked preview
-  const fakeApplicants = [
-    { initials: "AK", color: "bg-pink-400" },
-    { initials: "MJ", color: "bg-purple-400" },
-    { initials: "TL", color: "bg-blue-400" },
-    { initials: "SR", color: "bg-green-400" },
-    { initials: "DN", color: "bg-amber-400" },
-  ];
+  // ── Sub-step: Almost Ready ──────────────────────────────────────────────────
+  if (subStep === "almost_ready") {
+    return (
+      <div className="max-w-lg mx-auto">
+        <h1 className="text-3xl font-black text-[#111] mb-6">Your job is almost ready</h1>
+        <div className="mb-8">
+          <p className="font-bold text-[#111] mb-3">With your job, here's what happens next:</p>
+          <ul className="space-y-3">
+            {[
+              "Your listing goes live immediately on Artswrk.",
+              "Artists in our network will be notified about your post.",
+              "You'll receive applicants directly in your dashboard.",
+              "Sponsor your post to stay pinned at the top of search results.",
+            ].map((item) => (
+              <li key={item} className="flex items-start gap-3 text-gray-700">
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-2 flex-shrink-0" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="flex justify-end">
+          <Button
+            onClick={() => setSubStep("sponsor")}
+            className="hirer-grad-bg border-0 hover:opacity-90 font-bold px-8 py-5 rounded-xl text-base"
+          >
+            Continue
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
+  // ── Sub-step: Sponsor ───────────────────────────────────────────────────────
   return (
     <div className="max-w-2xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-black text-[#111]">Sponsor job</h1>
+        <button
+          onClick={() => handleConnect("subscription")}
+          className="text-sm text-[#F25722] font-semibold flex items-center gap-1 hover:underline"
+        >
+          <TrendingUp size={14} /> Switch to plans
+        </button>
+      </div>
 
-      {/* ── Job Live Banner ── */}
-      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-5 mb-6 text-center">
-        <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
-          <CheckCircle2 size={28} className="text-green-600" />
+      <div className="bg-white border border-gray-200 rounded-2xl p-6 mb-6">
+        <div className="flex flex-col md:flex-row gap-8">
+          {/* Left: budget controls */}
+          <div className="flex-1">
+            <h2 className="font-bold text-[#111] mb-1">Choose your daily budget</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              We recommend starting at{" "}
+              <span className="font-bold text-[#111] underline decoration-dotted">$5.00 average daily budget.</span>
+            </p>
+
+            {/* Budget input */}
+            <div className="flex items-stretch border border-gray-300 rounded-xl overflow-hidden mb-4 focus-within:border-[#F25722] transition-colors">
+              <span className="flex items-center px-4 text-gray-500 bg-gray-50 border-r border-gray-300 font-medium">$</span>
+              <input
+                type="number"
+                min={5}
+                step={1}
+                value={dailyBudget}
+                onChange={(e) => setDailyBudget(Math.max(5, parseInt(e.target.value) || 5))}
+                className="flex-1 px-4 py-3 text-lg font-bold text-[#111] outline-none"
+              />
+              <span className="flex items-center px-4 text-gray-500 bg-gray-50 border-l border-gray-300 text-sm">daily average</span>
+            </div>
+
+            {/* Quick budget buttons */}
+            <div className="flex gap-2 mb-6">
+              {[5, 10, 20, 50].map((amt) => (
+                <button
+                  key={amt}
+                  onClick={() => setDailyBudget(amt)}
+                  className={`flex-1 py-1.5 rounded-lg text-sm font-semibold border transition-all ${
+                    dailyBudget === amt
+                      ? "hirer-grad-bg text-white border-transparent"
+                      : "border-gray-200 text-gray-600 hover:border-[#F25722] hover:text-[#F25722]"
+                  }`}
+                >
+                  ${amt}
+                </button>
+              ))}
+            </div>
+
+            {/* Duration */}
+            <div>
+              <label className="block text-sm font-bold text-[#111] mb-2">Ad duration</label>
+              <select
+                value={duration}
+                onChange={(e) => setDuration(e.target.value as typeof duration)}
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm font-medium text-[#111] focus:outline-none focus:border-[#F25722] transition-colors"
+              >
+                <option value="7">7 days</option>
+                <option value="14">14 days</option>
+                <option value="30">30 days</option>
+                <option value="continuous">Runs continuously</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Right: gauge + performance card */}
+          <div className="flex flex-col items-center justify-start md:w-48">
+            <Gauge needleDeg={tier.needle} />
+            <div className="w-full bg-gray-50 rounded-xl p-4 mt-2 text-sm">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-gray-600">Ad performance:</span>
+                <span className={`font-bold ${tier.perfColor}`}>{tier.performance}</span>
+              </div>
+              {dailyBudget >= 5 ? (
+                <p className="text-gray-600">
+                  Your post will be{" "}
+                  <span className="font-bold text-[#111]">
+                    pinned for {durationDays ?? "continuous"}{durationDays ? " days" : ""}
+                  </span>.
+                </p>
+              ) : (
+                <p className="text-gray-500">Set a daily budget to pin your post to the top.</p>
+              )}
+              {dailyBudget >= 20 && (
+                <p className="text-gray-500 mt-2 text-xs">
+                  Looking to hire even faster?{" "}
+                  <button
+                    onClick={() => setDailyBudget(dailyBudget + 10)}
+                    className="text-[#F25722] font-semibold hover:underline"
+                  >
+                    Add $10/day
+                  </button>{" "}
+                  for maximum visibility.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
-        <h2 className="text-xl font-black text-[#111] mb-1">Your job is live! 🎉</h2>
-        <p className="text-sm text-gray-500 mb-3">
-          <span className="font-bold text-[#111]">{form.title || "Your listing"}</span> is now visible to 5,000+ artists in the Artswrk network.
-        </p>
-        {applicantCount > 0 && (
-          <div className="inline-flex items-center gap-2 bg-white border border-green-200 rounded-full px-4 py-1.5 text-sm font-semibold text-green-700 shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            {applicantCount} artist{applicantCount !== 1 ? "s" : ""} already applied
+
+        {/* Budget summary */}
+        {totalCost && (
+          <div className="mt-5 pt-5 border-t border-gray-100">
+            <p className="text-sm text-gray-700">
+              <span className="font-bold">Max budget:</span> ${totalCost.toFixed(2)} total for {durationDays} days
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5">You can change the amount, pause, or close your job at any time.</p>
+          </div>
+        )}
+        {duration === "continuous" && (
+          <div className="mt-5 pt-5 border-t border-gray-100">
+            <p className="text-sm text-gray-700">
+              <span className="font-bold">Max budget:</span> ${(dailyBudget * 7).toFixed(2)} per week
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5">You can change the amount, pause, or close your job at any time.</p>
           </div>
         )}
       </div>
 
-      {/* ── Locked Applicants Preview ── */}
-      <div className="bg-white border-2 border-gray-100 rounded-2xl overflow-hidden mb-6">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Users size={16} className="text-gray-400" />
-            <span className="text-sm font-bold text-[#111]">Applicants</span>
-            {applicantCount > 0 && (
-              <span className="bg-[#F25722] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                {applicantCount}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-gray-400">
-            <Lock size={12} />
-            Locked
-          </div>
-        </div>
-
-        {/* Blurred applicant rows */}
-        <div className="relative">
-          <div className="divide-y divide-gray-50">
-            {fakeApplicants.map((a, i) => (
-              <div key={i} className="px-5 py-3 flex items-center gap-3 select-none">
-                <div className={`w-9 h-9 rounded-full ${a.color} flex items-center justify-center text-white text-xs font-bold flex-shrink-0 blur-[3px]`}>
-                  {a.initials}
-                </div>
-                <div className="flex-1 space-y-1.5">
-                  <div className="h-3 bg-gray-200 rounded-full w-32 blur-[3px]" />
-                  <div className="h-2.5 bg-gray-100 rounded-full w-48 blur-[3px]" />
-                </div>
-                <div className="h-6 w-16 bg-gray-100 rounded-lg blur-[3px]" />
-              </div>
-            ))}
-          </div>
-
-          {/* Lock overlay */}
-          <div className="absolute inset-0 bg-gradient-to-b from-white/30 via-white/70 to-white flex flex-col items-center justify-end pb-5 px-5">
-            <div className="flex items-center gap-2 mb-2">
-              <Lock size={16} className="text-gray-400" />
-              <p className="text-sm font-semibold text-gray-600">
-                Unlock to see who applied
-              </p>
-            </div>
-            <p className="text-xs text-gray-400 text-center">
-              Pay only when you're ready to connect with candidates.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Headline ── */}
-      <div className="text-center mb-5">
-        <p className="text-lg font-black text-[#111]">Ready to connect with your artists?</p>
-        <p className="text-sm text-gray-500 mt-1">Pay only when you want to unlock candidates. No rush.</p>
-      </div>
-
-      {/* ── PRO subscriber fast-track ── */}
-      {isPro && (
-        <div className="mb-5 p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-orange-100 flex items-center gap-3">
-          <Crown size={20} className="text-[#F25722] flex-shrink-0" />
-          <div>
-            <p className="font-bold text-[#111] text-sm">You're an Artswrk PRO subscriber!</p>
-            <p className="text-xs text-gray-500">Unlimited candidate unlocks are included in your plan.</p>
-          </div>
-          <Button
-            onClick={() => handleConnect("subscription")}
-            disabled={isLoading}
-            className="ml-auto flex-none hirer-grad-bg border-0 hover:opacity-90 text-sm"
-          >
-            {isLoading ? <Loader2 size={16} className="animate-spin" /> : <>Unlock Now <Unlock size={14} className="ml-1" /></>}
-          </Button>
-        </div>
-      )}
-
-      {/* ── Pricing Cards ── */}
-      {!isPro && (
-        <div className="space-y-4 mb-6">
-
-          {/* ── Connect card (primary) ── */}
-          <div className="bg-white rounded-2xl border-2 border-[#F25722] p-5 relative overflow-hidden shadow-sm">
-            <div className="absolute top-3 right-3">
-              <Badge className="hirer-grad-bg text-white border-0 text-[10px] font-bold px-2">MOST POPULAR</Badge>
-            </div>
-
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl hirer-grad-bg flex items-center justify-center">
-                <Unlock size={18} className="text-white" />
-              </div>
-              <div>
-                <p className="font-black text-[#111] text-base leading-tight">Connect with Candidates</p>
-                <p className="text-xs text-gray-400">One-time · this job only · no commitment</p>
-              </div>
-            </div>
-
-            <div className="flex items-baseline gap-1 mb-1">
-              <span className="text-4xl font-black text-[#111]">${connectPrice}</span>
-              <span className="text-gray-400 text-sm">one-time</span>
-              {boostEnabled && (
-                <span className="text-xs text-gray-400 ml-1">($30 + $15 boost)</span>
-              )}
-            </div>
-            <p className="text-xs text-gray-500 mb-4">
-              Pay only when you're ready. Unlock all applicants for this job.
-            </p>
-
-            <ul className="space-y-2 mb-5">
-              {[
-                "Unlock all applicants for this job",
-                "Message candidates directly",
-                "Manage in your dashboard",
-                "No subscription required",
-              ].map((f) => (
-                <li key={f} className="flex items-center gap-2 text-sm text-gray-700">
-                  <CheckCircle2 size={14} className="text-[#F25722] flex-shrink-0" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-
-            {/* Boost toggle */}
-            <div
-              onClick={() => setBoostEnabled(!boostEnabled)}
-              className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all mb-4 ${
-                boostEnabled
-                  ? "border-[#F25722] bg-orange-50"
-                  : "border-dashed border-gray-200 hover:border-gray-300 bg-gray-50"
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${boostEnabled ? "hirer-grad-bg" : "bg-gray-200"}`}>
-                  <Zap size={13} className={boostEnabled ? "text-white" : "text-gray-400"} />
-                </div>
-                <div>
-                  <p className={`text-sm font-bold leading-tight ${boostEnabled ? "text-[#111]" : "text-gray-600"}`}>
-                    Boost this post
-                  </p>
-                  <p className="text-[11px] text-gray-400">Priority placement for 7 days · +$15</p>
-                </div>
-              </div>
-              <div className={`w-10 h-5 rounded-full transition-all relative flex-shrink-0 ${boostEnabled ? "hirer-grad-bg" : "bg-gray-200"}`}>
-                <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${boostEnabled ? "left-5" : "left-0.5"}`} />
-              </div>
-            </div>
-
-            <Button
-              onClick={() => handleConnect("one_time")}
-              disabled={isLoading}
-              className="w-full py-5 font-bold text-base hirer-grad-bg border-0 hover:opacity-90 transition-opacity"
-            >
-              {isLoading ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <>
-                  <Unlock size={16} className="mr-2" />
-                  Unlock Candidates · ${connectPrice}
-                </>
-              )}
-            </Button>
-          </div>
-
-          {/* ── PRO subscription card ── */}
-          <div className="bg-white rounded-2xl border-2 border-gray-200 p-5 flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#111] flex items-center justify-center">
-                <Crown size={18} className="text-white" />
-              </div>
-              <div>
-                <p className="font-black text-[#111] text-base leading-tight">PRO Subscription</p>
-                <p className="text-xs text-gray-400">Unlimited unlocks · cancel anytime</p>
-              </div>
-            </div>
-
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-black text-[#111]">$29</span>
-              <span className="text-gray-400 text-sm">/month</span>
-            </div>
-
-            <ul className="space-y-2">
-              {[
-                "Unlimited candidate unlocks",
-                "Priority placement in search",
-                "PRO badge on all your listings",
-                "Advanced applicant filters",
-                "Don't pay anything until you get candidates",
-              ].map((f) => (
-                <li key={f} className="flex items-center gap-2 text-sm text-gray-700">
-                  <CheckCircle2 size={14} className="text-gray-400 flex-shrink-0" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-
-            <Button
-              onClick={() => handleConnect("subscription")}
-              disabled={isLoading}
-              variant="outline"
-              className="w-full font-bold border-2 border-[#111] text-[#111] hover:bg-[#111] hover:text-white transition-colors bg-transparent py-4"
-            >
-              {isLoading ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <>Subscribe & Save — $29/mo</>
-              )}
-            </Button>
-          </div>
-
-          {/* ── Stay free option ── */}
-          <div className="text-center py-2">
-            <button
-              onClick={() => navigate("/app/jobs")}
-              className="text-sm text-gray-400 hover:text-gray-600 transition-colors underline underline-offset-2"
-            >
-              Stay free for now — I'll unlock candidates later
-            </button>
-            <p className="text-xs text-gray-300 mt-1">Your job stays live. You can unlock anytime from your dashboard.</p>
-          </div>
-        </div>
-      )}
-
-      {/* Not logged in note */}
+      {/* Not logged in warning */}
       {!isAuthenticated && (
         <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-2 text-sm text-amber-800">
           <span>⚠️</span>
@@ -928,14 +871,33 @@ function Step3({
         </div>
       )}
 
-      <div className="flex items-center gap-3 mt-2">
-        <Button variant="outline" onClick={onBack} className="flex-none px-5">
-          <ChevronLeft size={16} className="mr-1" />
-          Edit listing
-        </Button>
-        <p className="text-xs text-gray-400 flex-1 text-center">
-          🔒 Secure payment via Stripe
-        </p>
+      {/* Action buttons */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => navigate("/app/jobs")}
+          className="text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors px-2 py-2"
+        >
+          No thanks
+        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setSubStep("almost_ready")}
+            className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            Back
+          </button>
+          <Button
+            onClick={() => handleConnect("one_time")}
+            disabled={isLoading}
+            className="hirer-grad-bg border-0 hover:opacity-90 font-bold px-8 py-5 rounded-xl text-base"
+          >
+            {isLoading ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <>Save and continue →</>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );

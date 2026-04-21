@@ -587,3 +587,12 @@
 - [x] Step 3: PRO Subscription card — $29/mo for unlimited unlocks
 - [x] Step 3: "Stay free for now" escape route with clear messaging
 - [x] Step 2 CTA changed to "Post Job Free" with "Free to post · No credit card required" subtext
+
+## Post-Job Step 3 — Indeed-Style Boost Screen (DONE Apr 21)
+- [x] Replace current Step 3 pricing cards with Indeed-style "Boost your post" screen
+- [x] Daily budget input ($5 minimum, $10/$20/$50 presets + custom input)
+- [x] Animated speedometer gauge (Good → Strong → Very Strong) reacts to budget
+- [x] Right panel: days pinned + max budget total + "Add $X/day" upsell nudge at Very Strong
+- [x] "Switch to plans" link → PRO subscription option
+- [x] "No thanks" + "Back" + "Save and continue" bottom buttons
+- [x] "Your job is almost ready" pre-boost screen (Indeed pattern)
