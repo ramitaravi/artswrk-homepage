@@ -1127,6 +1127,7 @@ export async function updateUserOnboarding(userId: number, data: {
   website?: string;
   phoneNumber?: string;
   onboardingStep?: number;
+  userSignedUp?: boolean;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -1138,6 +1139,7 @@ export async function updateUserOnboarding(userId: number, data: {
   if (data.website !== undefined) updateData.website = data.website;
   if (data.phoneNumber !== undefined) updateData.phoneNumber = data.phoneNumber;
   if (data.onboardingStep !== undefined) updateData.onboardingStep = data.onboardingStep;
+  if (data.userSignedUp !== undefined) updateData.userSignedUp = data.userSignedUp;
   await db.update(users).set(updateData as any).where(eq(users.id, userId));
 }
 

@@ -1218,6 +1218,26 @@ Fields to extract:
       }),
 
     /**
+     * Get current onboarding status for the logged-in client.
+     * Used by /client-onboarding to resume from the last saved step.
+     */
+    getOnboardingStatus: protectedProcedure.query(async ({ ctx }) => {
+      const user = await getUserByOpenId(ctx.user.openId);
+      if (!user) throw new Error("User not found");
+      return {
+        onboardingStep: user.onboardingStep ?? 0,
+        businessOrIndividual: (user as any).businessOrIndividual ?? null,
+        hiringCategory: user.hiringCategory ?? null,
+        clientCompanyName: user.clientCompanyName ?? null,
+        location: user.location ?? null,
+        website: user.website ?? null,
+        phoneNumber: user.phoneNumber ?? null,
+        userSignedUp: user.userSignedUp ?? false,
+        firstName: user.firstName ?? null,
+      };
+    }),
+
+    /**
      * Save onboarding step data (business type, company details, etc.).
      */
     updateOnboarding: protectedProcedure
@@ -1229,6 +1249,7 @@ Fields to extract:
         website: z.string().optional(),
         phoneNumber: z.string().optional(),
         onboardingStep: z.number().optional(),
+        userSignedUp: z.boolean().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
