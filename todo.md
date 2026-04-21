@@ -560,3 +560,9 @@
 - [x] Schedule cron: every 15 min for frequent mode (incremental)
 - [x] Schedule cron: daily 2am for daily mode (full sync)
 - [ ] Add sync history view to admin dashboard
+
+## Sync Bug Fixes (Apr 21)
+- [x] Fix syncJobs: remove status filter loop — now fetches ALL jobs by Modified Date only
+- [x] Fix field name casing: Bubble returns "Request Status" (capital S), not "Request status"
+- [x] Status changes now sync correctly (Completed, Deleted by Client, Lost - No Revenue, etc.)
+- [x] Backfill missing job 1776728324832x534583996376416260 (Active, created Apr 20 11:38pm)

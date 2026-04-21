@@ -78,100 +78,100 @@ function safeInt(val) {
 // ── Sync: Jobs ────────────────────────────────────────────────────────────────
 
 async function syncJobs(conn, userMap, modifiedSince = null) {
-  const STATUSES = ["Active", "Confirmed", "Submissions Paused"];
   let upserted = 0, errors = 0;
 
-  for (const status of STATUSES) {
-    const constraints = [
-      { key: "Request status", constraint_type: "equals", value: status },
-    ];
-    if (modifiedSince) {
-      constraints.push({ key: "Modified Date", constraint_type: "greater than", value: modifiedSince });
+  // Fetch ALL jobs (no status filter) — capture new jobs, status changes, and deletions.
+  // For incremental mode, filter by Modified Date only.
+  const constraints = modifiedSince
+    ? [{ key: "Modified Date", constraint_type: "greater than", value: modifiedSince }]
+    : [];
+  const records = await fetchAllPages("Request", constraints);
+
+  for (const r of records) {
+    const clientUserId = r["Created By"] ? (userMap.get(r["Created By"]) ?? null) : null;
+    const loc = r.Location ?? {};
+    const startDate = safeDate(r["Start date"] ?? r["start date"]);
+    const endDate = safeDate(r["End date"] ?? r["end date"]);
+    const bubbleCreatedAt = safeDate(r["Created Date"]);
+    const bubbleModifiedAt = safeDate(r["Modified Date"]);
+    // Bubble returns both "Request Status" and "Request status" depending on record age — handle both
+    const requestStatus = r["Request Status"] ?? r["Request status"] ?? null;
+
+    // Resolve masterServiceTypeId from DB if available
+    let masterServiceTypeId = null;
+    if (r["Master Service Type"] ?? r["master service type"]) {
+      const mstId = r["Master Service Type"] ?? r["master service type"];
+      const [rows] = await conn.execute(
+        "SELECT id FROM master_service_types WHERE bubbleId = ? LIMIT 1",
+        [mstId]
+      );
+      masterServiceTypeId = rows[0]?.id ?? null;
     }
-    const records = await fetchAllPages("Request", constraints);
-    for (const r of records) {
-      const clientUserId = r["Created By"] ? (userMap.get(r["Created By"]) ?? null) : null;
-      const loc = r.Location ?? {};
-      const startDate = safeDate(r["Start date"] ?? r["start date"]);
-      const endDate = safeDate(r["End date"] ?? r["end date"]);
-      const bubbleCreatedAt = safeDate(r["Created Date"]);
-      const bubbleModifiedAt = safeDate(r["Modified Date"]);
 
-      // Resolve masterServiceTypeId from DB if available
-      let masterServiceTypeId = null;
-      if (r["Master Service Type"]) {
-        const [rows] = await conn.execute(
-          "SELECT id FROM master_service_types WHERE bubbleId = ? LIMIT 1",
-          [r["Master Service Type"]]
-        );
-        masterServiceTypeId = rows[0]?.id ?? null;
-      }
-
-      try {
-        await conn.execute(
-          `INSERT INTO jobs (
-            bubbleId, clientUserId, bubbleClientId, bubbleClientCompanyId,
-            description, slug, requestStatus, status,
-            dateType, startDate, endDate,
-            locationAddress, locationLat, locationLng,
-            isHourly, openRate, artistHourlyRate, clientHourlyRate,
-            ages, direct, sentToNetwork, transportation, converted,
-            masterServiceTypeId, clientEmail,
-            bubbleCreatedAt, bubbleModifiedAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON DUPLICATE KEY UPDATE
-            clientUserId = VALUES(clientUserId),
-            requestStatus = VALUES(requestStatus),
-            status = VALUES(status),
-            description = VALUES(description),
-            dateType = VALUES(dateType),
-            startDate = VALUES(startDate),
-            endDate = VALUES(endDate),
-            locationAddress = VALUES(locationAddress),
-            locationLat = VALUES(locationLat),
-            locationLng = VALUES(locationLng),
-            isHourly = VALUES(isHourly),
-            openRate = VALUES(openRate),
-            artistHourlyRate = VALUES(artistHourlyRate),
-            clientHourlyRate = VALUES(clientHourlyRate),
-            direct = VALUES(direct),
-            masterServiceTypeId = VALUES(masterServiceTypeId),
-            bubbleModifiedAt = VALUES(bubbleModifiedAt)`,
-          [
-            r._id,
-            clientUserId,
-            r["Created By"] ?? null,
-            r["Client-Company"] ?? null,
-            r.Description ?? r.description ?? null,
-            r.Slug ?? r.slug ?? null,
-            r["Request status"] ?? status,
-            status,
-            r["Date type"] ?? r["date type"] ?? null,
-            startDate,
-            endDate,
-            loc.address ?? null,
-            loc.lat != null ? String(loc.lat) : null,
-            loc.lng != null ? String(loc.lng) : null,
-            r["is hourly?"] || r["Is Hourly?"] ? 1 : 0,
-            r["open rate?"] || r["Open Rate?"] ? 1 : 0,
-            r["Artist Hourly Rate"] ?? r["artist hourly rate"] ?? null,
-            r["Client Hourly Rate"] ?? r["client hourly rate"] ?? null,
-            r.Ages ?? r.ages ?? null,
-            r["direct?"] || r["Direct?"] ? 1 : 0,
-            r["sent to network?"] || r["Sent to Network?"] ? 1 : 0,
-            r["transportation?"] || r["Transportation?"] ? 1 : 0,
-            r["converted?"] || r["Converted?"] ? 1 : 0,
-            masterServiceTypeId,
-            r["client email"] ?? r["Client Email"] ?? null,
-            bubbleCreatedAt,
-            bubbleModifiedAt,
-          ]
-        );
-        upserted++;
-      } catch (err) {
-        console.error(`  [jobs] Error upserting ${r._id}: ${err.message}`);
-        errors++;
-      }
+    try {
+      await conn.execute(
+        `INSERT INTO jobs (
+          bubbleId, clientUserId, bubbleClientId, bubbleClientCompanyId,
+          description, slug, requestStatus, status,
+          dateType, startDate, endDate,
+          locationAddress, locationLat, locationLng,
+          isHourly, openRate, artistHourlyRate, clientHourlyRate,
+          ages, direct, sentToNetwork, transportation, converted,
+          masterServiceTypeId, clientEmail,
+          bubbleCreatedAt, bubbleModifiedAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          clientUserId = VALUES(clientUserId),
+          requestStatus = VALUES(requestStatus),
+          status = VALUES(status),
+          description = VALUES(description),
+          dateType = VALUES(dateType),
+          startDate = VALUES(startDate),
+          endDate = VALUES(endDate),
+          locationAddress = VALUES(locationAddress),
+          locationLat = VALUES(locationLat),
+          locationLng = VALUES(locationLng),
+          isHourly = VALUES(isHourly),
+          openRate = VALUES(openRate),
+          artistHourlyRate = VALUES(artistHourlyRate),
+          clientHourlyRate = VALUES(clientHourlyRate),
+          direct = VALUES(direct),
+          masterServiceTypeId = VALUES(masterServiceTypeId),
+          bubbleModifiedAt = VALUES(bubbleModifiedAt)`,
+        [
+          r._id,
+          clientUserId,
+          r["Created By"] ?? null,
+          r["Client-Company"] ?? r["client company"] ?? null,
+          r.Description ?? r.description ?? null,
+          r.Slug ?? r.slug ?? null,
+          requestStatus,
+          requestStatus,  // store same value in both requestStatus and status columns
+          r["Date type"] ?? r["date type"] ?? r["DateType"] ?? null,
+          startDate,
+          endDate,
+          loc.address ?? null,
+          loc.lat != null ? String(loc.lat) : null,
+          loc.lng != null ? String(loc.lng) : null,
+          r["is hourly?"] || r["Is Hourly?"] ? 1 : 0,
+          r["open rate?"] || r["Open Rate?"] ? 1 : 0,
+          r["Artist Hourly Rate"] ?? r["artist hourly rate"] ?? null,
+          r["Client Hourly Rate"] ?? r["client hourly rate"] ?? null,
+          r.Ages ?? r.ages ?? null,
+          r["direct?"] || r["Direct?"] ? 1 : 0,
+          r["sent to network?"] || r["Sent to Network?"] ? 1 : 0,
+          r["transportation?"] || r["Transportation?"] || r["tranportation?"] ? 1 : 0,
+          r["converted?"] || r["Converted?"] ? 1 : 0,
+          masterServiceTypeId,
+          r["client email"] ?? r["Client Email"] ?? null,
+          bubbleCreatedAt,
+          bubbleModifiedAt,
+        ]
+      );
+      upserted++;
+    } catch (err) {
+      console.error(`  [jobs] Error upserting ${r._id}: ${err.message}`);
+      errors++;
     }
   }
   return { upserted, errors };
