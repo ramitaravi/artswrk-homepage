@@ -543,7 +543,7 @@ function ApplicantsTab({
         return (
           <div
             key={a.id}
-            className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:border-gray-200 transition-colors cursor-pointer"
+            className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:border-gray-200 hover:shadow-md transition-all cursor-pointer group"
             onClick={() => onSelectApplicant(a.id, allIds)}
           >
             <div className="flex items-start justify-between gap-3">
@@ -574,9 +574,12 @@ function ApplicantsTab({
                   )}
                 </div>
               </div>
-              <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${appStatusColor(a.status)}`}>
-                {a.status || "Interested"}
-              </span>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${appStatusColor(a.status)}`}>
+                  {a.status || "Interested"}
+                </span>
+                <ChevronRight size={14} className="text-gray-300 group-hover:text-[#F25722] transition-colors" />
+              </div>
             </div>
             {disciplines.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
@@ -589,7 +592,7 @@ function ApplicantsTab({
               <p className="text-xs text-gray-600 mt-2 leading-relaxed line-clamp-3">{a.message}</p>
             )}
             <div className="flex items-center gap-3 mt-3 flex-wrap text-xs text-gray-400" onClick={(e) => e.stopPropagation()}>
-              {rate && <span className="flex items-center gap-1"><DollarSign size={10} />{rate}</span>}
+              {rate && <span>{rate}</span>}
               {a.converted && (
                 <span className="flex items-center gap-1 text-green-500 font-medium">
                   <CheckCircle2 size={10} /> Converted
@@ -879,6 +882,9 @@ export default function ClientJobDetail() {
             <div>
               <p className="text-xs text-gray-400 font-medium mb-0.5">Posted by</p>
               <h2 className="text-xl font-black text-[#111]">{clientName}</h2>
+              {job.description && (
+                <p className="text-sm text-gray-500 mt-1 line-clamp-2 max-w-lg">{job.description}</p>
+              )}
               <div className="flex items-center gap-3 mt-2 flex-wrap">
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${jobStatusColor(job.requestStatus)}`}>
                   {job.requestStatus || "Active"}
