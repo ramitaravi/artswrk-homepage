@@ -57,9 +57,12 @@ export const appRouter = router({
           maxAge: ONE_YEAR_MS,
         });
 
+        const isAdmin = user.role === "admin" || user.openId === ENV.ownerOpenId;
         return {
           success: true,
           isTemporary: user.passwordIsTemporary ?? true,
+          isAdmin,
+          enterprise: !!(user as any).enterprise,
           user: {
             id: user.id,
             email: user.email,
@@ -181,8 +184,11 @@ export const appRouter = router({
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
+        const isAdmin = user.role === "admin" || user.openId === ENV.ownerOpenId;
         return {
           success: true,
+          isAdmin,
+          enterprise: !!(user as any).enterprise,
           user: {
             id: user.id,
             email: user.email,

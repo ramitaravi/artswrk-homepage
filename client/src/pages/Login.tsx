@@ -92,7 +92,16 @@ export default function Login() {
 
   const [, navigate] = useLocation();
   const searchStr = useSearch();
-  const next = new URLSearchParams(searchStr).get("next") ?? "/app";
+  const next = new URLSearchParams(searchStr).get("next");
+
+  function getDestination(data: { isAdmin?: boolean; enterprise?: boolean; user?: { userRole?: string | null } }) {
+    // Explicit ?next= param always wins (e.g. deep links before login)
+    if (next) return next;
+    if (data.isAdmin) return "/admin-dashboard";
+    if (data.enterprise) return "/enterprise";
+    if (data.user?.userRole === "Artist") return "/app";
+    return "/app"; // regular client
+  }
 
   // Focus the password field when stage changes
   useEffect(() => {
@@ -120,12 +129,12 @@ export default function Login() {
   });
 
   const passwordLogin = trpc.auth.passwordLogin.useMutation({
-    onSuccess: () => navigate(next),
+    onSuccess: (data) => navigate(getDestination(data)),
     onError: (err) => setError(err.message || "Invalid email or password."),
   });
 
   const setInitialPassword = trpc.auth.setInitialPassword.useMutation({
-    onSuccess: () => navigate(next),
+    onSuccess: (data) => navigate(getDestination(data)),
     onError: (err) => setError(err.message || "Something went wrong."),
   });
 
@@ -386,14 +395,14 @@ export default function Login() {
 
               <div className="space-y-3">
                 <a
-                  href={`/signup?email=${encodeURIComponent(email)}${next !== "/app" ? `&next=${encodeURIComponent(next)}` : ""}`}
+                  href={`/signup?email=${encodeURIComponent(email)}${next ? `&next=${encodeURIComponent(next)}` : ""}`}
                   className="w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                 >
                   <Building2 size={16} />
                   Join as a Client
                 </a>
                 <a
-                  href={`/join?email=${encodeURIComponent(email)}${next !== "/app" ? `&next=${encodeURIComponent(next)}` : ""}`}
+                  href={`/join?email=${encodeURIComponent(email)}${next ? `&next=${encodeURIComponent(next)}` : ""}`}
                   className="w-full py-3.5 rounded-xl text-sm font-bold text-[#111] bg-gray-100 hover:bg-gray-150 transition-colors flex items-center justify-center gap-2"
                 >
                   <Music size={16} />
@@ -409,7 +418,7 @@ export default function Login() {
           <p className="text-center text-xs text-gray-400 mt-6">
             Don't have an account?{" "}
             <a
-              href={`/join${next !== "/app" ? `?next=${encodeURIComponent(next)}` : ""}`}
+              href={`/join${next ? `?next=${encodeURIComponent(next)}` : ""}`}
               className="font-semibold text-[#F25722] hover:opacity-70 transition-opacity"
             >
               Join free
