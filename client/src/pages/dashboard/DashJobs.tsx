@@ -168,7 +168,7 @@ export default function DashJobs() {
             <div key={job.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div
                 className="p-5 cursor-pointer hover:bg-gray-50/50 transition-colors"
-                onClick={() => setExpandedJob(expandedJob === job.id ? null : job.id)}
+                onClick={() => navigate(`/app/jobs/${job.id}`)}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-4 flex-1 min-w-0">
@@ -236,7 +236,7 @@ export default function DashJobs() {
                     </button>
                     <ChevronDown
                       size={16}
-                      className={`text-gray-400 transition-transform ${expandedJob === job.id ? "rotate-180" : ""}`}
+                      className="text-gray-400"
                     />
                   </div>
                 </div>

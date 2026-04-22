@@ -2735,3 +2735,116 @@ export async function sendMessageToConversation({
   const newMsg = await db.select().from(messages).where(eq(messages.id, newId)).limit(1);
   return newMsg[0];
 }
+
+// ─── Client Job Unlock Helpers ────────────────────────────────────────────────
+
+/**
+ * Check if a client has unlocked a specific job (either via per-job payment or active subscription).
+ * Active subscribers (clientSubscriptionId set) are always considered unlocked.
+ */
+export async function isClientJobUnlocked(clientUserId: number, jobId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  // Check if user has an active subscription
+  const userRows = await db.execute(
+    `SELECT clientSubscriptionId FROM users WHERE id = ${clientUserId} LIMIT 1`
+  );
+  const user = (userRows[0] as unknown as any[])[0];
+  if (user?.clientSubscriptionId) return true;
+  // Check per-job unlock
+  const unlockRows = await db.execute(
+    `SELECT id FROM client_job_unlocks WHERE clientUserId = ${clientUserId} AND jobId = ${jobId} LIMIT 1`
+  );
+  return (unlockRows[0] as unknown as any[]).length > 0;
+}
+
+/**
+ * Record a per-job unlock after successful Stripe payment.
+ */
+export async function createClientJobUnlock(data: {
+  clientUserId: number;
+  jobId: number;
+  stripeSessionId?: string;
+  stripePaymentIntentId?: string;
+  amountCents?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const { clientJobUnlocks } = await import("../drizzle/schema");
+  // Avoid duplicates
+  const existing = await db.execute(
+    `SELECT id FROM client_job_unlocks WHERE clientUserId = ${data.clientUserId} AND jobId = ${data.jobId} LIMIT 1`
+  );
+  if ((existing[0] as unknown as any[]).length > 0) return;
+  await db.insert(clientJobUnlocks).values({
+    clientUserId: data.clientUserId,
+    jobId: data.jobId,
+    stripeSessionId: data.stripeSessionId,
+    stripePaymentIntentId: data.stripePaymentIntentId,
+    amountCents: data.amountCents ?? 3000,
+  });
+}
+
+/**
+ * Get all job IDs unlocked by a client (per-job unlocks only, not subscription).
+ */
+export async function getClientUnlockedJobIds(clientUserId: number): Promise<number[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(
+    `SELECT jobId FROM client_job_unlocks WHERE clientUserId = ${clientUserId}`
+  );
+  return (rows[0] as unknown as any[]).map((r: any) => r.jobId);
+}
+
+/**
+ * Get full applicant details for a single interested artist record (for drill-down view).
+ */
+export async function getApplicantDetail(interestedArtistId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.execute(
+    `SELECT ia.id, ia.status, ia.createdAt, ia.bubbleCreatedAt, ia.converted,
+       ia.artistHourlyRate, ia.clientHourlyRate, ia.artistFlatRate, ia.clientFlatRate,
+       ia.totalHours, ia.isHourlyRate, ia.message, ia.resumeLink,
+       ia.jobId,
+       u.id AS artistId, u.firstName AS artistFirstName, u.lastName AS artistLastName,
+       u.name AS artistName, u.email AS artistEmail, u.profilePicture AS artistProfilePicture,
+       u.location AS artistLocation, u.artswrkPro, u.artswrkBasic, u.slug AS artistSlug,
+       u.masterArtistTypes AS artistDisciplines, u.artistServices, u.bio AS artistBio,
+       u.website AS artistWebsite, u.instagram AS artistInstagram, u.portfolio AS artistPortfolio,
+       u.bookingCount, u.ratingScore, u.reviewCount, u.tagline AS artistTagline,
+       u.credits AS artistCredits, u.mediaPhotos, u.resumeFiles, u.workTypes,
+       u.optionAvailability, u.pronouns
+     FROM interested_artists ia
+     LEFT JOIN users u ON ia.artistUserId = u.id
+     WHERE ia.id = ${interestedArtistId}
+     LIMIT 1`
+  );
+  const result = (rows[0] as unknown as any[])[0];
+  return result ?? null;
+}
+
+/**
+ * Get full applicant list for a job with artist details (for client/enterprise job detail view).
+ */
+export async function getJobApplicantsWithDetails(jobId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(
+    `SELECT ia.id, ia.status, ia.createdAt, ia.bubbleCreatedAt, ia.converted,
+       ia.artistHourlyRate, ia.clientHourlyRate, ia.artistFlatRate, ia.clientFlatRate,
+       ia.totalHours, ia.isHourlyRate, ia.message, ia.resumeLink,
+       u.id AS artistId, u.firstName AS artistFirstName, u.lastName AS artistLastName,
+       u.name AS artistName, u.email AS artistEmail, u.profilePicture AS artistProfilePicture,
+       u.location AS artistLocation, u.artswrkPro, u.artswrkBasic, u.slug AS artistSlug,
+       u.masterArtistTypes AS artistDisciplines, u.bio AS artistBio,
+       u.bookingCount, u.ratingScore, u.tagline AS artistTagline, u.workTypes,
+       u.optionAvailability
+     FROM interested_artists ia
+     LEFT JOIN users u ON ia.artistUserId = u.id
+     WHERE ia.jobId = ${jobId}
+     ORDER BY COALESCE(ia.bubbleCreatedAt, ia.createdAt) DESC`
+  );
+  return (rows[0] as unknown as any[]);
+}

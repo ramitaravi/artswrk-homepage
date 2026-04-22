@@ -315,4 +315,47 @@ export const artistProfileRouter = router({
 
       return { success: true };
     }),
+
+  /** Public: look up an artist profile by their slug (for /book/:slug pages) */
+  getBySlug: publicProcedure
+    .input(z.object({ slug: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.slug, input.slug))
+        .limit(1);
+      if (!user) return null;
+      return {
+        id: user.id,
+        name: user.name || "",
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        slug: user.slug || "",
+        pronouns: user.pronouns || "",
+        tagline: user.tagline || "",
+        bio: user.bio || "",
+        location: user.location || "",
+        profilePicture: user.profilePicture || "",
+        artswrkPro: user.artswrkPro ?? false,
+        artswrkBasic: user.artswrkBasic ?? false,
+        bookingCount: user.bookingCount ?? 0,
+        ratingScore: user.ratingScore ?? 0,
+        reviewCount: user.reviewCount ?? 0,
+        optionAvailability: user.optionAvailability || "",
+        masterArtistTypes: user.masterArtistTypes || "",
+        artistServices: user.artistServices || "",
+        workTypes: user.workTypes || "",
+        artistExperiences: user.artistExperiences || "",
+        mediaPhotos: user.mediaPhotos || "",
+        resumes: user.resumes || "",
+        website: user.website || "",
+        instagram: user.instagram || "",
+        youtube: user.youtube || "",
+        portfolio: user.portfolio || "",
+        artistHourlyRate: (user as any).artistHourlyRate ?? null,
+      };
+    }),
 });

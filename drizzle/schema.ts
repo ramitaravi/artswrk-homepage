@@ -1160,3 +1160,26 @@ export const syncRuns = mysqlTable("sync_runs", {
 });
 export type SyncRun = typeof syncRuns.$inferSelect;
 export type InsertSyncRun = typeof syncRuns.$inferInsert;
+
+// ─── Client Job Unlocks ───────────────────────────────────────────────────────
+/**
+ * Tracks per-job unlocks for regular (non-enterprise) clients on the on-demand plan.
+ * Once a job is unlocked it stays unlocked forever, even if the client unsubscribes.
+ * Active subscribers have all jobs auto-unlocked (checked at query time via clientSubscriptionId).
+ */
+export const clientJobUnlocks = mysqlTable("client_job_unlocks", {
+  id: int("id").autoincrement().primaryKey(),
+  /** FK → users.id (the client who paid to unlock) */
+  clientUserId: int("clientUserId").notNull(),
+  /** FK → jobs.id */
+  jobId: int("jobId").notNull(),
+  /** Stripe Checkout Session ID for this payment */
+  stripeSessionId: varchar("stripeSessionId", { length: 128 }),
+  /** Stripe Payment Intent ID */
+  stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 128 }),
+  /** Amount paid in cents (3000 = $30) */
+  amountCents: int("amountCents").default(3000),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ClientJobUnlock = typeof clientJobUnlocks.$inferSelect;
+export type InsertClientJobUnlock = typeof clientJobUnlocks.$inferInsert;

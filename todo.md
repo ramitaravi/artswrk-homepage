@@ -614,3 +614,21 @@
 - [ ] Build /login page: join screen (Artist or Client choice cards)
 - [ ] Update navbar Login button to point to /login
 - [ ] Register /login route in App.tsx
+
+## Shared Job Detail + Applicant Review System
+
+- [ ] Add clientJobUnlocks table to drizzle schema (jobId, userId, unlockedAt)
+- [ ] Run pnpm db:push to migrate
+- [ ] Add DB helpers: isClientJobUnlocked, unlockClientJob, getClientJobUnlocksByUser
+- [ ] Add tRPC procedures: jobs.getDetail, jobs.getApplicants, jobs.unlockJob, jobs.createUnlockCheckout, jobs.createSubscriptionCheckout
+- [ ] Build shared JobDetail page (Applicants first tab, Overview second, Bookings hidden unless bookings exist)
+- [ ] Applicant cards: photo, name, PRO badge, location, disciplines, bio snippet, rate, date, Resume + Profile links, status badge
+- [ ] Locked applicants UI: blur cards, show unlock CTA ($30/job or $50/mo subscription)
+- [ ] Client subscription Stripe checkout (price_1PdZbaA91H1fWNkKPGY6kyEl = monthly, price_1PdZbJA91H1fWNkKoDO2U5CV = job unlock $30)
+- [ ] Handle Stripe webhook for client subscription activation (auto-unlock all jobs)
+- [ ] Applicant drill-down view: full profile, prev/next navigation between candidates
+- [ ] Message modal on applicant detail: compose → send → confirmation toast → open messenger thread
+- [ ] Enterprise messaging: also triggers email to artist on message send
+- [ ] Build public artist profile page at /book/:slug
+- [ ] Wire /app/jobs/:id route for client dashboard
+- [ ] Wire /app/enterprise/jobs/:id route for enterprise dashboard

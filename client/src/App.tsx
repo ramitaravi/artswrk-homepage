@@ -41,6 +41,8 @@ import DanceTeachers from "./pages/DanceTeachers";
 import DanceJudges from "./pages/DanceJudges";
 import MusicTeachers from "./pages/MusicTeachers";
 import Production from "./pages/Production";
+import ClientJobDetail from "./pages/dashboard/ClientJobDetail";
+import PublicArtistProfile from "./pages/ArtistProfile";
 import { useAuth } from "./_core/hooks/useAuth";
 import { trpc } from "./lib/trpc";
 
@@ -115,6 +117,24 @@ function Router() {
         {() => <AppRoute clientComponent={DashJobs} />}
       </Route>
 
+      {/* Client job detail — shared with enterprise */}
+      <Route path="/app/jobs/:jobId">
+        {() => (
+          <DashboardLayout>
+            <ClientJobDetail />
+          </DashboardLayout>
+        )}
+      </Route>
+
+      {/* Enterprise job detail */}
+      <Route path="/app/enterprise/jobs/:jobId">
+        {() => (
+          <DashboardLayout>
+            <ClientJobDetail />
+          </DashboardLayout>
+        )}
+      </Route>
+
       {/* Bookings: artists see their engagements, clients see confirmed bookings */}
       <Route path="/app/bookings">
         {() => <AppRoute clientComponent={Bookings} />}
@@ -179,6 +199,9 @@ function Router() {
       <Route path="/artist-dashboard">
         {() => { window.location.replace("/app"); return null; }}
       </Route>
+
+      {/* Public artist profile page */}
+      <Route path="/book/:slug" component={PublicArtistProfile} />
 
       {/* Enterprise landing page */}
       <Route path="/enterprise" component={Enterprise} />

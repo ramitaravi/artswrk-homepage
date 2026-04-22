@@ -800,11 +800,10 @@ type MasterTab = "jobs" | "companies" | "artists";
 
 function MasterView({
   user,
-  onSelectJob,
 }: {
   user: any;
-  onSelectJob: (job: any) => void;
 }) {
+  const [, navigate] = useLocation();
   const [tab, setTab] = useState<MasterTab>("jobs");
   const [showPostJob, setShowPostJob] = useState(false);
   const userId = user?.id;
@@ -932,7 +931,7 @@ function MasterView({
                     applicants={applications.filter(
                       (a: any) => a.jobTitle === (job.serviceType || job.title)
                     )}
-                    onViewDetail={() => onSelectJob(job)}
+                    onViewDetail={() => navigate(`/app/enterprise/jobs/${job.id}`)}
                   />
                 ))
               )}
@@ -1715,7 +1714,6 @@ function EnterpriseBillingSettings({ onBack }: { onBack: () => void }) {
 
 export default function Enterprise() {
   const { user, loading } = useAuth();
-  const [selectedJob, setSelectedJob] = useState<any>(null);
   const [activeSection, setActiveSection] = useState("dashboard");
   const utils = trpc.useUtils();
 
@@ -1765,7 +1763,6 @@ export default function Enterprise() {
         activeSection={activeSection}
         onNavigate={(section) => {
           setActiveSection(section);
-          setSelectedJob(null);
         }}
       />
 
@@ -1773,16 +1770,9 @@ export default function Enterprise() {
       <main className="flex-1 p-6 overflow-hidden">
         {activeSection === "settings" ? (
           <EnterpriseBillingSettings onBack={() => setActiveSection("dashboard")} />
-        ) : selectedJob ? (
-          <JobDetailView
-            job={selectedJob}
-            user={enterpriseUser}
-            onBack={() => setSelectedJob(null)}
-          />
         ) : (
           <MasterView
             user={enterpriseUser}
-            onSelectJob={(job) => setSelectedJob(job)}
           />
         )}
       </main>

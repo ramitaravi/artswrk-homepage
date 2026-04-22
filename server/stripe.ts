@@ -379,3 +379,74 @@ export async function createArtistPortalSession(
   });
   return { url: session.url };
 }
+
+/**
+ * Create a Stripe Checkout Session for a client to unlock a single job ($30, on-demand).
+ */
+export async function createClientJobUnlockCheckoutSession(
+  opts: CreateCheckoutOptions & { jobId: number; jobTitle?: string }
+): Promise<{ url: string; sessionId: string }> {
+  const stripe = getStripe();
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
+    mode: "payment",
+    line_items: [
+      {
+        price: "price_1PdZbJA91H1fWNkKoDO2U5CV",
+        quantity: 1,
+      },
+    ],
+    payment_intent_data: { setup_future_usage: "on_session" },
+    success_url: `${opts.origin}/app/jobs/${opts.jobId}?unlock_success=1&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${opts.origin}/app/jobs/${opts.jobId}`,
+    allow_promotion_codes: true,
+    client_reference_id: opts.userId?.toString(),
+    metadata: {
+      user_id: opts.userId?.toString() ?? "",
+      job_id: opts.jobId.toString(),
+      customer_email: opts.email ?? "",
+      type: "client_job_unlock",
+    },
+  };
+  if (opts.stripeCustomerId) {
+    sessionParams.customer = opts.stripeCustomerId;
+  } else if (opts.email) {
+    sessionParams.customer_email = opts.email;
+  }
+  const session = await stripe.checkout.sessions.create(sessionParams);
+  return { url: session.url!, sessionId: session.id };
+}
+
+/**
+ * Create a Stripe Checkout Session for a client monthly subscription ($50/mo).
+ */
+export async function createClientSubscriptionCheckoutSession(
+  opts: CreateCheckoutOptions & { jobId?: number }
+): Promise<{ url: string; sessionId: string }> {
+  const stripe = getStripe();
+  const returnJobPath = opts.jobId ? `/app/jobs/${opts.jobId}` : "/app/jobs";
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
+    mode: "subscription",
+    line_items: [
+      {
+        price: "price_1PdZbaA91H1fWNkKPGY6kyEl",
+        quantity: 1,
+      },
+    ],
+    success_url: `${opts.origin}${returnJobPath}?subscribed=1&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${opts.origin}${returnJobPath}`,
+    allow_promotion_codes: true,
+    client_reference_id: opts.userId?.toString(),
+    metadata: {
+      user_id: opts.userId?.toString() ?? "",
+      customer_email: opts.email ?? "",
+      type: "client_subscription",
+    },
+  };
+  if (opts.stripeCustomerId) {
+    sessionParams.customer = opts.stripeCustomerId;
+  } else if (opts.email) {
+    sessionParams.customer_email = opts.email;
+  }
+  const session = await stripe.checkout.sessions.create(sessionParams);
+  return { url: session.url!, sessionId: session.id };
+}

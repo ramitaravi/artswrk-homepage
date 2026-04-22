@@ -183,6 +183,13 @@
       "when": 1776709382934,
       "tag": "0025_long_vulcan",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "5",
+      "when": 1776879589439,
+      "tag": "0026_fluffy_the_stranger",
+      "breakpoints": true
     }
   ]
 }

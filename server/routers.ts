@@ -6,11 +6,11 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail } from "./email";
 import crypto from "crypto";
-import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistBasicCheckoutSession, createArtistPortalSession, createEnterpriseJobUnlockCheckoutSession, createEnterpriseSubscriptionCheckoutSession } from "./stripe";
+import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistBasicCheckoutSession, createArtistPortalSession, createEnterpriseJobUnlockCheckoutSession, createEnterpriseSubscriptionCheckoutSession, createClientJobUnlockCheckoutSession, createClientSubscriptionCheckoutSession } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
 import { storagePut } from "./storage";
 import { artistResumes } from "../drizzle/schema";
@@ -2557,6 +2557,161 @@ Fields to extract:
       }),
   }),
 
+  /** Client job detail, applicant review, and unlock flows */
+  clientJobs: router({
+    /** Get a single job with full details for the client dashboard. */
+    getDetail: protectedProcedure
+      .input(z.object({ jobId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const job = await getAdminJobById(input.jobId);
+        if (!job) return null;
+        if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
+        const unlocked = await isClientJobUnlocked(user.id, input.jobId);
+        const bookings = await getAdminJobBookings(input.jobId);
+        return { ...job, unlocked, bookingCount: bookings.length };
+      }),
+    /** Get applicants for a job. If locked, returns blurred preview only. */
+    getApplicants: protectedProcedure
+      .input(z.object({ jobId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const job = await getAdminJobById(input.jobId);
+        if (!job) throw new Error("Job not found");
+        if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
+        const applicants = await getJobApplicantsWithDetails(input.jobId);
+        const unlocked = user.role === "admin" || await isClientJobUnlocked(user.id, input.jobId);
+        if (!unlocked) {
+          return {
+            locked: true,
+            applicantCount: applicants.length,
+            preview: applicants.slice(0, 3).map((a: any) => ({
+              id: a.id,
+              artistFirstName: a.artistFirstName ? a.artistFirstName[0] + "•••" : "Artist",
+              artistName: "Locked",
+              artistLocation: a.artistLocation ? a.artistLocation.split(",")[0] + ", •••" : "Location hidden",
+              artistProfilePicture: null,
+              artswrkPro: a.artswrkPro,
+              status: a.status,
+            })),
+          };
+        }
+        return { locked: false, applicantCount: applicants.length, applicants };
+      }),
+    /** Get full detail for a single applicant (drill-down view). */
+    getApplicantDetail: protectedProcedure
+      .input(z.object({ applicantId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const applicant = await getApplicantDetail(input.applicantId);
+        if (!applicant) throw new Error("Applicant not found");
+        const job = await getAdminJobById(applicant.jobId);
+        if (!job) throw new Error("Job not found");
+        if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
+        const unlocked = user.role === "admin" || await isClientJobUnlocked(user.id, applicant.jobId);
+        if (!unlocked) throw new Error("Job must be unlocked to view applicant details");
+        return applicant;
+      }),
+    /** Get bookings for a job (shown only if bookings exist). */
+    getBookings: protectedProcedure
+      .input(z.object({ jobId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const job = await getAdminJobById(input.jobId);
+        if (!job) throw new Error("Job not found");
+        if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
+        return getAdminJobBookings(input.jobId);
+      }),
+    /** Start a Stripe checkout to unlock a single job ($30, on-demand). */
+    createUnlockCheckout: protectedProcedure
+      .input(z.object({ jobId: z.number(), origin: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const job = await getAdminJobById(input.jobId);
+        if (!job) throw new Error("Job not found");
+        if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
+        const alreadyUnlocked = await isClientJobUnlocked(user.id, input.jobId);
+        if (alreadyUnlocked) return { alreadyUnlocked: true, url: null };
+        const jobTitle = (job.description ?? "").split("\n")[0].slice(0, 60);
+        const { url } = await createClientJobUnlockCheckoutSession({
+          userId: user.id,
+          email: user.email ?? undefined,
+          stripeCustomerId: user.clientStripeCustomerId ?? undefined,
+          origin: input.origin,
+          jobId: input.jobId,
+          jobTitle,
+        });
+        return { alreadyUnlocked: false, url };
+      }),
+    /** Start a Stripe checkout for a client monthly subscription ($50/mo). */
+    createSubscriptionCheckout: protectedProcedure
+      .input(z.object({ jobId: z.number().optional(), origin: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const { url } = await createClientSubscriptionCheckoutSession({
+          userId: user.id,
+          email: user.email ?? undefined,
+          stripeCustomerId: user.clientStripeCustomerId ?? undefined,
+          origin: input.origin,
+          jobId: input.jobId,
+        });
+        return { url };
+      }),
+    /** Verify a job unlock after Stripe redirect and record it in the DB. */
+    verifyUnlock: protectedProcedure
+      .input(z.object({ sessionId: z.string(), jobId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const stripe = getStripe();
+        const session = await stripe.checkout.sessions.retrieve(input.sessionId);
+        if (session.payment_status !== "paid" && session.status !== "complete") {
+          throw new Error("Payment not completed");
+        }
+        await createClientJobUnlock({
+          clientUserId: user.id,
+          jobId: input.jobId,
+          stripeSessionId: input.sessionId,
+          stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : undefined,
+          amountCents: session.amount_total ?? 3000,
+        });
+        return { success: true };
+      }),
+    /** Send a message to an applicant (creates/finds conversation and sends message). */
+    messageApplicant: protectedProcedure
+      .input(z.object({ applicantId: z.number(), message: z.string().min(1).max(2000) }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const applicant = await getApplicantDetail(input.applicantId);
+        if (!applicant) throw new Error("Applicant not found");
+        const job = await getAdminJobById(applicant.jobId);
+        if (!job) throw new Error("Job not found");
+        if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
+        const unlocked = user.role === "admin" || await isClientJobUnlocked(user.id, applicant.jobId);
+        if (!unlocked) throw new Error("Job must be unlocked to message applicants");
+        const conversation = await getOrCreateConversation(user.id, applicant.artistId);
+        const msg = await sendMessageToConversation({ conversationId: conversation.id, senderUserId: user.id, content: input.message });
+        if ((user as any).enterprise && applicant.artistEmail) {
+          try {
+            await sendSimpleEmail({
+              to: applicant.artistEmail,
+              subject: `New message from ${(user as any).clientCompanyName ?? user.name ?? "Artswrk Client"}`,
+              html: `<p>Hi ${applicant.artistFirstName ?? "there"},</p><p>${(user as any).clientCompanyName ?? user.name ?? "A client"} has sent you a message on Artswrk:</p><blockquote style="border-left:3px solid #F25722;padding-left:12px;color:#555">${input.message}</blockquote><p><a href="https://artswrk.com/app/messages">Log in to reply</a></p><p>Best,<br/>The Artswrk Team</p>`,
+            });
+          } catch (e) {
+            console.error("[messageApplicant] Email send failed (non-fatal):", e);
+          }
+        }
+        return { success: true, conversationId: conversation.id, messageId: msg.id };
+      }),
+  }),
   /** Benefits / Partner perks — filtered by audience type */
   benefits: router({
     list: protectedProcedure
