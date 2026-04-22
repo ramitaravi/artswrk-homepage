@@ -1010,6 +1010,9 @@ function JobDetailView({
     );
 
   const checkoutJobUnlock = trpc.enterprise.checkoutJobUnlock.useMutation();
+  const checkoutSubscription = trpc.enterprise.checkoutSubscription.useMutation();
+  const [subInterval, setSubInterval] = useState<"month" | "year">("month");
+  const [subscribing, setSubscribing] = useState(false);
 
   const applicants = applicantsData?.applicants || [];
   const isLocked = applicantsData?.locked ?? false;
@@ -1033,6 +1036,20 @@ function JobDetailView({
     } catch (err: any) {
       toast.error(err.message || "Checkout failed");
       setCheckingOut(false);
+    }
+  }
+
+  async function handleSubscribeCheckout(interval: "month" | "year") {
+    setSubscribing(true);
+    try {
+      const result = await checkoutSubscription.mutateAsync({
+        interval,
+        origin: window.location.origin,
+      });
+      if (result.url) window.location.href = result.url;
+    } catch (err: any) {
+      toast.error(err.message || "Checkout failed");
+      setSubscribing(false);
     }
   }
 
@@ -1138,29 +1155,136 @@ function JobDetailView({
             </div>
           ) : isLocked ? (
             /* On-demand paywall */
-            <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center mb-4">
-                <Lock size={28} className="text-amber-500" />
+            <div className="p-6">
+              {/* Blurred candidate preview */}
+              {applicantCount > 0 && (
+                <div className="relative mb-6 rounded-xl overflow-hidden border border-gray-100">
+                  <div className="blur-sm pointer-events-none select-none">
+                    {Array.from({ length: Math.min(applicantCount, 3) }).map((_, i) => (
+                      <div key={i} className="flex items-center gap-3 px-5 py-4 border-b border-gray-50 last:border-0">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 flex-shrink-0" />
+                        <div className="flex-1 space-y-1.5">
+                          <div className="h-3 bg-gray-200 rounded w-32" />
+                          <div className="h-2.5 bg-gray-100 rounded w-48" />
+                        </div>
+                        <div className="h-8 w-20 bg-gray-100 rounded-lg" />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-[2px]">
+                    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-4 py-2 shadow-sm">
+                      <Lock size={14} className="text-[#F25722]" />
+                      <span className="text-xs font-bold text-[#111]">
+                        {applicantCount} candidate{applicantCount !== 1 ? "s" : ""} hidden
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Two options side by side */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Option 1: One-time unlock */}
+                <div className="border-2 border-gray-100 rounded-2xl p-5 flex flex-col">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
+                      <Unlock size={15} className="text-[#F25722]" />
+                    </div>
+                    <span className="text-sm font-bold text-[#111]">Unlock This Job</span>
+                  </div>
+                  <p className="text-3xl font-black text-[#111] mb-1">$100</p>
+                  <p className="text-xs text-gray-400 mb-4">One-time · this job only</p>
+                  <ul className="space-y-1.5 mb-5 flex-1">
+                    {[
+                      "Full candidate list for this job",
+                      "View profiles & contact info",
+                      "Message applicants directly",
+                      "No recurring commitment",
+                    ].map((f) => (
+                      <li key={f} className="flex items-start gap-2 text-xs text-gray-600">
+                        <CheckCircle2 size={12} className="text-[#F25722] mt-0.5 flex-shrink-0" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    onClick={handleUnlockCheckout}
+                    disabled={checkingOut || subscribing}
+                    className="w-full py-2.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {checkingOut ? (
+                      <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Redirecting…</>
+                    ) : (
+                      <><Unlock size={15} /> Unlock — $100</>
+                    )}
+                  </button>
+                  <p className="text-[11px] text-gray-400 text-center mt-2">Secure checkout via Stripe</p>
+                </div>
+
+                {/* Option 2: Subscribe */}
+                <div className="border-2 border-[#F25722] rounded-2xl p-5 flex flex-col relative">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#F25722] text-white text-[10px] font-black px-3 py-1 rounded-full whitespace-nowrap">
+                    BEST VALUE
+                  </div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
+                      <Star size={15} className="text-[#F25722]" />
+                    </div>
+                    <span className="text-sm font-bold text-[#111]">Enterprise Plan</span>
+                  </div>
+
+                  {/* Interval toggle */}
+                  <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5 mb-3 w-fit">
+                    <button
+                      onClick={() => setSubInterval("month")}
+                      className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${subInterval === "month" ? "bg-white shadow text-[#111]" : "text-gray-500"}`}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      onClick={() => setSubInterval("year")}
+                      className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${subInterval === "year" ? "bg-white shadow text-[#111]" : "text-gray-500"}`}
+                    >
+                      Annual <span className="text-[#F25722]">–17%</span>
+                    </button>
+                  </div>
+
+                  <p className="text-3xl font-black text-[#111] mb-0.5">
+                    {subInterval === "month" ? "$250" : "$208"}
+                    <span className="text-sm font-normal text-gray-400">/mo</span>
+                  </p>
+                  <p className="text-xs text-gray-400 mb-4">
+                    {subInterval === "year" ? "Billed $2,500/year · save $500" : "Billed monthly · cancel anytime"}
+                  </p>
+                  <ul className="space-y-1.5 mb-5 flex-1">
+                    {[
+                      "Unlimited candidate access",
+                      "All current & future jobs",
+                      "Priority artist matching",
+                      "Dedicated account support",
+                    ].map((f) => (
+                      <li key={f} className="flex items-start gap-2 text-xs text-gray-600">
+                        <CheckCircle2 size={12} className="text-[#F25722] mt-0.5 flex-shrink-0" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    onClick={() => handleSubscribeCheckout(subInterval)}
+                    disabled={subscribing || checkingOut}
+                    className="w-full py-2.5 rounded-xl text-sm font-bold text-[#F25722] border-2 border-[#F25722] hover:bg-orange-50 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {subscribing ? (
+                      <><div className="w-4 h-4 border-2 border-[#F25722]/40 border-t-[#F25722] rounded-full animate-spin" /> Redirecting…</>
+                    ) : (
+                      <>Subscribe — {subInterval === "month" ? "$250/mo" : "$2,500/yr"}</>
+                    )}
+                  </button>
+                  <p className="text-[11px] text-gray-400 text-center mt-2">
+                    {applicantCount >= 3 ? `Break-even at 3 jobs · you have ${applicantCount}+ waiting` : "Unlimited jobs · cancel anytime"}
+                  </p>
+                </div>
               </div>
-              <h3 className="text-lg font-black text-[#111] mb-2">
-                {applicantCount > 0 ? `${applicantCount} Candidate${applicantCount !== 1 ? "s" : ""} Applied` : "Candidates Available"}
-              </h3>
-              <p className="text-sm text-gray-500 max-w-sm mb-6 leading-relaxed">
-                Unlock the full candidate list for this job for a one-time fee of <strong>$100</strong>. You'll get full access to view, contact, and message all applicants.
-              </p>
-              <button
-                onClick={handleUnlockCheckout}
-                disabled={checkingOut}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#F25722] text-white font-bold text-sm hover:bg-[#d94d1e] transition-colors disabled:opacity-60"
-              >
-                {checkingOut ? (
-                  <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <Unlock size={16} />
-                )}
-                {checkingOut ? "Redirecting to checkout…" : "Unlock Candidates — $100"}
-              </button>
-              <p className="text-xs text-gray-400 mt-3">One-time payment · Secure checkout via Stripe</p>
             </div>
           ) : applicants.length === 0 ? (
             <div className="text-center py-12 text-gray-400 text-sm">

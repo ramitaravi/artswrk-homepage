@@ -84,6 +84,7 @@ export const STRIPE_PRODUCTS = {
    */
   ENTERPRISE_ON_DEMAND: {
     productId: "prod_TxJ7FkYDtKrFS1",
+    paymentLinkId: "plink_1SzOVjA91H1fWNkKiqwN8q1j",
     name: "Artswrk Enterprise — View Candidates",
     description: "Unlock candidate list for one PRO job posting.",
     amount: 10000, // $100 in cents
