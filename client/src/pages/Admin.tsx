@@ -6,7 +6,7 @@
  * Protected: only accessible when logged in as admin or owner.
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type MutableRefObject } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
@@ -2300,8 +2300,266 @@ function JobsSection() {
   );
 }
 
+// ─── Shared status helpers (bookings + payments) ──────────────────────────────
+const bookingStatusColor = (s: string | null | undefined) => {
+  if (s === "Confirmed") return "bg-green-50 text-green-600";
+  if (s === "Completed") return "bg-blue-50 text-blue-600";
+  if (s === "Cancelled") return "bg-red-50 text-red-500";
+  return "bg-gray-100 text-gray-500";
+};
+const paymentStatusColor = (s: string | null | undefined) => {
+  if (s === "Paid") return "bg-green-50 text-green-600";
+  if (s === "Unpaid") return "bg-orange-50 text-orange-600";
+  if (s === "Refunded") return "bg-purple-50 text-purple-600";
+  return "bg-gray-100 text-gray-500";
+};
+const stripeStatusColor = (status: string | null | undefined, stripeStatus: string | null | undefined) => {
+  if (status === "Success" || stripeStatus === "succeeded") return "bg-green-50 text-green-600";
+  if (stripeStatus === "failed") return "bg-red-50 text-red-500";
+  return "bg-gray-100 text-gray-500";
+};
+
+// ─── Booking: Payments Tab ─────────────────────────────────────────────────────
+function BookingPaymentsTab({ bookingId, onViewPayment }: { bookingId: number; onViewPayment: (id: number) => void }) {
+  const { data: pmts, isLoading } = trpc.admin.bookingPayments.useQuery({ bookingId });
+
+  if (isLoading) return <div className="flex items-center justify-center py-12"><div className="w-5 h-5 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" /></div>;
+  if (!pmts || (pmts as any[]).length === 0) return (
+    <div className="text-center py-12">
+      <p className="text-sm text-gray-400">No payments recorded for this booking.</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      {(pmts as any[]).map((p: any) => (
+        <div key={p.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer" onClick={() => onViewPayment(p.id)}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${stripeStatusColor(p.status, p.stripeStatus)}`}>
+                  {p.status || p.stripeStatus || "Unknown"}
+                </span>
+                {p.stripeCardBrand && <span className="text-[10px] text-gray-400">{p.stripeCardBrand} ···· {p.stripeCardLast4}</span>}
+              </div>
+              <p className="text-xs text-gray-500">{fmtDate(p.paymentDate || p.createdAt)}</p>
+              {p.stripeId && <p className="text-[10px] text-gray-300 font-mono mt-0.5">{p.stripeId}</p>}
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="text-lg font-black text-[#111]">{p.stripeAmount ? fmt$(p.stripeAmount) : "—"}</p>
+              {p.stripeApplicationFeeAmount && (
+                <p className="text-[10px] text-gray-400">App fee: {fmt$(p.stripeApplicationFeeAmount)}</p>
+              )}
+            </div>
+          </div>
+          {p.stripeReceiptUrl && (
+            <a href={p.stripeReceiptUrl} target="_blank" rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-1 text-xs text-blue-500 hover:underline"
+              onClick={e => e.stopPropagation()}>
+              <ExternalLink size={11} /> View receipt
+            </a>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Booking: Detail Page ──────────────────────────────────────────────────────
+function AdminBookingDetail({ bookingId, onBack, onViewJob, onViewPayment }: {
+  bookingId: number;
+  onBack: () => void;
+  onViewJob?: (jobId: number) => void;
+  onViewPayment: (paymentId: number) => void;
+}) {
+  const [tab, setTab] = useState<"overview" | "payments">("overview");
+  const { data: b, isLoading } = trpc.admin.getBooking.useQuery({ id: bookingId });
+
+  if (isLoading) return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" /></div>;
+  if (!b) return <div className="text-center py-24 text-gray-400">Booking not found.</div>;
+
+  const clientName = b.clientName || (b.clientFirstName ? `${b.clientFirstName} ${b.clientLastName ?? ""}`.trim() : null);
+  const artistName = b.artistName || (b.artistFirstName ? `${b.artistFirstName} ${b.artistLastName ?? ""}`.trim() : null);
+  const clientPic = b.clientProfilePicture;
+  const artistPic = b.artistProfilePicture;
+
+  return (
+    <div className="space-y-5">
+      {/* Breadcrumbs */}
+      <div className="flex items-center gap-2 text-sm">
+        <button onClick={onBack} className="text-gray-400 hover:text-[#F25722] transition-colors font-medium">Bookings</button>
+        <ChevronRight size={14} className="text-gray-300" />
+        <span className="text-[#111] font-semibold">Booking #{bookingId}</span>
+      </div>
+
+      {/* Hero card */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
+        {/* Status row */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className={`text-xs font-bold px-3 py-1 rounded-full ${bookingStatusColor(b.bookingStatus)}`}>{b.bookingStatus || "Unknown"}</span>
+          <span className={`text-xs font-bold px-3 py-1 rounded-full ${paymentStatusColor(b.paymentStatus)}`}>{b.paymentStatus || "Unpaid"}</span>
+          {b.externalPayment && <span className="text-xs font-bold px-3 py-1 rounded-full bg-purple-50 text-purple-600">External Payment</span>}
+        </div>
+
+        {/* Financials */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: "Client Rate", value: b.clientRate ? fmt$(b.clientRate * 100) : "—", color: "text-[#111]" },
+            { label: "Artist Rate", value: b.artistRate ? fmt$(b.artistRate * 100) : "—", color: "text-gray-600" },
+            { label: "Gross Profit", value: b.grossProfit ? fmt$(b.grossProfit * 100) : "—", color: "text-green-600" },
+            { label: "Hours", value: b.hours ? `${b.hours}h` : "—", color: "text-gray-600" },
+          ].map(({ label, value, color }) => (
+            <div key={label} className="bg-gray-50 rounded-xl p-3 text-center">
+              <p className={`text-lg font-black ${color}`}>{value}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Date + location */}
+        <div className="flex flex-wrap gap-6 pt-4 border-t border-gray-50">
+          {b.startDate && <div><p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Start</p><p className="text-sm text-gray-700">{fmtDateTime(b.startDate)}</p></div>}
+          {b.endDate && <div><p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">End</p><p className="text-sm text-gray-700">{fmtDateTime(b.endDate)}</p></div>}
+          {b.locationAddress && <div><p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Location</p><p className="text-sm text-gray-700 flex items-center gap-1"><MapPin size={11} />{b.locationAddress}</p></div>}
+          <div><p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Created</p><p className="text-sm text-gray-600">{fmtDate(b.bubbleCreatedAt || b.createdAt)}</p></div>
+        </div>
+
+        {b.description && (
+          <div className="pt-4 border-t border-gray-50">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-2">Notes</p>
+            <p className="text-sm text-gray-600 leading-relaxed">{b.description}</p>
+          </div>
+        )}
+      </div>
+
+      {/* People + Job links */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Client */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+          <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-3">Client</p>
+          {clientName ? (
+            <div className="flex items-center gap-3">
+              {clientPic ? (
+                <img src={clientPic.startsWith('//') ? `https:${clientPic}` : clientPic} alt={clientName} className="w-10 h-10 rounded-full object-cover border border-gray-100 flex-shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-sm font-black flex-shrink-0">{(clientName || "?")[0]}</div>
+              )}
+              <div>
+                <p className="text-sm font-bold text-[#111]">{clientName}</p>
+                <p className="text-xs text-gray-400">{b.clientEmail || "—"}</p>
+                {b.clientCompanyName && <p className="text-xs text-gray-400">{b.clientCompanyName}</p>}
+              </div>
+            </div>
+          ) : <p className="text-sm text-gray-400">No client linked</p>}
+        </div>
+
+        {/* Artist */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+          <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-3">Artist</p>
+          {artistName ? (
+            <div className="flex items-center gap-3">
+              {artistPic ? (
+                <img src={artistPic.startsWith('//') ? `https:${artistPic}` : artistPic} alt={artistName} className="w-10 h-10 rounded-full object-cover border border-gray-100 flex-shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#ec008c] to-[#ff7171] flex items-center justify-center text-white text-sm font-black flex-shrink-0">{(artistName || "?")[0]}</div>
+              )}
+              <div>
+                <p className="text-sm font-bold text-[#111]">{artistName}</p>
+                <p className="text-xs text-gray-400">{b.artistEmail || "—"}</p>
+                {b.artistSlug && (
+                  <a href={`https://artswrk.com/artists/${b.artistSlug}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-[#F25722] hover:underline flex items-center gap-0.5 mt-0.5"><ExternalLink size={9} /> View profile</a>
+                )}
+              </div>
+            </div>
+          ) : <p className="text-sm text-gray-400">No artist linked</p>}
+        </div>
+
+        {/* Job */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+          <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-3">Linked Job</p>
+          {b.jobId ? (
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-sm font-bold text-[#111]">Job #{b.jobId}</p>
+                {b.jobStatus && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${jobStatusColor(b.jobStatus)}`}>{b.jobStatus}</span>}
+              </div>
+              {b.jobHiringCategory && <p className="text-xs text-gray-500 mb-1">{b.jobHiringCategory}</p>}
+              {b.jobLocation && <p className="text-xs text-gray-400 flex items-center gap-1"><MapPin size={9} />{b.jobLocation}</p>}
+              {b.jobClientRate && <p className="text-xs text-gray-500 mt-1">${b.jobClientRate}/hr</p>}
+              {onViewJob && (
+                <button onClick={() => onViewJob(b.jobId)} className="mt-3 text-xs font-semibold text-[#F25722] hover:underline flex items-center gap-1">
+                  View Job →
+                </button>
+              )}
+            </div>
+          ) : <p className="text-sm text-gray-400">No job linked</p>}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-0 border-b border-gray-200">
+        {([{ key: "overview", label: "Overview" }, { key: "payments", label: "Payments" }] as const).map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            className={`px-5 py-3 text-sm font-semibold transition-colors border-b-2 -mb-px ${tab === t.key ? 'border-[#F25722] text-[#F25722]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "overview" && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-2">Financial Breakdown</p>
+              <div className="space-y-2">
+                {[
+                  ["Total Client Rate", b.totalClientRate ? fmt$(b.totalClientRate * 100) : "—"],
+                  ["Total Artist Rate", b.totalArtistRate ? fmt$(b.totalArtistRate * 100) : "—"],
+                  ["Stripe Fee", b.stripeFee ? fmt$(b.stripeFee * 100) : "—"],
+                  ["Post-Fee Revenue", b.postFeeRevenue ? fmt$(b.postFeeRevenue * 100) : "—"],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500">{label}</span>
+                    <span className="font-semibold text-[#111]">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-2">IDs</p>
+              <div className="space-y-1.5">
+                <p className="text-xs text-gray-500">DB ID: <span className="font-mono text-gray-700">{b.id}</span></p>
+                {b.bubbleId && <p className="text-xs text-gray-500">Bubble ID: <span className="font-mono text-gray-700 text-[10px]">{b.bubbleId}</span></p>}
+                {b.jobId && <p className="text-xs text-gray-500">Job ID: <span className="font-mono text-gray-700">{b.jobId}</span></p>}
+                {b.interestedArtistId && <p className="text-xs text-gray-500">Application ID: <span className="font-mono text-gray-700">{b.interestedArtistId}</span></p>}
+              </div>
+              {b.stripeCheckoutUrl && (
+                <a href={b.stripeCheckoutUrl} target="_blank" rel="noopener noreferrer"
+                  className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-500 hover:underline">
+                  <ExternalLink size={11} /> Stripe Checkout
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {tab === "payments" && <BookingPaymentsTab bookingId={bookingId} onViewPayment={onViewPayment} />}
+    </div>
+  );
+}
+
 // ─── Bookings Section ─────────────────────────────────────────────────────────
-function BookingsSection() {
+function BookingsSection({ onViewPayment, initialDetailId }: { onViewPayment?: (paymentId: number) => void; initialDetailId?: MutableRefObject<number | null> }) {
+  type View = { mode: "list" } | { mode: "detail"; id: number };
+  const [view, setView] = useState<View>(() => {
+    if (initialDetailId?.current != null) {
+      const id = initialDetailId.current;
+      initialDetailId.current = null;
+      return { mode: "detail", id };
+    }
+    return { mode: "list" };
+  });
+
   const [upcoming, setUpcoming] = useState<boolean | undefined>(true);
   const [paymentStatus, setPaymentStatus] = useState("");
   const [bookingStatus, setBookingStatus] = useState("");
@@ -2314,36 +2572,26 @@ function BookingsSection() {
     bookingStatus: bookingStatus || undefined,
     limit: LIMIT,
     offset: (page - 1) * LIMIT,
-  });
+  }, { enabled: view.mode === "list" });
 
-  const bookingStatusColor = (s: string | null | undefined) => {
-    if (s === "Confirmed") return "bg-green-50 text-green-600";
-    if (s === "Completed") return "bg-blue-50 text-blue-600";
-    if (s === "Cancelled") return "bg-red-50 text-red-500";
-    return "bg-gray-100 text-gray-500";
-  };
-  const paymentStatusColor = (s: string | null | undefined) => {
-    if (s === "Paid") return "bg-green-50 text-green-600";
-    if (s === "Unpaid") return "bg-orange-50 text-orange-600";
-    if (s === "Refunded") return "bg-purple-50 text-purple-600";
-    return "bg-gray-100 text-gray-500";
-  };
+  if (view.mode === "detail") return (
+    <AdminBookingDetail
+      bookingId={view.id}
+      onBack={() => setView({ mode: "list" })}
+      onViewPayment={(pid) => onViewPayment?.(pid)}
+    />
+  );
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-black text-[#111]">💰 Bookings ({data?.total?.toLocaleString() ?? "…"})</h1>
+      <h1 className="text-2xl font-black text-[#111]">Bookings ({data?.total?.toLocaleString() ?? "…"})</h1>
 
       {/* Filters */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-wrap gap-3">
         <div className="flex rounded-xl border border-gray-200 overflow-hidden">
-          {[{ label: "Upcoming", val: true }, { label: "Past", val: false }, { label: "All", val: undefined }].map(opt => (
-            <button
-              key={opt.label}
-              onClick={() => { setUpcoming(opt.val); setPage(1); }}
-              className={`px-3 py-2 text-xs font-medium transition-colors ${
-                upcoming === opt.val ? "bg-[#111] text-white" : "text-gray-600 hover:bg-gray-50"
-              }`}
-            >
+          {[{ label: "Upcoming", val: true as boolean | undefined }, { label: "Past", val: false as boolean | undefined }, { label: "All", val: undefined as boolean | undefined }].map(opt => (
+            <button key={opt.label} onClick={() => { setUpcoming(opt.val); setPage(1); }}
+              className={`px-3 py-2 text-xs font-medium transition-colors ${upcoming === opt.val ? "bg-[#111] text-white" : "text-gray-600 hover:bg-gray-50"}`}>
               {opt.label}
             </button>
           ))}
@@ -2369,6 +2617,7 @@ function BookingsSection() {
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Date</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Client / Artist</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Client Rate</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Artist Rate</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Gross Profit</th>
@@ -2378,45 +2627,204 @@ function BookingsSection() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-xs">Loading…</td></tr>
+                <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400 text-xs">Loading…</td></tr>
               ) : data?.bookings.length === 0 ? (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-xs">No bookings found</td></tr>
+                <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400 text-xs">No bookings found</td></tr>
               ) : data?.bookings.map(b => (
-                <tr key={b.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                <tr key={b.id} className="border-b border-gray-50 hover:bg-orange-50/30 transition-colors cursor-pointer" onClick={() => setView({ mode: "detail", id: b.id })}>
                   <td className="px-5 py-3 text-xs text-gray-700 whitespace-nowrap">{fmtDateTime(b.startDate)}</td>
+                  <td className="px-4 py-3">
+                    <p className="text-xs font-semibold text-[#111]">{b.clientUserId ? `Client #${b.clientUserId}` : "—"}</p>
+                    <p className="text-[10px] text-gray-400">{b.artistUserId ? `Artist #${b.artistUserId}` : "—"}</p>
+                  </td>
                   <td className="px-4 py-3 text-xs font-semibold text-[#111]">{b.clientRate ? fmt$(b.clientRate * 100) : "—"}</td>
                   <td className="px-4 py-3 text-xs text-gray-600">{b.artistRate ? fmt$(b.artistRate * 100) : "—"}</td>
                   <td className="px-4 py-3 text-xs text-green-600 font-semibold">{b.grossProfit ? fmt$(b.grossProfit * 100) : "—"}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${bookingStatusColor(b.bookingStatus)}`}>
-                      {b.bookingStatus || "—"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${paymentStatusColor(b.paymentStatus)}`}>
-                      {b.paymentStatus || "—"}
-                    </span>
-                  </td>
+                  <td className="px-4 py-3"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${bookingStatusColor(b.bookingStatus)}`}>{b.bookingStatus || "—"}</span></td>
+                  <td className="px-4 py-3"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${paymentStatusColor(b.paymentStatus)}`}>{b.paymentStatus || "—"}</span></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {data && (
-          <div className="px-5 py-3">
-            <Pagination page={page} total={data.total} limit={LIMIT} onPage={setPage} />
-          </div>
-        )}
+        {data && <div className="px-5 py-3"><Pagination page={page} total={data.total} limit={LIMIT} onPage={setPage} /></div>}
       </div>
     </div>
   );
 }
 
+// ─── Payment: Detail Page ──────────────────────────────────────────────────────
+function AdminPaymentDetail({ paymentId, onBack, onViewBooking }: {
+  paymentId: number;
+  onBack: () => void;
+  onViewBooking?: (bookingId: number) => void;
+}) {
+  const { data: p, isLoading } = trpc.admin.getPayment.useQuery({ id: paymentId });
+
+  if (isLoading) return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" /></div>;
+  if (!p) return <div className="text-center py-24 text-gray-400">Payment not found.</div>;
+
+  const clientName = p.clientName || (p.clientFirstName ? `${p.clientFirstName} ${p.clientLastName ?? ""}`.trim() : null);
+  const artistName = p.artistName || (p.artistFirstName ? `${p.artistFirstName} ${p.artistLastName ?? ""}`.trim() : null);
+
+  return (
+    <div className="space-y-5">
+      {/* Breadcrumbs */}
+      <div className="flex items-center gap-2 text-sm">
+        <button onClick={onBack} className="text-gray-400 hover:text-[#F25722] transition-colors font-medium">Payments</button>
+        <ChevronRight size={14} className="text-gray-300" />
+        <span className="text-[#111] font-semibold">Payment #{paymentId}</span>
+      </div>
+
+      {/* Hero card */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <span className={`text-xs font-bold px-3 py-1 rounded-full ${stripeStatusColor(p.status, p.stripeStatus)}`}>
+                {p.status || p.stripeStatus || "Unknown"}
+              </span>
+              {p.stripeCardBrand && (
+                <span className="text-sm text-gray-500">{p.stripeCardBrand} ···· {p.stripeCardLast4}</span>
+              )}
+            </div>
+            <p className="text-3xl font-black text-[#111]">{p.stripeAmount ? fmt$(p.stripeAmount) : "—"}</p>
+            <p className="text-sm text-gray-400 mt-1">{fmtDate(p.paymentDate || p.createdAt)}</p>
+          </div>
+          <div className="text-right">
+            {p.stripeApplicationFeeAmount && (
+              <div>
+                <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">App Fee</p>
+                <p className="text-lg font-bold text-green-600">{fmt$(p.stripeApplicationFeeAmount)}</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Stripe details */}
+        <div className="flex flex-wrap gap-6 pt-4 border-t border-gray-50">
+          {p.stripeId && <div><p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Stripe ID</p><p className="text-xs font-mono text-gray-600">{p.stripeId}</p></div>}
+          {p.stripeCardName && <div><p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Card Name</p><p className="text-sm text-gray-700">{p.stripeCardName}</p></div>}
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 flex-wrap pt-2">
+          {p.stripeReceiptUrl && (
+            <a href={p.stripeReceiptUrl} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#111] text-white text-xs font-semibold hover:bg-gray-800 transition-colors">
+              <ExternalLink size={12} /> View Receipt
+            </a>
+          )}
+          {p.stripeRefundUrl && (
+            <a href={p.stripeRefundUrl} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+              <ExternalLink size={12} /> Refund
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* People + Booking links */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Client */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+          <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-3">Client</p>
+          {clientName ? (
+            <div className="flex items-center gap-3">
+              {p.clientProfilePicture ? (
+                <img src={p.clientProfilePicture.startsWith('//') ? `https:${p.clientProfilePicture}` : p.clientProfilePicture} alt={clientName}
+                  className="w-10 h-10 rounded-full object-cover border border-gray-100 flex-shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-sm font-black flex-shrink-0">{(clientName || "?")[0]}</div>
+              )}
+              <div>
+                <p className="text-sm font-bold text-[#111]">{clientName}</p>
+                <p className="text-xs text-gray-400">{p.clientEmail || "—"}</p>
+                {p.clientCompanyName && <p className="text-xs text-gray-400">{p.clientCompanyName}</p>}
+              </div>
+            </div>
+          ) : <p className="text-sm text-gray-400">No client linked</p>}
+        </div>
+
+        {/* Artist */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+          <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-3">Artist (via booking)</p>
+          {artistName ? (
+            <div className="flex items-center gap-3">
+              {p.artistProfilePicture ? (
+                <img src={p.artistProfilePicture.startsWith('//') ? `https:${p.artistProfilePicture}` : p.artistProfilePicture} alt={artistName}
+                  className="w-10 h-10 rounded-full object-cover border border-gray-100 flex-shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#ec008c] to-[#ff7171] flex items-center justify-center text-white text-sm font-black flex-shrink-0">{(artistName || "?")[0]}</div>
+              )}
+              <div>
+                <p className="text-sm font-bold text-[#111]">{artistName}</p>
+                <p className="text-xs text-gray-400">{p.artistEmail || "—"}</p>
+                {p.artistSlug && (
+                  <a href={`https://artswrk.com/artists/${p.artistSlug}`} target="_blank" rel="noopener noreferrer"
+                    className="text-[10px] text-[#F25722] hover:underline flex items-center gap-0.5 mt-0.5"><ExternalLink size={9} /> View profile</a>
+                )}
+              </div>
+            </div>
+          ) : <p className="text-sm text-gray-400">No artist linked</p>}
+        </div>
+
+        {/* Linked Booking */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+          <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-3">Linked Booking</p>
+          {p.bookingId ? (
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-sm font-bold text-[#111]">Booking #{p.bookingId}</p>
+                {p.bookingStatus && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${bookingStatusColor(p.bookingStatus)}`}>{p.bookingStatus}</span>}
+              </div>
+              {p.bookingPaymentStatus && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${paymentStatusColor(p.bookingPaymentStatus)}`}>{p.bookingPaymentStatus}</span>}
+              {p.startDate && <p className="text-xs text-gray-500 mt-2">{fmtDateTime(p.startDate)}</p>}
+              {p.clientRate && <p className="text-xs text-gray-400 mt-1">Rate: {fmt$(p.clientRate * 100)}/hr</p>}
+              {onViewBooking && (
+                <button onClick={() => onViewBooking(p.bookingId)} className="mt-3 text-xs font-semibold text-[#F25722] hover:underline flex items-center gap-1">
+                  View Booking →
+                </button>
+              )}
+            </div>
+          ) : <p className="text-sm text-gray-400">No booking linked</p>}
+        </div>
+      </div>
+
+      {/* Description */}
+      {p.stripeDescription && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-2">Stripe Description</p>
+          <p className="text-sm text-gray-600 leading-relaxed">{p.stripeDescription}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Payments Section ─────────────────────────────────────────────────────────
-function PaymentsSection() {
+function PaymentsSection({ onViewBooking, initialDetailId }: { onViewBooking?: (bookingId: number) => void; initialDetailId?: MutableRefObject<number | null> }) {
+  type View = { mode: "list" } | { mode: "detail"; id: number };
+  const [view, setView] = useState<View>(() => {
+    if (initialDetailId?.current != null) {
+      const id = initialDetailId.current;
+      initialDetailId.current = null;
+      return { mode: "detail", id };
+    }
+    return { mode: "list" };
+  });
+
   const [page, setPage] = useState(1);
   const LIMIT = 50;
-  const { data, isLoading } = trpc.admin.payments.useQuery({ limit: LIMIT, offset: (page - 1) * LIMIT });
+  const { data, isLoading } = trpc.admin.payments.useQuery({ limit: LIMIT, offset: (page - 1) * LIMIT }, { enabled: view.mode === "list" });
+
+  if (view.mode === "detail") return (
+    <AdminPaymentDetail
+      paymentId={view.id}
+      onBack={() => setView({ mode: "list" })}
+      onViewBooking={onViewBooking}
+    />
+  );
 
   return (
     <div className="space-y-5">
@@ -2441,7 +2849,7 @@ function PaymentsSection() {
               ) : data?.payments.length === 0 ? (
                 <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-xs">No payments found</td></tr>
               ) : data?.payments.map(p => (
-                <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                <tr key={p.id} className="border-b border-gray-50 hover:bg-orange-50/30 transition-colors cursor-pointer" onClick={() => setView({ mode: "detail", id: p.id })}>
                   <td className="px-5 py-3">
                     <p className="font-semibold text-[#111] text-xs">
                       {p.clientName || p.clientFirstName ? displayName({ name: p.clientName, firstName: p.clientFirstName, lastName: p.clientLastName }) : p.clientCompanyName || "—"}
@@ -2451,11 +2859,7 @@ function PaymentsSection() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      p.status === "Success" || p.stripeStatus === "succeeded"
-                        ? "bg-green-50 text-green-600"
-                        : "bg-gray-100 text-gray-500"
-                    }`}>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${stripeStatusColor(p.status, p.stripeStatus)}`}>
                       {p.status || p.stripeStatus || "—"}
                     </span>
                   </td>
@@ -2468,11 +2872,7 @@ function PaymentsSection() {
             </tbody>
           </table>
         </div>
-        {data && (
-          <div className="px-5 py-3">
-            <Pagination page={page} total={data.total} limit={LIMIT} onPage={setPage} />
-          </div>
-        )}
+        {data && <div className="px-5 py-3"><Pagination page={page} total={data.total} limit={LIMIT} onPage={setPage} /></div>}
       </div>
     </div>
   );
@@ -3741,6 +4141,19 @@ export default function Admin() {
   const [section, setSection] = useState<AdminSection>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  // Cross-section deep-link: store a pending detail ID when navigating between sections
+  const pendingBookingId = useRef<number | null>(null);
+  const pendingPaymentId = useRef<number | null>(null);
+
+  function goToPayment(paymentId: number) {
+    pendingPaymentId.current = paymentId;
+    setSection("payments");
+  }
+  function goToBooking(bookingId: number) {
+    pendingBookingId.current = bookingId;
+    setSection("bookings");
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#fafafa]">
@@ -3776,8 +4189,8 @@ export default function Admin() {
           {section === "jobs" && <JobsSection />}
           {section === "pro-jobs" && <ProJobsSection />}
           {section === "enterprise-clients" && <EnterpriseClientsSection />}
-          {section === "bookings" && <BookingsSection />}
-          {section === "payments" && <PaymentsSection />}
+          {section === "bookings" && <BookingsSection onViewPayment={goToPayment} initialDetailId={pendingBookingId} />}
+          {section === "payments" && <PaymentsSection onViewBooking={goToBooking} initialDetailId={pendingPaymentId} />}
           {section === "subscriptions" && <SubscriptionsSection />}
           {section === "acquisition" && <AcquisitionSection />}
           {section === "settings" && <SettingsSection user={user} />}

@@ -1761,6 +1761,132 @@ export async function getAdminBookings({
   return { bookings: rows, total: Number(countRow?.count ?? 0) };
 }
 
+/** Admin: single booking with full client + artist + job info */
+export async function getAdminBookingById(bookingId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const rows = await db.execute(sql`
+    SELECT
+      b.id, b.bubbleId,
+      b.jobId, b.interestedArtistId,
+      b.clientUserId, b.artistUserId,
+      b.bookingStatus, b.paymentStatus,
+      b.clientRate, b.artistRate, b.totalClientRate, b.totalArtistRate,
+      b.grossProfit, b.stripeFee, b.postFeeRevenue,
+      b.hours, b.externalPayment,
+      b.startDate, b.endDate,
+      b.locationAddress, b.description,
+      b.stripeCheckoutUrl,
+      b.createdAt, b.bubbleCreatedAt,
+
+      c.id AS clientId,
+      c.name AS clientName,
+      c.firstName AS clientFirstName,
+      c.lastName AS clientLastName,
+      c.email AS clientEmail,
+      c.clientCompanyName,
+      c.profilePicture AS clientProfilePicture,
+      c.location AS clientLocation,
+
+      a.id AS artistId,
+      a.name AS artistName,
+      a.firstName AS artistFirstName,
+      a.lastName AS artistLastName,
+      a.email AS artistEmail,
+      a.profilePicture AS artistProfilePicture,
+      a.location AS artistLocation,
+      a.slug AS artistSlug,
+
+      j.id AS jobId2,
+      j.description AS jobDescription,
+      j.requestStatus AS jobStatus,
+      j.locationAddress AS jobLocation,
+      j.hiringCategory AS jobHiringCategory,
+      j.clientHourlyRate AS jobClientRate,
+      j.bubbleCreatedAt AS jobCreatedAt
+    FROM bookings b
+    LEFT JOIN users c ON b.clientUserId = c.id
+    LEFT JOIN users a ON b.artistUserId = a.id
+    LEFT JOIN jobs j ON b.jobId = j.id
+    WHERE b.id = ${bookingId}
+    LIMIT 1
+  `);
+
+  const row = (rows as any[])[0];
+  if (!row) return null;
+  return row;
+}
+
+/** Admin: payments for a specific booking */
+export async function getAdminBookingPayments(bookingId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const rows = await db.execute(sql`
+    SELECT
+      p.id, p.stripeId, p.status, p.stripeStatus,
+      p.stripeAmount, p.stripeApplicationFeeAmount,
+      p.stripeCardBrand, p.stripeCardLast4, p.stripeCardName,
+      p.stripeDescription, p.stripeReceiptUrl, p.stripeRefundUrl,
+      p.paymentDate, p.createdAt,
+      u.name AS clientName,
+      u.firstName AS clientFirstName,
+      u.lastName AS clientLastName,
+      u.email AS clientEmail
+    FROM payments p
+    LEFT JOIN users u ON p.clientUserId = u.id
+    WHERE p.bookingId = ${bookingId}
+    ORDER BY COALESCE(p.paymentDate, p.createdAt) DESC
+  `);
+  return rows as any[];
+}
+
+/** Admin: single payment with booking + client info */
+export async function getAdminPaymentById(paymentId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const rows = await db.execute(sql`
+    SELECT
+      p.id, p.stripeId, p.status, p.stripeStatus,
+      p.stripeAmount, p.stripeApplicationFeeAmount,
+      p.stripeCardBrand, p.stripeCardLast4, p.stripeCardName,
+      p.stripeDescription, p.stripeReceiptUrl, p.stripeRefundUrl,
+      p.paymentDate, p.createdAt, p.bookingId, p.clientUserId,
+
+      u.name AS clientName,
+      u.firstName AS clientFirstName,
+      u.lastName AS clientLastName,
+      u.email AS clientEmail,
+      u.clientCompanyName,
+      u.profilePicture AS clientProfilePicture,
+
+      b.bookingStatus, b.paymentStatus AS bookingPaymentStatus,
+      b.clientRate, b.artistRate, b.grossProfit,
+      b.startDate, b.endDate,
+      b.jobId AS bookingJobId,
+      b.artistUserId AS bookingArtistUserId,
+
+      a.name AS artistName,
+      a.firstName AS artistFirstName,
+      a.lastName AS artistLastName,
+      a.email AS artistEmail,
+      a.profilePicture AS artistProfilePicture,
+      a.slug AS artistSlug
+    FROM payments p
+    LEFT JOIN users u ON p.clientUserId = u.id
+    LEFT JOIN bookings b ON p.bookingId = b.id
+    LEFT JOIN users a ON b.artistUserId = a.id
+    WHERE p.id = ${paymentId}
+    LIMIT 1
+  `);
+
+  const row = (rows as any[])[0];
+  if (!row) return null;
+  return row;
+}
+
 /** Admin: recent payments paginated */
 // ── Premium Jobs helpers ────────────────────────────────────────────────────
 

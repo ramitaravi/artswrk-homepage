@@ -666,6 +666,24 @@ export const appRouter = router({
         return getAdminBookings(input);
       }),
 
+    /** Single booking with client + artist + job info — admin only */
+    getBooking: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getAdminBookingById } = await import("./db");
+        return getAdminBookingById(input.id);
+      }),
+
+    /** Payments for a booking — admin only */
+    bookingPayments: protectedProcedure
+      .input(z.object({ bookingId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getAdminBookingPayments } = await import("./db");
+        return getAdminBookingPayments(input.bookingId);
+      }),
+
     /** Recent payments paginated */
     payments: protectedProcedure
       .input(z.object({
@@ -675,6 +693,15 @@ export const appRouter = router({
       .query(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
         return getAdminPayments(input);
+      }),
+
+    /** Single payment with booking + client + artist info — admin only */
+    getPayment: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getAdminPaymentById } = await import("./db");
+        return getAdminPaymentById(input.id);
       }),
 
     /**
