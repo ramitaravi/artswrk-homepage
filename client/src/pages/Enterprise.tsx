@@ -48,6 +48,27 @@ function initials(name: string): string {
     .slice(0, 2);
 }
 
+function parseList(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try { return JSON.parse(raw) as string[]; } catch { return []; }
+}
+
+function fmtDate(d: Date | string | null | undefined): string {
+  if (!d) return "—";
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return "—";
+  return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function appStatusColor(status: string | null | undefined) {
+  switch (status) {
+    case "Booked": return "text-green-600 bg-green-50";
+    case "Confirmed": return "text-blue-600 bg-blue-50";
+    case "Rejected": return "text-red-500 bg-red-50";
+    default: return "text-[#F25722] bg-orange-50";
+  }
+}
+
 // ── Avatar ────────────────────────────────────────────────────────────────────
 
 function Avatar({
@@ -1010,6 +1031,69 @@ function MasterView({
   );
 }
 
+// ── Enterprise Message Panel ──────────────────────────────────────────────────
+
+function EnterpriseMessagePanel({
+  applicant,
+  name,
+  onClose,
+}: {
+  applicant: any;
+  name: string;
+  onClose: () => void;
+}) {
+  const [, navigate] = useLocation();
+  const [text, setText] = useState("");
+  const [sent, setSent] = useState(false);
+  const sendMsg = trpc.enterprise.messageArtist.useMutation({
+    onSuccess: () => {
+      setSent(true);
+      setTimeout(() => {
+        onClose();
+        navigate("/app/messages");
+      }, 1800);
+    },
+    onError: (e: any) => toast.error(e.message || "Failed to send message"),
+  });
+
+  if (sent) {
+    return (
+      <div className="mt-3 pt-3 border-t border-gray-100 flex flex-col items-center py-6 gap-3">
+        <CheckCircle2 size={24} className="text-green-500" />
+        <p className="font-bold text-sm text-[#111]">Message sent!</p>
+        <p className="text-xs text-gray-400">Opening your messages thread with {name}…</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-100 space-y-3" onClick={(e) => e.stopPropagation()}>
+      <textarea
+        placeholder={`Hi ${name}, I saw your application and…`}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        className="w-full min-h-[100px] resize-none text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F25722]/30"
+        autoFocus
+      />
+      <div className="flex items-center justify-end gap-2">
+        <button onClick={onClose} className="px-3 py-1.5 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+          Cancel
+        </button>
+        <button
+          onClick={() => sendMsg.mutate({ artistUserId: applicant.artistUserId, message: text })}
+          disabled={!text.trim() || sendMsg.isPending}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-[#111] rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+        >
+          {sendMsg.isPending ? (
+            <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+          ) : null}
+          Send Message
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Job Detail View ───────────────────────────────────────────────────────────
 
 type DetailTab = "applicants" | "details";
@@ -1025,6 +1109,7 @@ function JobDetailView({
 }) {
   const [tab, setTab] = useState<DetailTab>("applicants");
   const [checkingOut, setCheckingOut] = useState(false);
+  const [msgOpen, setMsgOpen] = useState<number | null>(null);
   const utils = trpc.useUtils();
 
   const { data: applicantsData, isLoading } =
@@ -1323,84 +1408,102 @@ function JobDetailView({
               No applicants yet.
             </div>
           ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">
-                    Name
-                  </th>
-                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-5 py-3 hidden md:table-cell">
-                    Details
-                  </th>
-                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">
-                    Get In Touch
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {applicants.map((a: any) => {
-                  const name = a.firstName
-                    ? `${a.firstName} ${a.lastName || ""}`.trim()
-                    : a.name || "Artist";
-                  const profileUrl = a.slug
-                    ? `https://artswrk.com/version-live/artist-profile?slug=${a.slug}`
-                    : null;
-                  return (
-                    <tr
-                      key={a.id}
-                      className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors"
-                    >
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <Avatar
-                            src={a.profilePicture}
-                            name={name}
-                            size="md"
+            <div className="space-y-3">
+              <p className="text-xs text-gray-400 font-medium">{applicants.length} applicant{applicants.length !== 1 ? "s" : ""}</p>
+              {applicants.map((a: any) => {
+                const name = a.firstName
+                  ? `${a.firstName} ${a.lastName || ""}`.trim()
+                  : a.name || "Artist";
+                const profileUrl = a.slug ? `/book/${a.slug}` : null;
+                const disciplines = parseList(a.disciplines).slice(0, 3);
+                const picUrl = fixUrl(a.profilePicture);
+                return (
+                  <div
+                    key={a.id}
+                    className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:border-gray-200 hover:shadow-md transition-all"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {picUrl ? (
+                          <img
+                            src={picUrl}
+                            alt={name}
+                            className="w-10 h-10 rounded-full object-cover flex-shrink-0 border-2 border-gray-100"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                           />
-                          <div>
-                            <p className="font-semibold text-sm text-[#111]">
-                              {name}
-                            </p>
-                            {a.location && (
-                              <p className="text-xs text-gray-400 flex items-center gap-1">
-                                <MapPin size={10} />
-                                {a.location}
-                              </p>
-                            )}
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-sm font-black flex-shrink-0">
+                            {(name[0] || "?").toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-bold text-[#111]">{name}</p>
                             {a.artswrkPro && (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-yellow-50 text-yellow-600 text-xs font-semibold">
-                                <Star size={9} fill="currentColor" />
-                                PRO
-                              </span>
+                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600">PRO</span>
                             )}
                           </div>
+                          {a.location && (
+                            <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                              <MapPin size={9} /> {a.location}
+                            </p>
+                          )}
                         </div>
-                      </td>
-                      <td className="px-5 py-4 hidden md:table-cell">
-                        {profileUrl ? (
-                          <a
-                            href={profileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-sm font-semibold text-[#F25722] hover:underline"
-                          >
-                            View Application <ExternalLink size={12} />
-                          </a>
-                        ) : (
-                          <span className="text-sm text-gray-300">—</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4">
-                        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#111] text-white text-xs font-semibold hover:bg-gray-800 transition-colors">
-                          <MessageCircle size={12} />
-                          Message
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+                      {a.status && (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${appStatusColor(a.status)}`}>
+                          {a.status}
+                        </span>
+                      )}
+                    </div>
+                    {disciplines.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {disciplines.map((d: string) => (
+                          <span key={d} className="text-[10px] px-2 py-0.5 rounded-full bg-pink-50 text-pink-600 font-medium">{d}</span>
+                        ))}
+                      </div>
+                    )}
+                    {a.message && (
+                      <p className="text-xs text-gray-600 mt-2 leading-relaxed line-clamp-3">{a.message}</p>
+                    )}
+                    <div className="flex items-center gap-3 mt-3 flex-wrap text-xs text-gray-400">
+                      {a.rate && <span>{a.rate}</span>}
+                      <span className="ml-auto">{fmtDate(a.createdAt)}</span>
+                      {a.resumeLink && (
+                        <a
+                          href={a.resumeLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#F25722] font-semibold hover:underline flex items-center gap-1"
+                        >
+                          <ExternalLink size={10} /> Resume
+                        </a>
+                      )}
+                      {profileUrl && (
+                        <a
+                          href={profileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-500 font-semibold hover:underline flex items-center gap-1"
+                        >
+                          <ExternalLink size={10} /> Profile
+                        </a>
+                      )}
+                      <button
+                        onClick={() => setMsgOpen(msgOpen === a.id ? null : a.id)}
+                        className="flex items-center gap-1 text-[#111] font-semibold hover:text-[#F25722] transition-colors"
+                      >
+                        <MessageCircle size={10} /> Message
+                      </button>
+                    </div>
+                    {/* Inline message panel */}
+                    {msgOpen === a.id && (
+                      <EnterpriseMessagePanel applicant={a} name={name} onClose={() => setMsgOpen(null)} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       )}

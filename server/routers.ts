@@ -2305,6 +2305,29 @@ Fields to extract:
         });
         return { url: session.url };
       }),
+
+    /** Send a direct message to an artist from enterprise job detail view */
+    messageArtist: protectedProcedure
+      .input(z.object({ artistUserId: z.number(), message: z.string().min(1).max(2000) }))
+      .mutation(async ({ input, ctx }) => {
+        const sender = await getUserById(ctx.user.id);
+        if (!sender) throw new Error("User not found");
+        const conversation = await getOrCreateConversation(ctx.user.id, input.artistUserId);
+        await sendMessageToConversation({ conversationId: conversation.id, senderUserId: ctx.user.id, content: input.message });
+        const artist = await getUserById(input.artistUserId);
+        if (artist?.email) {
+          try {
+            await sendSimpleEmail({
+              to: artist.email,
+              subject: `New message from ${(sender as any).clientCompanyName ?? sender.name ?? "Artswrk Client"}`,
+              html: `<p>Hi ${artist.firstName ?? "there"},</p><p>${(sender as any).clientCompanyName ?? sender.name ?? "A client"} has sent you a message on Artswrk:</p><blockquote style="border-left:3px solid #F25722;padding-left:12px;color:#555">${input.message}</blockquote><p><a href="https://artswrk.com/app/messages">Log in to reply</a></p><p>Best,<br/>The Artswrk Team</p>`,
+            });
+          } catch (e) {
+            console.error("[enterprise.messageArtist] Email send failed (non-fatal):", e);
+          }
+        }
+        return { success: true, conversationId: conversation.id };
+      }),
   }),
   // ── Artswrk user queries ─────────────────────────────────────────────────────────────────
   artistDashboard: router({
