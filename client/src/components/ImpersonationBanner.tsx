@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { ArrowLeft, UserCog } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { ADMIN_SESSION_COOKIE_NAME } from "@shared/const";
+import { IMPERSONATION_MARKER_COOKIE } from "@shared/const";
 
 export default function ImpersonationBanner() {
   const [isImpersonating, setIsImpersonating] = useState(false);
@@ -18,8 +18,8 @@ export default function ImpersonationBanner() {
 
   useEffect(() => {
     const cookies = document.cookie.split(";").map((c) => c.trim());
-    const hasBackup = cookies.some((c) => c.startsWith(ADMIN_SESSION_COOKIE_NAME + "="));
-    setIsImpersonating(hasBackup);
+    const hasMarker = cookies.some((c) => c.startsWith(IMPERSONATION_MARKER_COOKIE + "="));
+    setIsImpersonating(hasMarker);
   }, []);
 
   if (!isImpersonating) return null;

@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -938,6 +938,13 @@ export const appRouter = router({
           });
         }
 
+        // Set a non-httpOnly marker cookie so the client-side banner can detect impersonation
+        ctx.res.cookie(IMPERSONATION_MARKER_COOKIE, "1", {
+          ...cookieOptions,
+          httpOnly: false,
+          maxAge: ONE_YEAR_MS,
+        });
+
         // Set the session cookie to the target user's token
         ctx.res.cookie(COOKIE_NAME, targetToken, {
           ...cookieOptions,
@@ -974,8 +981,9 @@ export const appRouter = router({
           maxAge: ONE_YEAR_MS,
         });
 
-        // Clear the backup cookie
+        // Clear the backup cookie and the impersonation marker
         ctx.res.clearCookie(ADMIN_SESSION_COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+        ctx.res.clearCookie(IMPERSONATION_MARKER_COOKIE, { ...cookieOptions, httpOnly: false, maxAge: -1 });
 
         return { success: true };
       }),
