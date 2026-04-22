@@ -15,6 +15,7 @@ import {
   DollarSign, Calendar, Star, UserCheck, Building2, Key,
   AlertCircle, CheckCircle2, Eye, EyeOff, LogOut, Filter,
   MapPin, Clock, ArrowUpRight, UserCog, ArrowLeft, Sparkles, Globe, ExternalLink, Megaphone,
+  Plus, Edit2, Mail, ChevronDown, ToggleLeft, ToggleRight, Instagram, Link as LinkIcon, Send,
 } from "lucide-react";
 import AcquisitionSection from "./admin/Acquisition";
 import { ADMIN_SESSION_COOKIE_NAME } from "@shared/const";
@@ -351,8 +352,423 @@ function DashboardSection() {
   );
 }
 
+// ─── Artist constants ─────────────────────────────────────────────────────────
+const MASTER_ARTIST_TYPES = [
+  "Dance Teacher", "Choreographer", "Substitute Teacher", "Competition Coach",
+  "Yoga Instructor", "Pilates Instructor", "Fitness Instructor", "Vocal Coach",
+  "Music Teacher", "Photographer", "Videographer", "Event Performer",
+  "Dance Educator", "Dance Adjudicator", "Acting Coach", "Side Jobs",
+];
+const ARTIST_SERVICES = [
+  "Private Lessons", "Group Classes", "Workshops", "Masterclasses",
+  "Audition Coaching", "Competition Prep", "Choreography", "Performance",
+  "Adjudication", "Photography", "Videography", "Event Coverage",
+];
+const MASTER_STYLES = [
+  "Ballet", "Contemporary", "Jazz", "Hip Hop", "Tap", "Lyrical", "Modern",
+  "Ballroom", "Latin", "Salsa", "Swing", "Breakdancing", "Acrobatics",
+  "Musical Theatre", "Commercial", "K-Pop", "Afrobeats",
+];
+
+// ─── Multi-select chip picker ─────────────────────────────────────────────────
+function ChipPicker({ label, options, selected, onChange }: {
+  label: string;
+  options: string[];
+  selected: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const toggle = (o: string) =>
+    onChange(selected.includes(o) ? selected.filter(x => x !== o) : [...selected, o]);
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{label}</label>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map(o => (
+          <button
+            key={o}
+            type="button"
+            onClick={() => toggle(o)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+              selected.includes(o)
+                ? "bg-[#F25722] border-[#F25722] text-white"
+                : "bg-white border-gray-200 text-gray-600 hover:border-gray-400"
+            }`}
+          >
+            {o}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Admin Artist Form ────────────────────────────────────────────────────────
+function AdminArtistForm({
+  initial,
+  onSave,
+  onCancel,
+  isCreate,
+}: {
+  initial?: any;
+  onSave: (data: any) => void;
+  onCancel: () => void;
+  isCreate?: boolean;
+}) {
+  const parseArr = (v?: string | null) => { try { return JSON.parse(v || "[]") as string[]; } catch { return []; } };
+
+  const [firstName, setFirstName] = useState(initial?.firstName ?? "");
+  const [lastName, setLastName] = useState(initial?.lastName ?? "");
+  const [email, setEmail] = useState(initial?.email ?? "");
+  const [password, setPassword] = useState("");
+  const [pronouns, setPronouns] = useState(initial?.pronouns ?? "");
+  const [location, setLocation] = useState(initial?.location ?? "");
+  const [bio, setBio] = useState(initial?.bio ?? "");
+  const [website, setWebsite] = useState(initial?.website ?? "");
+  const [instagram, setInstagram] = useState(initial?.instagram ?? "");
+  const [tagline, setTagline] = useState(initial?.tagline ?? "");
+  const [profilePicture, setProfilePicture] = useState(initial?.profilePicture ?? "");
+  const [types, setTypes] = useState<string[]>(parseArr(initial?.masterArtistTypes));
+  const [services, setServices] = useState<string[]>(parseArr(initial?.artistServices));
+  const [styles, setStyles] = useState<string[]>(parseArr(initial?.masterStyles));
+  const [artswrkPro, setArtswrkPro] = useState<boolean>(!!initial?.artswrkPro);
+  const [artswrkBasic, setArtswrkBasic] = useState<boolean>(!!initial?.artswrkBasic);
+  const [sendWelcome, setSendWelcome] = useState(true);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    onSave({
+      firstName, lastName, email, pronouns, location, bio, website,
+      instagram, tagline, profilePicture, masterArtistTypes: types,
+      artistServices: services, masterStyles: styles, artswrkPro, artswrkBasic,
+      ...(isCreate ? { password: password || undefined, sendWelcomeEmail: sendWelcome } : {}),
+    });
+  }
+
+  const inputCls = "w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-400 focus:outline-none focus:border-[#F25722] transition-colors bg-white";
+  const labelCls = "block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5";
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-8">
+      {/* Basic Info */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
+        <h3 className="text-sm font-black text-[#111] uppercase tracking-wider">Basic Info</h3>
+
+        {/* Profile picture URL */}
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-xl flex-shrink-0 overflow-hidden">
+            {profilePicture ? (
+              <img src={profilePicture} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+            ) : (
+              <span>{(firstName[0] || "?").toUpperCase()}</span>
+            )}
+          </div>
+          <div className="flex-1">
+            <label className={labelCls}>Profile Picture URL</label>
+            <input value={profilePicture} onChange={e => setProfilePicture(e.target.value)} placeholder="https://..." className={inputCls} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>First Name *</label>
+            <input required value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Jane" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Last Name *</label>
+            <input required value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Doe" className={inputCls} />
+          </div>
+        </div>
+
+        <div>
+          <label className={labelCls}>Email *</label>
+          <input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="jane@example.com" className={inputCls} />
+        </div>
+
+        {isCreate && (
+          <div>
+            <label className={labelCls}>Password (optional — leave blank to set later)</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 characters" className={inputCls} />
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>Pronouns</label>
+            <input value={pronouns} onChange={e => setPronouns(e.target.value)} placeholder="She/her" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Location</label>
+            <input value={location} onChange={e => setLocation(e.target.value)} placeholder="New York, NY" className={inputCls} />
+          </div>
+        </div>
+
+        <div>
+          <label className={labelCls}>Tagline</label>
+          <input value={tagline} onChange={e => setTagline(e.target.value)} placeholder="Short one-liner that appears on their profile" className={inputCls} />
+        </div>
+
+        <div>
+          <label className={labelCls}>Bio</label>
+          <textarea value={bio} onChange={e => setBio(e.target.value)} placeholder="Tell their story…" rows={4} className={`${inputCls} resize-none`} />
+        </div>
+      </div>
+
+      {/* Specialties */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
+        <h3 className="text-sm font-black text-[#111] uppercase tracking-wider">Specialties</h3>
+        <ChipPicker label="Artist Types" options={MASTER_ARTIST_TYPES} selected={types} onChange={setTypes} />
+        <ChipPicker label="Services" options={ARTIST_SERVICES} selected={services} onChange={setServices} />
+        <ChipPicker label="Styles" options={MASTER_STYLES} selected={styles} onChange={setStyles} />
+      </div>
+
+      {/* Social & Web */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+        <h3 className="text-sm font-black text-[#111] uppercase tracking-wider">Social & Web</h3>
+        <div>
+          <label className={labelCls}>Website</label>
+          <input value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://janedoe.com" className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Instagram handle</label>
+          <div className="relative">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
+            <input value={instagram} onChange={e => setInstagram(e.target.value.replace("@", ""))} placeholder="janedoe" className={`${inputCls} pl-8`} />
+          </div>
+        </div>
+      </div>
+
+      {/* Plan */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+        <h3 className="text-sm font-black text-[#111] uppercase tracking-wider">Plan</h3>
+        <div className="flex items-center gap-6">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <button type="button" onClick={() => setArtswrkBasic(v => !v)} className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${artswrkBasic ? "bg-blue-500" : "bg-gray-200"}`}>
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${artswrkBasic ? "translate-x-4" : ""}`} />
+            </button>
+            <span className="text-sm font-medium text-[#111]">Basic</span>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <button type="button" onClick={() => setArtswrkPro(v => !v)} className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${artswrkPro ? "bg-amber-500" : "bg-gray-200"}`}>
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${artswrkPro ? "translate-x-4" : ""}`} />
+            </button>
+            <span className="text-sm font-medium text-[#111]">PRO</span>
+          </label>
+        </div>
+      </div>
+
+      {/* Welcome email (create only) */}
+      {isCreate && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <label className="flex items-center justify-between cursor-pointer">
+            <div>
+              <p className="text-sm font-semibold text-[#111]">Send welcome email</p>
+              <p className="text-xs text-gray-400 mt-0.5">Sends the Artswrk welcome email to this artist after creation</p>
+            </div>
+            <button type="button" onClick={() => setSendWelcome(v => !v)} className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ml-4 ${sendWelcome ? "bg-[#F25722]" : "bg-gray-200"}`}>
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${sendWelcome ? "translate-x-4" : ""}`} />
+            </button>
+          </label>
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex items-center justify-between pt-2">
+        <button type="button" onClick={onCancel} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+          Cancel
+        </button>
+        <button type="submit" className="px-6 py-2.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity">
+          {isCreate ? "Create Artist" : "Save Changes"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ─── Admin Artist Detail ──────────────────────────────────────────────────────
+function AdminArtistDetail({ artistId, onBack, onEdit }: { artistId: number; onBack: () => void; onEdit: () => void }) {
+  const { data: artist, isLoading } = trpc.admin.getArtist.useQuery({ id: artistId });
+  const utils = trpc.useUtils();
+  const sendWelcome = trpc.admin.sendWelcomeEmail.useMutation({
+    onSuccess: () => alert("Welcome email sent!"),
+    onError: (e) => alert("Failed: " + e.message),
+  });
+
+  const parseArr = (v?: string | null) => { try { return JSON.parse(v || "[]") as string[]; } catch { return []; } };
+
+  if (isLoading) return (
+    <div className="flex justify-center py-24">
+      <div className="w-6 h-6 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" />
+    </div>
+  );
+  if (!artist) return <div className="text-center py-24 text-gray-400 text-sm">Artist not found</div>;
+
+  const name = displayName(artist);
+  const types = parseArr(artist.masterArtistTypes);
+  const services = parseArr(artist.artistServices);
+  const styles = parseArr(artist.masterStyles);
+
+  return (
+    <div className="space-y-6">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm">
+        <button onClick={onBack} className="text-gray-400 hover:text-[#F25722] font-medium transition-colors flex items-center gap-1">
+          <ChevronLeft size={14} /> Artists
+        </button>
+        <span className="text-gray-300">/</span>
+        <span className="text-[#111] font-semibold">{name}</span>
+      </div>
+
+      {/* Hero card */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-5">
+            {artist.profilePicture ? (
+              <img src={artist.profilePicture} alt={name} className="w-20 h-20 rounded-2xl object-cover flex-shrink-0" />
+            ) : (
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-2xl flex-shrink-0">
+                {(name[0] || "?").toUpperCase()}
+              </div>
+            )}
+            <div>
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <h2 className="text-2xl font-black text-[#111]">{name}</h2>
+                {artist.artswrkPro && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">PRO</span>}
+                {artist.artswrkBasic && !artist.artswrkPro && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Basic</span>}
+                {artist.priorityList && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">Featured</span>}
+              </div>
+              {artist.tagline && <p className="text-sm text-gray-500 mb-1">{artist.tagline}</p>}
+              <div className="flex items-center gap-4 flex-wrap text-xs text-gray-400">
+                {artist.email && <span className="flex items-center gap-1"><Mail size={11} />{artist.email}</span>}
+                {artist.location && <span className="flex items-center gap-1"><MapPin size={11} />{artist.location}</span>}
+                {artist.pronouns && <span>{artist.pronouns}</span>}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => sendWelcome.mutate({ artistId })}
+              disabled={sendWelcome.isPending}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              <Send size={13} />
+              {sendWelcome.isPending ? "Sending…" : "Send Welcome"}
+            </button>
+            <RunAsButton userId={artist.id} userName={name} userRole="Artist" />
+            <button
+              onClick={onEdit}
+              className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-[#F25722] text-white hover:opacity-90 transition-opacity"
+            >
+              <Edit2 size={13} /> Edit
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Left column */}
+        <div className="lg:col-span-2 space-y-5">
+          {/* Bio */}
+          {artist.bio && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Bio</p>
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{artist.bio}</p>
+            </div>
+          )}
+
+          {/* Specialties */}
+          {(types.length > 0 || services.length > 0 || styles.length > 0) && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Specialties</p>
+              {types.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-2">Artist Types</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {types.map((t: string) => <span key={t} className="px-2.5 py-1 rounded-full bg-pink-50 text-pink-600 text-xs font-medium">{t}</span>)}
+                  </div>
+                </div>
+              )}
+              {services.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-2">Services</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {services.map((s: string) => <span key={s} className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-medium">{s}</span>)}
+                  </div>
+                </div>
+              )}
+              {styles.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-2">Styles</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {styles.map((s: string) => <span key={s} className="px-2.5 py-1 rounded-full bg-purple-50 text-purple-600 text-xs font-medium">{s}</span>)}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Right column */}
+        <div className="space-y-5">
+          {/* Meta */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Details</p>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-400 text-xs">ID</span>
+                <span className="font-mono text-xs text-gray-600">{artist.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400 text-xs">Joined</span>
+                <span className="text-xs text-gray-600">{fmtDate(artist.bubbleCreatedAt || artist.createdAt)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400 text-xs">Plan</span>
+                <span className="text-xs font-semibold">{artist.artswrkPro ? "PRO" : artist.artswrkBasic ? "Basic" : "Free"}</span>
+              </div>
+              {artist.slug && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400 text-xs">Slug</span>
+                  <span className="text-xs text-gray-600 font-mono">@{artist.slug}</span>
+                </div>
+              )}
+              {artist.bookingCount !== null && artist.bookingCount !== 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400 text-xs">Bookings</span>
+                  <span className="text-xs text-gray-600">{artist.bookingCount}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Links */}
+          {(artist.website || artist.instagram) && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Links</p>
+              <div className="space-y-2">
+                {artist.website && (
+                  <a href={artist.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-[#F25722] hover:underline">
+                    <Globe size={12} /> {artist.website}
+                  </a>
+                )}
+                {artist.instagram && (
+                  <a href={`https://instagram.com/${artist.instagram}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-[#F25722] hover:underline">
+                    <Instagram size={12} /> @{artist.instagram}
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Artists Section ──────────────────────────────────────────────────────────
 function ArtistsSection() {
+  type View = { mode: "list" } | { mode: "detail"; id: number } | { mode: "edit"; id: number } | { mode: "create" };
+  const [view, setView] = useState<View>({ mode: "list" });
+
   const [search, setSearch] = useState("");
   const [locationSearch, setLocationSearch] = useState("");
   const [artistType, setArtistType] = useState("");
@@ -378,22 +794,100 @@ function ArtistsSection() {
     plan: plan || undefined,
     limit: LIMIT,
     offset: (page - 1) * LIMIT,
+  }, { enabled: view.mode === "list" });
+
+  const utils = trpc.useUtils();
+
+  const updateArtist = trpc.admin.updateArtist.useMutation({
+    onSuccess: (updated) => {
+      utils.admin.getArtist.invalidate({ id: (view as any).id });
+      utils.admin.artists.invalidate();
+      if (updated) setView({ mode: "detail", id: updated.id });
+    },
+    onError: (e) => alert("Save failed: " + e.message),
   });
 
-  const ARTIST_TYPES = ["Dance Educator", "Photographer", "Dance Adjudicator", "Videographer", "Acting Coach", "Vocal Coach", "Side Jobs", "Music Teacher"];
+  const createArtist = trpc.admin.createArtist.useMutation({
+    onSuccess: (created) => {
+      utils.admin.artists.invalidate();
+      if (created) setView({ mode: "detail", id: created.id });
+    },
+    onError: (e) => alert("Create failed: " + e.message),
+  });
+
   const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
+  // ── Sub-views ──────────────────────────────────────────────────────────────
+  if (view.mode === "detail") {
+    return (
+      <AdminArtistDetail
+        artistId={view.id}
+        onBack={() => setView({ mode: "list" })}
+        onEdit={() => setView({ mode: "edit", id: view.id })}
+      />
+    );
+  }
+
+  if (view.mode === "edit") {
+    const id = view.id;
+    return (
+      <AdminArtistEditWrapper
+        artistId={id}
+        onBack={() => setView({ mode: "detail", id })}
+        onSave={(data: any) => updateArtist.mutate({ id, ...data })}
+        isSaving={updateArtist.isPending}
+      />
+    );
+  }
+
+  if (view.mode === "create") {
+    return (
+      <div className="space-y-5">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-2 text-sm">
+          <button onClick={() => setView({ mode: "list" })} className="text-gray-400 hover:text-[#F25722] font-medium transition-colors flex items-center gap-1">
+            <ChevronLeft size={14} /> Artists
+          </button>
+          <span className="text-gray-300">/</span>
+          <span className="text-[#111] font-semibold">Create Artist</span>
+        </div>
+        <div>
+          <h1 className="text-2xl font-black text-[#111]">Create Artist</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Add a new artist to the platform</p>
+        </div>
+        <AdminArtistForm
+          isCreate
+          onCancel={() => setView({ mode: "list" })}
+          onSave={(data: any) => createArtist.mutate(data)}
+        />
+        {createArtist.isPending && (
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="w-4 h-4 border-2 border-gray-300 border-t-[#F25722] rounded-full animate-spin" />
+            Creating artist…
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── List view ──────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-black text-[#111]">All Artists ({data?.total?.toLocaleString() ?? "…"})</h1>
+        <button
+          onClick={() => setView({ mode: "create" })}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity"
+        >
+          <Plus size={15} /> Create Artist
+        </button>
       </div>
 
       {/* Filters */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-wrap gap-3">
         <select value={artistType} onChange={e => { setArtistType(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
           <option value="">Artist Type</option>
-          {ARTIST_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          {MASTER_ARTIST_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
         <select value={state} onChange={e => { setState(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
           <option value="">State</option>
@@ -436,7 +930,11 @@ function ArtistsSection() {
               ) : data?.artists.map(a => {
                 const types = (() => { try { return JSON.parse(a.masterArtistTypes || "[]"); } catch { return []; } })();
                 return (
-                  <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                  <tr
+                    key={a.id}
+                    className="border-b border-gray-50 hover:bg-orange-50/40 transition-colors cursor-pointer"
+                    onClick={() => setView({ mode: "detail", id: a.id })}
+                  >
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
                         {a.profilePicture ? (
@@ -471,8 +969,16 @@ function ArtistsSection() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(a.bubbleCreatedAt || a.createdAt)}</td>
-                    <td className="px-4 py-3">
-                      <RunAsButton userId={a.id} userName={displayName(a)} userRole="Artist" />
+                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => setView({ mode: "detail", id: a.id })}
+                          className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors"
+                        >
+                          <Eye size={11} /> View
+                        </button>
+                        <RunAsButton userId={a.id} userName={displayName(a)} userRole="Artist" />
+                      </div>
                     </td>
                   </tr>
                 );
@@ -486,6 +992,47 @@ function ArtistsSection() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Edit wrapper (loads artist then renders form) ────────────────────────────
+function AdminArtistEditWrapper({ artistId, onBack, onSave, isSaving }: {
+  artistId: number;
+  onBack: () => void;
+  onSave: (data: any) => void;
+  isSaving: boolean;
+}) {
+  const { data: artist, isLoading } = trpc.admin.getArtist.useQuery({ id: artistId });
+
+  if (isLoading) return (
+    <div className="flex justify-center py-24">
+      <div className="w-6 h-6 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" />
+    </div>
+  );
+  if (!artist) return <div className="text-center py-24 text-gray-400 text-sm">Artist not found</div>;
+
+  return (
+    <div className="space-y-5">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm">
+        <button onClick={onBack} className="text-gray-400 hover:text-[#F25722] font-medium transition-colors flex items-center gap-1">
+          <ChevronLeft size={14} /> {displayName(artist)}
+        </button>
+        <span className="text-gray-300">/</span>
+        <span className="text-[#111] font-semibold">Edit</span>
+      </div>
+      <div>
+        <h1 className="text-2xl font-black text-[#111]">Edit Artist</h1>
+        <p className="text-sm text-gray-400 mt-0.5">{displayName(artist)} · {artist.email}</p>
+      </div>
+      <AdminArtistForm initial={artist} onCancel={onBack} onSave={onSave} />
+      {isSaving && (
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="w-4 h-4 border-2 border-gray-300 border-t-[#F25722] rounded-full animate-spin" />
+          Saving…
+        </div>
+      )}
     </div>
   );
 }

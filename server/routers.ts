@@ -252,6 +252,145 @@ export const appRouter = router({
         return getAdminArtists(input);
       }),
 
+    /** Get a single artist (full user row) by ID — admin only */
+    getArtist: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        return getUserById(input.id);
+      }),
+
+    /** Update artist fields — admin only */
+    updateArtist: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+        email: z.string().email().optional(),
+        pronouns: z.string().optional(),
+        location: z.string().optional(),
+        bio: z.string().optional(),
+        website: z.string().optional(),
+        instagram: z.string().optional(),
+        tiktok: z.string().optional(),
+        youtube: z.string().optional(),
+        profilePicture: z.string().optional(),
+        masterArtistTypes: z.array(z.string()).optional(),
+        artistServices: z.array(z.string()).optional(),
+        masterStyles: z.array(z.string()).optional(),
+        tagline: z.string().optional(),
+        credits: z.string().optional(),
+        artswrkPro: z.boolean().optional(),
+        artswrkBasic: z.boolean().optional(),
+        priorityList: z.boolean().optional(),
+        slug: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { id, masterArtistTypes, artistServices, masterStyles, ...rest } = input;
+        const { getDb } = await import("./db");
+        const { users: usersTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const db = await getDb();
+        if (!db) throw new Error("DB unavailable");
+        await db.update(usersTable).set({
+          ...rest,
+          ...(masterArtistTypes !== undefined ? { masterArtistTypes: JSON.stringify(masterArtistTypes) } : {}),
+          ...(artistServices !== undefined ? { artistServices: JSON.stringify(artistServices) } : {}),
+          ...(masterStyles !== undefined ? { masterStyles: JSON.stringify(masterStyles) } : {}),
+        }).where(eq(usersTable.id, id));
+        return getUserById(id);
+      }),
+
+    /** Create a new artist account — admin only */
+    createArtist: protectedProcedure
+      .input(z.object({
+        email: z.string().email(),
+        firstName: z.string().min(1),
+        lastName: z.string().min(1),
+        password: z.string().min(8).optional(),
+        pronouns: z.string().optional(),
+        location: z.string().optional(),
+        bio: z.string().optional(),
+        website: z.string().optional(),
+        instagram: z.string().optional(),
+        profilePicture: z.string().optional(),
+        masterArtistTypes: z.array(z.string()).default([]),
+        artistServices: z.array(z.string()).default([]),
+        masterStyles: z.array(z.string()).default([]),
+        tagline: z.string().optional(),
+        artswrkPro: z.boolean().default(false),
+        artswrkBasic: z.boolean().default(false),
+        sendWelcomeEmail: z.boolean().default(true),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getDb } = await import("./db");
+        const { users: usersTable } = await import("../drizzle/schema");
+        const db = await getDb();
+        if (!db) throw new Error("DB unavailable");
+
+        // Check email not already in use
+        const existing = await getUserByEmail(input.email.toLowerCase().trim());
+        if (existing) throw new Error(`An account with email ${input.email} already exists`);
+
+        // Generate openId for the new user
+        const openId = `admin_${crypto.randomBytes(16).toString("hex")}`;
+
+        // Slug from name
+        const slug = `${input.firstName}-${input.lastName}`.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+
+        const values: any = {
+          openId,
+          email: input.email.toLowerCase().trim(),
+          firstName: input.firstName,
+          lastName: input.lastName,
+          name: `${input.firstName} ${input.lastName}`,
+          slug,
+          userRole: "Artist" as const,
+          pronouns: input.pronouns ?? null,
+          location: input.location ?? null,
+          bio: input.bio ?? null,
+          website: input.website ?? null,
+          instagram: input.instagram ?? null,
+          profilePicture: input.profilePicture ?? null,
+          masterArtistTypes: input.masterArtistTypes.length ? JSON.stringify(input.masterArtistTypes) : null,
+          artistServices: input.artistServices.length ? JSON.stringify(input.artistServices) : null,
+          masterStyles: input.masterStyles.length ? JSON.stringify(input.masterStyles) : null,
+          tagline: input.tagline ?? null,
+          artswrkPro: input.artswrkPro,
+          artswrkBasic: input.artswrkBasic,
+          userSignedUp: true,
+          onboardingStep: 4,
+        };
+
+        if (input.password) {
+          values.passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
+          values.passwordIsTemporary = false;
+        }
+
+        const result = await db.insert(usersTable).values(values);
+        const newId = (result as any).insertId as number;
+
+        if (input.sendWelcomeEmail) {
+          sendArtistWelcomeEmail({ to: input.email, firstName: input.firstName })
+            .catch((err) => console.error("[Admin] Welcome email failed:", err.message));
+        }
+
+        return getUserById(newId);
+      }),
+
+    /** Send welcome email to an existing artist — admin only */
+    sendWelcomeEmail: protectedProcedure
+      .input(z.object({ artistId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const artist = await getUserById(input.artistId);
+        if (!artist?.email) throw new Error("Artist has no email address");
+        await sendArtistWelcomeEmail({ to: artist.email, firstName: artist.firstName || artist.name?.split(" ")[0] || "there" });
+        return { success: true };
+      }),
+
     /** All clients with search + filters */
     clients: protectedProcedure
       .input(z.object({
