@@ -252,13 +252,11 @@ function ApplicantDetailView({
               )}
               <div className="flex items-center gap-3 mt-2 flex-wrap">
                 {rate && (
-                  <span className="text-xs text-gray-500 flex items-center gap-1">
-                    <DollarSign size={11} /> {rate}
-                  </span>
+                  <span className="text-xs text-gray-500">{rate}</span>
                 )}
-                {applicant.bookingCount > 0 && (
-                  <span className="text-xs text-gray-400">{applicant.bookingCount} booking{applicant.bookingCount !== 1 ? "s" : ""}</span>
-                )}
+              {applicant.bookingCount > 0 && (
+                <span className="text-xs text-gray-400">{applicant.bookingCount} booking{applicant.bookingCount !== 1 ? "s" : ""}</span>
+              )}
                 {applicant.optionAvailability && (
                   <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-600 font-medium">{applicant.optionAvailability}</span>
                 )}
@@ -300,7 +298,7 @@ function ApplicantDetailView({
       {applicant.message && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Application Message</p>
-          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{applicant.message}</p>
+          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap italic">{applicant.message}</p>
           <p className="text-xs text-gray-400 mt-3">{fmtDate(applicant.bubbleCreatedAt || applicant.createdAt)}</p>
         </div>
       )}
