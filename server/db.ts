@@ -325,6 +325,91 @@ export async function getArtistJobApplications(artistUserId: number, limit = 50,
 }
 
 /**
+ * Admin: get a single job by ID with full client info.
+ */
+export async function getAdminJobById(jobId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.execute(
+    `SELECT j.*,
+       u.firstName AS clientFirstName, u.lastName AS clientLastName,
+       u.name AS clientName, u.email AS clientEmail,
+       u.clientCompanyName, u.id AS clientDbId,
+       COALESCE(u.enterpriseLogoUrl, u.profilePicture) AS clientProfilePicture
+     FROM jobs j
+     LEFT JOIN users u ON j.clientUserId = u.id
+     WHERE j.id = ${jobId}
+     LIMIT 1`
+  );
+  const arr = rows[0] as unknown as any[];
+  return arr[0] ?? null;
+}
+
+/**
+ * Admin: get all applicants (interested_artists) for a job with full artist info.
+ */
+export async function getAdminJobApplicants(jobId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(
+    `SELECT ia.id, ia.status, ia.createdAt, ia.bubbleCreatedAt, ia.converted,
+       ia.artistHourlyRate, ia.clientHourlyRate, ia.artistFlatRate, ia.clientFlatRate,
+       ia.totalHours, ia.isHourlyRate, ia.message, ia.resumeLink,
+       u.id AS artistId, u.firstName AS artistFirstName, u.lastName AS artistLastName,
+       u.name AS artistName, u.email AS artistEmail, u.profilePicture AS artistProfilePicture,
+       u.location AS artistLocation, u.artswrkPro, u.artswrkBasic, u.slug AS artistSlug,
+       u.masterArtistTypes AS artistDisciplines
+     FROM interested_artists ia
+     LEFT JOIN users u ON ia.artistUserId = u.id
+     WHERE ia.jobId = ${jobId}
+     ORDER BY COALESCE(ia.bubbleCreatedAt, ia.createdAt) DESC`
+  );
+  return (rows[0] as unknown as any[]);
+}
+
+/**
+ * Admin: get all bookings for a job with artist info.
+ */
+export async function getAdminJobBookings(jobId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(
+    `SELECT b.id, b.bookingStatus, b.paymentStatus, b.clientRate, b.artistRate,
+       b.totalClientRate, b.totalArtistRate, b.grossProfit, b.hours,
+       b.startDate, b.endDate, b.locationAddress, b.externalPayment,
+       u.firstName AS artistFirstName, u.lastName AS artistLastName,
+       u.name AS artistName, u.profilePicture AS artistProfilePicture, u.id AS artistId
+     FROM bookings b
+     LEFT JOIN users u ON b.artistUserId = u.id
+     WHERE b.jobId = ${jobId} AND (b.deleted IS NULL OR b.deleted = 0)
+     ORDER BY COALESCE(b.startDate, b.bubbleCreatedAt, b.createdAt) DESC`
+  );
+  return (rows[0] as unknown as any[]);
+}
+
+/**
+ * Admin: update a regular job's editable fields.
+ */
+export async function updateAdminJob(jobId: number, fields: Record<string, any>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const { eq } = await import("drizzle-orm");
+  const { jobs: jobsTable } = await import("../drizzle/schema");
+  await db.update(jobsTable).set(fields).where(eq(jobsTable.id, jobId));
+}
+
+/**
+ * Admin: update a PRO (premium) job's editable fields.
+ */
+export async function updateAdminProJob(jobId: number, fields: Record<string, any>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const { eq } = await import("drizzle-orm");
+  const { premiumJobs: premiumJobsTable } = await import("../drizzle/schema");
+  await db.update(premiumJobsTable).set(fields).where(eq(premiumJobsTable.id, jobId));
+}
+
+/**
  * Admin: get all jobs posted by a given client.
  */
 export async function getAdminClientJobs(clientUserId: number, limit = 100, offset = 0) {

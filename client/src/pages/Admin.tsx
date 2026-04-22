@@ -1876,8 +1876,324 @@ function ClientsSection() {
   );
 }
 
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+const jobStatusColor = (s: string | null | undefined) => {
+  if (!s) return "bg-gray-100 text-gray-500";
+  if (s === "Active") return "bg-green-50 text-green-600";
+  if (s === "Completed") return "bg-blue-50 text-blue-600";
+  if (s === "Confirmed") return "bg-purple-50 text-purple-600";
+  if (s.includes("Lost") || s.includes("Deleted") || s === "Closed" || s === "Inactive") return "bg-red-50 text-red-500";
+  return "bg-gray-100 text-gray-500";
+};
+
+const appStatusColor = (s: string | null) => {
+  if (!s) return "bg-gray-100 text-gray-500";
+  if (s === "Confirmed") return "bg-green-50 text-green-600";
+  if (s === "Declined") return "bg-red-50 text-red-500";
+  return "bg-blue-50 text-blue-600";
+};
+
+// ─── Job Applicants Tab ───────────────────────────────────────────────────────
+function JobApplicantsTab({ jobId }: { jobId: number }) {
+  const { data: apps, isLoading } = trpc.admin.jobApplicants.useQuery({ jobId });
+
+  if (isLoading) return <div className="flex justify-center py-12"><div className="w-5 h-5 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" /></div>;
+  if (!apps || apps.length === 0) return (
+    <div className="text-center py-16 text-gray-400">
+      <Users size={32} className="mx-auto mb-3 opacity-20" />
+      <p className="text-sm">No applicants yet</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-gray-400 font-medium">{apps.length} applicant{apps.length !== 1 ? "s" : ""}</p>
+      {apps.map((a: any) => {
+        const name = [a.artistFirstName, a.artistLastName].filter(Boolean).join(" ") || a.artistName || "Unknown Artist";
+        const types = (() => { try { return JSON.parse(a.artistDisciplines || "[]").slice(0, 3) as string[]; } catch { return []; } })();
+        const profileUrl = a.artistSlug ? `https://artswrk.com/artists/${a.artistSlug}` : null;
+        return (
+          <div key={a.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                {a.artistProfilePicture ? (
+                  <img src={a.artistProfilePicture} alt={name} className="w-10 h-10 rounded-full object-cover flex-shrink-0 border-2 border-gray-100" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-sm font-black flex-shrink-0">
+                    {(name[0] || "?").toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-bold text-[#111]">{name}</p>
+                    {a.artswrkPro && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600">PRO</span>}
+                  </div>
+                  {a.artistLocation && <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5"><MapPin size={9} />{a.artistLocation}</p>}
+                </div>
+              </div>
+              <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${appStatusColor(a.status)}`}>
+                {a.status || "Interested"}
+              </span>
+            </div>
+            {types.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {types.map((t: string) => <span key={t} className="text-[10px] px-2 py-0.5 rounded-full bg-pink-50 text-pink-600 font-medium">{t}</span>)}
+              </div>
+            )}
+            {a.message && <p className="text-xs text-gray-600 mt-2 leading-relaxed line-clamp-3">{a.message}</p>}
+            <div className="flex items-center gap-3 mt-3 flex-wrap text-xs text-gray-400">
+              {(a.artistHourlyRate || a.clientHourlyRate) && <span className="flex items-center gap-1"><DollarSign size={10} />${a.artistHourlyRate ?? a.clientHourlyRate}/hr</span>}
+              {a.converted && <span className="flex items-center gap-1 text-green-500 font-medium"><CheckCircle2 size={10} />Converted to booking</span>}
+              <span className="ml-auto">{fmtDate(a.bubbleCreatedAt || a.createdAt)}</span>
+              {a.resumeLink && <a href={a.resumeLink} target="_blank" rel="noopener noreferrer" className="text-[#F25722] font-semibold hover:underline flex items-center gap-1"><ExternalLink size={10} />Resume</a>}
+              {profileUrl && <a href={profileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 font-semibold hover:underline flex items-center gap-1"><ExternalLink size={10} />Profile</a>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Job Bookings Tab ─────────────────────────────────────────────────────────
+function JobBookingsTab({ jobId }: { jobId: number }) {
+  const { data: bookings, isLoading } = trpc.admin.jobBookings.useQuery({ jobId });
+
+  if (isLoading) return <div className="flex justify-center py-12"><div className="w-5 h-5 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" /></div>;
+  if (!bookings || bookings.length === 0) return (
+    <div className="text-center py-16 text-gray-400">
+      <BookOpen size={32} className="mx-auto mb-3 opacity-20" />
+      <p className="text-sm">No bookings for this job</p>
+    </div>
+  );
+
+  const bkStatusColor = (s: string | null) => {
+    if (s === "Completed") return "bg-green-50 text-green-600";
+    if (s === "Confirmed") return "bg-blue-50 text-blue-600";
+    if (s === "Cancelled") return "bg-red-50 text-red-500";
+    return "bg-amber-50 text-amber-600";
+  };
+
+  const totalRevenue = bookings.reduce((sum: number, b: any) => sum + (b.bookingStatus === "Completed" ? Number(b.totalClientRate ?? b.clientRate ?? 0) : 0), 0);
+
+  return (
+    <div className="space-y-4">
+      {totalRevenue > 0 && (
+        <div className="bg-green-50 rounded-xl p-4 flex items-center gap-3">
+          <DollarSign size={16} className="text-green-600" />
+          <div>
+            <p className="text-sm font-bold text-green-800">Revenue from completed bookings: {fmt$(totalRevenue)}</p>
+            <p className="text-xs text-green-600">{bookings.filter((b: any) => b.bookingStatus === "Completed").length} of {bookings.length} completed</p>
+          </div>
+        </div>
+      )}
+      {bookings.map((b: any) => {
+        const name = [b.artistFirstName, b.artistLastName].filter(Boolean).join(" ") || b.artistName || "Unknown";
+        return (
+          <div key={b.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                {b.artistProfilePicture ? (
+                  <img src={b.artistProfilePicture} alt={name} className="w-9 h-9 rounded-full object-cover flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-xs font-black flex-shrink-0">{(name[0] || "?").toUpperCase()}</div>
+                )}
+                <p className="text-sm font-semibold text-[#111]">{name}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${bkStatusColor(b.bookingStatus)}`}>{b.bookingStatus || "—"}</span>
+                {(b.totalClientRate || b.clientRate) && <span className="text-xs font-bold text-[#111]">{fmt$(Number(b.totalClientRate ?? b.clientRate))}</span>}
+              </div>
+            </div>
+            <div className="flex items-center gap-4 mt-3 flex-wrap text-xs text-gray-400">
+              {b.startDate && <span className="flex items-center gap-1"><Calendar size={10} />{fmtDate(b.startDate)}</span>}
+              {b.locationAddress && <span className="flex items-center gap-1"><MapPin size={10} />{b.locationAddress}</span>}
+              {b.hours && <span className="flex items-center gap-1"><Clock size={10} />{b.hours}h</span>}
+              {b.paymentStatus && <span className={`flex items-center gap-1 font-medium ${b.paymentStatus === "Paid" ? "text-green-500" : "text-amber-500"}`}><CreditCard size={10} />{b.paymentStatus}</span>}
+              {b.totalArtistRate || b.artistRate ? <span className="text-gray-400">Artist: {fmt$(Number(b.totalArtistRate ?? b.artistRate))}</span> : null}
+              {b.grossProfit ? <span className="text-gray-400">Profit: {fmt$(Number(b.grossProfit))}</span> : null}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Admin Job Detail ─────────────────────────────────────────────────────────
+function AdminJobDetail({ jobId, onBack, onEdit }: { jobId: number; onBack: () => void; onEdit: () => void }) {
+  const { data: job, isLoading } = trpc.admin.getJob.useQuery({ id: jobId });
+  const [tab, setTab] = useState<"overview" | "applicants" | "bookings">("overview");
+
+  if (isLoading) return <div className="flex justify-center py-24"><div className="w-6 h-6 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" /></div>;
+  if (!job) return <div className="text-center py-24 text-gray-400 text-sm">Job not found</div>;
+
+  const clientName = job.clientCompanyName || (job.clientFirstName ? displayName({ name: job.clientName, firstName: job.clientFirstName, lastName: job.clientLastName }) : null) || job.clientEmail || "Unknown Client";
+
+  const TABS = [
+    { id: "overview" as const, label: "Overview" },
+    { id: "applicants" as const, label: "Applicants" },
+    { id: "bookings" as const, label: "Bookings" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 text-sm">
+        <button onClick={onBack} className="text-gray-400 hover:text-[#F25722] font-medium transition-colors flex items-center gap-1"><ChevronLeft size={14} /> Jobs</button>
+        <span className="text-gray-300">/</span>
+        <span className="text-[#111] font-semibold line-clamp-1 max-w-xs">{job.description?.slice(0, 50) || `Job #${job.id}`}</span>
+      </div>
+
+      {/* Hero */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            {job.clientProfilePicture ? (
+              <img src={job.clientProfilePicture} alt={clientName} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
+            ) : (
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-xl flex-shrink-0">
+                {(clientName[0] || "?").toUpperCase()}
+              </div>
+            )}
+            <div>
+              <p className="text-xs text-gray-400 font-medium mb-0.5">Posted by</p>
+              <h2 className="text-xl font-black text-[#111]">{clientName}</h2>
+              <div className="flex items-center gap-3 mt-2 flex-wrap">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${jobStatusColor(job.requestStatus)}`}>{job.requestStatus || "—"}</span>
+                {job.hiringCategory && <span className="text-[10px] px-2 py-0.5 rounded-full bg-pink-50 text-pink-600 font-semibold">{job.hiringCategory}</span>}
+                {job.locationAddress && <span className="flex items-center gap-1 text-xs text-gray-400"><MapPin size={10} />{job.locationAddress}</span>}
+                {job.startDate && <span className="flex items-center gap-1 text-xs text-gray-400"><Calendar size={10} />{fmtDate(job.startDate)}</span>}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={onEdit} className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-[#F25722] text-white hover:opacity-90 transition-opacity">
+              <Edit2 size={13} /> Edit
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-gray-100">
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${tab === t.id ? "border-[#F25722] text-[#F25722]" : "border-transparent text-gray-400 hover:text-gray-700"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "overview" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="lg:col-span-2 space-y-5">
+            {job.description && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Description</p>
+                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{job.description}</p>
+              </div>
+            )}
+          </div>
+          <div className="space-y-5">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Details</p>
+              <div className="space-y-3">
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Job ID</span><span className="font-mono text-xs text-gray-600">{job.id}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Posted</span><span className="text-xs text-gray-600">{fmtDate(job.bubbleCreatedAt || job.createdAt)}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Rate</span><span className="text-xs font-semibold text-[#111]">{job.openRate ? "Open Rate" : job.clientHourlyRate ? `$${job.clientHourlyRate}/hr` : "—"}</span></div>
+                {job.artistHourlyRate && <div className="flex justify-between"><span className="text-gray-400 text-xs">Artist Rate</span><span className="text-xs text-gray-600">${job.artistHourlyRate}/hr</span></div>}
+                {job.dateType && <div className="flex justify-between"><span className="text-gray-400 text-xs">Date Type</span><span className="text-xs text-gray-600">{job.dateType}</span></div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {tab === "applicants" && <JobApplicantsTab jobId={jobId} />}
+      {tab === "bookings" && <JobBookingsTab jobId={jobId} />}
+    </div>
+  );
+}
+
+// ─── Admin Job Edit Wrapper ───────────────────────────────────────────────────
+function AdminJobEditWrapper({ jobId, onBack, onSave, isSaving }: { jobId: number; onBack: () => void; onSave: (d: any) => void; isSaving: boolean }) {
+  const { data: job, isLoading } = trpc.admin.getJob.useQuery({ id: jobId });
+  const [description, setDescription] = useState("");
+  const [requestStatus, setRequestStatus] = useState("");
+  const [locationAddress, setLocationAddress] = useState("");
+  const [hiringCategory, setHiringCategory] = useState("");
+  const [clientHourlyRate, setClientHourlyRate] = useState("");
+  const [artistHourlyRate, setArtistHourlyRate] = useState("");
+  const [openRate, setOpenRate] = useState(false);
+
+  useEffect(() => {
+    if (job) {
+      setDescription(job.description || "");
+      setRequestStatus(job.requestStatus || "");
+      setLocationAddress(job.locationAddress || "");
+      setHiringCategory(job.hiringCategory || "");
+      setClientHourlyRate(job.clientHourlyRate ? String(job.clientHourlyRate) : "");
+      setArtistHourlyRate(job.artistHourlyRate ? String(job.artistHourlyRate) : "");
+      setOpenRate(!!job.openRate);
+    }
+  }, [job]);
+
+  if (isLoading) return <div className="flex justify-center py-24"><div className="w-6 h-6 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" /></div>;
+
+  const JOB_STATUSES = ["Active", "Completed", "Lost - No Revenue", "Confirmed", "Deleted by Client", "Submissions Paused", "Pending Payment"];
+  const inputCls = "w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-400 focus:outline-none focus:border-[#F25722] transition-colors bg-white";
+  const labelCls = "block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5";
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-2 text-sm">
+        <button onClick={onBack} className="text-gray-400 hover:text-[#F25722] font-medium transition-colors flex items-center gap-1"><ChevronLeft size={14} /> Job</button>
+        <span className="text-gray-300">/</span>
+        <span className="text-[#111] font-semibold">Edit</span>
+      </div>
+      <h1 className="text-2xl font-black text-[#111]">Edit Job #{jobId}</h1>
+      <form onSubmit={e => { e.preventDefault(); onSave({ description, requestStatus, locationAddress, hiringCategory, clientHourlyRate: clientHourlyRate ? Number(clientHourlyRate) : null, artistHourlyRate: artistHourlyRate ? Number(artistHourlyRate) : null, openRate }); }} className="space-y-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
+          <div><label className={labelCls}>Description</label><textarea value={description} onChange={e => setDescription(e.target.value)} rows={5} className={`${inputCls} resize-none`} /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className={labelCls}>Status</label>
+              <select value={requestStatus} onChange={e => setRequestStatus(e.target.value)} className={inputCls}>
+                <option value="">—</option>
+                {JOB_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div><label className={labelCls}>Location</label><input value={locationAddress} onChange={e => setLocationAddress(e.target.value)} placeholder="City, State" className={inputCls} /></div>
+          </div>
+          <div><label className={labelCls}>Hiring Category</label>
+            <select value={hiringCategory} onChange={e => setHiringCategory(e.target.value)} className={inputCls}>
+              <option value="">—</option>
+              {HIRING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className={labelCls}>Client Rate ($/hr)</label><input type="number" value={clientHourlyRate} onChange={e => setClientHourlyRate(e.target.value)} placeholder="0" className={inputCls} /></div>
+            <div><label className={labelCls}>Artist Rate ($/hr)</label><input type="number" value={artistHourlyRate} onChange={e => setArtistHourlyRate(e.target.value)} placeholder="0" className={inputCls} /></div>
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <button type="button" onClick={() => setOpenRate(v => !v)} className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${openRate ? "bg-[#F25722]" : "bg-gray-200"}`}>
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${openRate ? "translate-x-4" : ""}`} />
+            </button>
+            <span className="text-sm font-medium text-[#111]">Open Rate (artist sets own rate)</span>
+          </label>
+        </div>
+        <div className="flex items-center justify-between">
+          <button type="button" onClick={onBack} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+          <button type="submit" className="px-6 py-2.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity">Save Changes</button>
+        </div>
+      </form>
+      {isSaving && <div className="flex items-center gap-2 text-sm text-gray-500"><div className="w-4 h-4 border-2 border-gray-300 border-t-[#F25722] rounded-full animate-spin" />Saving…</div>}
+    </div>
+  );
+}
+
 // ─── Jobs Section ─────────────────────────────────────────────────────────────
 function JobsSection() {
+  type View = { mode: "list" } | { mode: "detail"; id: number } | { mode: "edit"; id: number };
+  const [view, setView] = useState<View>({ mode: "list" });
+
   const [search, setSearch] = useState("");
   const [companySearch, setCompanySearch] = useState("");
   const [locationSearch, setLocationSearch] = useState("");
@@ -1891,12 +2207,7 @@ function JobsSection() {
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      setDebouncedSearch(search);
-      setDebouncedCompany(companySearch);
-      setDebouncedLocation(locationSearch);
-      setPage(1);
-    }, 400);
+    timer.current = setTimeout(() => { setDebouncedSearch(search); setDebouncedCompany(companySearch); setDebouncedLocation(locationSearch); setPage(1); }, 400);
     return () => clearTimeout(timer.current);
   }, [search, companySearch, locationSearch]);
 
@@ -1907,24 +2218,29 @@ function JobsSection() {
     status: status || undefined,
     limit: LIMIT,
     offset: (page - 1) * LIMIT,
+  }, { enabled: view.mode === "list" });
+
+  const utils = trpc.useUtils();
+  const updateJob = trpc.admin.updateJob.useMutation({
+    onSuccess: (updated) => {
+      utils.admin.getJob.invalidate({ id: (view as any).id });
+      utils.admin.jobs.invalidate();
+      if (updated) setView({ mode: "detail", id: updated.id });
+    },
+    onError: (e) => alert("Save failed: " + e.message),
   });
 
   const JOB_STATUSES = ["Active", "Completed", "Lost - No Revenue", "Confirmed", "Deleted by Client", "Submissions Paused", "Pending Payment"];
 
-  const statusColor = (s: string | null | undefined) => {
-    if (!s) return "bg-gray-100 text-gray-500";
-    if (s === "Active") return "bg-green-50 text-green-600";
-    if (s === "Completed") return "bg-blue-50 text-blue-600";
-    if (s === "Confirmed") return "bg-purple-50 text-purple-600";
-    if (s.includes("Lost") || s.includes("Deleted")) return "bg-red-50 text-red-500";
-    return "bg-gray-100 text-gray-500";
-  };
+  if (view.mode === "detail") return <AdminJobDetail jobId={view.id} onBack={() => setView({ mode: "list" })} onEdit={() => setView({ mode: "edit", id: view.id })} />;
+  if (view.mode === "edit") {
+    const id = view.id;
+    return <AdminJobEditWrapper jobId={id} onBack={() => setView({ mode: "detail", id })} onSave={(d) => updateJob.mutate({ id, ...d })} isSaving={updateJob.isPending} />;
+  }
 
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-black text-[#111]">All Jobs ({data?.total?.toLocaleString() ?? "…"})</h1>
-
-      {/* Filters */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-wrap gap-3">
         <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
           <option value="">Status</option>
@@ -1932,26 +2248,24 @@ function JobsSection() {
         </select>
         <div className="flex items-center gap-2 flex-1 min-w-[150px] bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
           <Search size={13} className="text-gray-400 flex-shrink-0" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search Clients..." className="bg-transparent text-xs text-[#111] placeholder-gray-400 focus:outline-none w-full" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search clients…" className="bg-transparent text-xs text-[#111] placeholder-gray-400 focus:outline-none w-full" />
         </div>
         <div className="flex items-center gap-2 flex-1 min-w-[150px] bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
           <Building2 size={13} className="text-gray-400 flex-shrink-0" />
-          <input value={companySearch} onChange={e => setCompanySearch(e.target.value)} placeholder="Search Company..." className="bg-transparent text-xs text-[#111] placeholder-gray-400 focus:outline-none w-full" />
+          <input value={companySearch} onChange={e => setCompanySearch(e.target.value)} placeholder="Search company…" className="bg-transparent text-xs text-[#111] placeholder-gray-400 focus:outline-none w-full" />
         </div>
         <div className="flex items-center gap-2 flex-1 min-w-[150px] bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
           <MapPin size={13} className="text-gray-400 flex-shrink-0" />
-          <input value={locationSearch} onChange={e => setLocationSearch(e.target.value)} placeholder="Search Location..." className="bg-transparent text-xs text-[#111] placeholder-gray-400 focus:outline-none w-full" />
+          <input value={locationSearch} onChange={e => setLocationSearch(e.target.value)} placeholder="Search location…" className="bg-transparent text-xs text-[#111] placeholder-gray-400 focus:outline-none w-full" />
         </div>
       </div>
-
-      {/* Table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Client / Company</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Details</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Description</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Rate</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Status</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Posted</th>
@@ -1963,40 +2277,24 @@ function JobsSection() {
               ) : data?.jobs.length === 0 ? (
                 <tr><td colSpan={5} className="px-5 py-10 text-center text-gray-400 text-xs">No jobs found</td></tr>
               ) : data?.jobs.map(j => (
-                <tr key={j.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                <tr key={j.id} className="border-b border-gray-50 hover:bg-orange-50/40 transition-colors cursor-pointer" onClick={() => setView({ mode: "detail", id: j.id })}>
                   <td className="px-5 py-3">
-                    <p className="font-semibold text-[#111] text-xs">
-                      {j.clientName || j.clientFirstName ? displayName({ name: j.clientName, firstName: j.clientFirstName, lastName: j.clientLastName }) : "—"}
-                    </p>
+                    <p className="font-semibold text-[#111] text-xs">{j.clientName || j.clientFirstName ? displayName({ name: j.clientName, firstName: j.clientFirstName, lastName: j.clientLastName }) : "—"}</p>
                     <p className="text-[10px] text-gray-400">{j.clientCompanyName || j.clientEmail || "—"}</p>
                   </td>
                   <td className="px-4 py-3 max-w-[200px]">
                     <p className="text-xs text-gray-700 line-clamp-2">{j.description || "—"}</p>
-                    {j.locationAddress && (
-                      <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
-                        <MapPin size={9} /> {j.locationAddress}
-                      </p>
-                    )}
+                    {j.locationAddress && <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5"><MapPin size={9} />{j.locationAddress}</p>}
                   </td>
-                  <td className="px-4 py-3 text-xs font-semibold text-[#111]">
-                    {j.openRate ? "Open Rate" : j.clientHourlyRate ? `$${j.clientHourlyRate}/hr` : "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColor(j.requestStatus)}`}>
-                      {j.requestStatus || "—"}
-                    </span>
-                  </td>
+                  <td className="px-4 py-3 text-xs font-semibold text-[#111]">{j.openRate ? "Open Rate" : j.clientHourlyRate ? `$${j.clientHourlyRate}/hr` : "—"}</td>
+                  <td className="px-4 py-3"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${jobStatusColor(j.requestStatus)}`}>{j.requestStatus || "—"}</span></td>
                   <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(j.bubbleCreatedAt || j.createdAt)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {data && (
-          <div className="px-5 py-3">
-            <Pagination page={page} total={data.total} limit={LIMIT} onPage={setPage} />
-          </div>
-        )}
+        {data && <div className="px-5 py-3"><Pagination page={page} total={data.total} limit={LIMIT} onPage={setPage} /></div>}
       </div>
     </div>
   );
@@ -2180,7 +2478,7 @@ function PaymentsSection() {
   );
 }
 
-// ─── PRO Job Detail Modal ──────────────────────────────────────────────────
+// ─── PRO Job types ────────────────────────────────────────────────────────────
 type ProJob = {
   id: number;
   company?: string | null;
@@ -2196,273 +2494,344 @@ type ProJob = {
   applyLink?: string | null;
   applyDirect?: boolean | null;
   featured?: boolean | null;
+  tag?: string | null;
   createdAt?: Date | string | null;
   interestedCount?: number;
 };
 
-function ProJobModal({ job, onClose }: { job: ProJob; onClose: () => void }) {
-  const { data: artists, isLoading } = trpc.admin.premiumJobArtists.useQuery({ jobId: job.id });
+// ─── PRO Job: Interested Artists Tab ──────────────────────────────────────────
+function ProJobInterestedArtistsTab({ jobId, jobBudget }: { jobId: number; jobBudget?: string | null }) {
+  const { data: artists, isLoading } = trpc.admin.premiumJobArtists.useQuery({ jobId });
 
-  // Close on backdrop click or Escape key
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  const logoSrc = job.logo ? (job.logo.startsWith('//') ? `https:${job.logo}` : job.logo) : null;
-  const cleanDesc = job.description ? job.description.replace(/\[.*?\]/g, '').trim() : '';
-
+  if (isLoading) return (
+    <div className="flex items-center justify-center py-16">
+      <div className="w-5 h-5 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" />
+    </div>
+  );
+  if (!artists || (artists as any[]).length === 0) return (
+    <div className="text-center py-16">
+      <Users size={32} className="text-gray-200 mx-auto mb-2" />
+      <p className="text-sm text-gray-400">No interested artists recorded yet.</p>
+    </div>
+  );
   return (
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-
-      {/* Modal */}
-      <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
-
-        {/* Header: job details */}
-        <div className="flex-shrink-0 px-6 pt-6 pb-5 border-b border-gray-100">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-4">
-              {logoSrc ? (
-                <img src={logoSrc} alt={job.company || ''}
-                  className="w-14 h-14 rounded-xl object-cover border border-gray-100 flex-shrink-0"
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-              ) : (
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-xl font-black flex-shrink-0">
-                  {(job.company || 'P')[0]}
-                </div>
-              )}
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-lg font-black text-[#111]">{job.serviceType || 'PRO Job'}</h2>
-                  {job.featured && (
-                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-600 border border-yellow-200">Featured</span>
-                  )}
-                </div>
-                <p className="text-sm text-gray-500 font-medium mt-0.5">{job.company || '—'}</p>
-                <div className="flex items-center gap-3 mt-2 flex-wrap">
-                  {job.category && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 font-semibold">{job.category}</span>
-                  )}
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    job.status === 'Active' ? 'bg-green-50 text-green-600'
-                    : job.status === 'Inactive' || job.status === 'Closed' ? 'bg-red-50 text-red-500'
-                    : 'bg-gray-100 text-gray-500'
-                  }`}>{job.status || 'Unknown'}</span>
-                  {job.workFromAnywhere && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-blue-500 font-semibold">
-                      <Globe size={10} /> Remote
-                    </span>
-                  )}
-                  {job.location && !job.workFromAnywhere && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-gray-400">
-                      <MapPin size={10} /> {job.location}
-                    </span>
-                  )}
+    <div className="space-y-3">
+      {(artists as any[]).map((a: any) => {
+        const fullName = a.artistFirstName && a.artistLastName
+          ? `${a.artistFirstName} ${a.artistLastName}`
+          : a.artistName || 'Unknown Artist';
+        const initials = (a.artistFirstName || a.artistName || '?')[0].toUpperCase();
+        const profileUrl = a.artistSlug
+          ? `https://artswrk.com/artists/${a.artistSlug}`
+          : a.artistEmail ? `mailto:${a.artistEmail}` : null;
+        return (
+          <div key={a.id} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                {a.artistProfilePicture ? (
+                  <img src={a.artistProfilePicture.startsWith('//') ? `https:${a.artistProfilePicture}` : a.artistProfilePicture} alt={fullName}
+                    className="w-12 h-12 rounded-full object-cover flex-shrink-0 border-2 border-gray-100"
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#ec008c] to-[#ff7171] flex items-center justify-center text-white text-base font-black flex-shrink-0">
+                    {initials}
+                  </div>
+                )}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-bold text-[#111]">{fullName}</p>
+                    {a.artswrkPro && <span className="text-[9px] font-black text-[#F25722] bg-orange-50 px-1.5 py-0.5 rounded-full border border-orange-100">PRO</span>}
+                  </div>
+                  {a.artistLocation && <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1"><MapPin size={10} /> {a.artistLocation}</p>}
                 </div>
               </div>
+              {(a.rate || jobBudget) && (
+                <div className="flex-shrink-0 px-3 py-1.5 rounded-xl bg-[#fce8e4] text-[#F25722] text-xs font-bold">{a.rate || jobBudget}</div>
+              )}
             </div>
-            <button onClick={onClose} className="flex-shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
-              <X size={18} />
-            </button>
+            {a.message && <p className="mt-3 text-xs text-gray-600 leading-relaxed">{a.message.length > 250 ? a.message.substring(0, 250) + '…' : a.message}</p>}
+            {!a.message && a.artistBio && <p className="mt-3 text-xs text-gray-500 leading-relaxed italic">{a.artistBio.length > 200 ? a.artistBio.substring(0, 200) + '…' : a.artistBio}</p>}
+            {a.artistDisciplines && (() => {
+              try {
+                const discs: string[] = JSON.parse(a.artistDisciplines);
+                if (discs.length > 0) return (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {discs.slice(0, 4).map((d: string) => <span key={d} className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{d}</span>)}
+                    {discs.length > 4 && <span className="text-[10px] text-gray-400">+{discs.length - 4} more</span>}
+                  </div>
+                );
+              } catch { return null; }
+              return null;
+            })()}
+            <div className="mt-3 flex gap-2">
+              {a.resumeLink && (
+                <a href={a.resumeLink} target="_blank" rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-[#111] text-white text-xs font-semibold hover:bg-gray-800 transition-all">
+                  View Submission →
+                </a>
+              )}
+              {profileUrl && !a.resumeLink && (
+                <a href={profileUrl} target="_blank" rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-all">
+                  View Profile →
+                </a>
+              )}
+              {profileUrl && a.resumeLink && (
+                <a href={profileUrl} target="_blank" rel="noopener noreferrer"
+                  className="px-3 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition-all">
+                  Profile
+                </a>
+              )}
+            </div>
           </div>
+        );
+      })}
+    </div>
+  );
+}
 
-          {/* Meta row */}
-          <div className="flex items-center gap-5 mt-4 flex-wrap">
-            {job.budget && (
-              <div>
-                <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Budget</p>
-                <p className="text-sm font-bold text-[#111]">{job.budget}</p>
+// ─── PRO Job: Detail Page ──────────────────────────────────────────────────────
+function AdminProJobDetail({ jobId, onBack, onEdit }: { jobId: number; onBack: () => void; onEdit: () => void }) {
+  const [tab, setTab] = useState<"overview" | "artists">("overview");
+  const { data: job, isLoading } = trpc.admin.getProJob.useQuery({ id: jobId });
+
+  if (isLoading) return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" /></div>;
+  if (!job) return <div className="text-center py-24 text-gray-400">PRO Job not found.</div>;
+
+  const logoSrc = job.logo ? (job.logo.startsWith('//') ? `https:${job.logo}` : job.logo) : null;
+  const proJobStatusColor = (s: string | null | undefined) => {
+    if (s === 'Active') return 'bg-green-50 text-green-600';
+    if (s === 'Inactive' || s === 'Closed') return 'bg-red-50 text-red-500';
+    if (s === 'Draft') return 'bg-yellow-50 text-yellow-600';
+    return 'bg-gray-100 text-gray-500';
+  };
+  const cleanDesc = job.description ? job.description.replace(/\[.*?\]/g, '').trim() : '';
+
+  const tabs = [
+    { key: "overview", label: "Overview" },
+    { key: "artists", label: `Interested Artists${(job as any).interestedCount ? ` (${(job as any).interestedCount})` : ''}` },
+  ] as const;
+
+  return (
+    <div className="space-y-5">
+      {/* Breadcrumbs */}
+      <div className="flex items-center gap-2 text-sm">
+        <button onClick={onBack} className="text-gray-400 hover:text-[#F25722] transition-colors font-medium">PRO Jobs</button>
+        <ChevronRight size={14} className="text-gray-300" />
+        <span className="text-[#111] font-semibold">{job.serviceType || `PRO Job #${jobId}`}</span>
+      </div>
+
+      {/* Hero card */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            {logoSrc ? (
+              <img src={logoSrc} alt={job.company || ''} className="w-16 h-16 rounded-xl object-cover border border-gray-100 flex-shrink-0"
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            ) : (
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-2xl font-black flex-shrink-0">
+                {(job.company || 'P')[0]}
               </div>
             )}
             <div>
-              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Posted</p>
-              <p className="text-sm font-medium text-gray-600">{fmtDate(job.createdAt)}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl font-black text-[#111]">{job.serviceType || 'PRO Job'}</h1>
+                {job.featured && <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-600 border border-yellow-200">Featured</span>}
+                {job.applyDirect && <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">Direct Apply</span>}
+              </div>
+              <p className="text-sm text-gray-500 font-medium mt-0.5">{job.company || '—'}</p>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                {job.category && <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 font-semibold">{job.category}</span>}
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${proJobStatusColor(job.status)}`}>{job.status || 'Unknown'}</span>
+                {job.workFromAnywhere
+                  ? <span className="inline-flex items-center gap-1 text-[10px] text-blue-500 font-semibold"><Globe size={10} /> Remote</span>
+                  : job.location && <span className="inline-flex items-center gap-1 text-[10px] text-gray-400"><MapPin size={10} /> {job.location}</span>}
+              </div>
             </div>
-            {job.applyEmail && (
-              <div>
-                <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Apply Email</p>
-                <a href={`mailto:${job.applyEmail}`} className="text-sm font-medium text-[#F25722] hover:underline">{job.applyEmail}</a>
-              </div>
-            )}
-            {job.applyLink && (
-              <div>
-                <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Apply Link</p>
-                <a href={job.applyLink} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-500 hover:underline flex items-center gap-1">
-                  <ExternalLink size={11} /> View
-                </a>
-              </div>
-            )}
           </div>
+          <button onClick={onEdit} className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+            <Edit2 size={13} /> Edit
+          </button>
+        </div>
 
-          {/* Description */}
-          {cleanDesc && (
-            <div className="mt-4 p-3 bg-gray-50 rounded-xl">
-              <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">
-                {cleanDesc.length > 400 ? cleanDesc.substring(0, 400) + '…' : cleanDesc}
-              </p>
+        {/* Meta row */}
+        <div className="flex flex-wrap gap-6 mt-5 pt-5 border-t border-gray-50">
+          {job.budget && <div><p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Budget</p><p className="text-sm font-bold text-[#111]">{job.budget}</p></div>}
+          <div><p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Posted</p><p className="text-sm text-gray-600">{fmtDate(job.createdAt)}</p></div>
+          {job.applyEmail && <div><p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Apply Email</p><a href={`mailto:${job.applyEmail}`} className="text-sm text-[#F25722] hover:underline">{job.applyEmail}</a></div>}
+          {job.applyLink && (
+            <div>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Apply Link</p>
+              <a href={job.applyLink} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-500 hover:underline flex items-center gap-1"><ExternalLink size={11} /> View</a>
             </div>
           )}
-        </div>
-
-        {/* Artist list */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="px-6 py-4">
-            <h3 className="text-sm font-black text-[#111] mb-4">
-              Interested Artists
-              <span className="ml-2 text-xs font-normal text-gray-400">({(artists as any[])?.length ?? job.interestedCount ?? 0})</span>
-            </h3>
-
-            {isLoading ? (
-              <div className="flex items-center justify-center py-10">
-                <div className="w-5 h-5 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" />
-              </div>
-            ) : !artists || (artists as any[]).length === 0 ? (
-              <div className="text-center py-10">
-                <Users size={32} className="text-gray-200 mx-auto mb-2" />
-                <p className="text-sm text-gray-400">No interested artists recorded yet.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {(artists as any[]).map((a: any) => {
-                  const fullName = a.artistFirstName && a.artistLastName
-                    ? `${a.artistFirstName} ${a.artistLastName}`
-                    : a.artistName || 'Unknown Artist';
-                  const initials = (a.artistFirstName || a.artistName || '?')[0].toUpperCase();
-                  const profileUrl = a.artistSlug
-                    ? `https://artswrk.com/artists/${a.artistSlug}`
-                    : a.artistEmail ? `mailto:${a.artistEmail}` : null;
-
-                  return (
-                    <div key={a.id} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
-                      {/* Artist header */}
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          {a.artistProfilePicture ? (
-                            <img
-                              src={a.artistProfilePicture}
-                              alt={fullName}
-                              className="w-12 h-12 rounded-full object-cover flex-shrink-0 border-2 border-gray-100"
-                              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#ec008c] to-[#ff7171] flex items-center justify-center text-white text-base font-black flex-shrink-0">
-                              {initials}
-                            </div>
-                          )}
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-bold text-[#111]">{fullName}</p>
-                              {a.artswrkPro && (
-                                <span className="text-[9px] font-black text-[#F25722] bg-orange-50 px-1.5 py-0.5 rounded-full border border-orange-100">PRO</span>
-                              )}
-                            </div>
-                            {a.artistLocation && (
-                              <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-                                <MapPin size={10} /> {a.artistLocation}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        {/* Rate badge from application (or job budget fallback) */}
-                        {(a.rate || job.budget) && (
-                          <div className="flex-shrink-0 px-3 py-1.5 rounded-xl bg-[#fce8e4] text-[#F25722] text-xs font-bold">
-                            {a.rate || job.budget}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Application message */}
-                      {a.message && (
-                        <p className="mt-3 text-xs text-gray-600 leading-relaxed">
-                          {a.message.length > 250 ? a.message.substring(0, 250) + '…' : a.message}
-                        </p>
-                      )}
-
-                      {/* Bio (shown if no message) */}
-                      {!a.message && a.artistBio && (
-                        <p className="mt-3 text-xs text-gray-500 leading-relaxed italic">
-                          {a.artistBio.length > 200 ? a.artistBio.substring(0, 200) + '…' : a.artistBio}
-                        </p>
-                      )}
-
-                      {/* Disciplines */}
-                      {a.artistDisciplines && (() => {
-                        try {
-                          const discs: string[] = JSON.parse(a.artistDisciplines);
-                          if (discs.length > 0) return (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {discs.slice(0, 4).map((d: string) => (
-                                <span key={d} className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{d}</span>
-                              ))}
-                              {discs.length > 4 && <span className="text-[10px] text-gray-400">+{discs.length - 4} more</span>}
-                            </div>
-                          );
-                        } catch { return null; }
-                        return null;
-                      })()}
-
-                      {/* View Submission / Resume link */}
-                      <div className="mt-3 flex gap-2">
-                        {a.resumeLink && (
-                          <a
-                            href={a.resumeLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-[#111] text-white text-xs font-semibold hover:bg-gray-800 transition-all"
-                          >
-                            View Submission →
-                          </a>
-                        )}
-                        {profileUrl && !a.resumeLink && (
-                          <a
-                            href={profileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all"
-                          >
-                            View Profile →
-                          </a>
-                        )}
-                        {profileUrl && a.resumeLink && (
-                          <a
-                            href={profileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-3 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition-all"
-                          >
-                            Profile
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          {(job as any).tag && <div><p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Tag</p><p className="text-sm text-gray-600">{(job as any).tag}</p></div>}
         </div>
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-0 border-b border-gray-200">
+        {tabs.map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            className={`px-5 py-3 text-sm font-semibold transition-colors border-b-2 -mb-px ${tab === t.key ? 'border-[#F25722] text-[#F25722]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      {tab === "overview" && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          {cleanDesc ? (
+            <>
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Description</h3>
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{cleanDesc}</p>
+            </>
+          ) : (
+            <p className="text-sm text-gray-400 text-center py-8">No description provided.</p>
+          )}
+        </div>
+      )}
+      {tab === "artists" && <ProJobInterestedArtistsTab jobId={jobId} jobBudget={job.budget} />}
+    </div>
+  );
+}
+
+// ─── PRO Job: Edit Wrapper ─────────────────────────────────────────────────────
+function AdminProJobEditWrapper({ jobId, onBack, onSave, isSaving }: {
+  jobId: number;
+  onBack: () => void;
+  onSave: (d: Record<string, any>) => void;
+  isSaving: boolean;
+}) {
+  const { data: job, isLoading } = trpc.admin.getProJob.useQuery({ id: jobId });
+
+  const [company, setCompany] = useState("");
+  const [serviceType, setServiceType] = useState("");
+  const [category, setCategory] = useState("");
+  const [budget, setBudget] = useState("");
+  const [description, setDescription] = useState("");
+  const [location, setLocation] = useState("");
+  const [status, setStatus] = useState("");
+  const [workFromAnywhere, setWorkFromAnywhere] = useState(false);
+  const [featured, setFeatured] = useState(false);
+  const [applyDirect, setApplyDirect] = useState(false);
+  const [applyEmail, setApplyEmail] = useState("");
+  const [applyLink, setApplyLink] = useState("");
+  const [tag, setTag] = useState("");
+
+  useEffect(() => {
+    if (!job) return;
+    setCompany(job.company ?? "");
+    setServiceType(job.serviceType ?? "");
+    setCategory(job.category ?? "");
+    setBudget(job.budget ?? "");
+    setDescription(job.description ?? "");
+    setLocation(job.location ?? "");
+    setStatus(job.status ?? "");
+    setWorkFromAnywhere(job.workFromAnywhere ?? false);
+    setFeatured(job.featured ?? false);
+    setApplyDirect(job.applyDirect ?? false);
+    setApplyEmail(job.applyEmail ?? "");
+    setApplyLink(job.applyLink ?? "");
+    setTag((job as any).tag ?? "");
+  }, [job]);
+
+  if (isLoading) return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" /></div>;
+
+  const labelCls = "block text-xs font-semibold text-gray-600 mb-1.5";
+  const inputCls = "w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all";
+  const PRO_STATUSES = ["Active", "Inactive", "Draft", "Closed"];
+  const PRO_CATEGORIES = HIRING_CATEGORIES;
+
+  const ToggleRow = ({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) => (
+    <label className="flex items-center justify-between cursor-pointer">
+      <span className="text-sm font-medium text-[#111]">{label}</span>
+      <button type="button" onClick={() => onChange(!value)}
+        className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${value ? "bg-[#F25722]" : "bg-gray-200"}`}>
+        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${value ? "translate-x-4" : ""}`} />
+      </button>
+    </label>
+  );
+
+  return (
+    <div className="space-y-5">
+      {/* Breadcrumbs */}
+      <div className="flex items-center gap-2 text-sm">
+        <button onClick={() => onBack()} className="text-gray-400 hover:text-[#F25722] transition-colors font-medium">PRO Jobs</button>
+        <ChevronRight size={14} className="text-gray-300" />
+        <button onClick={onBack} className="text-gray-400 hover:text-[#F25722] transition-colors font-medium">{job?.serviceType || `PRO Job #${jobId}`}</button>
+        <ChevronRight size={14} className="text-gray-300" />
+        <span className="text-[#111] font-semibold">Edit</span>
+      </div>
+      <h1 className="text-2xl font-black text-[#111]">Edit PRO Job #{jobId}</h1>
+      <form onSubmit={e => { e.preventDefault(); onSave({ company, serviceType, category, budget, description, location, status, workFromAnywhere, featured, applyDirect, applyEmail, applyLink, tag }); }} className="space-y-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
+          <h3 className="text-sm font-bold text-gray-700">Job Details</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className={labelCls}>Company</label><input value={company} onChange={e => setCompany(e.target.value)} placeholder="Company name" className={inputCls} /></div>
+            <div><label className={labelCls}>Role / Service Type</label><input value={serviceType} onChange={e => setServiceType(e.target.value)} placeholder="e.g. Makeup Artist" className={inputCls} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Category</label>
+              <select value={category} onChange={e => setCategory(e.target.value)} className={inputCls}>
+                <option value="">— Select —</option>
+                {PRO_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Status</label>
+              <select value={status} onChange={e => setStatus(e.target.value)} className={inputCls}>
+                <option value="">— Select —</option>
+                {PRO_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className={labelCls}>Budget</label><input value={budget} onChange={e => setBudget(e.target.value)} placeholder="e.g. $500–$1,000/day" className={inputCls} /></div>
+            <div><label className={labelCls}>Location</label><input value={location} onChange={e => setLocation(e.target.value)} placeholder="City, State" className={inputCls} /></div>
+          </div>
+          <div><label className={labelCls}>Description</label><textarea value={description} onChange={e => setDescription(e.target.value)} rows={6} className={`${inputCls} resize-none`} /></div>
+          <div><label className={labelCls}>Tag</label><input value={tag} onChange={e => setTag(e.target.value)} placeholder="Optional tag" className={inputCls} /></div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+          <h3 className="text-sm font-bold text-gray-700">Apply Settings</h3>
+          <div><label className={labelCls}>Apply Email</label><input type="email" value={applyEmail} onChange={e => setApplyEmail(e.target.value)} placeholder="jobs@company.com" className={inputCls} /></div>
+          <div><label className={labelCls}>Apply Link</label><input type="url" value={applyLink} onChange={e => setApplyLink(e.target.value)} placeholder="https://…" className={inputCls} /></div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+          <h3 className="text-sm font-bold text-gray-700">Flags</h3>
+          <ToggleRow label="Work From Anywhere (Remote)" value={workFromAnywhere} onChange={setWorkFromAnywhere} />
+          <ToggleRow label="Featured Listing" value={featured} onChange={setFeatured} />
+          <ToggleRow label="Direct Apply (no middleman)" value={applyDirect} onChange={setApplyDirect} />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <button type="button" onClick={onBack} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+          <button type="submit" disabled={isSaving} className="px-6 py-2.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity disabled:opacity-50">
+            {isSaving ? "Saving…" : "Save Changes"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
 
 // ─── PRO Jobs Section ───────────────────────────────────────────────────────
 function ProJobsSection() {
+  type View = { mode: "list" } | { mode: "detail"; id: number } | { mode: "edit"; id: number };
+  const [view, setView] = useState<View>({ mode: "list" });
+
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
-  const [selectedJob, setSelectedJob] = useState<ProJob | null>(null);
   const LIMIT = 50;
 
-  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 350);
     return () => clearTimeout(t);
@@ -2473,15 +2842,28 @@ function ProJobsSection() {
     offset: (page - 1) * LIMIT,
     search: debouncedSearch || undefined,
     status: statusFilter || undefined,
+  }, { enabled: view.mode === "list" });
+
+  const utils = trpc.useUtils();
+  const updateProJob = trpc.admin.updateProJob.useMutation({
+    onSuccess: (updated) => {
+      utils.admin.getProJob.invalidate({ id: (view as any).id });
+      utils.admin.premiumJobs.invalidate();
+      if (updated) setView({ mode: "detail", id: updated.id });
+    },
+    onError: (e) => alert("Save failed: " + e.message),
   });
 
   const statuses = ["Active", "Inactive", "Draft", "Closed"];
 
+  if (view.mode === "detail") return <AdminProJobDetail jobId={view.id} onBack={() => setView({ mode: "list" })} onEdit={() => setView({ mode: "edit", id: view.id })} />;
+  if (view.mode === "edit") {
+    const id = view.id;
+    return <AdminProJobEditWrapper jobId={id} onBack={() => setView({ mode: "detail", id })} onSave={(d) => updateProJob.mutate({ id, ...d })} isSaving={updateProJob.isPending} />;
+  }
+
   return (
     <div className="space-y-5">
-      {/* Modal */}
-      {selectedJob && <ProJobModal job={selectedJob} onClose={() => setSelectedJob(null)} />}
-
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-black text-[#111]">
           PRO Jobs
@@ -2537,20 +2919,13 @@ function ProJobsSection() {
               ) : data?.jobs.length === 0 ? (
                 <tr><td colSpan={8} className="px-5 py-10 text-center text-gray-400 text-xs">No PRO jobs found</td></tr>
               ) : data?.jobs.map(job => (
-                <tr
-                  key={job.id}
-                  className="border-b border-gray-50 hover:bg-orange-50/30 transition-colors cursor-pointer"
-                  onClick={() => setSelectedJob(job as ProJob)}
-                >
-                  {/* Company */}
+                <tr key={job.id} className="border-b border-gray-50 hover:bg-orange-50/30 transition-colors cursor-pointer" onClick={() => setView({ mode: "detail", id: job.id })}>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2.5">
                       {job.logo ? (
-                        <img src={job.logo.startsWith('//') ? `https:${job.logo}` : job.logo}
-                          alt={job.company || ''}
+                        <img src={job.logo.startsWith('//') ? `https:${job.logo}` : job.logo} alt={job.company || ''}
                           className="w-7 h-7 rounded-lg object-cover flex-shrink-0 border border-gray-100"
-                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
+                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                       ) : (
                         <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
                           {(job.company || 'P')[0]}
@@ -2559,61 +2934,35 @@ function ProJobsSection() {
                       <span className="font-semibold text-[#111] text-xs">{job.company || '—'}</span>
                     </div>
                   </td>
-                  {/* Role */}
-                  <td className="px-4 py-3">
-                    <p className="text-xs font-medium text-[#111] max-w-[180px] truncate">{job.serviceType || '—'}</p>
-                  </td>
-                  {/* Category */}
-                  <td className="px-4 py-3">
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 font-semibold">
-                      {job.category || '—'}
-                    </span>
-                  </td>
-                  {/* Budget */}
+                  <td className="px-4 py-3"><p className="text-xs font-medium text-[#111] max-w-[180px] truncate">{job.serviceType || '—'}</p></td>
+                  <td className="px-4 py-3"><span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 font-semibold">{job.category || '—'}</span></td>
                   <td className="px-4 py-3 text-xs text-gray-600 max-w-[120px] truncate">{job.budget || '—'}</td>
-                  {/* Status */}
                   <td className="px-4 py-3">
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                       job.status === 'Active' ? 'bg-green-50 text-green-600'
                       : job.status === 'Inactive' || job.status === 'Closed' ? 'bg-red-50 text-red-500'
                       : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {job.status || '—'}
-                    </span>
+                    }`}>{job.status || '—'}</span>
                   </td>
-                  {/* Interested count */}
                   <td className="px-4 py-3">
                     {(job as any).interestedCount > 0 ? (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722]">
-                        <Users size={10} />
-                        {(job as any).interestedCount}
+                        <Users size={10} />{(job as any).interestedCount}
                       </span>
-                    ) : (
-                      <span className="text-xs text-gray-300">—</span>
-                    )}
+                    ) : <span className="text-xs text-gray-300">—</span>}
                   </td>
-                  {/* Remote */}
                   <td className="px-4 py-3">
-                    {job.workFromAnywhere ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-blue-500 font-semibold">
-                        <Globe size={10} /> Remote
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-300">On-site</span>
-                    )}
+                    {job.workFromAnywhere
+                      ? <span className="inline-flex items-center gap-1 text-[10px] text-blue-500 font-semibold"><Globe size={10} /> Remote</span>
+                      : <span className="text-xs text-gray-300">On-site</span>}
                   </td>
-                  {/* Posted date */}
                   <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{fmtDate(job.createdAt)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {data && (
-          <div className="px-5 py-3">
-            <Pagination page={page} total={data.total} limit={LIMIT} onPage={setPage} />
-          </div>
-        )}
+        {data && <div className="px-5 py-3"><Pagination page={page} total={data.total} limit={LIMIT} onPage={setPage} /></div>}
       </div>
     </div>
   );

@@ -530,6 +530,89 @@ export const appRouter = router({
         return { bookings: rows, totalSpendCents, completedCount };
       }),
 
+    /** Get a single regular job with client info — admin only */
+    getJob: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getAdminJobById } = await import("./db");
+        return getAdminJobById(input.id);
+      }),
+
+    /** Update a regular job — admin only */
+    updateJob: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        description: z.string().optional(),
+        requestStatus: z.string().optional(),
+        locationAddress: z.string().optional(),
+        hiringCategory: z.string().optional(),
+        artistHourlyRate: z.number().nullable().optional(),
+        clientHourlyRate: z.number().nullable().optional(),
+        openRate: z.boolean().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { id, ...fields } = input;
+        const { updateAdminJob, getAdminJobById } = await import("./db");
+        await updateAdminJob(id, fields);
+        return getAdminJobById(id);
+      }),
+
+    /** All applicants for a specific regular job — admin only */
+    jobApplicants: protectedProcedure
+      .input(z.object({ jobId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getAdminJobApplicants } = await import("./db");
+        return getAdminJobApplicants(input.jobId);
+      }),
+
+    /** All bookings for a specific regular job — admin only */
+    jobBookings: protectedProcedure
+      .input(z.object({ jobId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getAdminJobBookings } = await import("./db");
+        return getAdminJobBookings(input.jobId);
+      }),
+
+    /** Get a single PRO job by id — admin only */
+    getProJob: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getPremiumJobById } = await import("./db");
+        return getPremiumJobById(input.id);
+      }),
+
+    /** Update a PRO job — admin only */
+    updateProJob: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        company: z.string().optional(),
+        logo: z.string().optional(),
+        serviceType: z.string().optional(),
+        category: z.string().optional(),
+        description: z.string().optional(),
+        budget: z.string().optional(),
+        location: z.string().optional(),
+        status: z.string().optional(),
+        workFromAnywhere: z.boolean().optional(),
+        featured: z.boolean().optional(),
+        applyDirect: z.boolean().optional(),
+        applyEmail: z.string().optional(),
+        applyLink: z.string().optional(),
+        tag: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { id, ...fields } = input;
+        const { updateAdminProJob, getPremiumJobById } = await import("./db");
+        await updateAdminProJob(id, fields);
+        return getPremiumJobById(id);
+      }),
+
     /** All clients with search + filters */
     clients: protectedProcedure
       .input(z.object({
