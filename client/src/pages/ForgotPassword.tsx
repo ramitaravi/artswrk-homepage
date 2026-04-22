@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import Navbar from "@/components/Navbar";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -33,12 +34,8 @@ export default function ForgotPassword() {
   const loading = forgotPassword.isPending;
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center px-4">
-      {/* Logo */}
-      <a href="/" className="flex items-center select-none mb-10">
-        <span className="font-black text-2xl tracking-tight hirer-grad-text">ARTS</span>
-        <span className="font-black text-2xl tracking-tight bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">WRK</span>
-      </a>
+    <div className="min-h-screen bg-[#fafafa] flex flex-col items-center px-4 pt-28 pb-12">
+      <Navbar />
 
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">

@@ -13,6 +13,7 @@ import { useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { Eye, EyeOff, ArrowRight, ArrowLeft, CheckCircle2, Zap, Star, Lock } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import Navbar from "@/components/Navbar";
 
 const ARTIST_TYPES = [
   "Dance Teacher", "Choreographer", "Substitute Teacher", "Competition Coach",
@@ -110,12 +111,8 @@ export default function ArtistJoin() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-12" style={{ fontFamily: "Poppins, sans-serif" }}>
-      {/* Logo */}
-      <a href="/" className="flex items-center mb-10 select-none">
-        <span className="font-black text-2xl tracking-tight hirer-grad-text">ARTS</span>
-        <span className="font-black text-2xl tracking-tight bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">WRK</span>
-      </a>
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center px-4 pt-28 pb-12" style={{ fontFamily: "Poppins, sans-serif" }}>
+      <Navbar />
 
       <div className="w-full max-w-md">
 

@@ -517,3 +517,49 @@ export async function sendProJobPostedEmail(data: {
     `,
   });
 }
+
+/**
+ * Notify a user that they have a new message from someone on Artswrk.
+ */
+export async function sendNewMessageEmail({
+  to,
+  recipientFirstName,
+  senderName,
+  messagePreview,
+  dashboardUrl,
+}: {
+  to: string;
+  recipientFirstName: string;
+  senderName: string;
+  messagePreview: string;
+  dashboardUrl: string;
+}) {
+  const preview = messagePreview.length > 200 ? messagePreview.slice(0, 197) + "…" : messagePreview;
+  await sendSimpleEmail({
+    to,
+    subject: `New message from ${senderName} on Artswrk`,
+    html: `
+      <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+        <div style="background:linear-gradient(90deg,#FFBC5D,#F25722);padding:24px 28px;">
+          <span style="font-size:22px;font-weight:900;letter-spacing:-0.5px;color:#fff;">ARTS<span style="background:#111;padding:2px 6px;border-radius:4px;margin-left:2px;font-size:18px;">WRK</span></span>
+        </div>
+        <div style="padding:28px;">
+          <p style="font-size:16px;font-weight:700;color:#111;margin:0 0 6px;">Hey ${recipientFirstName},</p>
+          <p style="font-size:14px;color:#6b7280;margin:0 0 20px;">You have a new message from <strong style="color:#111;">${senderName}</strong> on Artswrk.</p>
+
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-left:4px solid #F25722;border-radius:8px;padding:16px 18px;margin-bottom:24px;">
+            <p style="font-size:13px;color:#374151;margin:0;line-height:1.6;">"${preview}"</p>
+          </div>
+
+          <a href="${dashboardUrl}" style="display:inline-block;background:linear-gradient(90deg,#FFBC5D,#F25722);color:#fff;font-size:14px;font-weight:700;padding:12px 28px;border-radius:50px;text-decoration:none;">
+            Reply on Artswrk →
+          </a>
+
+          <p style="font-size:12px;color:#9ca3af;margin-top:24px;">
+            You're receiving this because someone sent you a message on <a href="https://artswrk.com" style="color:#F25722;">Artswrk</a>. You can reply directly from your dashboard.
+          </p>
+        </div>
+      </div>
+    `,
+  });
+}

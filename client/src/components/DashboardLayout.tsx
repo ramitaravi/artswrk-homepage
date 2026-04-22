@@ -1,8 +1,7 @@
 /*
  * ARTSWRK DASHBOARD LAYOUT
- * Persistent left sidebar + top header + scrollable content area
- * Uses real tRPC auth session — user data comes from the database
- * Hirer gradient: #FFBC5D → #F25722
+ * White sidebar + light content area — visually matches the Enterprise dashboard.
+ * Works for both Artist and Client roles.
  */
 
 import { useEffect, useState } from "react";
@@ -49,7 +48,7 @@ const CLIENT_CORE_NAV: NavItem[] = [
   { label: "Bookings", icon: <Calendar size={18} />, href: "/app/bookings" },
   { label: "Payments", icon: <CreditCard size={18} />, href: "/app/payments" },
   { label: "Artists", icon: <Users size={18} />, href: "/app/artists" },
-  { label: "Messages", icon: <MessageSquare size={18} />, href: "/app/messages", badge: 3 },
+  { label: "Messages", icon: <MessageSquare size={18} />, href: "/app/messages" },
 ];
 
 const CLIENT_PREMIUM_NAV: NavItem[] = [
@@ -75,37 +74,30 @@ const ARTIST_PREMIUM_NAV: NavItem[] = [
   { label: "Community", icon: <Users2 size={18} />, href: "/app/community", premium: true },
 ];
 
-function NavLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+function NavLink({ item }: { item: NavItem }) {
   const [location] = useLocation();
   const isActive = location === item.href || (item.href !== "/app" && location.startsWith(item.href));
 
   return (
     <Link href={item.href}>
       <div
-        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 cursor-pointer group relative ${
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors cursor-pointer ${
           isActive
-            ? "hirer-grad-bg text-white shadow-sm"
-            : "text-gray-400 hover:bg-white/5 hover:text-white"
+            ? "bg-orange-50 text-[#F25722]"
+            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
         }`}
       >
         <span className="flex-shrink-0">{item.icon}</span>
-        {!collapsed && (
-          <>
-            <span className="text-sm font-medium flex-1 truncate">{item.label}</span>
-            {item.premium && (
-              <span className="flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300">
-                <Crown size={9} /> PRO
-              </span>
-            )}
-            {item.badge && !item.premium && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-pink-500 text-white min-w-[18px] text-center">
-                {item.badge}
-              </span>
-            )}
-          </>
+        <span className="text-sm font-medium flex-1 truncate">{item.label}</span>
+        {item.premium && (
+          <span className="flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200">
+            <Crown size={9} /> PRO
+          </span>
         )}
-        {collapsed && item.badge && (
-          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-pink-500" />
+        {item.badge && !item.premium && (
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#F25722] text-white min-w-[18px] text-center">
+            {item.badge}
+          </span>
         )}
       </div>
     </Link>
@@ -115,7 +107,6 @@ function NavLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const [, navigate] = useLocation();
-  const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [checkoutBanner, setCheckoutBanner] = useState<"basic" | "pro" | null>(null);
 
@@ -125,13 +116,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const plan = params.get("plan");
     if (plan === "basic" || plan === "pro") {
       setCheckoutBanner(plan);
-      // Remove the query param from the URL without a page reload
-      const cleanUrl = window.location.pathname;
-      window.history.replaceState({}, "", cleanUrl);
+      window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
 
-  // Fetch the full artswrk user record from DB using the authenticated user's email
+  // Fetch the full artswrk user record from DB
   const { data: artswrkUser } = trpc.artswrkUsers.getByEmail.useQuery(
     { email: user?.email ?? "" },
     { enabled: !!user?.email }
@@ -149,13 +138,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     navigate("/login");
   }
 
-  // Derive display values — prefer real DB data, fall back to session data
   const displayName = artswrkUser
     ? `${artswrkUser.firstName || ""} ${artswrkUser.lastName || ""}`.trim() || artswrkUser.name || user?.name || "User"
     : user?.name || "User";
 
-  const displayStudio = artswrkUser?.clientCompanyName || "Artswrk";
-  const displayLocation = ""; // location fields not yet in schema
+  const displayStudio = artswrkUser?.clientCompanyName || artswrkUser?.firstName || "Artswrk";
   const isPremium = artswrkUser?.clientPremium ?? false;
   const isArtist = artswrkUser?.userRole === "Artist";
   const coreNav = isArtist ? ARTIST_CORE_NAV : CLIENT_CORE_NAV;
@@ -163,14 +150,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const avatarInitials = displayName
     .split(" ")
-    .map((n) => n[0])
+    .map((n: string) => n[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#f5f5f5]">
+      <div className="flex h-screen items-center justify-center bg-gray-50">
         <Loader2 className="animate-spin text-[#F25722]" size={32} />
       </div>
     );
@@ -180,118 +167,120 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
-      {/* Logo + collapse toggle */}
-      <div className="flex items-center justify-between px-4 py-5 border-b border-white/10">
-        {!collapsed && (
-          <a href="/" className="flex items-center select-none">
-            <span className="font-black text-xl tracking-tight hirer-grad-text">ARTS</span>
-            <span className="font-black text-xl tracking-tight bg-white text-[#111] px-1.5 py-0.5 rounded ml-0.5 text-sm">WRK</span>
-          </a>
-        )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors hidden lg:flex"
-        >
-          {collapsed ? <ChevronRight size={16} /> : <Menu size={16} />}
-        </button>
+      {/* Logo */}
+      <div className="px-5 pt-6 pb-5">
+        <Link href="/">
+          <span className="font-black text-xl tracking-tight">
+            <span className="hirer-grad-text">ARTS</span>
+            <span className="bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">WRK</span>
+          </span>
+        </Link>
       </div>
 
-      {/* User info */}
-      {!collapsed && (
-        <div className="px-4 py-4 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            {artswrkUser?.profilePicture ? (
-              <img
-                src={artswrkUser.profilePicture}
-                alt={displayName}
-                className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-              />
-            ) : (
-              <div className="w-9 h-9 rounded-full hirer-grad-bg flex items-center justify-center text-white text-xs font-black flex-shrink-0">
-                {avatarInitials}
-              </div>
-            )}
-            <div className="min-w-0">
-              <p className="text-white text-sm font-semibold truncate">{displayName}</p>
-              <p className="text-gray-500 text-xs truncate">{displayStudio}</p>
-              {isPremium && (
-                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 mt-0.5">
-                  <Crown size={8} /> PREMIUM
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Core nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {coreNav.map((item) => (
-          <NavLink key={item.href} item={item} collapsed={collapsed} />
-        ))}
-
-        {/* Premium section */}
-        {!collapsed && (
-          <div className="pt-4 pb-1">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 px-3 mb-2">
-              Premium Features
-            </p>
+      {/* User info card */}
+      <div className="mx-3 mb-4 p-3 rounded-xl bg-gray-50 border border-gray-100 flex items-center gap-3">
+        {artswrkUser?.profilePicture ? (
+          <img
+            src={artswrkUser.profilePicture}
+            alt={displayName}
+            className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+          />
+        ) : (
+          <div className="w-9 h-9 rounded-full hirer-grad-bg flex items-center justify-center text-white text-xs font-black flex-shrink-0">
+            {avatarInitials}
           </div>
         )}
-        {collapsed && <div className="pt-3 border-t border-white/10 my-2" />}
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-[#111] truncate">{displayName}</p>
+          <p className="text-xs text-gray-400 truncate">{displayStudio}</p>
+          {isPremium && (
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200 mt-0.5">
+              <Crown size={8} /> PREMIUM
+            </span>
+          )}
+          {isArtist && (artswrkUser as any)?.artswrkPro && (
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-50 text-[#F25722] border border-orange-200 mt-0.5">
+              <Star size={8} /> PRO
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Core nav */}
+      <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
+        {coreNav.map((item) => (
+          <NavLink key={item.href} item={item} />
+        ))}
+
+        {/* Premium section divider */}
+        <div className="pt-4 pb-1">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-3 mb-1">
+            {isArtist ? "PRO Features" : "Premium Features"}
+          </p>
+        </div>
+
         {premiumNav.map((item) => (
-          <NavLink key={item.href} item={item} collapsed={collapsed} />
+          <NavLink key={item.href} item={item} />
         ))}
       </nav>
 
       {/* Bottom actions */}
-      <div className="px-3 py-4 border-t border-white/10 space-y-0.5">
+      <div className="px-3 py-4 border-t border-gray-100 space-y-0.5">
         <Link href="/app/settings">
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white transition-all cursor-pointer">
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors cursor-pointer">
             <Settings size={18} className="flex-shrink-0" />
-            {!collapsed && <span className="text-sm font-medium">Settings</span>}
+            <span className="text-sm font-medium">Settings</span>
           </div>
         </Link>
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-all"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-600 hover:bg-red-50 hover:text-red-500 transition-colors"
         >
           <LogOut size={18} className="flex-shrink-0" />
-          {!collapsed && <span className="text-sm font-medium">Logout</span>}
+          <span className="text-sm font-medium">Logout</span>
         </button>
-        {!collapsed && (
-          <p className="text-[10px] text-gray-700 text-center pt-2">
-            © 2026 Artswrk
-          </p>
-        )}
+        <p className="text-[10px] text-gray-300 text-center pt-2">© 2026 Artswrk</p>
       </div>
     </div>
   );
 
   return (
-    <div className="flex h-screen bg-[#f5f5f5] overflow-hidden">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Desktop sidebar */}
-      <aside
-        className={`hidden lg:flex flex-col bg-[#111] transition-all duration-200 flex-shrink-0 ${
-          collapsed ? "w-16" : "w-60"
-        }`}
-      >
+      <aside className="hidden lg:flex flex-col w-56 flex-shrink-0 bg-white border-r border-gray-100">
         {sidebarContent}
       </aside>
 
       {/* Mobile sidebar overlay */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="w-60 bg-[#111] flex flex-col">{sidebarContent}</div>
-          <div className="flex-1 bg-black/50" onClick={() => setMobileOpen(false)} />
+          <div className="w-56 bg-white border-r border-gray-100 flex flex-col shadow-xl">
+            <div className="flex items-center justify-between px-5 pt-5 pb-3">
+              <Link href="/">
+                <span className="font-black text-xl tracking-tight">
+                  <span className="hirer-grad-text">ARTS</span>
+                  <span className="bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">WRK</span>
+                </span>
+              </Link>
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            {sidebarContent}
+          </div>
+          <div className="flex-1 bg-black/30" onClick={() => setMobileOpen(false)} />
         </div>
       )}
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top header */}
-        <header className="bg-white border-b border-gray-100 px-5 py-3.5 flex items-center justify-between flex-shrink-0">
+        <header className="bg-white border-b border-gray-100 px-4 lg:px-6 py-3.5 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
+            {/* Mobile hamburger */}
             <button
               onClick={() => setMobileOpen(true)}
               className="lg:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
@@ -300,22 +289,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
             <div>
               <p className="text-sm font-bold text-[#111]">{displayStudio}</p>
-              {displayLocation && <p className="text-xs text-gray-400">{displayLocation}</p>}
+              {isArtist && (
+                <p className="text-xs text-gray-400">Artist Dashboard</p>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Post a Job CTA */}
-            <Link href="/post-job">
-              <button className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity">
-                + Post a Job
-              </button>
-            </Link>
+          <div className="flex items-center gap-2">
+            {/* Post a Job CTA — clients only */}
+            {!isArtist && (
+              <Link href="/post-job">
+                <button className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity">
+                  + Post a Job
+                </button>
+              </Link>
+            )}
 
             {/* Notifications */}
-            <button className="relative p-2 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors">
+            <button className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
               <Bell size={18} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#F25722]" />
             </button>
 
             {/* Avatar */}
@@ -330,6 +322,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {avatarInitials}
               </div>
             )}
+
+            {/* Mobile nav toggle (shown right of avatar on very small screens) */}
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="sm:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+            >
+              <ChevronRight size={18} />
+            </button>
           </div>
         </header>
 
@@ -344,7 +344,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {checkoutBanner === "pro" ? (
                 <span>
                   <Sparkles size={14} className="inline mr-1" />
-                  Welcome to <strong>Artswrk PRO</strong>! Your subscription is now active. Enjoy exclusive PRO jobs and premium features.
+                  Welcome to <strong>Artswrk PRO</strong>! Your subscription is now active.
                 </span>
               ) : (
                 <span>
@@ -356,7 +356,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <button
               onClick={() => setCheckoutBanner(null)}
               className="flex-shrink-0 p-1 rounded-full hover:bg-white/20 transition-colors"
-              aria-label="Dismiss"
             >
               <X size={16} />
             </button>

@@ -11,6 +11,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { Eye, EyeOff, ArrowRight, ArrowLeft, Music, Building2, CheckCircle2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import Navbar from "@/components/Navbar";
 
 type Stage = "email" | "password" | "set-password" | "not-found";
 
@@ -181,8 +182,8 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center px-4">
-      <Logo />
+    <div className="min-h-screen bg-[#fafafa] flex flex-col items-center px-4 pt-28 pb-12">
+      <Navbar />
 
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">

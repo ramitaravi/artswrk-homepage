@@ -1,123 +1,206 @@
 /*
- * ARTSWRK DASHBOARD — BENEFITS (Premium)
+ * ARTSWRK DASHBOARD — BENEFITS HUB
+ * Matches the design in the screenshot:
+ *   - Green savings banner
+ *   - Category filter tabs (horizontal scroll)
+ *   - Benefit cards: logo + name + category + description + offer pill
+ * Data loaded from DB via trpc.benefits.list, filtered by the logged-in user's role.
  */
 
-import { Crown, Zap, Shield, Percent, Headphones, Star, ChevronRight, CheckCircle } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle2, ChevronRight, ExternalLink } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 
-const BENEFITS = [
-  {
-    icon: <Zap size={20} />, color: "bg-amber-50 text-amber-500",
-    title: "Priority Job Placement",
-    desc: "Your job postings are shown first to artists in your area, getting you 3x more qualified applicants.",
-    active: true,
-  },
-  {
-    icon: <Shield size={20} />, color: "bg-blue-50 text-blue-500",
-    title: "Verified Studio Badge",
-    desc: "Display a verified badge on your company page and job listings to build trust with artists.",
-    active: true,
-  },
-  {
-    icon: <Percent size={20} />, color: "bg-green-50 text-green-500",
-    title: "0% Platform Fee",
-    desc: "Premium members pay zero platform fees on all payments made through Artswrk.",
-    active: true,
-  },
-  {
-    icon: <Headphones size={20} />, color: "bg-purple-50 text-purple-500",
-    title: "Dedicated Support",
-    desc: "Access to a dedicated account manager and priority support response within 2 hours.",
-    active: true,
-  },
-  {
-    icon: <Star size={20} />, color: "bg-rose-50 text-rose-500",
-    title: "Featured Studio Listing",
-    desc: "Get featured on the Artswrk homepage and in our weekly newsletter sent to 5,000+ artists.",
-    active: false,
-  },
-];
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
-const PARTNER_PERKS = [
-  { name: "Staples Business", desc: "20% off all office & studio supplies", code: "ARTSWRK20" },
-  { name: "Zoom", desc: "3 months free Zoom Pro for virtual auditions", code: "ARTSWRK-ZOOM" },
-  { name: "Canva Pro", desc: "Free Canva Pro for studio marketing materials", code: "ARTSWRK-CANVA" },
-  { name: "QuickBooks", desc: "50% off QuickBooks for 6 months", code: "ARTSWRK-QB" },
-];
+function fixUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith("//")) return `https:${url}`;
+  return url;
+}
+
+function initials(name: string): string {
+  return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+}
+
+// ── Benefit Card ───────────────────────────────────────────────────────────────
+
+function BenefitCard({ benefit }: { benefit: any }) {
+  const logoUrl = fixUrl(benefit.logoUrl);
+  const category = benefit.categories?.[0] ?? "";
+  const href = fixUrl(benefit.url);
+
+  return (
+    <a
+      href={href ?? undefined}
+      target={href ? "_blank" : undefined}
+      rel="noopener noreferrer"
+      className="block bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-5 group"
+    >
+      <div className="flex items-start gap-4">
+        {/* Logo */}
+        <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-gray-50 border border-gray-100">
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={benefit.companyName}
+              className="w-full h-full object-contain p-1"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-sm">
+              {initials(benefit.companyName || "B")}
+            </div>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <h3 className="font-bold text-[#111] text-base mb-0.5 leading-snug">
+            {benefit.companyName}
+          </h3>
+          {category && (
+            <p className="text-sm font-semibold text-gray-500 mb-2">{category}</p>
+          )}
+          {benefit.businessDescription && (
+            <p className="text-sm text-gray-600 leading-relaxed mb-3 line-clamp-3">
+              {benefit.businessDescription}
+            </p>
+          )}
+          {benefit.discountOffering && (
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 rounded-full border border-[#F25722] text-[#F25722] text-xs font-semibold flex-shrink-0">
+                Offer
+              </span>
+              <span className="text-sm text-[#F25722] font-medium flex items-center gap-1">
+                {benefit.discountOffering}
+                <ChevronRight size={14} />
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Arrow */}
+        <ChevronRight
+          size={20}
+          className="text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0 mt-1"
+        />
+      </div>
+    </a>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function Benefits() {
+  const { user } = useAuth();
+  const [activeCategory, setActiveCategory] = useState<string>("All");
+
+  // Determine audience type from user role
+  const { data: artswrkUser } = trpc.artswrkUsers.getByEmail.useQuery(
+    { email: user?.email ?? "" },
+    { enabled: !!user?.email }
+  );
+  const audienceType = artswrkUser?.userRole === "Artist" ? "Artist" : "Client";
+
+  const { data, isLoading } = trpc.benefits.list.useQuery(
+    { audienceType },
+    { enabled: !!artswrkUser }
+  );
+
+  const allBenefits = data?.benefits ?? [];
+
+  // Collect all unique categories across loaded benefits
+  const allCategories = Array.from(
+    new Set(allBenefits.flatMap((b: any) => b.categories ?? []))
+  ).sort() as string[];
+
+  const categories = ["All", ...allCategories];
+
+  const filtered =
+    activeCategory === "All"
+      ? allBenefits
+      : allBenefits.filter((b: any) => b.categories?.includes(activeCategory));
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <div className="mb-7">
-        <div className="flex items-center gap-2 mb-1">
-          <h1 className="text-2xl font-black text-[#111]">Benefits</h1>
-          <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-600">
-            <Crown size={10} /> Premium
-          </span>
-        </div>
-        <p className="text-gray-500 text-sm">Your premium perks and partner discounts</p>
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-3xl font-black text-[#111] mb-1">Benefits Hub</h1>
+        <p className="text-gray-500 text-sm">Exclusive Discounts for Artswrk Subscribers</p>
       </div>
 
-      {/* Premium status card */}
-      <div className="hirer-grad-bg rounded-2xl p-6 mb-7 text-white relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-white/5 -translate-y-1/4 translate-x-1/4" />
-        <div className="relative flex items-center justify-between">
+      {/* Savings banner */}
+      {allBenefits.length > 0 && (
+        <div className="flex items-start gap-3 bg-green-50 border border-green-100 rounded-xl px-4 py-3.5 mb-7">
+          <CheckCircle2 size={18} className="text-green-500 flex-shrink-0 mt-0.5" />
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Crown size={18} className="text-amber-300" />
-              <p className="text-sm font-bold text-white/80">Premium Member</p>
-            </div>
-            <p className="text-2xl font-black mb-1">FieldCrest Studio</p>
-            <p className="text-sm text-white/60">Member since January 2025 · Renews April 2025</p>
-          </div>
-          <div className="text-right">
-            <p className="text-3xl font-black">$49</p>
-            <p className="text-sm text-white/60">/month</p>
+            <p className="text-sm font-bold text-green-800">
+              $1000+ in savings unlocked with your Artswrk Membership
+            </p>
+            <p className="text-xs text-green-600 mt-0.5">
+              You have access to {allBenefits.length} exclusive benefit{allBenefits.length !== 1 ? "s" : ""} with your Artswrk Membership. Get connected to the industry's leading services below.
+            </p>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Active benefits */}
-      <h2 className="text-sm font-bold text-[#111] mb-4">Your Benefits</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-        {BENEFITS.map((benefit) => (
-          <div key={benefit.title} className={`bg-white rounded-2xl border p-5 shadow-sm ${benefit.active ? "border-gray-100" : "border-dashed border-gray-200 opacity-60"}`}>
-            <div className="flex items-start gap-3">
-              <div className={`w-10 h-10 rounded-xl ${benefit.color} flex items-center justify-center flex-shrink-0`}>
-                {benefit.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="text-sm font-bold text-[#111]">{benefit.title}</p>
-                  {benefit.active && <CheckCircle size={13} className="text-green-500 flex-shrink-0" />}
+      {/* Category filter tabs */}
+      {categories.length > 1 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 mb-6 scrollbar-none">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                activeCategory === cat
+                  ? "border-[#111] bg-[#111] text-white"
+                  : "border-gray-200 text-gray-600 hover:border-gray-400 hover:text-gray-900"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Benefits list */}
+      {isLoading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse">
+              <div className="flex gap-4">
+                <div className="w-16 h-16 rounded-xl bg-gray-100 flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-gray-100 rounded w-1/3" />
+                  <div className="h-3 bg-gray-100 rounded w-1/5" />
+                  <div className="h-3 bg-gray-100 rounded w-full" />
+                  <div className="h-3 bg-gray-100 rounded w-3/4" />
                 </div>
-                <p className="text-xs text-gray-500 leading-relaxed">{benefit.desc}</p>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Partner perks */}
-      <h2 className="text-sm font-bold text-[#111] mb-4">Partner Perks</h2>
-      <div className="space-y-3">
-        {PARTNER_PERKS.map((perk) => (
-          <div key={perk.name} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-xs font-black text-gray-600 flex-shrink-0">
-              {perk.name.charAt(0)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-[#111]">{perk.name}</p>
-              <p className="text-xs text-gray-500">{perk.desc}</p>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <p className="text-xs font-mono font-bold text-[#F25722] bg-orange-50 px-2 py-1 rounded-lg mb-1">{perk.code}</p>
-              <button className="text-xs font-semibold text-gray-500 hover:text-[#F25722] transition-colors flex items-center gap-0.5 ml-auto">
-                Redeem <ChevronRight size={11} />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <p className="text-sm">No benefits found{activeCategory !== "All" ? ` in ${activeCategory}` : ""}.</p>
+          {activeCategory !== "All" && (
+            <button
+              onClick={() => setActiveCategory("All")}
+              className="mt-2 text-sm text-[#F25722] hover:underline"
+            >
+              Show all benefits
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filtered.map((benefit: any) => (
+            <BenefitCard key={benefit.id} benefit={benefit} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

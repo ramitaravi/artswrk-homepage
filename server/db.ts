@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, isNotNull, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, masterServiceTypes, messages, payments, premiumJobInterestedArtists, premiumJobs, users } from "../drizzle/schema";
+import { ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, benefits, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, masterServiceTypes, messages, payments, premiumJobInterestedArtists, premiumJobs, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -2351,4 +2351,79 @@ export async function getMasterServiceTypeName(id: number | null | undefined): P
     .where(eq(masterServiceTypes.id, id))
     .limit(1);
   return rows[0]?.name ?? String(id);
+}
+
+/**
+ * Return benefits filtered by audience type.
+ * audienceType: "Artist" | "Client" — matches records whose audienceTypes JSON array
+ * contains the given value.
+ */
+export async function getBenefits(audienceType: "Artist" | "Client") {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.select().from(benefits).orderBy(asc(benefits.companyName));
+  // Filter in JS since audienceTypes is stored as a JSON string
+  return rows.filter((b) => {
+    try {
+      const types: string[] = JSON.parse(b.audienceTypes ?? "[]");
+      return types.includes(audienceType);
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
+ * Get an existing conversation between a client and artist, or create one.
+ */
+export async function getOrCreateConversation(clientUserId: number, artistUserId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  // Try to find existing
+  const existing = await db
+    .select()
+    .from(conversations)
+    .where(and(eq(conversations.clientUserId, clientUserId), eq(conversations.artistUserId, artistUserId)))
+    .limit(1);
+  if (existing[0]) return existing[0];
+  // Create new
+  const result = await db.insert(conversations).values({
+    clientUserId,
+    artistUserId,
+    lastMessageDate: new Date(),
+    unreadCount: 0,
+  });
+  const newId = (result as any).insertId as number;
+  const created = await db.select().from(conversations).where(eq(conversations.id, newId)).limit(1);
+  return created[0];
+}
+
+/**
+ * Insert a new message into a conversation, and update the conversation's lastMessageDate / unreadCount.
+ */
+export async function sendMessageToConversation({
+  conversationId,
+  senderUserId,
+  content,
+}: {
+  conversationId: number;
+  senderUserId: number;
+  content: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const result = await db.insert(messages).values({
+    conversationId,
+    senderUserId,
+    content,
+    isSystem: false,
+  });
+  const newId = (result as any).insertId as number;
+  // Update conversation timestamp + unreadCount
+  await db
+    .update(conversations)
+    .set({ lastMessageDate: new Date(), unreadCount: sql`unreadCount + 1` })
+    .where(eq(conversations.id, conversationId));
+  const newMsg = await db.select().from(messages).where(eq(messages.id, newId)).limit(1);
+  return newMsg[0];
 }

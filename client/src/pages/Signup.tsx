@@ -12,6 +12,7 @@
  */
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
+import Navbar from "@/components/Navbar";
 import { trpc } from "@/lib/trpc";
 import { Eye, EyeOff, ArrowRight, ArrowLeft, CheckCircle2, Building2, User, Music, Trophy, Calendar, HelpCircle, Sparkles, MapPin, Globe, Phone, Zap, Star } from "lucide-react";
 
@@ -280,12 +281,8 @@ export default function Signup() {
 
   // ─── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-12">
-      {/* Logo */}
-      <a href="/" className="flex items-center mb-10 select-none">
-        <span className="font-black text-2xl tracking-tight hirer-grad-text">ARTS</span>
-        <span className="font-black text-2xl tracking-tight bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">WRK</span>
-      </a>
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center px-4 pt-28 pb-12">
+      <Navbar />
 
       <div className="w-full max-w-md">
         {/* ── Step 1: Account ─────────────────────────────────────────── */}

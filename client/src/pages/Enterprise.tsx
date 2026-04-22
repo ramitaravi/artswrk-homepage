@@ -23,6 +23,9 @@ import {
   Archive,
   Lock,
   Unlock,
+  Settings,
+  Zap,
+  AlertCircle,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -189,6 +192,12 @@ function Sidebar({
       label: "Browse Artists",
       onClick: () => navigate("/app/artists"),
       active: false,
+    },
+    {
+      icon: <Settings size={18} />,
+      label: "Settings",
+      onClick: () => onNavigate("settings"),
+      active: activeSection === "settings",
     },
   ];
 
@@ -1249,12 +1258,20 @@ function JobDetailView({
                     </button>
                   </div>
 
-                  <p className="text-3xl font-black text-[#111] mb-0.5">
-                    {subInterval === "month" ? "$250" : "$208"}
+                  <div className="mb-0.5">
+                    <span className="text-sm text-gray-400 line-through mr-1">
+                      {subInterval === "month" ? "$500" : "$417"}
+                    </span>
+                    <span className="text-3xl font-black text-[#111]">
+                      {subInterval === "month" ? "$250" : "$208"}
+                    </span>
                     <span className="text-sm font-normal text-gray-400">/mo</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mb-1">
+                    {subInterval === "year" ? "Billed $2,500/yr (list $5,000) · save 50%" : "Billed monthly · cancel anytime"}
                   </p>
-                  <p className="text-xs text-gray-400 mb-4">
-                    {subInterval === "year" ? "Billed $2,500/year · save $500" : "Billed monthly · cancel anytime"}
+                  <p className="text-[11px] text-[#F25722] font-semibold mb-4">
+                    Introductory pricing — locked in for life of subscription
                   </p>
                   <ul className="space-y-1.5 mb-5 flex-1">
                     {[
@@ -1430,12 +1447,276 @@ function JobDetailView({
   );
 }
 
+// ── Enterprise Billing Settings ──────────────────────────────────────────────
+
+function EnterpriseBillingSettings({ onBack }: { onBack: () => void }) {
+  const { data: billing, isLoading } = trpc.enterprise.getBillingInfo.useQuery(undefined, { retry: false });
+  const createPortal = trpc.enterprise.billingPortal.useMutation();
+  const checkoutSubscription = trpc.enterprise.checkoutSubscription.useMutation();
+  const [subInterval, setSubInterval] = useState<"month" | "year">("month");
+  const [loadingPortal, setLoadingPortal] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
+
+  async function handleManageBilling() {
+    setLoadingPortal(true);
+    try {
+      const result = await createPortal.mutateAsync({ returnUrl: `${window.location.origin}/enterprise?settings=1` });
+      if (result.url) window.location.href = result.url;
+    } catch (err: any) {
+      toast.error(err.message || "Could not open billing portal");
+      setLoadingPortal(false);
+    }
+  }
+
+  async function handleSubscribe() {
+    setSubscribing(true);
+    try {
+      const result = await checkoutSubscription.mutateAsync({
+        interval: subInterval,
+        origin: window.location.origin,
+      });
+      if (result.url) window.location.href = result.url;
+    } catch (err: any) {
+      toast.error(err.message || "Checkout failed");
+      setSubscribing(false);
+    }
+  }
+
+  const plan = billing?.enterprisePlan;
+  const status = billing?.subscriptionStatus;
+  const interval = billing?.subscriptionInterval;
+  const renewsAt = billing?.currentPeriodEnd;
+  const cancelAtEnd = billing?.cancelAtPeriodEnd;
+
+  const isSubscriber = plan === "subscriber";
+
+  return (
+    <div className="flex-1 overflow-y-auto max-w-2xl">
+      {/* Header */}
+      <div className="mb-6">
+        <button
+          onClick={onBack}
+          className="text-sm text-gray-400 hover:text-gray-700 transition-colors mb-3 flex items-center gap-1"
+        >
+          ← Back to Dashboard
+        </button>
+        <h1 className="text-2xl font-black text-[#111]">Settings</h1>
+        <p className="text-sm text-gray-500 mt-1">Manage your Enterprise plan and billing</p>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-4">
+          {[1, 2].map((i) => (
+            <div key={i} className="bg-white rounded-2xl border border-gray-100 p-6 animate-pulse">
+              <div className="h-4 bg-gray-100 rounded w-1/3 mb-3" />
+              <div className="h-8 bg-gray-100 rounded w-1/2 mb-2" />
+              <div className="h-3 bg-gray-100 rounded w-2/3" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {/* Current Plan Card */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Current Plan</h2>
+
+            {isSubscriber ? (
+              <div>
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xl font-black text-[#111]">Enterprise Subscriber</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        status === "active" ? "bg-green-100 text-green-700" :
+                        status === "past_due" ? "bg-amber-100 text-amber-700" :
+                        "bg-red-100 text-red-600"
+                      }`}>
+                        {status === "active" ? "Active" : status === "past_due" ? "Past Due" : status}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      {interval === "year" ? "Annual billing — $2,500/yr" : "Monthly billing — $250/mo"}
+                    </p>
+                    {renewsAt && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        {cancelAtEnd ? "Cancels" : "Renews"} {new Date(renewsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                      </p>
+                    )}
+                  </div>
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                    <Zap size={22} className="text-white" />
+                  </div>
+                </div>
+
+                <ul className="space-y-1.5 mb-5">
+                  {[
+                    "Unlimited candidate access across all jobs",
+                    "Post unlimited PRO jobs",
+                    "Priority artist matching",
+                    "Dedicated account support",
+                  ].map((f) => (
+                    <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
+                      <CheckCircle2 size={14} className="text-purple-500 flex-shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+
+                <button
+                  onClick={handleManageBilling}
+                  disabled={loadingPortal}
+                  className="w-full py-2.5 rounded-xl text-sm font-bold border-2 border-[#111] text-[#111] hover:bg-[#111] hover:text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {loadingPortal ? (
+                    <><div className="w-4 h-4 border-2 border-current/40 border-t-current rounded-full animate-spin" /> Opening portal…</>
+                  ) : (
+                    <><CreditCard size={15} /> Manage Billing &amp; Invoices</>
+                  )}
+                </button>
+                <p className="text-xs text-gray-400 text-center mt-2">
+                  Update payment method, download invoices, or cancel
+                </p>
+              </div>
+            ) : plan === "on_demand" ? (
+              <div>
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="text-xl font-black text-[#111] mb-1">On-Demand</p>
+                    <p className="text-sm text-gray-500">$100 per job to unlock candidate lists</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center flex-shrink-0">
+                    <Unlock size={20} className="text-white" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50 border border-amber-100 mb-4">
+                  <AlertCircle size={14} className="text-amber-600 flex-shrink-0" />
+                  <p className="text-xs text-amber-700">Subscribe to get unlimited access at a lower per-job cost.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-gray-500 text-sm mb-2">No active plan</p>
+                <p className="text-xs text-gray-400">Subscribe below to unlock all features</p>
+              </div>
+            )}
+          </div>
+
+          {/* Upgrade / Switch Plan (shown when not subscriber, or when subscriber to let them switch interval) */}
+          {(!isSubscriber) && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Upgrade to Enterprise Subscription</h2>
+
+              {/* Interval toggle */}
+              <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 mb-5 w-fit">
+                <button
+                  onClick={() => setSubInterval("month")}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${subInterval === "month" ? "bg-white shadow text-[#111]" : "text-gray-500"}`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setSubInterval("year")}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${subInterval === "year" ? "bg-white shadow text-[#111]" : "text-gray-500"}`}
+                >
+                  Annual <span className="text-[#F25722] text-xs">–50%</span>
+                </button>
+              </div>
+
+              <div className="border-2 border-[#F25722] rounded-2xl p-5 mb-4">
+                <div className="flex items-end gap-2 mb-1">
+                  <span className="text-sm text-gray-400 line-through">
+                    {subInterval === "month" ? "$500" : "$417"}/mo
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-1 mb-1">
+                  <span className="text-4xl font-black text-[#111]">
+                    {subInterval === "month" ? "$250" : "$208"}
+                  </span>
+                  <span className="text-gray-400 text-sm">/mo</span>
+                </div>
+                <p className="text-xs text-gray-400 mb-0.5">
+                  {subInterval === "year" ? "Billed $2,500/yr (list price $5,000)" : "Billed monthly · cancel anytime"}
+                </p>
+                <p className="text-xs text-[#F25722] font-semibold mb-4">
+                  Introductory pricing — locked in for life of subscription
+                </p>
+
+                <ul className="space-y-2 mb-5">
+                  {[
+                    "Unlimited candidate access across all jobs",
+                    "Post unlimited PRO jobs",
+                    "Priority artist matching",
+                    "Dedicated account support",
+                  ].map((f) => (
+                    <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
+                      <CheckCircle2 size={14} className="text-[#F25722] flex-shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+
+                <button
+                  onClick={handleSubscribe}
+                  disabled={subscribing}
+                  className="w-full py-3 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {subscribing ? (
+                    <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Redirecting…</>
+                  ) : (
+                    <>Subscribe — {subInterval === "month" ? "$250/mo" : "$2,500/yr"}</>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Manage billing for subscribers — switch interval */}
+          {isSubscriber && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">Switch Billing Interval</h2>
+              <p className="text-xs text-gray-400 mb-4">Changes take effect at next renewal.</p>
+              <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 mb-4 w-fit">
+                <button
+                  onClick={() => setSubInterval("month")}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${subInterval === "month" ? "bg-white shadow text-[#111]" : "text-gray-500"}`}
+                >
+                  Monthly — $250/mo
+                </button>
+                <button
+                  onClick={() => setSubInterval("year")}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${subInterval === "year" ? "bg-white shadow text-[#111]" : "text-gray-500"}`}
+                >
+                  Annual — $2,500/yr <span className="text-[#F25722] text-xs">–17%</span>
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mb-3">
+                To switch intervals, use the billing portal to update your subscription.
+              </p>
+              <button
+                onClick={handleManageBilling}
+                disabled={loadingPortal}
+                className="px-5 py-2.5 rounded-xl text-sm font-bold border border-gray-200 text-gray-700 hover:border-gray-400 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {loadingPortal ? (
+                  <><div className="w-4 h-4 border-2 border-current/40 border-t-current rounded-full animate-spin" /> Opening…</>
+                ) : (
+                  <><CreditCard size={15} /> Open Billing Portal</>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Enterprise Page ──────────────────────────────────────────────────────
 
 export default function Enterprise() {
   const { user, loading } = useAuth();
   const [selectedJob, setSelectedJob] = useState<any>(null);
-  const [activeSection] = useState("dashboard");
+  const [activeSection, setActiveSection] = useState("dashboard");
   const utils = trpc.useUtils();
 
   // Fetch the enterprise user data from DB (by ID to get full profile)
@@ -1482,12 +1763,17 @@ export default function Enterprise() {
       {/* Sidebar */}
       <Sidebar
         activeSection={activeSection}
-        onNavigate={() => setSelectedJob(null)}
+        onNavigate={(section) => {
+          setActiveSection(section);
+          setSelectedJob(null);
+        }}
       />
 
       {/* Main content */}
       <main className="flex-1 p-6 overflow-hidden">
-        {selectedJob ? (
+        {activeSection === "settings" ? (
+          <EnterpriseBillingSettings onBack={() => setActiveSection("dashboard")} />
+        ) : selectedJob ? (
           <JobDetailView
             job={selectedJob}
             user={enterpriseUser}

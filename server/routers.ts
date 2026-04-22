@@ -6,9 +6,9 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation } from "./db";
 import { invokeLLM } from "./_core/llm";
-import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail } from "./email";
+import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail } from "./email";
 import crypto from "crypto";
 import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistBasicCheckoutSession, createArtistPortalSession, createEnterpriseJobUnlockCheckoutSession, createEnterpriseSubscriptionCheckoutSession } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
@@ -946,6 +946,100 @@ export const appRouter = router({
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) return { totalConversations: 0, totalMessages: 0, unreadMessages: 0 };
         return getMessageStatsByClientId(user.id);
+      }),
+
+    /**
+     * Send a message in an existing conversation.
+     * Saves to DB and emails the recipient.
+     */
+    sendMessage: protectedProcedure
+      .input(z.object({
+        conversationId: z.number(),
+        content: z.string().min(1).max(5000),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const sender = await getUserByOpenId(ctx.user.openId);
+        if (!sender) throw new Error("User not found");
+
+        const msg = await sendMessageToConversation({
+          conversationId: input.conversationId,
+          senderUserId: sender.id,
+          content: input.content,
+        });
+
+        // Determine recipient from conversation
+        const { getDb } = await import("./db");
+        const db = await getDb();
+        if (db) {
+          const { conversations } = await import("../drizzle/schema");
+          const { eq } = await import("drizzle-orm");
+          const convRows = await db.select().from(conversations).where(eq(conversations.id, input.conversationId)).limit(1);
+          const conv = convRows[0];
+          if (conv) {
+            // Recipient is whoever isn't the sender
+            const recipientId = sender.id === conv.clientUserId ? conv.artistUserId : conv.clientUserId;
+            if (recipientId) {
+              const recipient = await getUserById(recipientId);
+              if (recipient?.email) {
+                const appUrl = process.env.VITE_APP_URL || "https://artswrk.com";
+                const senderName = [sender.firstName, sender.lastName].filter(Boolean).join(" ") || sender.name || "Someone";
+                sendNewMessageEmail({
+                  to: recipient.email,
+                  recipientFirstName: recipient.firstName || recipient.name?.split(" ")[0] || "there",
+                  senderName,
+                  messagePreview: input.content,
+                  dashboardUrl: `${appUrl}/app/messages`,
+                }).catch((err) => console.error("[Messages] Email send failed:", err.message));
+              }
+            }
+          }
+        }
+
+        return { message: msg };
+      }),
+
+    /**
+     * Get or create a conversation between the logged-in user and an artist, then send an optional first message.
+     */
+    startConversation: protectedProcedure
+      .input(z.object({
+        artistUserId: z.number(),
+        initialMessage: z.string().min(1).max(5000).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const sender = await getUserByOpenId(ctx.user.openId);
+        if (!sender) throw new Error("User not found");
+
+        // Determine client vs artist role — clients start convos with artists
+        const isClient = sender.userRole !== "Artist";
+        const clientUserId = isClient ? sender.id : input.artistUserId;
+        const artistUserId = isClient ? input.artistUserId : sender.id;
+
+        const convo = await getOrCreateConversation(clientUserId, artistUserId);
+
+        if (input.initialMessage) {
+          await sendMessageToConversation({
+            conversationId: convo.id,
+            senderUserId: sender.id,
+            content: input.initialMessage,
+          });
+          // Email recipient
+          const recipientId = isClient ? artistUserId : clientUserId;
+          const recipient = await getUserById(recipientId);
+          if (recipient?.email) {
+            const appUrl = process.env.VITE_APP_URL || "https://artswrk.com";
+            const senderName = [sender.firstName, sender.lastName].filter(Boolean).join(" ") || sender.name || "Someone";
+            sendNewMessageEmail({
+              to: recipient.email,
+              recipientFirstName: recipient.firstName || recipient.name?.split(" ")[0] || "there",
+              senderName,
+              messagePreview: input.initialMessage,
+              dashboardUrl: `${appUrl}/app/messages`,
+            }).catch((err) => console.error("[Messages] Email send failed:", err.message));
+          }
+        }
+
+        return { conversationId: convo.id };
       }),
   }),
 
@@ -2072,6 +2166,28 @@ Fields to extract:
           `${input.origin}/artist-dashboard?tab=settings`
         );
         return { url };
+      }),
+  }),
+
+  /** Benefits / Partner perks — filtered by audience type */
+  benefits: router({
+    list: protectedProcedure
+      .input(z.object({ audienceType: z.enum(["Artist", "Client"]) }))
+      .query(async ({ input }) => {
+        const rows = await getBenefits(input.audienceType);
+        return {
+          benefits: rows.map((b) => ({
+            id: b.id,
+            companyName: b.companyName ?? "",
+            logoUrl: b.logoUrl ?? null,
+            url: b.url ?? null,
+            businessDescription: b.businessDescription ?? null,
+            discountOffering: b.discountOffering ?? null,
+            howToRedeem: b.howToRedeem ?? null,
+            categories: (() => { try { return JSON.parse(b.categories ?? "[]") as string[]; } catch { return [] as string[]; } })(),
+            audienceTypes: (() => { try { return JSON.parse(b.audienceTypes ?? "[]") as string[]; } catch { return [] as string[]; } })(),
+          })),
+        };
       }),
   }),
 });

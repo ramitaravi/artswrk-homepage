@@ -12,6 +12,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
+import Navbar from "@/components/Navbar";
 import {
   CheckCircle2, ArrowRight, ArrowLeft, ChevronDown, ChevronUp,
   Camera, MapPin, Phone, Instagram, Youtube, Plus, X, Mail,
@@ -983,7 +984,8 @@ export default function ArtistOnboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex">
+    <div className="min-h-screen bg-[#fafafa] flex pt-16">
+      <Navbar />
       {/* Sidebar */}
       <div className="hidden lg:flex flex-col w-64 shrink-0 p-8 border-r border-gray-100 bg-white">
         <StepSidebar step={step} completedSteps={completedSteps} />

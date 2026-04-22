@@ -16,6 +16,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
+import Navbar from "@/components/Navbar";
 import {
   ArrowRight, ArrowLeft, CheckCircle2, Building2, User, Music, Trophy,
   Calendar, HelpCircle, MapPin, Globe, Phone, Star, Sparkles, Zap,
@@ -319,7 +320,8 @@ export default function ClientOnboarding() {
   const isIndividual = form.businessOrIndividual === "Individual";
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pt-16">
+      <Navbar />
       <div className="max-w-5xl mx-auto px-6 py-12 flex gap-16">
 
         {/* ── Sidebar ──────────────────────────────────────────────────── */}

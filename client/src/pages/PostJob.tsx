@@ -10,6 +10,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import SharedNavbar from "@/components/Navbar";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -1011,35 +1012,7 @@ export default function PostJob() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-100">
-        <div className="mx-auto px-5 lg:px-10 max-w-7xl">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center select-none">
-              <span className="font-black text-2xl tracking-tight hirer-grad-text">
-                ARTS
-              </span>
-              <span className="font-black text-2xl tracking-tight bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">
-                WRK
-              </span>
-            </Link>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/jobs"
-                className="text-sm font-medium text-gray-600 hover:text-black transition-colors"
-              >
-                Browse Jobs
-              </Link>
-              <Link
-                href="/app"
-                className="text-sm font-medium text-gray-600 hover:text-black transition-colors"
-              >
-                Dashboard
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <SharedNavbar />
 
       <div className="pt-24 pb-16 px-5">
         <StepIndicator step={step} />
