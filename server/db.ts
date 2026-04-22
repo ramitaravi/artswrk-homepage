@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, isNotNull, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, messages, payments, premiumJobInterestedArtists, premiumJobs, users } from "../drizzle/schema";
+import { ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, masterServiceTypes, messages, payments, premiumJobInterestedArtists, premiumJobs, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -2335,4 +2335,20 @@ export async function isJobUnlocked(clientUserId: number, jobId: number): Promis
     ))
     .limit(1);
   return rows.length > 0;
+}
+
+/**
+ * Resolve a master_service_type DB id (integer) to its human-readable name.
+ * Returns the id as a string fallback if not found.
+ */
+export async function getMasterServiceTypeName(id: number | null | undefined): Promise<string> {
+  if (!id) return "Dance Teacher";
+  const db = await getDb();
+  if (!db) return String(id);
+  const rows = await db
+    .select({ name: masterServiceTypes.name })
+    .from(masterServiceTypes)
+    .where(eq(masterServiceTypes.id, id))
+    .limit(1);
+  return rows[0]?.name ?? String(id);
 }

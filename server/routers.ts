@@ -8,7 +8,7 @@ import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
 import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked } from "./db";
 import { invokeLLM } from "./_core/llm";
-import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail } from "./email";
+import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail } from "./email";
 import crypto from "crypto";
 import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistBasicCheckoutSession, createArtistPortalSession, createEnterpriseJobUnlockCheckoutSession, createEnterpriseSubscriptionCheckoutSession } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
@@ -1138,6 +1138,32 @@ Fields to extract:
           transportation: input.transportation,
           requestStatus: "Active",
         });
+
+        // Send confirmation email (no Stripe webhook fires for free jobs)
+        if (user.email) {
+          const appUrl = process.env.VITE_APP_URL || "https://artswrk.com";
+          const rateDisplay = input.openRate
+            ? "Open rate (negotiable)"
+            : input.isHourly && input.clientHourlyRate
+            ? `$${input.clientHourlyRate}/hr`
+            : input.clientHourlyRate
+            ? `$${input.clientHourlyRate} flat`
+            : "Rate TBD";
+          sendJobPostedEmail({
+            to: user.email,
+            firstName: user.firstName ?? user.name?.split(" ")[0] ?? "there",
+            serviceType: "Job Posting",
+            date: input.startDate
+              ? new Date(input.startDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+              : input.dateType === "Ongoing" ? "Ongoing" : "Flexible / TBD",
+            location: input.locationAddress || "Location TBD",
+            rate: rateDisplay,
+            description: input.description,
+            transportation: input.transportation,
+            jobLink: `${appUrl}/app/jobs`,
+          }).catch((err) => console.error("[free job email]", err));
+        }
+
         return { jobId: job.id };
       }),
 
@@ -1666,6 +1692,25 @@ Fields to extract:
           createdByUserId: ctx.user.id,
           bubbleClientCompanyId: input.bubbleClientCompanyId || null,
         });
+
+        // Send PRO job confirmation email
+        const poster = await getUserByOpenId(ctx.user.openId);
+        if (poster?.email) {
+          const appUrl = process.env.VITE_APP_URL || "https://artswrk.com";
+          sendProJobPostedEmail({
+            to: poster.email,
+            firstName: poster.firstName ?? poster.name?.split(" ")[0] ?? "there",
+            company: input.company,
+            serviceType: input.serviceType,
+            category: input.category || null,
+            location: input.location || null,
+            budget: input.budget || null,
+            description: input.description || null,
+            workFromAnywhere: input.workFromAnywhere,
+            jobLink: `${appUrl}/enterprise`,
+          }).catch((err) => console.error("[PRO job email]", err));
+        }
+
         return { success: true, jobId };
       }),
 

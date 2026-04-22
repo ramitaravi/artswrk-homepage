@@ -326,22 +326,194 @@ export async function sendArtistWelcomeEmail({
   });
 }
 
-// ─── Typed helper: Job Posted ─────────────────────────────────────────────────
-export async function sendJobPostedEmail(data: JobPostedEmailData): Promise<boolean> {
-  return sendTransactionalEmail({
+// ─── Job Posted Confirmation (regular jobs) ───────────────────────────────────
+export async function sendJobPostedEmail(data: {
+  to: string;
+  firstName: string;
+  /** Human-readable service type name e.g. "Substitute Teacher" */
+  serviceType: string;
+  date: string;
+  location: string;
+  rate: string;
+  description: string;
+  jobLink: string;
+  transportation: boolean;
+}): Promise<boolean> {
+  return sendSimpleEmail({
     to: data.to,
-    templateId: SENDGRID_TEMPLATES.JOB_POSTED,
-    dynamicData: {
-      subject: "Your job has been posted!",
-      FirstName: data.firstName,
-      Service: data.service,
-      ArtistType: data.artistType,
-      Date: data.date,
-      Location: data.location,
-      TransportDetails: data.transportDetails ?? "N/A",
-      TransportReimbursed: data.transportReimbursed ?? "No",
-      Description: data.description,
-      joblink: data.jobLink,
-    },
+    subject: "Your job is live on Artswrk! 🎉",
+    html: `
+      <div style="font-family:'Helvetica Neue',sans-serif;max-width:580px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f0f0f0">
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:28px 36px">
+          <div style="display:inline-flex;align-items:center;gap:6px">
+            <span style="font-size:20px;font-weight:900;color:#fff;letter-spacing:-0.5px">ARTS</span>
+            <span style="font-size:20px;font-weight:900;background:#111;color:#fff;padding:2px 8px;border-radius:6px">WRK</span>
+          </div>
+          <p style="color:rgba(255,255,255,0.85);font-size:13px;margin:8px 0 0">Job Confirmation</p>
+        </div>
+
+        <!-- Body -->
+        <div style="padding:36px">
+          <h1 style="font-size:22px;font-weight:900;color:#111;margin:0 0 6px">Your job is live! 🎉</h1>
+          <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 28px">
+            Hey ${data.firstName}, your job posting is now live on Artswrk and artists can start applying.
+          </p>
+
+          <!-- Job details card -->
+          <div style="background:#f9f9f9;border-radius:12px;padding:20px 24px;margin-bottom:28px">
+            <h2 style="font-size:17px;font-weight:800;color:#111;margin:0 0 16px">${data.serviceType}</h2>
+            <table style="width:100%;border-collapse:collapse">
+              <tr>
+                <td style="padding:6px 0;vertical-align:top;width:110px">
+                  <span style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px">Date</span>
+                </td>
+                <td style="padding:6px 0;vertical-align:top">
+                  <span style="font-size:14px;color:#111;font-weight:600">${data.date}</span>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;vertical-align:top">
+                  <span style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px">Location</span>
+                </td>
+                <td style="padding:6px 0;vertical-align:top">
+                  <span style="font-size:14px;color:#111;font-weight:600">${data.location}</span>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;vertical-align:top">
+                  <span style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px">Rate</span>
+                </td>
+                <td style="padding:6px 0;vertical-align:top">
+                  <span style="font-size:14px;color:#111;font-weight:600">${data.rate}</span>
+                </td>
+              </tr>
+              ${data.transportation ? `
+              <tr>
+                <td style="padding:6px 0;vertical-align:top">
+                  <span style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px">Transport</span>
+                </td>
+                <td style="padding:6px 0;vertical-align:top">
+                  <span style="font-size:14px;color:#111;font-weight:600">Reimbursed ✓</span>
+                </td>
+              </tr>` : ""}
+              ${data.description ? `
+              <tr>
+                <td style="padding:12px 0 6px;vertical-align:top" colspan="2">
+                  <span style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px">Description</span>
+                </td>
+              </tr>
+              <tr>
+                <td colspan="2" style="padding:0 0 6px">
+                  <span style="font-size:14px;color:#444;line-height:1.5">${data.description}</span>
+                </td>
+              </tr>` : ""}
+            </table>
+          </div>
+
+          <a href="${data.jobLink}" style="display:inline-block;background:linear-gradient(90deg,#FFBC5D,#F25722);color:#fff;font-weight:800;font-size:14px;padding:14px 32px;border-radius:12px;text-decoration:none;margin-bottom:28px">
+            View Your Job Posting →
+          </a>
+
+          <hr style="border:none;border-top:1px solid #f0f0f0;margin:0 0 20px" />
+          <p style="color:#999;font-size:13px;line-height:1.6;margin:0">
+            Questions? Email us at <a href="mailto:contact@artswrk.com" style="color:#F25722">contact@artswrk.com</a>
+          </p>
+        </div>
+      </div>
+    `,
+  });
+}
+
+// ─── PRO / Enterprise Job Posted Confirmation ─────────────────────────────────
+export async function sendProJobPostedEmail(data: {
+  to: string;
+  firstName: string;
+  company: string;
+  serviceType: string;
+  category: string | null;
+  location: string | null;
+  budget: string | null;
+  description: string | null;
+  workFromAnywhere: boolean;
+  jobLink: string;
+}): Promise<boolean> {
+  const locationDisplay = data.workFromAnywhere
+    ? "Work From Anywhere"
+    : data.location || "Location TBD";
+
+  return sendSimpleEmail({
+    to: data.to,
+    subject: `Your PRO job is live on Artswrk! 🚀`,
+    html: `
+      <div style="font-family:'Helvetica Neue',sans-serif;max-width:580px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f0f0f0">
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:28px 36px">
+          <div style="display:inline-flex;align-items:center;gap:6px">
+            <span style="font-size:20px;font-weight:900;color:#fff;letter-spacing:-0.5px">ARTS</span>
+            <span style="font-size:20px;font-weight:900;background:#111;color:#fff;padding:2px 8px;border-radius:6px">WRK</span>
+          </div>
+          <p style="color:rgba(255,255,255,0.85);font-size:13px;margin:8px 0 0">PRO Job Confirmation · ${data.company}</p>
+        </div>
+
+        <!-- Body -->
+        <div style="padding:36px">
+          <h1 style="font-size:22px;font-weight:900;color:#111;margin:0 0 6px">Your PRO job is live! 🚀</h1>
+          <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 28px">
+            Hey ${data.firstName}, your job has been posted to the Artswrk PRO network. Qualified artists will see it right away.
+          </p>
+
+          <!-- Job card -->
+          <div style="background:#f9f9f9;border-radius:12px;padding:20px 24px;margin-bottom:28px">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px">
+              <div>
+                <h2 style="font-size:17px;font-weight:800;color:#111;margin:0 0 4px">${data.serviceType}</h2>
+                <span style="font-size:12px;color:#888;font-weight:600">${data.company}${data.category ? ` · ${data.category}` : ""}</span>
+              </div>
+              ${data.workFromAnywhere ? `<span style="background:#e8f5e9;color:#2e7d32;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap">Remote</span>` : ""}
+            </div>
+            <table style="width:100%;border-collapse:collapse">
+              <tr>
+                <td style="padding:6px 0;vertical-align:top;width:110px">
+                  <span style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px">Location</span>
+                </td>
+                <td style="padding:6px 0;vertical-align:top">
+                  <span style="font-size:14px;color:#111;font-weight:600">${locationDisplay}</span>
+                </td>
+              </tr>
+              ${data.budget ? `
+              <tr>
+                <td style="padding:6px 0;vertical-align:top">
+                  <span style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px">Budget</span>
+                </td>
+                <td style="padding:6px 0;vertical-align:top">
+                  <span style="font-size:14px;color:#111;font-weight:600">${data.budget}</span>
+                </td>
+              </tr>` : ""}
+              ${data.description ? `
+              <tr>
+                <td style="padding:12px 0 6px;vertical-align:top" colspan="2">
+                  <span style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px">Description</span>
+                </td>
+              </tr>
+              <tr>
+                <td colspan="2" style="padding:0 0 6px">
+                  <span style="font-size:14px;color:#444;line-height:1.5">${data.description}</span>
+                </td>
+              </tr>` : ""}
+            </table>
+          </div>
+
+          <a href="${data.jobLink}" style="display:inline-block;background:linear-gradient(90deg,#FFBC5D,#F25722);color:#fff;font-weight:800;font-size:14px;padding:14px 32px;border-radius:12px;text-decoration:none;margin-bottom:28px">
+            View Your Job Posting →
+          </a>
+
+          <hr style="border:none;border-top:1px solid #f0f0f0;margin:0 0 20px" />
+          <p style="color:#999;font-size:13px;line-height:1.6;margin:0">
+            Need to edit your post or have questions? Email <a href="mailto:contact@artswrk.com" style="color:#F25722">contact@artswrk.com</a>
+          </p>
+        </div>
+      </div>
+    `,
   });
 }

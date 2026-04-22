@@ -11,6 +11,7 @@ import { getStripe } from "../stripe";
 import { ENV } from "./env";
 import { activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, getJobById, getUserById, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, recordEnterpriseJobUnlock, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription } from "../db";
 import { sendJobPostedEmail } from "../email";
+import { getMasterServiceTypeName } from "../db";
 import { handleBubbleWebhook } from "../bubbleWebhook";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -71,23 +72,32 @@ async function startServer() {
           await activateJob(jobId);
           console.log(`[Webhook] Activated job ${jobId}`);
 
-          // Send "Your job has been posted!" email
+          // Send "Your job is live!" confirmation email
           try {
             const job = await getJobById(jobId);
             const poster = userId ? await getUserById(userId) : null;
             if (job && poster?.email) {
               const appUrl = process.env.VITE_APP_URL || "https://artswrk.com";
+              const serviceTypeName = await getMasterServiceTypeName(job.masterServiceTypeId as any);
+              const rateDisplay = job.openRate
+                ? "Open rate (negotiable)"
+                : job.isHourly && job.clientHourlyRate
+                ? `$${job.clientHourlyRate}/hr`
+                : job.clientHourlyRate
+                ? `$${job.clientHourlyRate} flat`
+                : "Rate TBD";
               await sendJobPostedEmail({
                 to: poster.email,
                 firstName: poster.firstName || poster.name?.split(" ")[0] || "there",
-                service: job.masterServiceTypeId || "Dance Teacher",
-                artistType: "Dancer",
+                serviceType: serviceTypeName,
                 date: job.startDate
                   ? new Date(job.startDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
-                  : "Flexible / TBD",
+                  : job.dateType === "Ongoing" ? "Ongoing" : "Flexible / TBD",
                 location: job.locationAddress || "Location TBD",
+                rate: rateDisplay,
                 description: job.description || "",
-                jobLink: `${appUrl}/jobs/${jobId}`,
+                transportation: !!(job as any).transportation,
+                jobLink: `${appUrl}/app/jobs`,
               });
             }
           } catch (emailErr: any) {
