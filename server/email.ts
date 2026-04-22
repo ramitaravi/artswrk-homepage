@@ -234,6 +234,98 @@ export async function sendNewApplicantAlertEmail({
   }
 }
 
+// ─── Simple raw HTML email ────────────────────────────────────────────────────
+export async function sendSimpleEmail({
+  to,
+  subject,
+  html,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<boolean> {
+  if (!process.env.SENDGRID_API_KEY) {
+    console.warn("[email] SENDGRID_API_KEY not set — skipping email send");
+    return false;
+  }
+  try {
+    await sgMail.send({ to, from: { email: FROM_EMAIL, name: FROM_NAME }, subject, html });
+    return true;
+  } catch (err: unknown) {
+    console.error("[email] Failed to send simple email:", err instanceof Error ? err.message : err);
+    return false;
+  }
+}
+
+// ─── Artist Welcome Email ─────────────────────────────────────────────────────
+export async function sendArtistWelcomeEmail({
+  to,
+  firstName,
+}: {
+  to: string;
+  firstName: string;
+}): Promise<boolean> {
+  const appUrl = process.env.VITE_APP_URL || "https://artswrk.com";
+  return sendSimpleEmail({
+    to,
+    subject: "Welcome to Artswrk! 🎉",
+    html: `
+      <div style="font-family:'Helvetica Neue',sans-serif;max-width:580px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f0f0f0">
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:32px 40px">
+          <div style="display:inline-flex;align-items:center;gap:6px">
+            <span style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-0.5px">ARTS</span>
+            <span style="font-size:22px;font-weight:900;background:#111;color:#fff;padding:2px 8px;border-radius:6px">WRK</span>
+          </div>
+        </div>
+
+        <!-- Body -->
+        <div style="padding:40px">
+          <h1 style="font-size:24px;font-weight:900;color:#111;margin:0 0 8px">Hey ${firstName},</h1>
+          <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 20px">
+            Thanks for joining Artswrk! We're so glad you're here.
+          </p>
+          <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 28px">
+            Artswrk was built <strong>for artists by artists</strong> — our mission is to shatter the starving artist stigma. We help you pay your bills with part-time work when you need it most.
+          </p>
+
+          <h2 style="font-size:16px;font-weight:800;color:#111;margin:0 0 16px">Here's how to get started:</h2>
+
+          <div style="border-left:3px solid #FFBC5D;padding:12px 16px;margin-bottom:16px;background:#fffdf9;border-radius:0 8px 8px 0">
+            <p style="margin:0 0 4px;font-weight:700;color:#111;font-size:14px">🎨 Create Your Profile</p>
+            <p style="margin:0;color:#666;font-size:13px;line-height:1.5">Build a custom profile with your bio, services, and skillsets. Share the link in your bio so potential employers can see what you do best!</p>
+          </div>
+
+          <div style="border-left:3px solid #F25722;padding:12px 16px;margin-bottom:16px;background:#fffbf9;border-radius:0 8px 8px 0">
+            <p style="margin:0 0 4px;font-weight:700;color:#111;font-size:14px">🔍 Browse Jobs</p>
+            <p style="margin:0;color:#666;font-size:13px;line-height:1.5">We have hundreds of jobs to choose from — from creative work to side jobs. Something new is posted every day.</p>
+          </div>
+
+          <div style="border-left:3px solid #FFBC5D;padding:12px 16px;margin-bottom:28px;background:#fffdf9;border-radius:0 8px 8px 0">
+            <p style="margin:0 0 4px;font-weight:700;color:#111;font-size:14px">💳 Choose Your Plan</p>
+            <p style="margin:0;color:#666;font-size:13px;line-height:1.5">To apply to jobs, we have two plans — <strong>Artswrk Basic ($30/year)</strong> and <strong>Artswrk PRO ($10.99/month or $110/year)</strong>. Our average booking on Basic is $250/booking — on PRO, you'll earn $500+ per job. One booking pays your subscription back!</p>
+          </div>
+
+          <a href="${appUrl}/app" style="display:inline-block;background:linear-gradient(90deg,#FFBC5D,#F25722);color:#fff;font-weight:800;font-size:14px;padding:14px 32px;border-radius:12px;text-decoration:none;margin-bottom:32px">
+            Go to My Dashboard →
+          </a>
+
+          <hr style="border:none;border-top:1px solid #f0f0f0;margin:0 0 24px" />
+
+          <p style="color:#888;font-size:13px;line-height:1.6;margin:0">
+            If you have questions, email us at <a href="mailto:contact@artswrk.com" style="color:#F25722">contact@artswrk.com</a>. We're happy to help or hear feedback to make your experience the best it can be.
+          </p>
+          <p style="color:#888;font-size:13px;margin:16px 0 0">
+            Best,<br />
+            <strong style="color:#111">Nick &amp; Rami</strong><br />
+            Co-Founders, Artswrk
+          </p>
+        </div>
+      </div>
+    `,
+  });
+}
+
 // ─── Typed helper: Job Posted ─────────────────────────────────────────────────
 export async function sendJobPostedEmail(data: JobPostedEmailData): Promise<boolean> {
   return sendTransactionalEmail({

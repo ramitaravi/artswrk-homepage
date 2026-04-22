@@ -69,6 +69,13 @@ export const MASTER_ARTIST_TYPES = [
     isPublic: true,
     iconUrl: "//118d26995be0b113d0cb8cb06dbea400.cdn.bubble.io/f1718898894855x171700931015632100/Copy%20of%20Landing%20Page%20Social%20Asset.png",
   },
+  {
+    bubbleId: "artswrk_dance_competition_staff",
+    name: "Dance Competition Staff",
+    listingOrder: 10,
+    isPublic: true,
+    iconUrl: "//118d26995be0b113d0cb8cb06dbea400.cdn.bubble.io/f1749064284874x810797988699827800/2.png",
+  },
 ] as const;
 
 export const MASTER_SERVICE_TYPES = [
@@ -125,6 +132,13 @@ export const MASTER_SERVICE_TYPES = [
   { bubbleId: "1718897301734x723011082328963500", name: "Content Creator",               bubbleArtistTypeId: "1718896784814x357092022052048100", listingOrder: null, isPublic: false, isMcLandingPage: false },
   { bubbleId: "1718972194772x237171618015870500", name: "Retail",                        bubbleArtistTypeId: "1718896784814x357092022052048100", listingOrder: null, isPublic: false, isMcLandingPage: false },
   { bubbleId: "1724105478368x370504358015882240", name: "Customer Service",              bubbleArtistTypeId: "1718896784814x357092022052048100", listingOrder: null, isPublic: false, isMcLandingPage: false },
+
+  // ── Dance Competition Staff ─────────────────────────────────────────────────
+  { bubbleId: "artswrk_dcs_judge",         name: "Dance Competition Judge", bubbleArtistTypeId: "artswrk_dance_competition_staff", listingOrder: 1,    isPublic: true, isMcLandingPage: false },
+  { bubbleId: "artswrk_dcs_tabulator",     name: "Tabulator",               bubbleArtistTypeId: "artswrk_dance_competition_staff", listingOrder: 2,    isPublic: true, isMcLandingPage: false },
+  { bubbleId: "artswrk_dcs_emcee",         name: "Emcee / Announcer",       bubbleArtistTypeId: "artswrk_dance_competition_staff", listingOrder: 3,    isPublic: true, isMcLandingPage: false },
+  { bubbleId: "artswrk_dcs_backstage",     name: "Backstage Manager",       bubbleArtistTypeId: "artswrk_dance_competition_staff", listingOrder: 4,    isPublic: true, isMcLandingPage: false },
+  { bubbleId: "artswrk_dcs_general_staff", name: "General Staff",           bubbleArtistTypeId: "artswrk_dance_competition_staff", listingOrder: 5,    isPublic: true, isMcLandingPage: false },
 
   // ── No artist type (standalone) ─────────────────────────────────────────────
   { bubbleId: "1714772660662x913566450486813600", name: "Event Performers",              bubbleArtistTypeId: null,                              listingOrder: null, isPublic: true,  isMcLandingPage: false },

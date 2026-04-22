@@ -8,7 +8,7 @@ import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
 import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked } from "./db";
 import { invokeLLM } from "./_core/llm";
-import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail } from "./email";
+import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail } from "./email";
 import crypto from "crypto";
 import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistBasicCheckoutSession, createArtistPortalSession, createEnterpriseJobUnlockCheckoutSession, createEnterpriseSubscriptionCheckoutSession } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
@@ -1310,6 +1310,133 @@ Fields to extract:
         if (!user) throw new Error("User not found");
         await updateUserOnboarding(user.id, input);
         return { success: true };
+      }),
+
+    /**
+     * Get artist onboarding status for resume-from-step.
+     */
+    getArtistOnboardingStatus: protectedProcedure.query(async ({ ctx }) => {
+      const user = await getUserByOpenId(ctx.user.openId);
+      if (!user) throw new Error("User not found");
+      return {
+        onboardingStep: user.onboardingStep ?? 0,
+        masterArtistTypes: user.masterArtistTypes ? JSON.parse(user.masterArtistTypes as string) : [],
+        artistServices: user.artistServices ? JSON.parse(user.artistServices as string) : [],
+        bio: user.bio ?? null,
+        location: user.location ?? null,
+        phoneNumber: user.phoneNumber ?? null,
+        instagram: user.instagram ?? null,
+        tiktok: user.tiktok ?? null,
+        youtube: user.youtube ?? null,
+        profilePicture: user.profilePicture ?? null,
+        firstName: user.firstName ?? null,
+        userSignedUp: user.userSignedUp ?? false,
+      };
+    }),
+
+    /**
+     * Save artist onboarding data (artist types, services, profile info).
+     * Fires welcome email when userSignedUp transitions to true.
+     */
+    updateArtistOnboarding: protectedProcedure
+      .input(z.object({
+        masterArtistTypes: z.array(z.string()).optional(),
+        artistServices: z.array(z.string()).optional(),
+        bio: z.string().optional(),
+        location: z.string().optional(),
+        phoneNumber: z.string().optional(),
+        instagram: z.string().optional(),
+        tiktok: z.string().optional(),
+        youtube: z.string().optional(),
+        profilePicture: z.string().optional(),
+        onboardingStep: z.number().optional(),
+        userSignedUp: z.boolean().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const wasSignedUp = user.userSignedUp;
+        await updateUserOnboarding(user.id, input);
+        // Send welcome email on first completion
+        if (input.userSignedUp && !wasSignedUp && user.email) {
+          sendArtistWelcomeEmail({
+            to: user.email,
+            firstName: user.firstName ?? user.name ?? "there",
+          }).catch((err) => console.error("[welcome email]", err));
+        }
+        return { success: true };
+      }),
+
+    /**
+     * Upload a profile picture (base64) and save the URL to the user record.
+     */
+    uploadProfilePicture: protectedProcedure
+      .input(z.object({
+        base64: z.string(),
+        contentType: z.string().default("image/jpeg"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const buf = Buffer.from(input.base64, "base64");
+        const ext = input.contentType.split("/")[1] ?? "jpg";
+        const { url } = await storagePut(
+          `profile-pictures/${user.id}-${Date.now()}.${ext}`,
+          buf,
+          input.contentType
+        );
+        await updateUserOnboarding(user.id, { profilePicture: url });
+        return { url };
+      }),
+
+    /**
+     * Send artist invite emails.
+     */
+    sendArtistInvites: protectedProcedure
+      .input(z.object({ emails: z.array(z.string().email()).min(1).max(20) }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const senderName = user.firstName ?? user.name ?? "A fellow artist";
+        const appUrl = process.env.VITE_APP_URL || "https://artswrk.com";
+        const results = await Promise.allSettled(
+          input.emails.map((email) =>
+            sendSimpleEmail({
+              to: email,
+              subject: `${senderName} invited you to join Artswrk`,
+              html: `
+                <div style="font-family:'Helvetica Neue',sans-serif;max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f0f0f0">
+                  <div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:28px 36px">
+                    <div style="display:inline-flex;align-items:center;gap:6px">
+                      <span style="font-size:20px;font-weight:900;color:#fff">ARTS</span>
+                      <span style="font-size:20px;font-weight:900;background:#111;color:#fff;padding:2px 8px;border-radius:6px">WRK</span>
+                    </div>
+                  </div>
+                  <div style="padding:36px">
+                    <h2 style="color:#111;font-size:22px;font-weight:900;margin:0 0 12px">Hey there,</h2>
+                    <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 16px">
+                      Hope you're doing well! I wanted to invite you to join me on Artswrk.
+                    </p>
+                    <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 24px">
+                      <strong>Artswrk is a jobs network for artists.</strong> You can find jobs for dance teachers, music teachers, photographers, videographers, and more. You can also pick up side jobs!
+                    </p>
+                    <a href="${appUrl}/join" style="display:inline-block;background:linear-gradient(90deg,#FFBC5D,#F25722);color:#fff;font-weight:800;font-size:14px;padding:14px 32px;border-radius:12px;text-decoration:none;margin-bottom:28px">
+                      Get started at artswrk.com ⭐️
+                    </a>
+                    <hr style="border:none;border-top:1px solid #f0f0f0;margin:0 0 20px" />
+                    <p style="color:#888;font-size:13px;margin:0">
+                      Talk to you soon!<br/><br/>
+                      Best,<br/>
+                      <strong style="color:#111">${senderName}</strong>
+                    </p>
+                  </div>
+                </div>
+              `,
+            })
+          )
+        );
+        const sent = results.filter((r) => r.status === "fulfilled").length;
+        return { sent, total: input.emails.length };
       }),
   }),
 

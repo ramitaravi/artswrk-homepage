@@ -1128,6 +1128,14 @@ export async function updateUserOnboarding(userId: number, data: {
   phoneNumber?: string;
   onboardingStep?: number;
   userSignedUp?: boolean;
+  // Artist-specific
+  masterArtistTypes?: string[];
+  artistServices?: string[];
+  bio?: string;
+  instagram?: string;
+  tiktok?: string;
+  youtube?: string;
+  profilePicture?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -1140,6 +1148,13 @@ export async function updateUserOnboarding(userId: number, data: {
   if (data.phoneNumber !== undefined) updateData.phoneNumber = data.phoneNumber;
   if (data.onboardingStep !== undefined) updateData.onboardingStep = data.onboardingStep;
   if (data.userSignedUp !== undefined) updateData.userSignedUp = data.userSignedUp;
+  if (data.masterArtistTypes !== undefined) updateData.masterArtistTypes = JSON.stringify(data.masterArtistTypes);
+  if (data.artistServices !== undefined) updateData.artistServices = JSON.stringify(data.artistServices);
+  if (data.bio !== undefined) updateData.bio = data.bio;
+  if (data.instagram !== undefined) updateData.instagram = data.instagram;
+  if (data.tiktok !== undefined) updateData.tiktok = data.tiktok;
+  if (data.youtube !== undefined) updateData.youtube = data.youtube;
+  if (data.profilePicture !== undefined) updateData.profilePicture = data.profilePicture;
   await db.update(users).set(updateData as any).where(eq(users.id, userId));
 }
 

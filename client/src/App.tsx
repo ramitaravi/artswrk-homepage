@@ -24,6 +24,7 @@ import ArtistProfile from "./pages/dashboard/ArtistProfile";
 import PostJob from "./pages/PostJob";
 import Signup from "./pages/Signup";
 import ClientOnboarding from "./pages/ClientOnboarding";
+import ArtistOnboarding from "./pages/ArtistOnboarding";
 import ArtistJoin from "./pages/ArtistJoin";
 import Admin from "./pages/Admin";
 import Enterprise from "./pages/Enterprise";
@@ -92,6 +93,7 @@ function Router() {
       <Route path="/post-job" component={PostJob} />
       <Route path="/signup" component={Signup} />
       <Route path="/client-onboarding" component={ClientOnboarding} />
+      <Route path="/artist-onboarding" component={ArtistOnboarding} />
       <Route path="/join" component={ArtistJoin} />
       <Route path="/about" component={About} />
       <Route path="/dance-competitions" component={DanceCompetitions} />
