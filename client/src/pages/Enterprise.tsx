@@ -800,8 +800,12 @@ type MasterTab = "jobs" | "companies" | "artists";
 
 function MasterView({
   user,
+  onSelectJob,
+  initialJobId,
 }: {
   user: any;
+  onSelectJob: (job: any) => void;
+  initialJobId?: number;
 }) {
   const [, navigate] = useLocation();
   const [tab, setTab] = useState<MasterTab>("jobs");
@@ -835,6 +839,18 @@ function MasterView({
   const applications = appsData?.applications || [];
   const companies = clientCompaniesData?.companies || [];
   const artists = artistsData?.artists || [];
+
+  // Auto-select job when arriving via /enterprise/:jobId deep link
+  const [autoSelected, setAutoSelected] = useState(false);
+  useEffect(() => {
+    if (initialJobId && jobs.length > 0 && !autoSelected) {
+      const match = jobs.find((j: any) => j.id === initialJobId);
+      if (match) {
+        setAutoSelected(true);
+        onSelectJob(match);
+      }
+    }
+  }, [initialJobId, jobs, autoSelected, onSelectJob]);
 
   // Use job logo as fallback since the logged-in user may be a different account
   const firstJobLogo = jobs.length > 0 ? fixUrl(jobs[0].logo) : null;
@@ -931,7 +947,7 @@ function MasterView({
                     applicants={applications.filter(
                       (a: any) => a.jobTitle === (job.serviceType || job.title)
                     )}
-                    onViewDetail={() => navigate(`/app/enterprise/jobs/${job.id}`)}
+                    onViewDetail={() => onSelectJob(job)}
                   />
                 ))
               )}
@@ -1712,10 +1728,22 @@ function EnterpriseBillingSettings({ onBack }: { onBack: () => void }) {
 
 // ── Main Enterprise Page ──────────────────────────────────────────────────────
 
-export default function Enterprise() {
+export default function Enterprise({ initialJobId }: { initialJobId?: number } = {}) {
   const { user, loading } = useAuth();
+  const [, navigate] = useLocation();
+  const [selectedJob, setSelectedJob] = useState<any>(null);
   const [activeSection, setActiveSection] = useState("dashboard");
   const utils = trpc.useUtils();
+
+  function selectJob(job: any) {
+    setSelectedJob(job);
+    navigate(`/enterprise/${job.id}`);
+  }
+
+  function clearJob() {
+    setSelectedJob(null);
+    navigate("/enterprise");
+  }
 
   // Fetch the enterprise user data from DB (by ID to get full profile)
   const { data: userById } = trpc.artswrkUsers.getById.useQuery(
@@ -1763,6 +1791,7 @@ export default function Enterprise() {
         activeSection={activeSection}
         onNavigate={(section) => {
           setActiveSection(section);
+          clearJob();
         }}
       />
 
@@ -1770,9 +1799,17 @@ export default function Enterprise() {
       <main className="flex-1 p-6 overflow-hidden">
         {activeSection === "settings" ? (
           <EnterpriseBillingSettings onBack={() => setActiveSection("dashboard")} />
+        ) : selectedJob ? (
+          <JobDetailView
+            job={selectedJob}
+            user={enterpriseUser}
+            onBack={clearJob}
+          />
         ) : (
           <MasterView
             user={enterpriseUser}
+            onSelectJob={selectJob}
+            initialJobId={initialJobId}
           />
         )}
       </main>

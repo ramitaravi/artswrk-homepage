@@ -57,8 +57,7 @@ function DashRoute({ component: Component }: { component: React.ComponentType })
 
 /**
  * Role-aware /app route dispatcher.
- * Artists see ArtistDashboard (URL-driven content); clients see their dedicated pages.
- * Accepts an optional clientComponent override — falls back to Overview for the home route.
+ * Artists see ArtistDashboard; enterprise clients redirect to /enterprise; regular clients see their pages.
  */
 function AppRoute({ clientComponent: ClientComponent = Overview }: { clientComponent?: React.ComponentType }) {
   const { user } = useAuth();
@@ -67,8 +66,14 @@ function AppRoute({ clientComponent: ClientComponent = Overview }: { clientCompo
     { enabled: !!user?.email }
   );
 
-  // While loading, render the layout skeleton (DashboardLayout shows its own spinner)
   const isArtist = artswrkUser?.userRole === "Artist";
+  const isEnterprise = !!(artswrkUser as any)?.enterprise;
+
+  // Enterprise users belong on /enterprise, not the regular dashboard
+  if (isEnterprise) {
+    window.location.replace("/enterprise");
+    return null;
+  }
 
   return (
     <DashboardLayout>
@@ -203,8 +208,11 @@ function Router() {
       {/* Public artist profile page */}
       <Route path="/book/:slug" component={PublicArtistProfile} />
 
-      {/* Enterprise landing page */}
-      <Route path="/enterprise" component={Enterprise} />
+      {/* Enterprise dashboard — job-level deep link must come before the base route */}
+      <Route path="/enterprise/:jobId">
+        {(params) => <Enterprise initialJobId={parseInt((params as any).jobId)} />}
+      </Route>
+      <Route path="/enterprise">{() => <Enterprise />}</Route>
 
       {/* Admin — separate path, admin-only */}
       <Route path="/admin-dashboard" component={Admin} />
