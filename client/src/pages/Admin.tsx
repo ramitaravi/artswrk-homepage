@@ -18,7 +18,7 @@ import {
   Plus, Edit2, Mail, ChevronDown, ToggleLeft, ToggleRight, Instagram, Link as LinkIcon, Send,
 } from "lucide-react";
 import AcquisitionSection from "./admin/Acquisition";
-import { ADMIN_SESSION_COOKIE_NAME } from "@shared/const";
+import { ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE } from "@shared/const";
 import { Link } from "wouter";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -116,14 +116,14 @@ function StatCard({ label, value, sub, icon, accent }: {
   label: string; value: string | number; sub?: string; icon: React.ReactNode; accent?: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-start gap-4">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${accent || "bg-orange-50 text-[#F25722]"}`}>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-start gap-3 min-w-0 overflow-hidden">
+      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${accent || "bg-orange-50 text-[#F25722]"}`}>
         {icon}
       </div>
-      <div>
-        <p className="text-xs text-gray-400 font-medium">{label}</p>
-        <p className="text-2xl font-black text-[#111] leading-tight">{value}</p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-gray-400 font-medium truncate">{label}</p>
+        <p className="text-lg font-black text-[#111] leading-tight break-words">{value}</p>
+        {sub && <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{sub}</p>}
       </div>
     </div>
   );
@@ -143,8 +143,8 @@ function ImpersonationBanner() {
   useEffect(() => {
     // Check if the admin backup cookie exists (means we're impersonating)
     const cookies = document.cookie.split(";").map(c => c.trim());
-    const hasBackup = cookies.some(c => c.startsWith(ADMIN_SESSION_COOKIE_NAME + "="));
-    setIsImpersonating(hasBackup);
+    const hasMarker = cookies.some(c => c.startsWith(IMPERSONATION_MARKER_COOKIE + "="));
+    setIsImpersonating(hasMarker);
   }, []);
 
   if (!isImpersonating) return null;
@@ -260,7 +260,7 @@ function DashboardSection() {
 
       {/* Primary stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Revenue" value={fmt$(stats?.totalRevenueCents ?? 0)} icon={<DollarSign size={18} />} />
+        <StatCard label="Revenue" value={fmt$(stats?.totalRevenueCents ?? 0)} sub="Synced payments only" icon={<DollarSign size={18} />} />
         <StatCard label="Commission" value={fmt$(stats?.totalCommissionCents ?? 0)} icon={<TrendingUp size={18} />} accent="bg-green-50 text-green-600" />
         <StatCard label="Bookings" value={(stats?.totalBookings ?? 0).toLocaleString()} icon={<BookOpen size={18} />} accent="bg-blue-50 text-blue-600" />
         <StatCard label="Future Revenue" value={fmt$(stats?.futureRevenueCents ?? 0)} icon={<Calendar size={18} />} accent="bg-purple-50 text-purple-600" />
