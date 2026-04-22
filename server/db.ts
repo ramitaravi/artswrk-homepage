@@ -764,7 +764,7 @@ export async function getMessagesByConversationId(
     .from(messages)
     .leftJoin(senderUser, eq(messages.senderUserId, senderUser.id))
     .where(eq(messages.conversationId, conversationId))
-    .orderBy(messages.bubbleCreatedAt)
+    .orderBy(sql`COALESCE(${messages.bubbleCreatedAt}, ${messages.createdAt})`)
     .limit(limit)
     .offset(offset);
 }

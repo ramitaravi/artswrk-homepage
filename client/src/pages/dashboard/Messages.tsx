@@ -182,6 +182,7 @@ export default function Messages() {
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
+  const [optimisticMsgs, setOptimisticMsgs] = useState<Message[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [, navigate] = useLocation();
@@ -203,12 +204,34 @@ export default function Messages() {
   );
 
   const sendMessage = trpc.messages.sendMessage.useMutation({
-    onSuccess: () => {
+    onMutate: ({ content, conversationId }) => {
+      // Optimistically add the message to the thread immediately
+      const optimistic: Message = {
+        id: -Date.now(), // temp negative id
+        conversationId,
+        senderUserId: myUserId ?? null,
+        bubbleSentById: null,
+        content,
+        isSystem: false,
+        createdAt: new Date(),
+        bubbleCreatedAt: null,
+        senderFirstName: artswrkUser?.firstName ?? null,
+        senderLastName: artswrkUser?.lastName ?? null,
+        senderName: artswrkUser?.name ?? null,
+        senderProfilePicture: artswrkUser?.profilePicture ?? null,
+        senderUserRole: artswrkUser?.userRole ?? null,
+      };
+      setOptimisticMsgs((prev) => [...prev, optimistic]);
       setDraft("");
+    },
+    onSuccess: () => {
+      // Clear optimistic and let real data take over
+      setOptimisticMsgs([]);
       utils.messages.byConversation.invalidate({ conversationId: activeConvoId! });
       utils.messages.myConversations.invalidate();
     },
     onError: (err) => {
+      setOptimisticMsgs([]);
       toast.error(err.message || "Failed to send message");
     },
   });
@@ -220,14 +243,20 @@ export default function Messages() {
     }
   }, [conversations, activeConvoId]);
 
-  // Auto-scroll when messages load or new message sent
+  // Clear optimistic messages when switching conversations
+  useEffect(() => {
+    setOptimisticMsgs([]);
+  }, [activeConvoId]);
+
+  // Auto-scroll when messages load or new message sent (including optimistic)
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [msgs]);
+  }, [msgs, optimisticMsgs]);
 
   function handleSend() {
-    if (!draft.trim() || !activeConvoId) return;
-    sendMessage.mutate({ conversationId: activeConvoId, content: draft.trim() });
+    const text = draft.trim();
+    if (!text || !activeConvoId) return;
+    sendMessage.mutate({ conversationId: activeConvoId, content: text });
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -357,13 +386,13 @@ export default function Messages() {
               <div className="flex justify-center py-8">
                 <div className="w-5 h-5 border-2 border-[#F25722] border-t-transparent rounded-full animate-spin" />
               </div>
-            ) : (msgs ?? []).length === 0 ? (
+            ) : (msgs ?? []).length === 0 && optimisticMsgs.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-gray-400 py-12">
                 <MessageSquare size={32} className="mb-3 opacity-30" />
                 <p className="text-sm">No messages yet — say hello!</p>
               </div>
             ) : (
-              (msgs ?? []).map((msg) => (
+              [...(msgs ?? []), ...optimisticMsgs].map((msg) => (
                 <ChatBubble key={msg.id} msg={msg} isFromMe={isFromMe(msg)} />
               ))
             )}
