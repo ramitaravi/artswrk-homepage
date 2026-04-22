@@ -853,8 +853,8 @@ export default function ArtistOnboarding() {
   const updateOnboarding = trpc.signup.updateArtistOnboarding.useMutation();
   const uploadPictureMutation = trpc.signup.uploadProfilePicture.useMutation();
   const sendInvitesMutation = trpc.signup.sendArtistInvites.useMutation();
-  const basicCheckout = trpc.artist.subscription.createBasicCheckout?.useMutation?.();
-  const proCheckout = trpc.artist.subscription.createCheckout?.useMutation?.();
+  const basicCheckout = trpc.artistSubscription.createBasicCheckout?.useMutation?.();
+  const proCheckout = trpc.artistSubscription.createProCheckout?.useMutation?.();
 
   // ── Auth redirect ──────────────────────────────────────────────────────────
   useEffect(() => {
