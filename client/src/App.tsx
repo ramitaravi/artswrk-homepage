@@ -11,6 +11,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import DashboardLayout from "./components/DashboardLayout";
 import Overview from "./pages/dashboard/Overview";
+import SimpleDashboard from "./pages/dashboard/SimpleDashboard";
 import DashJobs from "./pages/dashboard/DashJobs";
 import Bookings from "./pages/dashboard/Bookings";
 import Payments from "./pages/dashboard/Payments";
@@ -125,6 +126,11 @@ function Router() {
       {/* Home: artists see their overview, clients see hiring stats */}
       <Route path="/app">
         {() => <AppRoute clientComponent={Overview} />}
+      </Route>
+
+      {/* Simple dashboard — enterprise-style layout experiment */}
+      <Route path="/app/simple">
+        {() => <AppRoute clientComponent={SimpleDashboard} />}
       </Route>
 
       {/* Jobs: artists see job feed + applications, clients see their postings */}

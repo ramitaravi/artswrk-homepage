@@ -29,6 +29,7 @@ import {
   X,
   Sparkles,
   CheckCircle2,
+  LayoutGrid,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
@@ -44,6 +45,7 @@ interface NavItem {
 // Client (hirer) nav
 const CLIENT_CORE_NAV: NavItem[] = [
   { label: "Dashboard", icon: <LayoutDashboard size={18} />, href: "/app" },
+  { label: "Dashboard Simple", icon: <LayoutGrid size={18} />, href: "/app/simple" },
   { label: "My Jobs", icon: <Briefcase size={18} />, href: "/app/jobs" },
   { label: "Bookings", icon: <Calendar size={18} />, href: "/app/bookings" },
   { label: "Payments", icon: <CreditCard size={18} />, href: "/app/payments" },
