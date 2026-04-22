@@ -45,6 +45,7 @@ import ClientJobDetail from "./pages/dashboard/ClientJobDetail";
 import PublicArtistProfile from "./pages/ArtistProfile";
 import { useAuth } from "./_core/hooks/useAuth";
 import { trpc } from "./lib/trpc";
+import ImpersonationBanner from "./components/ImpersonationBanner";
 
 // DashboardLayout handles auth protection internally (redirects to /login if not authenticated)
 function DashRoute({ component: Component }: { component: React.ComponentType }) {
@@ -234,6 +235,7 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
+          <ImpersonationBanner />
           <Router />
         </TooltipProvider>
       </ThemeProvider>

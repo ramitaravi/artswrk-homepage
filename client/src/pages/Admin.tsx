@@ -4178,7 +4178,6 @@ export default function Admin() {
 
   return (
     <div className="flex min-h-screen bg-[#f8f8f8]">
-      <ImpersonationBanner />
       <Sidebar active={section} onSelect={setSection} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(c => !c)} />
 
       <main className="flex-1 overflow-auto">
