@@ -332,7 +332,7 @@ export async function getAdminClientJobs(clientUserId: number, limit = 100, offs
   if (!db) return [];
   const rows = await db.execute(
     `SELECT
-       j.id, j.requestStatus, j.description, j.hiringCategory, j.locationAddress,
+       j.id, j.requestStatus, j.description, j.locationAddress,
        j.startDate, j.dateType, j.isHourly, j.openRate,
        j.artistHourlyRate, j.clientHourlyRate, j.artistFlatRate, j.clientFlatRate,
        j.bubbleCreatedAt, j.createdAt,
