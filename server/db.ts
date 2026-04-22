@@ -324,6 +324,57 @@ export async function getArtistJobApplications(artistUserId: number, limit = 50,
   return (rows[0] as unknown as any[]);
 }
 
+/**
+ * Admin: get all applications (interested_artists) for a given artist, with job + client info.
+ */
+export async function getAdminArtistApplications(artistUserId: number, limit = 100, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(
+    `SELECT
+       ia.id, ia.status, ia.createdAt, ia.bubbleCreatedAt, ia.converted,
+       ia.artistHourlyRate, ia.clientHourlyRate, ia.artistFlatRate, ia.clientFlatRate,
+       ia.totalHours, ia.isHourlyRate, ia.message,
+       ia.jobId,
+       j.description, j.locationAddress, j.startDate, j.requestStatus, j.dateType,
+       j.isHourly, j.openRate, j.artistHourlyRate AS jobArtistRate, j.clientHourlyRate AS jobClientRate,
+       j.hiringCategory,
+       u.clientCompanyName, u.id AS clientUserId,
+       COALESCE(u.enterpriseLogoUrl, u.profilePicture) AS clientProfilePicture
+     FROM interested_artists ia
+     JOIN jobs j ON ia.jobId = j.id
+     LEFT JOIN users u ON j.clientUserId = u.id
+     WHERE ia.artistUserId = ${artistUserId}
+     ORDER BY COALESCE(ia.bubbleCreatedAt, ia.createdAt) DESC
+     LIMIT ${limit} OFFSET ${offset}`
+  );
+  return (rows[0] as unknown as any[]);
+}
+
+/**
+ * Admin: get all bookings for a given artist with client info + per-booking payment totals.
+ */
+export async function getAdminArtistBookings(artistUserId: number, limit = 100, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(
+    `SELECT
+       b.id, b.bookingStatus, b.paymentStatus, b.clientRate, b.artistRate,
+       b.totalClientRate, b.totalArtistRate, b.grossProfit, b.hours,
+       b.startDate, b.endDate, b.locationAddress, b.description,
+       b.externalPayment, b.bubbleCreatedAt, b.createdAt,
+       u.clientCompanyName, u.id AS clientUserId,
+       COALESCE(u.enterpriseLogoUrl, u.profilePicture) AS clientProfilePicture,
+       (SELECT SUM(p.stripeAmount) FROM payments p WHERE p.bookingId = b.id AND p.stripeStatus = 'succeeded') AS totalPaidCents
+     FROM bookings b
+     LEFT JOIN users u ON b.clientUserId = u.id
+     WHERE b.artistUserId = ${artistUserId} AND (b.deleted IS NULL OR b.deleted = 0)
+     ORDER BY COALESCE(b.startDate, b.bubbleCreatedAt, b.createdAt) DESC
+     LIMIT ${limit} OFFSET ${offset}`
+  );
+  return (rows[0] as unknown as any[]);
+}
+
 export async function setUserPassword(
   userId: number,
   passwordHash: string,

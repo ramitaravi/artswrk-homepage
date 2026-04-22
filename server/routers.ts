@@ -391,6 +391,30 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    /** All applications for a specific artist — admin only */
+    artistApplications: protectedProcedure
+      .input(z.object({ artistId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getAdminArtistApplications } = await import("./db");
+        return getAdminArtistApplications(input.artistId);
+      }),
+
+    /** All bookings for a specific artist with earnings — admin only */
+    artistBookings: protectedProcedure
+      .input(z.object({ artistId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getAdminArtistBookings } = await import("./db");
+        const rows = await getAdminArtistBookings(input.artistId);
+        const totalEarningsCents = rows.reduce((sum: number, b: any) => {
+          const rate = b.totalArtistRate ?? b.artistRate ?? 0;
+          return sum + (b.bookingStatus === "Completed" ? Number(rate) : 0);
+        }, 0);
+        const completedCount = rows.filter((b: any) => b.bookingStatus === "Completed").length;
+        return { bookings: rows, totalEarningsCents, completedCount };
+      }),
+
     /** All clients with search + filters */
     clients: protectedProcedure
       .input(z.object({

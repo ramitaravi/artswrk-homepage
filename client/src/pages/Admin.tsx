@@ -584,10 +584,168 @@ function AdminArtistForm({
   );
 }
 
+// ─── Artist Applications Tab ──────────────────────────────────────────────────
+function ArtistApplicationsTab({ artistId }: { artistId: number }) {
+  const { data: apps, isLoading } = trpc.admin.artistApplications.useQuery({ artistId });
+
+  if (isLoading) return <div className="flex justify-center py-12"><div className="w-5 h-5 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" /></div>;
+  if (!apps || apps.length === 0) return (
+    <div className="text-center py-16 text-gray-400">
+      <Briefcase size={32} className="mx-auto mb-3 opacity-20" />
+      <p className="text-sm">No applications yet</p>
+    </div>
+  );
+
+  const statusColor = (s: string | null) => {
+    if (!s) return "bg-gray-100 text-gray-500";
+    if (s === "Confirmed") return "bg-green-50 text-green-600";
+    if (s === "Declined") return "bg-red-50 text-red-500";
+    return "bg-blue-50 text-blue-600";
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-xs text-gray-400 font-medium">{apps.length} application{apps.length !== 1 ? "s" : ""}</p>
+      </div>
+      {apps.map((a: any) => (
+        <div key={a.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              {a.clientProfilePicture ? (
+                <img src={a.clientProfilePicture} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+              ) : (
+                <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 flex-shrink-0">
+                  <Building2 size={14} />
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[#111] truncate">{a.clientCompanyName || "Unknown Client"}</p>
+                {a.description && (
+                  <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{a.description}</p>
+                )}
+              </div>
+            </div>
+            <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColor(a.status)}`}>
+              {a.status || "Interested"}
+            </span>
+          </div>
+          <div className="flex items-center gap-4 mt-3 flex-wrap text-xs text-gray-400">
+            {a.locationAddress && <span className="flex items-center gap-1"><MapPin size={10} />{a.locationAddress}</span>}
+            {a.startDate && <span className="flex items-center gap-1"><Calendar size={10} />{fmtDate(a.startDate)}</span>}
+            {a.hiringCategory && <span className="flex items-center gap-1"><Star size={10} />{a.hiringCategory}</span>}
+            {(a.artistHourlyRate || a.jobArtistRate) && (
+              <span className="flex items-center gap-1"><DollarSign size={10} />${a.artistHourlyRate ?? a.jobArtistRate}/hr</span>
+            )}
+            <span className="ml-auto">{fmtDate(a.bubbleCreatedAt || a.createdAt)}</span>
+          </div>
+          {a.converted && (
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-green-600">
+              <CheckCircle2 size={11} /> Converted to booking
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Artist Bookings & Earnings Tab ──────────────────────────────────────────
+function ArtistBookingsTab({ artistId }: { artistId: number }) {
+  const { data, isLoading } = trpc.admin.artistBookings.useQuery({ artistId });
+
+  if (isLoading) return <div className="flex justify-center py-12"><div className="w-5 h-5 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" /></div>;
+
+  const bookings = data?.bookings ?? [];
+  const totalEarnings = data?.totalEarningsCents ?? 0;
+  const completedCount = data?.completedCount ?? 0;
+  const totalBookings = bookings.length;
+
+  if (totalBookings === 0) return (
+    <div className="text-center py-16 text-gray-400">
+      <BookOpen size={32} className="mx-auto mb-3 opacity-20" />
+      <p className="text-sm">No bookings yet</p>
+    </div>
+  );
+
+  const statusColor = (s: string | null) => {
+    if (!s) return "bg-gray-100 text-gray-500";
+    if (s === "Completed") return "bg-green-50 text-green-600";
+    if (s === "Confirmed") return "bg-blue-50 text-blue-600";
+    if (s === "Cancelled") return "bg-red-50 text-red-500";
+    return "bg-amber-50 text-amber-600";
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Summary stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center">
+          <p className="text-2xl font-black text-[#111]">{totalBookings}</p>
+          <p className="text-xs text-gray-400 mt-0.5">Total Bookings</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center">
+          <p className="text-2xl font-black text-green-600">{completedCount}</p>
+          <p className="text-xs text-gray-400 mt-0.5">Completed</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center">
+          <p className="text-2xl font-black text-[#F25722]">{fmt$(totalEarnings)}</p>
+          <p className="text-xs text-gray-400 mt-0.5">Total Earned</p>
+        </div>
+      </div>
+
+      {/* Bookings list */}
+      <div className="space-y-3">
+        {bookings.map((b: any) => {
+          const artistEarning = b.totalArtistRate ?? b.artistRate;
+          return (
+            <div key={b.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  {b.clientProfilePicture ? (
+                    <img src={b.clientProfilePicture} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 flex-shrink-0">
+                      <Building2 size={14} />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#111] truncate">{b.clientCompanyName || "Unknown Client"}</p>
+                    {b.description && <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{b.description}</p>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColor(b.bookingStatus)}`}>
+                    {b.bookingStatus || "—"}
+                  </span>
+                  {artistEarning ? (
+                    <span className="text-xs font-bold text-[#111]">{fmt$(Number(artistEarning))}</span>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex items-center gap-4 mt-3 flex-wrap text-xs text-gray-400">
+                {b.startDate && <span className="flex items-center gap-1"><Calendar size={10} />{fmtDate(b.startDate)}</span>}
+                {b.locationAddress && <span className="flex items-center gap-1"><MapPin size={10} />{b.locationAddress}</span>}
+                {b.hours && <span className="flex items-center gap-1"><Clock size={10} />{b.hours}h</span>}
+                {b.paymentStatus && (
+                  <span className={`flex items-center gap-1 font-medium ${b.paymentStatus === "Paid" ? "text-green-500" : "text-amber-500"}`}>
+                    <CreditCard size={10} />{b.paymentStatus}
+                  </span>
+                )}
+                {b.externalPayment && <span className="text-gray-400">External payment</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Admin Artist Detail ──────────────────────────────────────────────────────
 function AdminArtistDetail({ artistId, onBack, onEdit }: { artistId: number; onBack: () => void; onEdit: () => void }) {
   const { data: artist, isLoading } = trpc.admin.getArtist.useQuery({ id: artistId });
-  const utils = trpc.useUtils();
+  const [tab, setTab] = useState<"overview" | "applications" | "bookings">("overview");
   const sendWelcome = trpc.admin.sendWelcomeEmail.useMutation({
     onSuccess: () => alert("Welcome email sent!"),
     onError: (e) => alert("Failed: " + e.message),
@@ -606,6 +764,12 @@ function AdminArtistDetail({ artistId, onBack, onEdit }: { artistId: number; onB
   const types = parseArr(artist.masterArtistTypes);
   const services = parseArr(artist.artistServices);
   const styles = parseArr(artist.masterStyles);
+
+  const TABS = [
+    { id: "overview" as const, label: "Overview" },
+    { id: "applications" as const, label: "Applications" },
+    { id: "bookings" as const, label: "Bookings & Earnings" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -664,102 +828,119 @@ function AdminArtistDetail({ artistId, onBack, onEdit }: { artistId: number; onB
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Left column */}
-        <div className="lg:col-span-2 space-y-5">
-          {/* Bio */}
-          {artist.bio && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Bio</p>
-              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{artist.bio}</p>
-            </div>
-          )}
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-gray-100">
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${
+              tab === t.id
+                ? "border-[#F25722] text-[#F25722]"
+                : "border-transparent text-gray-400 hover:text-gray-700"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-          {/* Specialties */}
-          {(types.length > 0 || services.length > 0 || styles.length > 0) && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Specialties</p>
-              {types.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 mb-2">Artist Types</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {types.map((t: string) => <span key={t} className="px-2.5 py-1 rounded-full bg-pink-50 text-pink-600 text-xs font-medium">{t}</span>)}
-                  </div>
-                </div>
-              )}
-              {services.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 mb-2">Services</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {services.map((s: string) => <span key={s} className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-medium">{s}</span>)}
-                  </div>
-                </div>
-              )}
-              {styles.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 mb-2">Styles</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {styles.map((s: string) => <span key={s} className="px-2.5 py-1 rounded-full bg-purple-50 text-purple-600 text-xs font-medium">{s}</span>)}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Right column */}
-        <div className="space-y-5">
-          {/* Meta */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Details</p>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-400 text-xs">ID</span>
-                <span className="font-mono text-xs text-gray-600">{artist.id}</span>
+      {/* Tab content */}
+      {tab === "overview" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* Left column */}
+          <div className="lg:col-span-2 space-y-5">
+            {artist.bio && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Bio</p>
+                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{artist.bio}</p>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400 text-xs">Joined</span>
-                <span className="text-xs text-gray-600">{fmtDate(artist.bubbleCreatedAt || artist.createdAt)}</span>
+            )}
+            {(types.length > 0 || services.length > 0 || styles.length > 0) && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Specialties</p>
+                {types.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 mb-2">Artist Types</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {types.map((t: string) => <span key={t} className="px-2.5 py-1 rounded-full bg-pink-50 text-pink-600 text-xs font-medium">{t}</span>)}
+                    </div>
+                  </div>
+                )}
+                {services.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 mb-2">Services</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {services.map((s: string) => <span key={s} className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-medium">{s}</span>)}
+                    </div>
+                  </div>
+                )}
+                {styles.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 mb-2">Styles</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {styles.map((s: string) => <span key={s} className="px-2.5 py-1 rounded-full bg-purple-50 text-purple-600 text-xs font-medium">{s}</span>)}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400 text-xs">Plan</span>
-                <span className="text-xs font-semibold">{artist.artswrkPro ? "PRO" : artist.artswrkBasic ? "Basic" : "Free"}</span>
-              </div>
-              {artist.slug && (
-                <div className="flex justify-between">
-                  <span className="text-gray-400 text-xs">Slug</span>
-                  <span className="text-xs text-gray-600 font-mono">@{artist.slug}</span>
-                </div>
-              )}
-              {artist.bookingCount !== null && artist.bookingCount !== 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-400 text-xs">Bookings</span>
-                  <span className="text-xs text-gray-600">{artist.bookingCount}</span>
-                </div>
-              )}
-            </div>
+            )}
           </div>
 
-          {/* Links */}
-          {(artist.website || artist.instagram) && (
+          {/* Right column */}
+          <div className="space-y-5">
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Links</p>
-              <div className="space-y-2">
-                {artist.website && (
-                  <a href={artist.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-[#F25722] hover:underline">
-                    <Globe size={12} /> {artist.website}
-                  </a>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Details</p>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-400 text-xs">ID</span>
+                  <span className="font-mono text-xs text-gray-600">{artist.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400 text-xs">Joined</span>
+                  <span className="text-xs text-gray-600">{fmtDate(artist.bubbleCreatedAt || artist.createdAt)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400 text-xs">Plan</span>
+                  <span className="text-xs font-semibold">{artist.artswrkPro ? "PRO" : artist.artswrkBasic ? "Basic" : "Free"}</span>
+                </div>
+                {artist.slug && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400 text-xs">Slug</span>
+                    <span className="text-xs text-gray-600 font-mono">@{artist.slug}</span>
+                  </div>
                 )}
-                {artist.instagram && (
-                  <a href={`https://instagram.com/${artist.instagram}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-[#F25722] hover:underline">
-                    <Instagram size={12} /> @{artist.instagram}
-                  </a>
+                {!!artist.bookingCount && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400 text-xs">Bookings</span>
+                    <span className="text-xs text-gray-600">{artist.bookingCount}</span>
+                  </div>
                 )}
               </div>
             </div>
-          )}
+            {(artist.website || artist.instagram) && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Links</p>
+                <div className="space-y-2">
+                  {artist.website && (
+                    <a href={artist.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-[#F25722] hover:underline">
+                      <Globe size={12} /> {artist.website}
+                    </a>
+                  )}
+                  {artist.instagram && (
+                    <a href={`https://instagram.com/${artist.instagram}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-[#F25722] hover:underline">
+                      <Instagram size={12} /> @{artist.instagram}
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {tab === "applications" && <ArtistApplicationsTab artistId={artistId} />}
+      {tab === "bookings" && <ArtistBookingsTab artistId={artistId} />}
     </div>
   );
 }
