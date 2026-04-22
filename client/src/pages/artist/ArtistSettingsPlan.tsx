@@ -124,7 +124,7 @@ function PlanCard({ tier, currentPlan, billingInterval, onUpgrade, isLoading, lo
 
       {/* Price */}
       <div className="flex items-end gap-1 mt-1">
-        <p className={`text-3xl font-black text-gray-900 transition-opacity ${pricingLoading && tier !== "free" ? "opacity-40" : ""}`}>
+        <p className={`text-3xl font-black text-[#111] transition-opacity ${pricingLoading && tier !== "free" ? "opacity-40" : ""}`}>
           {displayPrice}
         </p>
         {tier !== "free" && (
@@ -178,9 +178,8 @@ function PlanCard({ tier, currentPlan, billingInterval, onUpgrade, isLoading, lo
             onClick={() => onUpgrade(tier as "basic" | "pro")}
             disabled={isLoading}
             className={`w-full py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-60 ${
-              isPro ? "" : "bg-gradient-to-r from-pink-500 to-rose-500"
+              isPro ? "hirer-grad-bg" : "bg-gradient-to-r from-pink-500 to-rose-500"
             }`}
-            style={isPro ? { background: "linear-gradient(90deg,#FFBC5D,#F25722)" } : undefined}
           >
             {isThisLoading ? (
               <Loader2 size={16} className="animate-spin" />
@@ -269,7 +268,7 @@ export default function ArtistSettingsPlan() {
     <div className="space-y-8 max-w-3xl">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-black text-gray-900">Plan & Billing</h2>
+        <h2 className="text-2xl font-black text-[#111]">Plan & Billing</h2>
         <p className="text-sm text-gray-500 mt-1">Manage your Artswrk subscription and billing details.</p>
       </div>
 
@@ -292,7 +291,7 @@ export default function ArtistSettingsPlan() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Current Plan</p>
-          <p className="text-xl font-black text-gray-900 mt-0.5">
+          <p className="text-xl font-black text-[#111] mt-0.5">
             {currentPlan === "pro" ? "Artswrk PRO"
              : currentPlan === "basic" ? "Artswrk Basic"
              : "Free"}
@@ -364,7 +363,7 @@ export default function ArtistSettingsPlan() {
             <button
               onClick={() => setBillingInterval("month")}
               className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
-                billingInterval === "month" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                billingInterval === "month" ? "bg-white text-[#111] shadow-sm" : "text-gray-500 hover:text-gray-700"
               }`}
             >
               Monthly
@@ -372,7 +371,7 @@ export default function ArtistSettingsPlan() {
             <button
               onClick={() => setBillingInterval("year")}
               className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all flex items-center gap-1.5 ${
-                billingInterval === "year" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                billingInterval === "year" ? "bg-white text-[#111] shadow-sm" : "text-gray-500 hover:text-gray-700"
               }`}
             >
               Annual
@@ -423,7 +422,7 @@ export default function ArtistSettingsPlan() {
         <div className="rounded-2xl border border-gray-100 bg-white p-6 space-y-4">
           <div className="flex items-center gap-2">
             <Zap size={16} className="text-amber-500" />
-            <h3 className="text-base font-bold text-gray-900">PRO Features Unlocked</h3>
+            <h3 className="text-base font-bold text-[#111]">PRO Features Unlocked</h3>
           </div>
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {PRO_FEATURES.map((f) => (
@@ -438,7 +437,7 @@ export default function ArtistSettingsPlan() {
               <button
                 onClick={handleManageBilling}
                 disabled={createPortal.isPending}
-                className="flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors"
+                className="flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-[#111] transition-colors"
               >
                 {createPortal.isPending ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
                 Manage subscription, invoices & payment method
@@ -450,7 +449,7 @@ export default function ArtistSettingsPlan() {
 
       {/* FAQ */}
       <div className="rounded-2xl border border-gray-100 bg-white p-6 space-y-4">
-        <h3 className="text-base font-bold text-gray-900">Frequently Asked Questions</h3>
+        <h3 className="text-base font-bold text-[#111]">Frequently Asked Questions</h3>
         <div className="space-y-4 text-sm text-gray-600">
           <div>
             <p className="font-semibold text-gray-800">Can I cancel anytime?</p>

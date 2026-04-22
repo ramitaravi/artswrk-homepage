@@ -96,8 +96,7 @@ function StudioAvatar({ name, logo, size = "md" }: { name: string; logo?: string
   }
 
   return (
-    <div className={`${sizeClass} rounded-full flex-shrink-0 flex items-center justify-center font-bold text-white`}
-      style={{ background: "linear-gradient(135deg,#FFBC5D,#F25722)" }}>
+    <div className={`${sizeClass} rounded-full flex-shrink-0 flex items-center justify-center font-bold text-white hirer-grad-bg`}>
       {initials}
     </div>
   );
@@ -116,7 +115,7 @@ function DashboardTab({ user }: { user: any }) {
           <div className="flex items-start gap-4">
             <StudioAvatar name={user?.name || "Artist"} logo={user?.profilePicture} size="lg" />
             <div>
-              <h1 className="text-2xl font-black text-gray-900">Hey, {firstName} 🎉</h1>
+              <h1 className="text-2xl font-black text-[#111]">Hey, {firstName} 🎉</h1>
               <div className="flex items-center gap-2 mt-1">
                 <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
                   <Star size={11} className="fill-amber-500 text-amber-500" /> Artswrk PRO Member
@@ -146,13 +145,13 @@ function DashboardTab({ user }: { user: any }) {
       {/* Your Tasks */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
         <div className="flex items-center gap-3 mb-4">
-          <h2 className="text-base font-bold text-gray-900">Your Tasks</h2>
+          <h2 className="text-base font-bold text-[#111]">Your Tasks</h2>
           <span className="w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">1</span>
         </div>
         <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
           <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-semibold text-gray-900">Mark as complete (1)</p>
+            <p className="text-sm font-semibold text-[#111]">Mark as complete (1)</p>
             <p className="text-xs text-gray-500 mt-0.5">1 booking must be marked as complete</p>
           </div>
           <button className="ml-auto text-xs font-semibold text-amber-700 hover:underline flex-shrink-0">View →</button>
@@ -163,15 +162,14 @@ function DashboardTab({ user }: { user: any }) {
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+            <h2 className="text-base font-bold text-[#111] flex items-center gap-2">
               Profile Boost <span className="text-amber-500">⭐️</span>
             </h2>
             <p className="text-sm text-gray-500 mt-1 max-w-md">
               Want to get in front of studios like you do on Facebook? Create a boosted post to directly reach hundreds of studios near you.
             </p>
           </div>
-          <button className="flex-shrink-0 flex items-center gap-1.5 text-sm font-semibold text-white px-4 py-2 rounded-full transition-opacity hover:opacity-90"
-            style={{ background: "linear-gradient(90deg,#ec008c,#ff7171)" }}>
+          <button className="flex-shrink-0 flex items-center gap-1.5 text-sm font-semibold text-white px-4 py-2 rounded-full transition-opacity hover:opacity-90 hirer-grad-bg">
             Get started <ArrowRight size={13} />
           </button>
         </div>
@@ -180,10 +178,10 @@ function DashboardTab({ user }: { user: any }) {
       {/* PRO Jobs */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+          <h2 className="text-base font-bold text-[#111] flex items-center gap-2">
             Jobs <span className="text-xs font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">PRO ⭐️</span>
           </h2>
-          <button className="text-sm font-semibold text-gray-600 hover:text-gray-900 flex items-center gap-1">
+          <button className="text-sm font-semibold text-gray-600 hover:text-[#111] flex items-center gap-1">
             View PRO Jobs <ChevronRight size={14} />
           </button>
         </div>
@@ -191,7 +189,7 @@ function DashboardTab({ user }: { user: any }) {
           {PRO_JOBS.map(job => (
             <div key={job.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">{job.title}</p>
+                <p className="text-sm font-semibold text-[#111] truncate">{job.title}</p>
                 <p className="text-xs text-gray-500">{job.company}</p>
                 <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
                   <MapPin size={10} /> {job.location}
@@ -214,8 +212,8 @@ function DashboardTab({ user }: { user: any }) {
       {/* Jobs for You */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-bold text-gray-900">Jobs for You</h2>
-          <button className="text-sm font-semibold text-gray-600 hover:text-gray-900 flex items-center gap-1">
+          <h2 className="text-base font-bold text-[#111]">Jobs for You</h2>
+          <button className="text-sm font-semibold text-gray-600 hover:text-[#111] flex items-center gap-1">
             View All <ChevronRight size={14} />
           </button>
         </div>
@@ -224,7 +222,7 @@ function DashboardTab({ user }: { user: any }) {
             <div key={job.id} className="flex items-start gap-3 py-3 border-b border-gray-50 last:border-0">
               <StudioAvatar name={job.studio} logo={job.logo} size="md" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-gray-900">{job.studio}</p>
+                <p className="text-sm font-bold text-[#111]">{job.studio}</p>
                 <p className="text-sm text-gray-700">{job.serviceType}</p>
                 <p className="text-xs text-gray-500 mt-0.5">{job.location} · Posted {job.postedAgo}</p>
                 <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
@@ -239,8 +237,7 @@ function DashboardTab({ user }: { user: any }) {
                   <CheckCircle2 size={11} /> Applied!
                 </span>
               ) : (
-                <button className="flex-shrink-0 text-xs font-semibold text-white px-3 py-1.5 rounded-full hover:opacity-90 transition-opacity"
-                  style={{ background: "#111" }}>
+                <button className="flex-shrink-0 text-xs font-semibold text-white bg-[#111] px-3 py-1.5 rounded-full hover:opacity-80 transition-opacity">
                   Apply
                 </button>
               )}
@@ -274,7 +271,7 @@ function JobsTab({ user }: { user: any }) {
     <button
       onClick={() => setSubTab(tab)}
       className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors ${
-        subTab === tab ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"
+        subTab === tab ? "bg-[#111] text-white" : "text-gray-600 hover:bg-gray-100"
       }`}
     >
       {label}
@@ -284,7 +281,7 @@ function JobsTab({ user }: { user: any }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-black text-gray-900">Jobs</h2>
+        <h2 className="text-xl font-black text-[#111]">Jobs</h2>
       </div>
 
       {/* Sub-tab bar */}
@@ -298,7 +295,7 @@ function JobsTab({ user }: { user: any }) {
       {subTab === "jobs-for-you" && (
         <div className="bg-white rounded-2xl border border-gray-100">
           {feedLoading ? (
-            <div className="p-8 text-center"><div className="w-6 h-6 border-2 border-gray-200 border-t-gray-800 rounded-full animate-spin mx-auto" /></div>
+            <div className="p-8 text-center"><div className="w-6 h-6 border-2 border-gray-200 border-t-[#F25722] rounded-full animate-spin mx-auto" /></div>
           ) : !jobsFeed?.length ? (
             <div className="p-8 text-center">
               <Briefcase size={36} className="mx-auto text-gray-300 mb-3" />
@@ -310,7 +307,7 @@ function JobsTab({ user }: { user: any }) {
                 <div key={job.id} className="flex items-start gap-3 p-4">
                   <StudioAvatar name={job.studioName || job.creatorName || "Studio"} logo={job.logo} size="md" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-gray-900">{job.studioName || job.creatorName}</p>
+                    <p className="text-sm font-bold text-[#111]">{job.studioName || job.creatorName}</p>
                     <p className="text-sm text-gray-700">{job.serviceType}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
                       {job.location && !job.location.includes("[object") ? job.location : (job.workFromAnywhere ? "Work From Anywhere" : "Location TBD")}
@@ -320,7 +317,7 @@ function JobsTab({ user }: { user: any }) {
                       {job.rate && <span className="flex items-center gap-1"><CreditCard size={10} /> {job.rate}</span>}
                     </div>
                   </div>
-                  <button className="flex-shrink-0 text-xs font-semibold text-white px-3 py-1.5 rounded-full hover:opacity-90 transition-opacity" style={{ background: "#111" }}>
+                  <button className="flex-shrink-0 text-xs font-semibold text-white bg-[#111] px-3 py-1.5 rounded-full hover:opacity-80 transition-opacity">
                     Apply
                   </button>
                 </div>
@@ -334,7 +331,7 @@ function JobsTab({ user }: { user: any }) {
       {subTab === "pro-jobs" && (
         <div className="bg-white rounded-2xl border border-gray-100">
           {proLoading ? (
-            <div className="p-8 text-center"><div className="w-6 h-6 border-2 border-gray-200 border-t-gray-800 rounded-full animate-spin mx-auto" /></div>
+            <div className="p-8 text-center"><div className="w-6 h-6 border-2 border-gray-200 border-t-[#F25722] rounded-full animate-spin mx-auto" /></div>
           ) : !proJobs?.length ? (
             <div className="p-8 text-center">
               <Star size={36} className="mx-auto text-gray-300 mb-3" />
@@ -349,7 +346,7 @@ function JobsTab({ user }: { user: any }) {
                     <div className="flex items-center gap-3 min-w-0">
                       <StudioAvatar name={job.companyName || "Company"} logo={job.logo} size="sm" />
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-gray-900 truncate">{job.serviceType}</p>
+                        <p className="text-sm font-bold text-[#111] truncate">{job.serviceType}</p>
                         <p className="text-xs text-gray-500">{job.companyName}</p>
                         <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
                           <MapPin size={10} /> {job.workFromAnywhere ? "Work From Anywhere" : (job.location && !job.location.includes("[object") ? job.location : "Location TBD")}
@@ -381,7 +378,7 @@ function JobsTab({ user }: { user: any }) {
       {subTab === "applications" && (
         <div className="bg-white rounded-2xl border border-gray-100">
           {appsLoading ? (
-            <div className="p-8 text-center"><div className="w-6 h-6 border-2 border-gray-200 border-t-gray-800 rounded-full animate-spin mx-auto" /></div>
+            <div className="p-8 text-center"><div className="w-6 h-6 border-2 border-gray-200 border-t-[#F25722] rounded-full animate-spin mx-auto" /></div>
           ) : !applications?.length ? (
             <div className="p-8 text-center">
               <CheckCircle2 size={36} className="mx-auto text-gray-300 mb-3" />
@@ -395,7 +392,7 @@ function JobsTab({ user }: { user: any }) {
                   <div className="flex items-center gap-3 min-w-0">
                     <StudioAvatar name={app.companyName || "Company"} logo={app.logo} size="sm" />
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-gray-900 truncate">{app.jobTitle}</p>
+                      <p className="text-sm font-bold text-[#111] truncate">{app.jobTitle}</p>
                       <p className="text-xs text-gray-500">{app.companyName}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{app.appliedAt ? new Date(app.appliedAt).toLocaleDateString() : ""}</p>
                     </div>
@@ -435,7 +432,7 @@ function BookingsTab() {
     <button
       onClick={() => setSubTab(tab)}
       className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors ${
-        subTab === tab ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"
+        subTab === tab ? "bg-[#111] text-white" : "text-gray-600 hover:bg-gray-100"
       }`}
     >
       {label}
@@ -462,7 +459,7 @@ function BookingsTab() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-black text-gray-900">Bookings</h2>
+      <h2 className="text-xl font-black text-[#111]">Bookings</h2>
 
       <div className="flex flex-wrap items-center gap-1 bg-gray-100 p-1 rounded-2xl w-fit">
         {subTabBtn("mark-complete", "Mark as Complete")}
@@ -485,7 +482,7 @@ function BookingsTab() {
                 <div className="flex items-center gap-3 min-w-0">
                   <StudioAvatar name={booking.company} logo={booking.logo} size="sm" />
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-gray-900 truncate">{booking.jobTitle}</p>
+                    <p className="text-sm font-bold text-[#111] truncate">{booking.jobTitle}</p>
                     <p className="text-xs text-gray-500">{booking.company}</p>
                     <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
                       <span className="flex items-center gap-1"><Calendar size={10} /> {booking.date}</span>
@@ -496,7 +493,7 @@ function BookingsTab() {
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {statusBadge(booking.status)}
                   {booking.status === "mark-complete" && (
-                    <button className="text-xs font-semibold text-white bg-gray-900 px-3 py-1.5 rounded-full hover:bg-gray-700 transition-colors">
+                    <button className="text-xs font-semibold text-white bg-[#111] px-3 py-1.5 rounded-full hover:bg-gray-700 transition-colors">
                       Mark Complete
                     </button>
                   )}
@@ -524,18 +521,18 @@ function PaymentsTab() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-black text-gray-900">Payments</h2>
+      <h2 className="text-xl font-black text-[#111]">Payments</h2>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <p className="text-xs text-gray-500 mb-1">Total Earned</p>
-          <p className="text-2xl font-black text-gray-900">${totalEarned.toFixed(2)}</p>
+          <p className="text-2xl font-black text-[#111]">${totalEarned.toFixed(2)}</p>
           <p className="text-xs text-green-600 mt-1 font-semibold">↑ All time</p>
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <p className="text-xs text-gray-500 mb-1">Pending</p>
-          <p className="text-2xl font-black text-gray-900">${totalPending.toFixed(2)}</p>
+          <p className="text-2xl font-black text-[#111]">${totalPending.toFixed(2)}</p>
           <p className="text-xs text-amber-600 mt-1 font-semibold">Awaiting payment</p>
         </div>
       </div>
@@ -543,18 +540,18 @@ function PaymentsTab() {
       {/* Payment history */}
       <div className="bg-white rounded-2xl border border-gray-100">
         <div className="px-5 py-4 border-b border-gray-50">
-          <h3 className="text-sm font-bold text-gray-900">Payment History</h3>
+          <h3 className="text-sm font-bold text-[#111]">Payment History</h3>
         </div>
         <div className="divide-y divide-gray-50">
           {SAMPLE_PAYMENTS.map(payment => (
             <div key={payment.id} className="flex items-center justify-between p-4">
               <div className="min-w-0">
-                <p className="text-sm font-bold text-gray-900 truncate">{payment.jobTitle}</p>
+                <p className="text-sm font-bold text-[#111] truncate">{payment.jobTitle}</p>
                 <p className="text-xs text-gray-500">{payment.company}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{payment.date} · {payment.method}</p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <p className="text-sm font-bold text-gray-900">{payment.amount}</p>
+                <p className="text-sm font-bold text-[#111]">{payment.amount}</p>
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
                   payment.status === "paid" ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
                 }`}>
@@ -570,7 +567,7 @@ function PaymentsTab() {
       <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-5 text-white">
         <h3 className="text-sm font-bold mb-1">Set Up Direct Deposit</h3>
         <p className="text-xs text-gray-400 mb-3">Connect your bank account to receive payments directly from hirers.</p>
-        <button className="text-xs font-semibold text-gray-900 bg-white px-4 py-2 rounded-full hover:bg-gray-100 transition-colors">
+        <button className="text-xs font-semibold text-[#111] bg-white px-4 py-2 rounded-full hover:bg-gray-100 transition-colors">
           Connect Bank Account
         </button>
       </div>
@@ -592,7 +589,7 @@ function MessagesTab() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-black text-gray-900">Messages</h2>
+      <h2 className="text-xl font-black text-[#111]">Messages</h2>
 
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
         {!selected ? (
@@ -614,7 +611,7 @@ function MessagesTab() {
                   <StudioAvatar name={msg.from} logo={msg.avatar} size="md" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <p className={`text-sm truncate ${msg.unread ? "font-bold text-gray-900" : "font-semibold text-gray-700"}`}>{msg.from}</p>
+                      <p className={`text-sm truncate ${msg.unread ? "font-bold text-[#111]" : "font-semibold text-gray-700"}`}>{msg.from}</p>
                       <p className="text-xs text-gray-400 flex-shrink-0 ml-2">{msg.time}</p>
                     </div>
                     <p className={`text-xs truncate mt-0.5 ${msg.unread ? "text-gray-700" : "text-gray-500"}`}>{msg.preview}</p>
@@ -628,11 +625,11 @@ function MessagesTab() {
           // Conversation view
           <div className="flex flex-col h-[480px]">
             <div className="flex items-center gap-3 p-4 border-b border-gray-100">
-              <button onClick={() => setSelected(null)} className="text-gray-500 hover:text-gray-900 transition-colors">
+              <button onClick={() => setSelected(null)} className="text-gray-500 hover:text-[#111] transition-colors">
                 <ChevronRight size={18} className="rotate-180" />
               </button>
               <StudioAvatar name={selectedMsg?.from || ""} logo={selectedMsg?.avatar} size="sm" />
-              <p className="text-sm font-bold text-gray-900">{selectedMsg?.from}</p>
+              <p className="text-sm font-bold text-[#111]">{selectedMsg?.from}</p>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               <div className="flex justify-start">
@@ -647,9 +644,9 @@ function MessagesTab() {
                 <input
                   type="text"
                   placeholder="Type a message..."
-                  className="flex-1 text-sm px-4 py-2.5 rounded-full border border-gray-200 focus:outline-none focus:border-gray-400 transition-colors"
+                  className="flex-1 text-sm px-4 py-2.5 rounded-full border border-gray-200 focus:outline-none focus:border-[#F25722] transition-colors"
                 />
-                <button className="w-9 h-9 rounded-full bg-gray-900 text-white flex items-center justify-center hover:bg-gray-700 transition-colors flex-shrink-0">
+                <button className="w-9 h-9 rounded-full bg-[#111] text-white flex items-center justify-center hover:bg-gray-700 transition-colors flex-shrink-0">
                   <ArrowRight size={14} />
                 </button>
               </div>
@@ -669,7 +666,7 @@ function ProfileTab({ user }: { user: any }) {
       <div className="flex items-start gap-5 mb-6">
         <StudioAvatar name={user?.name || "Artist"} logo={user?.profilePicture} size="lg" />
         <div className="flex-1">
-          <h2 className="text-xl font-black text-gray-900">{user?.name || "Your Name"}</h2>
+          <h2 className="text-xl font-black text-[#111]">{user?.name || "Your Name"}</h2>
           <p className="text-sm text-gray-500 mt-0.5">{user?.email}</p>
           {user?.bio && (
             <p className="text-sm text-gray-600 mt-3 leading-relaxed line-clamp-4">{user.bio}</p>
@@ -679,23 +676,22 @@ function ProfileTab({ user }: { user: any }) {
       <div className="grid grid-cols-2 gap-4">
         <div className="p-4 bg-gray-50 rounded-xl">
           <p className="text-xs text-gray-500 mb-1">Location</p>
-          <p className="text-sm font-semibold text-gray-900">{user?.location || "Not set"}</p>
+          <p className="text-sm font-semibold text-[#111]">{user?.location || "Not set"}</p>
         </div>
         <div className="p-4 bg-gray-50 rounded-xl">
           <p className="text-xs text-gray-500 mb-1">Artist Type</p>
-          <p className="text-sm font-semibold text-gray-900">{user?.masterArtistTypes || "Not set"}</p>
+          <p className="text-sm font-semibold text-[#111]">{user?.masterArtistTypes || "Not set"}</p>
         </div>
         <div className="p-4 bg-gray-50 rounded-xl">
           <p className="text-xs text-gray-500 mb-1">Instagram</p>
-          <p className="text-sm font-semibold text-gray-900">{user?.instagram || "Not set"}</p>
+          <p className="text-sm font-semibold text-[#111]">{user?.instagram || "Not set"}</p>
         </div>
         <div className="p-4 bg-gray-50 rounded-xl">
           <p className="text-xs text-gray-500 mb-1">Website</p>
-          <p className="text-sm font-semibold text-gray-900">{user?.website || "Not set"}</p>
+          <p className="text-sm font-semibold text-[#111]">{user?.website || "Not set"}</p>
         </div>
       </div>
-      <button className="mt-4 w-full py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition-opacity"
-        style={{ background: "linear-gradient(90deg,#FFBC5D,#F25722)" }}>
+      <button className="mt-4 w-full py-2.5 rounded-xl text-sm font-semibold text-white hirer-grad-bg hover:opacity-90 transition-opacity">
         Edit Profile
       </button>
     </div>
@@ -715,7 +711,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
+          <h2 className="text-lg font-black text-[#111] flex items-center gap-2">
             PRO Jobs <span className="text-xs font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">⭐️</span>
           </h2>
         </div>
@@ -727,7 +723,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
               <Star size={22} className="text-amber-600 fill-amber-400" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-base font-black text-gray-900">Unlock PRO Jobs</p>
+              <p className="text-base font-black text-[#111]">Unlock PRO Jobs</p>
               <p className="text-sm text-gray-600 mt-1 leading-relaxed">
                 PRO jobs are exclusive listings from top companies — competitions, touring productions, and enterprise studios. Upgrade to PRO to apply to all of them.
               </p>
@@ -742,8 +738,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
               <div className="mt-5 flex items-center gap-3">
                 <button
                   onClick={onGoToSettings}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90"
-                  style={{ background: "linear-gradient(90deg,#FFBC5D,#F25722)" }}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90 hirer-grad-bg"
                 >
                   <Sparkles size={15} />
                   {proMonthlyPrice ? `Upgrade to PRO — from ${proMonthlyPrice}/mo` : "Upgrade to PRO"}
@@ -763,7 +758,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
             {PRO_JOBS.slice(0, 5).map(job => (
               <div key={job.id} className="flex items-center justify-between p-4 select-none">
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-gray-900 blur-sm">{job.title}</p>
+                  <p className="text-sm font-bold text-[#111] blur-sm">{job.title}</p>
                   <p className="text-xs text-gray-500 blur-sm">{job.company}</p>
                   <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5 blur-sm">
                     <MapPin size={10} /> {job.location}
@@ -790,7 +785,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
+        <h2 className="text-lg font-black text-[#111] flex items-center gap-2">
           PRO Jobs <span className="text-xs font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">⭐️</span>
         </h2>
         <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full flex items-center gap-1">
@@ -801,7 +796,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
         {PRO_JOBS.map(job => (
           <div key={job.id} className="flex items-center justify-between p-4">
             <div className="min-w-0">
-              <p className="text-sm font-bold text-gray-900">{job.title}</p>
+              <p className="text-sm font-bold text-[#111]">{job.title}</p>
               <p className="text-xs text-gray-500">{job.company}</p>
               <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
                 <MapPin size={10} /> {job.location}
@@ -829,7 +824,7 @@ function ComingSoonTab({ icon, title }: { icon: React.ReactNode; title: string }
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
       <div className="w-12 h-12 mx-auto text-gray-300 mb-3">{icon}</div>
-      <h2 className="text-lg font-bold text-gray-900 mb-1">{title}</h2>
+      <h2 className="text-lg font-bold text-[#111] mb-1">{title}</h2>
       <p className="text-sm text-gray-500">Coming soon. Data integration in progress.</p>
     </div>
   );
@@ -858,7 +853,7 @@ export default function ArtistDashboard() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8">
+    <div className="max-w-5xl mx-auto px-6 py-8">
       {renderContent()}
     </div>
   );

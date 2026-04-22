@@ -156,7 +156,7 @@ function ServicesTab() {
               </div>
             )}
             <div className="flex-1 pt-1">
-              <h3 className="text-base font-semibold text-gray-900 mb-3">{cat.name}</h3>
+              <h3 className="text-base font-semibold text-[#111] mb-3">{cat.name}</h3>
               <div className="flex flex-wrap gap-2">
                 {cat.subServices.map((sub, j) => (
                   <span
@@ -233,7 +233,7 @@ function ReviewsTab() {
               </div>
             )}
             <div>
-              <p className="text-sm font-semibold text-gray-900 leading-tight">{review.reviewerName}</p>
+              <p className="text-sm font-semibold text-[#111] leading-tight">{review.reviewerName}</p>
               {review.reviewerStudio && (
                 <p className="text-xs text-gray-500">{review.reviewerStudio}</p>
               )}
@@ -446,7 +446,7 @@ export default function ArtistProfilePage() {
               {/* Share */}
               <button
                 onClick={handleShare}
-                className="w-full flex items-center justify-center gap-2 py-1.5 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-1.5 text-sm text-gray-600 hover:text-[#111] transition-colors"
               >
                 <Share2 size={15} />
                 Share
