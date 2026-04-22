@@ -338,7 +338,7 @@ export async function getAdminArtistApplications(artistUserId: number, limit = 1
        ia.jobId,
        j.description, j.locationAddress, j.startDate, j.requestStatus, j.dateType,
        j.isHourly, j.openRate, j.artistHourlyRate AS jobArtistRate, j.clientHourlyRate AS jobClientRate,
-       j.hiringCategory,
+       u.hiringCategory,
        u.clientCompanyName, u.id AS clientUserId,
        COALESCE(u.enterpriseLogoUrl, u.profilePicture) AS clientProfilePicture
      FROM interested_artists ia
