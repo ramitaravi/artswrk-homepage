@@ -44,7 +44,6 @@ import Production from "./pages/Production";
 import ClientJobDetail from "./pages/dashboard/ClientJobDetail";
 import PublicArtistProfile from "./pages/ArtistProfile";
 import { useAuth } from "./_core/hooks/useAuth";
-import { trpc } from "./lib/trpc";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 
 // DashboardLayout handles auth protection internally (redirects to /login if not authenticated)
@@ -58,17 +57,27 @@ function DashRoute({ component: Component }: { component: React.ComponentType })
 
 /**
  * Role-aware /app route dispatcher.
- * Artists see ArtistDashboard; enterprise clients redirect to /enterprise; regular clients see their pages.
+ * auth.me returns the full DB User object — userRole and enterprise are available immediately,
+ * no secondary query needed. Using a secondary lookup caused a race where the client dashboard
+ * flashed (or stuck) while the second query was in flight.
  */
 function AppRoute({ clientComponent: ClientComponent = Overview }: { clientComponent?: React.ComponentType }) {
-  const { user } = useAuth();
-  const { data: artswrkUser } = trpc.artswrkUsers.getByEmail.useQuery(
-    { email: user?.email ?? "" },
-    { enabled: !!user?.email }
-  );
+  const { user, loading } = useAuth();
 
-  const isArtist = artswrkUser?.userRole === "Artist";
-  const isEnterprise = !!(artswrkUser as any)?.enterprise;
+  // auth.me returns the full User row — userRole and enterprise are on it directly
+  const isArtist = (user as any)?.userRole === "Artist";
+  const isEnterprise = !!(user as any)?.enterprise;
+
+  // Wait for auth before making routing decisions to avoid a wrong-dashboard flash
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="w-6 h-6 border-2 border-[#F25722] border-t-transparent rounded-full animate-spin" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   // Enterprise users belong on /enterprise, not the regular dashboard
   if (isEnterprise) {
