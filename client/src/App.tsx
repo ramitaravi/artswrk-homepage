@@ -148,10 +148,10 @@ function Router() {
         {() => <DashRoute component={SubLists} />}
       </Route>
       <Route path="/app/community">
-        {() => <AppRoute clientComponent={Community} />}
+        {() => <DashRoute component={Community} />}
       </Route>
       <Route path="/app/benefits">
-        {() => <AppRoute clientComponent={Benefits} />}
+        {() => <DashRoute component={Benefits} />}
       </Route>
 
       {/* Artist-only routes (rendered inside ArtistDashboard via URL matching) */}

@@ -97,16 +97,12 @@ export default function Benefits() {
   const { user } = useAuth();
   const [activeCategory, setActiveCategory] = useState<string>("All");
 
-  // Determine audience type from user role
-  const { data: artswrkUser } = trpc.artswrkUsers.getByEmail.useQuery(
-    { email: user?.email ?? "" },
-    { enabled: !!user?.email }
-  );
-  const audienceType = artswrkUser?.userRole === "Artist" ? "Artist" : "Client";
+  // Determine audience type from user role (available directly from auth)
+  const audienceType = user?.userRole === "Artist" ? "Artist" : "Client";
 
   const { data, isLoading } = trpc.benefits.list.useQuery(
     { audienceType },
-    { enabled: !!artswrkUser }
+    { enabled: !!user }
   );
 
   const allBenefits = data?.benefits ?? [];
