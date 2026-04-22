@@ -350,8 +350,12 @@ export default function Overview() {
                 </div>
               ) : !recentApplicants || recentApplicants.length === 0 ? (
                 <div className="p-6 text-center text-gray-400 text-xs">
-                  <Users size={24} className="mx-auto mb-2 opacity-30" />
-                  <p>No applicants yet</p>
+                  <Users size={28} className="mx-auto mb-2 opacity-30" />
+                  <p className="font-semibold text-gray-600 mb-1">No applicants yet</p>
+                  <p className="mb-3">Post a job to start receiving applications.</p>
+                  <Link href="/app/jobs/new" className="inline-flex items-center gap-1 px-4 py-1.5 rounded-full text-xs font-bold text-white bg-[#111] hover:opacity-80 transition-opacity">
+                    Post a job →
+                  </Link>
                 </div>
               ) : (
                   recentApplicants.map((a) => {

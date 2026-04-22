@@ -4,7 +4,7 @@
  */
 
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import {
   Calendar, Clock, MapPin, DollarSign, CheckCircle, AlertCircle,
   ChevronDown, ChevronUp, CreditCard, User, Briefcase, ExternalLink,
@@ -363,9 +363,17 @@ export default function Bookings() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center text-gray-400">
-          <DollarSign size={32} className="mx-auto mb-3 opacity-30" />
-          <p className="font-semibold">No bookings found</p>
-          <p className="text-sm mt-1">Try a different filter</p>
+          <Calendar size={36} className="mx-auto mb-3 opacity-30" />
+          <p className="font-semibold text-gray-700 mb-1">No bookings found</p>
+          <p className="text-sm mt-1 mb-4">Post a job or browse artists to get your first booking.</p>
+          <div className="flex items-center justify-center gap-3">
+            <Link href="/app/artists" className="px-4 py-2 rounded-full text-xs font-bold text-white bg-[#111] hover:opacity-80 transition-opacity">
+              Browse artists →
+            </Link>
+            <Link href="/app/jobs/new" className="px-4 py-2 rounded-full text-xs font-bold text-[#111] border border-gray-200 hover:bg-gray-50 transition-colors">
+              Post a job
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="space-y-3">

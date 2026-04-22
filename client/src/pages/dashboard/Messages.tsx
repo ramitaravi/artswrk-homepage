@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Search, MessageSquare, Send, ArrowLeft } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -320,8 +320,23 @@ export default function Messages() {
           ))
         ) : filteredConvos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-400 px-4 text-center">
-            <MessageSquare size={24} className="mb-2 opacity-30" />
-            <p className="text-xs">No conversations yet</p>
+            <MessageSquare size={28} className="mb-2 opacity-30" />
+            <p className="text-xs font-semibold text-gray-600 mb-1">No conversations yet</p>
+            {artswrkUser?.userRole === "Artist" ? (
+              <>
+                <p className="text-xs mb-3">Apply to jobs to start chatting with hirers.</p>
+                <Link href="/app/jobs" className="px-4 py-1.5 rounded-full text-xs font-bold text-white bg-[#111] hover:opacity-80 transition-opacity">
+                  Browse jobs →
+                </Link>
+              </>
+            ) : (
+              <>
+                <p className="text-xs mb-3">Hire an artist to start a conversation.</p>
+                <Link href="/app/artists" className="px-4 py-1.5 rounded-full text-xs font-bold text-white bg-[#111] hover:opacity-80 transition-opacity">
+                  Browse artists →
+                </Link>
+              </>
+            )}
           </div>
         ) : (
           filteredConvos.map((c) => (

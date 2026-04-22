@@ -5,6 +5,7 @@
  * Right: Recent Transactions list (artist photo, name, date, amount)
  */
 
+import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 
@@ -208,8 +209,15 @@ export default function Payments() {
               ))}
             </div>
           ) : !recentPayments || recentPayments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-              <p className="text-sm">No transactions yet</p>
+            <div className="flex flex-col items-center justify-center py-16 px-6 text-center text-gray-400">
+              <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                <span className="text-2xl">💳</span>
+              </div>
+              <p className="text-sm font-semibold text-gray-700 mb-1">No transactions yet</p>
+              <p className="text-xs text-gray-400 mb-4">Hire an artist to get started.</p>
+              <Link href="/app/artists" className="px-4 py-2 rounded-full text-xs font-bold text-white bg-[#111] hover:opacity-80 transition-opacity">
+                Browse artists →
+              </Link>
             </div>
           ) : (
             <div className="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">

@@ -299,7 +299,11 @@ function JobsTab({ user }: { user: any }) {
           ) : !jobsFeed?.length ? (
             <div className="p-8 text-center">
               <Briefcase size={36} className="mx-auto text-gray-300 mb-3" />
-              <p className="text-sm text-gray-500">No jobs available right now. Check back soon!</p>
+              <p className="text-sm font-semibold text-gray-700 mb-1">No jobs right now</p>
+              <p className="text-sm text-gray-500 mb-4">Make sure your profile is complete so hirers can find you.</p>
+              <a href="/app/artists" className="inline-flex items-center px-4 py-2 rounded-full text-xs font-bold text-white bg-[#111] hover:opacity-80 transition-opacity">
+                Browse artist profiles →
+              </a>
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
@@ -335,7 +339,14 @@ function JobsTab({ user }: { user: any }) {
           ) : !proJobs?.length ? (
             <div className="p-8 text-center">
               <Star size={36} className="mx-auto text-gray-300 mb-3" />
-              <p className="text-sm text-gray-500">No PRO jobs available right now.</p>
+              <p className="text-sm font-semibold text-gray-700 mb-1">No PRO jobs right now</p>
+              <p className="text-sm text-gray-500 mb-4">New PRO jobs are posted regularly. Check back soon!</p>
+              <a
+                href="/app/settings"
+                className="inline-flex items-center px-4 py-2 rounded-full text-xs font-bold text-white hirer-grad-bg hover:opacity-80 transition-opacity"
+              >
+                Upgrade to PRO →
+              </a>
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
@@ -383,7 +394,13 @@ function JobsTab({ user }: { user: any }) {
             <div className="p-8 text-center">
               <CheckCircle2 size={36} className="mx-auto text-gray-300 mb-3" />
               <p className="text-sm font-semibold text-gray-700 mb-1">No applications yet</p>
-              <p className="text-sm text-gray-500">Apply to PRO jobs to see your applications here.</p>
+              <p className="text-sm text-gray-500 mb-4">Browse PRO jobs and apply to start tracking here.</p>
+              <button
+                onClick={() => setSubTab("pro-jobs")}
+                className="inline-flex items-center px-4 py-2 rounded-full text-xs font-bold text-white bg-[#111] hover:opacity-80 transition-opacity"
+              >
+                Browse PRO jobs →
+              </button>
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
@@ -473,7 +490,10 @@ function BookingsTab() {
           <div className="p-8 text-center">
             <Calendar size={36} className="mx-auto text-gray-300 mb-3" />
             <p className="text-sm font-semibold text-gray-700 mb-1">No bookings here</p>
-            <p className="text-sm text-gray-500">Bookings in this category will appear here.</p>
+            <p className="text-sm text-gray-500 mb-4">Apply to jobs to start getting booked by hirers.</p>
+            <a href="/app/jobs" className="inline-flex items-center px-4 py-2 rounded-full text-xs font-bold text-white bg-[#111] hover:opacity-80 transition-opacity">
+              Browse jobs →
+            </a>
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
@@ -599,7 +619,10 @@ function MessagesTab() {
               <div className="p-8 text-center">
                 <MessageSquare size={36} className="mx-auto text-gray-300 mb-3" />
                 <p className="text-sm font-semibold text-gray-700 mb-1">No messages yet</p>
-                <p className="text-sm text-gray-500">When hirers message you, they'll appear here.</p>
+                <p className="text-sm text-gray-500 mb-4">Apply to jobs to start conversations with hirers.</p>
+                <a href="/app/jobs" className="inline-flex items-center px-4 py-2 rounded-full text-xs font-bold text-white bg-[#111] hover:opacity-80 transition-opacity">
+                  Browse jobs →
+                </a>
               </div>
             ) : (
               SAMPLE_MESSAGES.map(msg => (
