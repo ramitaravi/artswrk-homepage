@@ -325,6 +325,52 @@ export async function getArtistJobApplications(artistUserId: number, limit = 50,
 }
 
 /**
+ * Admin: get all jobs posted by a given client.
+ */
+export async function getAdminClientJobs(clientUserId: number, limit = 100, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(
+    `SELECT
+       j.id, j.requestStatus, j.description, j.hiringCategory, j.locationAddress,
+       j.startDate, j.dateType, j.isHourly, j.openRate,
+       j.artistHourlyRate, j.clientHourlyRate, j.artistFlatRate, j.clientFlatRate,
+       j.bubbleCreatedAt, j.createdAt,
+       (SELECT COUNT(*) FROM interested_artists ia WHERE ia.jobId = j.id) AS applicantCount,
+       (SELECT COUNT(*) FROM bookings b WHERE b.jobId = j.id AND (b.deleted IS NULL OR b.deleted = 0)) AS bookingCount
+     FROM jobs j
+     WHERE j.clientUserId = ${clientUserId}
+     ORDER BY COALESCE(j.bubbleCreatedAt, j.createdAt) DESC
+     LIMIT ${limit} OFFSET ${offset}`
+  );
+  return (rows[0] as unknown as any[]);
+}
+
+/**
+ * Admin: get all bookings for a given client with artist info + spend.
+ */
+export async function getAdminClientBookings(clientUserId: number, limit = 100, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(
+    `SELECT
+       b.id, b.bookingStatus, b.paymentStatus, b.clientRate, b.artistRate,
+       b.totalClientRate, b.totalArtistRate, b.grossProfit, b.hours,
+       b.startDate, b.endDate, b.locationAddress, b.description,
+       b.externalPayment, b.bubbleCreatedAt, b.createdAt,
+       u.firstName AS artistFirstName, u.lastName AS artistLastName, u.name AS artistName,
+       u.profilePicture AS artistProfilePicture,
+       u.id AS artistUserId
+     FROM bookings b
+     LEFT JOIN users u ON b.artistUserId = u.id
+     WHERE b.clientUserId = ${clientUserId} AND (b.deleted IS NULL OR b.deleted = 0)
+     ORDER BY COALESCE(b.startDate, b.bubbleCreatedAt, b.createdAt) DESC
+     LIMIT ${limit} OFFSET ${offset}`
+  );
+  return (rows[0] as unknown as any[]);
+}
+
+/**
  * Admin: get all applications (interested_artists) for a given artist, with job + client info.
  */
 export async function getAdminArtistApplications(artistUserId: number, limit = 100, offset = 0) {

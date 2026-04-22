@@ -415,6 +415,121 @@ export const appRouter = router({
         return { bookings: rows, totalEarningsCents, completedCount };
       }),
 
+    /** Get a single client (full user row) by ID — admin only */
+    getClient: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        return getUserById(input.id);
+      }),
+
+    /** Update client fields — admin only */
+    updateClient: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+        email: z.string().email().optional(),
+        clientCompanyName: z.string().optional(),
+        location: z.string().optional(),
+        website: z.string().optional(),
+        instagram: z.string().optional(),
+        profilePicture: z.string().optional(),
+        businessOrIndividual: z.string().optional(),
+        hiringCategory: z.string().optional(),
+        clientPremium: z.boolean().optional(),
+        enterprise: z.boolean().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { id, ...rest } = input;
+        const { getDb } = await import("./db");
+        const { users: usersTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const db = await getDb();
+        if (!db) throw new Error("DB unavailable");
+        await db.update(usersTable).set(rest).where(eq(usersTable.id, id));
+        return getUserById(id);
+      }),
+
+    /** Create a new client account — admin only */
+    createClient: protectedProcedure
+      .input(z.object({
+        email: z.string().email(),
+        firstName: z.string().min(1),
+        lastName: z.string().min(1),
+        password: z.string().min(8).optional(),
+        clientCompanyName: z.string().optional(),
+        location: z.string().optional(),
+        website: z.string().optional(),
+        profilePicture: z.string().optional(),
+        businessOrIndividual: z.string().optional(),
+        hiringCategory: z.string().optional(),
+        clientPremium: z.boolean().default(false),
+        enterprise: z.boolean().default(false),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getDb } = await import("./db");
+        const { users: usersTable } = await import("../drizzle/schema");
+        const db = await getDb();
+        if (!db) throw new Error("DB unavailable");
+        const existing = await getUserByEmail(input.email.toLowerCase().trim());
+        if (existing) throw new Error(`An account with email ${input.email} already exists`);
+        const openId = `admin_${crypto.randomBytes(16).toString("hex")}`;
+        const slug = `${input.firstName}-${input.lastName}`.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+        const values: any = {
+          openId,
+          email: input.email.toLowerCase().trim(),
+          firstName: input.firstName,
+          lastName: input.lastName,
+          name: `${input.firstName} ${input.lastName}`,
+          slug,
+          userRole: "Client" as const,
+          clientCompanyName: input.clientCompanyName ?? null,
+          location: input.location ?? null,
+          website: input.website ?? null,
+          profilePicture: input.profilePicture ?? null,
+          businessOrIndividual: input.businessOrIndividual ?? null,
+          hiringCategory: input.hiringCategory ?? null,
+          clientPremium: input.clientPremium,
+          enterprise: input.enterprise,
+          userSignedUp: true,
+          onboardingStep: 4,
+        };
+        if (input.password) {
+          values.passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
+          values.passwordIsTemporary = false;
+        }
+        const result = await db.insert(usersTable).values(values);
+        const newId = (result as any).insertId as number;
+        return getUserById(newId);
+      }),
+
+    /** All jobs posted by a specific client — admin only */
+    clientJobs: protectedProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getAdminClientJobs } = await import("./db");
+        return getAdminClientJobs(input.clientId);
+      }),
+
+    /** All bookings for a specific client with spend totals — admin only */
+    clientBookings: protectedProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getAdminClientBookings } = await import("./db");
+        const rows = await getAdminClientBookings(input.clientId);
+        const totalSpendCents = rows.reduce((sum: number, b: any) => {
+          const rate = b.totalClientRate ?? b.clientRate ?? 0;
+          return sum + (b.bookingStatus === "Completed" ? Number(rate) : 0);
+        }, 0);
+        const completedCount = rows.filter((b: any) => b.bookingStatus === "Completed").length;
+        return { bookings: rows, totalSpendCents, completedCount };
+      }),
+
     /** All clients with search + filters */
     clients: protectedProcedure
       .input(z.object({

@@ -1218,8 +1218,456 @@ function AdminArtistEditWrapper({ artistId, onBack, onSave, isSaving }: {
   );
 }
 
+// ─── Client constants ─────────────────────────────────────────────────────────
+const HIRING_CATEGORIES = [
+  "Dance Educator", "Choreographer", "Photographer", "Videographer",
+  "Dance Adjudicator", "Acting Coach", "Vocal Coach", "Music Teacher",
+  "Fitness Instructor", "Event Performer", "Competition Coach",
+];
+
+// ─── Admin Client Form ────────────────────────────────────────────────────────
+function AdminClientForm({
+  initial,
+  onSave,
+  onCancel,
+  isCreate,
+}: {
+  initial?: any;
+  onSave: (data: any) => void;
+  onCancel: () => void;
+  isCreate?: boolean;
+}) {
+  const [firstName, setFirstName] = useState(initial?.firstName ?? "");
+  const [lastName, setLastName] = useState(initial?.lastName ?? "");
+  const [email, setEmail] = useState(initial?.email ?? "");
+  const [password, setPassword] = useState("");
+  const [clientCompanyName, setClientCompanyName] = useState(initial?.clientCompanyName ?? "");
+  const [location, setLocation] = useState(initial?.location ?? "");
+  const [website, setWebsite] = useState(initial?.website ?? "");
+  const [instagram, setInstagram] = useState(initial?.instagram ?? "");
+  const [profilePicture, setProfilePicture] = useState(initial?.profilePicture ?? "");
+  const [businessOrIndividual, setBusinessOrIndividual] = useState(initial?.businessOrIndividual ?? "");
+  const [hiringCategory, setHiringCategory] = useState(initial?.hiringCategory ?? "");
+  const [clientPremium, setClientPremium] = useState<boolean>(!!initial?.clientPremium);
+  const [enterprise, setEnterprise] = useState<boolean>(!!initial?.enterprise);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    onSave({
+      firstName, lastName, email, clientCompanyName, location, website,
+      instagram, profilePicture, businessOrIndividual, hiringCategory,
+      clientPremium, enterprise,
+      ...(isCreate ? { password: password || undefined } : {}),
+    });
+  }
+
+  const inputCls = "w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-400 focus:outline-none focus:border-[#F25722] transition-colors bg-white";
+  const labelCls = "block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5";
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-8">
+      {/* Basic Info */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
+        <h3 className="text-sm font-black text-[#111] uppercase tracking-wider">Basic Info</h3>
+
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-xl flex-shrink-0 overflow-hidden">
+            {profilePicture ? (
+              <img src={profilePicture} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+            ) : (
+              <span>{(firstName[0] || "?").toUpperCase()}</span>
+            )}
+          </div>
+          <div className="flex-1">
+            <label className={labelCls}>Profile Picture URL</label>
+            <input value={profilePicture} onChange={e => setProfilePicture(e.target.value)} placeholder="https://..." className={inputCls} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>First Name *</label>
+            <input required value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Jane" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Last Name *</label>
+            <input required value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Doe" className={inputCls} />
+          </div>
+        </div>
+
+        <div>
+          <label className={labelCls}>Email *</label>
+          <input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="jane@company.com" className={inputCls} />
+        </div>
+
+        {isCreate && (
+          <div>
+            <label className={labelCls}>Password (optional — leave blank to set later)</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 characters" className={inputCls} />
+          </div>
+        )}
+
+        <div>
+          <label className={labelCls}>Company Name</label>
+          <input value={clientCompanyName} onChange={e => setClientCompanyName(e.target.value)} placeholder="Acme Dance Studio" className={inputCls} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>Location</label>
+            <input value={location} onChange={e => setLocation(e.target.value)} placeholder="New York, NY" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Business or Individual</label>
+            <select value={businessOrIndividual} onChange={e => setBusinessOrIndividual(e.target.value)} className={inputCls}>
+              <option value="">Select…</option>
+              <option value="Business">Business</option>
+              <option value="Individual">Individual</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className={labelCls}>Primary Hiring Category</label>
+          <select value={hiringCategory} onChange={e => setHiringCategory(e.target.value)} className={inputCls}>
+            <option value="">Select…</option>
+            {HIRING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Social & Web */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+        <h3 className="text-sm font-black text-[#111] uppercase tracking-wider">Social & Web</h3>
+        <div>
+          <label className={labelCls}>Website</label>
+          <input value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://company.com" className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Instagram handle</label>
+          <div className="relative">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
+            <input value={instagram} onChange={e => setInstagram(e.target.value.replace("@", ""))} placeholder="company" className={`${inputCls} pl-8`} />
+          </div>
+        </div>
+      </div>
+
+      {/* Plan */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+        <h3 className="text-sm font-black text-[#111] uppercase tracking-wider">Plan & Access</h3>
+        <div className="flex items-center gap-6">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <button type="button" onClick={() => setClientPremium(v => !v)} className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${clientPremium ? "bg-amber-500" : "bg-gray-200"}`}>
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${clientPremium ? "translate-x-4" : ""}`} />
+            </button>
+            <span className="text-sm font-medium text-[#111]">Premium</span>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <button type="button" onClick={() => setEnterprise(v => !v)} className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${enterprise ? "bg-purple-500" : "bg-gray-200"}`}>
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${enterprise ? "translate-x-4" : ""}`} />
+            </button>
+            <span className="text-sm font-medium text-[#111]">Enterprise</span>
+          </label>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-2">
+        <button type="button" onClick={onCancel} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+          Cancel
+        </button>
+        <button type="submit" className="px-6 py-2.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity">
+          {isCreate ? "Create Client" : "Save Changes"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ─── Client Edit Wrapper ──────────────────────────────────────────────────────
+function AdminClientEditWrapper({ clientId, onBack, onSave, isSaving }: {
+  clientId: number;
+  onBack: () => void;
+  onSave: (data: any) => void;
+  isSaving: boolean;
+}) {
+  const { data: client, isLoading } = trpc.admin.getClient.useQuery({ id: clientId });
+  if (isLoading) return <div className="flex justify-center py-24"><div className="w-6 h-6 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" /></div>;
+  if (!client) return <div className="text-center py-24 text-gray-400 text-sm">Client not found</div>;
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-2 text-sm">
+        <button onClick={onBack} className="text-gray-400 hover:text-[#F25722] font-medium transition-colors flex items-center gap-1">
+          <ChevronLeft size={14} /> {displayName(client)}
+        </button>
+        <span className="text-gray-300">/</span>
+        <span className="text-[#111] font-semibold">Edit</span>
+      </div>
+      <div>
+        <h1 className="text-2xl font-black text-[#111]">Edit Client</h1>
+        <p className="text-sm text-gray-400 mt-0.5">{displayName(client)} · {client.email}</p>
+      </div>
+      <AdminClientForm initial={client} onCancel={onBack} onSave={onSave} />
+      {isSaving && <div className="flex items-center gap-2 text-sm text-gray-500"><div className="w-4 h-4 border-2 border-gray-300 border-t-[#F25722] rounded-full animate-spin" />Saving…</div>}
+    </div>
+  );
+}
+
+// ─── Client Jobs Tab ──────────────────────────────────────────────────────────
+function ClientJobsTab({ clientId }: { clientId: number }) {
+  const { data: jobs, isLoading } = trpc.admin.clientJobs.useQuery({ clientId });
+
+  if (isLoading) return <div className="flex justify-center py-12"><div className="w-5 h-5 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" /></div>;
+  if (!jobs || jobs.length === 0) return (
+    <div className="text-center py-16 text-gray-400">
+      <Briefcase size={32} className="mx-auto mb-3 opacity-20" />
+      <p className="text-sm">No jobs posted yet</p>
+    </div>
+  );
+
+  const statusColor = (s: string | null) => {
+    if (!s) return "bg-gray-100 text-gray-500";
+    if (s === "Active") return "bg-green-50 text-green-600";
+    if (s === "Completed") return "bg-blue-50 text-blue-600";
+    if (s === "Confirmed") return "bg-purple-50 text-purple-600";
+    if (s.includes("Lost") || s.includes("Deleted")) return "bg-red-50 text-red-500";
+    return "bg-gray-100 text-gray-500";
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-gray-400 font-medium">{jobs.length} job{jobs.length !== 1 ? "s" : ""} posted</p>
+      {jobs.map((j: any) => (
+        <div key={j.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[#111] line-clamp-1">{j.description || "Untitled job"}</p>
+              {j.hiringCategory && <p className="text-xs text-gray-500 mt-0.5">{j.hiringCategory}</p>}
+            </div>
+            <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColor(j.requestStatus)}`}>
+              {j.requestStatus || "—"}
+            </span>
+          </div>
+          <div className="flex items-center gap-4 mt-3 flex-wrap text-xs text-gray-400">
+            {j.locationAddress && <span className="flex items-center gap-1"><MapPin size={10} />{j.locationAddress}</span>}
+            {j.startDate && <span className="flex items-center gap-1"><Calendar size={10} />{fmtDate(j.startDate)}</span>}
+            {j.artistHourlyRate && <span className="flex items-center gap-1"><DollarSign size={10} />${j.artistHourlyRate}/hr artist</span>}
+            <span className="flex items-center gap-1"><Users size={10} />{Number(j.applicantCount)} applicant{Number(j.applicantCount) !== 1 ? "s" : ""}</span>
+            {Number(j.bookingCount) > 0 && (
+              <span className="flex items-center gap-1 text-green-500 font-medium"><CheckCircle2 size={10} />{Number(j.bookingCount)} booked</span>
+            )}
+            <span className="ml-auto">{fmtDate(j.bubbleCreatedAt || j.createdAt)}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Client Bookings & Spend Tab ──────────────────────────────────────────────
+function ClientBookingsTab({ clientId }: { clientId: number }) {
+  const { data, isLoading } = trpc.admin.clientBookings.useQuery({ clientId });
+
+  if (isLoading) return <div className="flex justify-center py-12"><div className="w-5 h-5 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" /></div>;
+
+  const bookings = data?.bookings ?? [];
+  const totalSpend = data?.totalSpendCents ?? 0;
+  const completedCount = data?.completedCount ?? 0;
+
+  if (bookings.length === 0) return (
+    <div className="text-center py-16 text-gray-400">
+      <BookOpen size={32} className="mx-auto mb-3 opacity-20" />
+      <p className="text-sm">No bookings yet</p>
+    </div>
+  );
+
+  const statusColor = (s: string | null) => {
+    if (!s) return "bg-gray-100 text-gray-500";
+    if (s === "Completed") return "bg-green-50 text-green-600";
+    if (s === "Confirmed") return "bg-blue-50 text-blue-600";
+    if (s === "Cancelled") return "bg-red-50 text-red-500";
+    return "bg-amber-50 text-amber-600";
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center">
+          <p className="text-2xl font-black text-[#111]">{bookings.length}</p>
+          <p className="text-xs text-gray-400 mt-0.5">Total Bookings</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center">
+          <p className="text-2xl font-black text-green-600">{completedCount}</p>
+          <p className="text-xs text-gray-400 mt-0.5">Completed</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center">
+          <p className="text-2xl font-black text-[#F25722]">{fmt$(totalSpend)}</p>
+          <p className="text-xs text-gray-400 mt-0.5">Total Spent</p>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {bookings.map((b: any) => {
+          const artistName = [b.artistFirstName, b.artistLastName].filter(Boolean).join(" ") || b.artistName || "Unknown Artist";
+          const clientCost = b.totalClientRate ?? b.clientRate;
+          return (
+            <div key={b.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  {b.artistProfilePicture ? (
+                    <img src={b.artistProfilePicture} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  ) : (
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-xs font-black flex-shrink-0">
+                      {(artistName[0] || "?").toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#111] truncate">{artistName}</p>
+                    {b.description && <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{b.description}</p>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColor(b.bookingStatus)}`}>{b.bookingStatus || "—"}</span>
+                  {clientCost ? <span className="text-xs font-bold text-[#111]">{fmt$(Number(clientCost))}</span> : null}
+                </div>
+              </div>
+              <div className="flex items-center gap-4 mt-3 flex-wrap text-xs text-gray-400">
+                {b.startDate && <span className="flex items-center gap-1"><Calendar size={10} />{fmtDate(b.startDate)}</span>}
+                {b.locationAddress && <span className="flex items-center gap-1"><MapPin size={10} />{b.locationAddress}</span>}
+                {b.hours && <span className="flex items-center gap-1"><Clock size={10} />{b.hours}h</span>}
+                {b.paymentStatus && (
+                  <span className={`flex items-center gap-1 font-medium ${b.paymentStatus === "Paid" ? "text-green-500" : "text-amber-500"}`}>
+                    <CreditCard size={10} />{b.paymentStatus}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Admin Client Detail ──────────────────────────────────────────────────────
+function AdminClientDetail({ clientId, onBack, onEdit }: { clientId: number; onBack: () => void; onEdit: () => void }) {
+  const { data: client, isLoading } = trpc.admin.getClient.useQuery({ id: clientId });
+  const [tab, setTab] = useState<"overview" | "jobs" | "bookings">("overview");
+
+  if (isLoading) return <div className="flex justify-center py-24"><div className="w-6 h-6 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" /></div>;
+  if (!client) return <div className="text-center py-24 text-gray-400 text-sm">Client not found</div>;
+
+  const name = displayName(client);
+  const TABS = [
+    { id: "overview" as const, label: "Overview" },
+    { id: "jobs" as const, label: "Jobs Posted" },
+    { id: "bookings" as const, label: "Bookings & Spend" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm">
+        <button onClick={onBack} className="text-gray-400 hover:text-[#F25722] font-medium transition-colors flex items-center gap-1">
+          <ChevronLeft size={14} /> Clients
+        </button>
+        <span className="text-gray-300">/</span>
+        <span className="text-[#111] font-semibold">{name}</span>
+      </div>
+
+      {/* Hero card */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-5">
+            {client.profilePicture ? (
+              <img src={client.profilePicture} alt={name} className="w-20 h-20 rounded-2xl object-cover flex-shrink-0" />
+            ) : (
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-2xl flex-shrink-0">
+                {(name[0] || "?").toUpperCase()}
+              </div>
+            )}
+            <div>
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <h2 className="text-2xl font-black text-[#111]">{name}</h2>
+                {client.enterprise && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">Enterprise</span>}
+                {client.clientPremium && !client.enterprise && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">Premium</span>}
+              </div>
+              {client.clientCompanyName && <p className="text-sm text-gray-500 mb-1 font-medium">{client.clientCompanyName}</p>}
+              <div className="flex items-center gap-4 flex-wrap text-xs text-gray-400">
+                {client.email && <span className="flex items-center gap-1"><Mail size={11} />{client.email}</span>}
+                {client.location && <span className="flex items-center gap-1"><MapPin size={11} />{client.location}</span>}
+                {client.businessOrIndividual && <span>{client.businessOrIndividual}</span>}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <RunAsButton userId={client.id} userName={name} userRole="Client" enterprise={client.enterprise} />
+            <button onClick={onEdit} className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-[#F25722] text-white hover:opacity-90 transition-opacity">
+              <Edit2 size={13} /> Edit
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-gray-100">
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${
+              tab === t.id ? "border-[#F25722] text-[#F25722]" : "border-transparent text-gray-400 hover:text-gray-700"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      {tab === "overview" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="lg:col-span-2 space-y-5">
+            {client.hiringCategory && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Hiring Focus</p>
+                <span className="px-3 py-1.5 rounded-full bg-pink-50 text-pink-600 text-sm font-medium">{client.hiringCategory}</span>
+              </div>
+            )}
+          </div>
+          <div className="space-y-5">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Details</p>
+              <div className="space-y-3">
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">ID</span><span className="font-mono text-xs text-gray-600">{client.id}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Joined</span><span className="text-xs text-gray-600">{fmtDate(client.bubbleCreatedAt || client.createdAt)}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Plan</span><span className="text-xs font-semibold">{client.enterprise ? "Enterprise" : client.clientPremium ? "Premium" : "Basic"}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Type</span><span className="text-xs text-gray-600">{client.businessOrIndividual || "—"}</span></div>
+                {client.slug && <div className="flex justify-between"><span className="text-gray-400 text-xs">Slug</span><span className="text-xs font-mono text-gray-600">@{client.slug}</span></div>}
+              </div>
+            </div>
+            {(client.website || client.instagram) && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Links</p>
+                <div className="space-y-2">
+                  {client.website && <a href={client.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-[#F25722] hover:underline"><Globe size={12} />{client.website}</a>}
+                  {client.instagram && <a href={`https://instagram.com/${client.instagram}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-[#F25722] hover:underline"><Instagram size={12} />@{client.instagram}</a>}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {tab === "jobs" && <ClientJobsTab clientId={clientId} />}
+      {tab === "bookings" && <ClientBookingsTab clientId={clientId} />}
+    </div>
+  );
+}
+
 // ─── Clients Section ──────────────────────────────────────────────────────────
 function ClientsSection() {
+  type View = { mode: "list" } | { mode: "detail"; id: number } | { mode: "edit"; id: number } | { mode: "create" };
+  const [view, setView] = useState<View>({ mode: "list" });
+
   const [search, setSearch] = useState("");
   const [companySearch, setCompanySearch] = useState("");
   const [locationSearch, setLocationSearch] = useState("");
@@ -1255,20 +1703,73 @@ function ClientsSection() {
     businessType: businessType || undefined,
     limit: LIMIT,
     offset: (page - 1) * LIMIT,
+  }, { enabled: view.mode === "list" });
+
+  const utils = trpc.useUtils();
+
+  const updateClient = trpc.admin.updateClient.useMutation({
+    onSuccess: (updated) => {
+      utils.admin.getClient.invalidate({ id: (view as any).id });
+      utils.admin.clients.invalidate();
+      if (updated) setView({ mode: "detail", id: updated.id });
+    },
+    onError: (e) => alert("Save failed: " + e.message),
   });
 
-  const HIRING_CATS = ["Dance Educator", "Photographer", "Dance Adjudicator", "Videographer", "Acting Coach", "Vocal Coach", "Side Jobs", "Music Teacher"];
+  const createClient = trpc.admin.createClient.useMutation({
+    onSuccess: (created) => {
+      utils.admin.clients.invalidate();
+      if (created) setView({ mode: "detail", id: created.id });
+    },
+    onError: (e) => alert("Create failed: " + e.message),
+  });
+
   const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
+  if (view.mode === "detail") {
+    return <AdminClientDetail clientId={view.id} onBack={() => setView({ mode: "list" })} onEdit={() => setView({ mode: "edit", id: view.id })} />;
+  }
+
+  if (view.mode === "edit") {
+    const id = view.id;
+    return <AdminClientEditWrapper clientId={id} onBack={() => setView({ mode: "detail", id })} onSave={(data: any) => updateClient.mutate({ id, ...data })} isSaving={updateClient.isPending} />;
+  }
+
+  if (view.mode === "create") {
+    return (
+      <div className="space-y-5">
+        <div className="flex items-center gap-2 text-sm">
+          <button onClick={() => setView({ mode: "list" })} className="text-gray-400 hover:text-[#F25722] font-medium transition-colors flex items-center gap-1">
+            <ChevronLeft size={14} /> Clients
+          </button>
+          <span className="text-gray-300">/</span>
+          <span className="text-[#111] font-semibold">Create Client</span>
+        </div>
+        <div>
+          <h1 className="text-2xl font-black text-[#111]">Create Client</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Add a new client to the platform</p>
+        </div>
+        <AdminClientForm isCreate onCancel={() => setView({ mode: "list" })} onSave={(data: any) => createClient.mutate(data)} />
+        {createClient.isPending && <div className="flex items-center gap-2 text-sm text-gray-500"><div className="w-4 h-4 border-2 border-gray-300 border-t-[#F25722] rounded-full animate-spin" />Creating client…</div>}
+      </div>
+    );
+  }
+
+  // List view
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-black text-[#111]">All Clients ({data?.total?.toLocaleString() ?? "…"})</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-black text-[#111]">All Clients ({data?.total?.toLocaleString() ?? "…"})</h1>
+        <button onClick={() => setView({ mode: "create" })} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity">
+          <Plus size={15} /> Create Client
+        </button>
+      </div>
 
       {/* Filters */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-wrap gap-3">
         <select value={hiringCategory} onChange={e => { setHiringCategory(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
           <option value="">Hiring Category</option>
-          {HIRING_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+          {HIRING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <select value={state} onChange={e => { setState(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
           <option value="">State</option>
@@ -1319,7 +1820,11 @@ function ClientsSection() {
               ) : data?.clients.length === 0 ? (
                 <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400 text-xs">No clients found</td></tr>
               ) : data?.clients.map(c => (
-                <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                <tr
+                  key={c.id}
+                  className="border-b border-gray-50 hover:bg-orange-50/40 transition-colors cursor-pointer"
+                  onClick={() => setView({ mode: "detail", id: c.id })}
+                >
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
                       {c.profilePicture ? (
@@ -1338,7 +1843,9 @@ function ClientsSection() {
                   <td className="px-4 py-3 text-xs text-gray-700">{c.clientCompanyName || "—"}</td>
                   <td className="px-4 py-3 text-xs text-gray-600">{c.location || "—"}</td>
                   <td className="px-4 py-3">
-                    {c.clientPremium ? (
+                    {(c as any).enterprise ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">Enterprise</span>
+                    ) : c.clientPremium ? (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">Premium</span>
                     ) : (
                       <span className="text-[10px] text-gray-400">Basic</span>
@@ -1346,8 +1853,13 @@ function ClientsSection() {
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500">{c.businessOrIndividual || "—"}</td>
                   <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(c.bubbleCreatedAt || c.createdAt)}</td>
-                  <td className="px-4 py-3">
-                    <RunAsButton userId={c.id} userName={displayName(c)} userRole="Client" enterprise={(c as any).enterprise} />
+                  <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => setView({ mode: "detail", id: c.id })} className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors">
+                        <Eye size={11} /> View
+                      </button>
+                      <RunAsButton userId={c.id} userName={displayName(c)} userRole="Client" enterprise={(c as any).enterprise} />
+                    </div>
                   </td>
                 </tr>
               ))}
