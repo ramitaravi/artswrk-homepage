@@ -19,6 +19,12 @@ import {
   getCampaignById,
   getOverviewStats,
 } from "../brevo";
+import {
+  getMergedUnsubscribes,
+  addBrevoUnsubscribe,
+  addSendGridUnsubscribe,
+  syncSuppressionGaps,
+} from "../suppressions";
 
 // ── Admin guard ───────────────────────────────────────────────────────────────
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -119,4 +125,61 @@ export const leadsRouter = router({
     .query(async ({ input }) => {
       return getCampaignById(input.id);
     }),
+
+  // ── Suppression / Unsubscribes ──────────────────────────────────────────────
+
+  // Get merged unsubscribe list from Brevo + SendGrid
+  getUnsubscribes: adminProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(2000).default(500),
+        search: z.string().optional(),
+        filter: z.enum(["all", "both", "brevo_only", "sendgrid_only"]).default("all"),
+      })
+    )
+    .query(async ({ input }) => {
+      const result = await getMergedUnsubscribes(input.limit);
+      let contacts = result.contacts;
+
+      // Apply source filter
+      if (input.filter === "both") {
+        contacts = contacts.filter((c) => c.sources === "both");
+      } else if (input.filter === "brevo_only") {
+        contacts = contacts.filter((c) => c.sources === "brevo");
+      } else if (input.filter === "sendgrid_only") {
+        contacts = contacts.filter((c) => c.sources === "sendgrid");
+      }
+
+      // Apply search
+      if (input.search) {
+        const q = input.search.toLowerCase();
+        contacts = contacts.filter((c) => c.email.includes(q));
+      }
+
+      return {
+        contacts,
+        total: contacts.length,
+        brevoCount: result.brevoCount,
+        sendgridCount: result.sendgridCount,
+        bothCount: result.bothCount,
+        onlyBrevoCount: result.onlyBrevoCount,
+        onlySendGridCount: result.onlySendGridCount,
+      };
+    }),
+
+  // Add a single email to both Brevo and SendGrid suppressions
+  addUnsubscribe: adminProcedure
+    .input(z.object({ email: z.string().email() }))
+    .mutation(async ({ input }) => {
+      const [brevoOk, sgOk] = await Promise.all([
+        addBrevoUnsubscribe(input.email),
+        addSendGridUnsubscribe(input.email),
+      ]);
+      return { brevoOk, sgOk };
+    }),
+
+  // Sync gaps: push Brevo-only emails to SendGrid and vice versa
+  syncUnsubscribes: adminProcedure.mutation(async () => {
+    return syncSuppressionGaps();
+  }),
 });

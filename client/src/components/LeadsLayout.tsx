@@ -13,6 +13,7 @@ import {
   ChevronRight,
   ArrowLeft,
   Loader2,
+  UserMinus,
 } from "lucide-react";
 
 const NAV = [
@@ -20,6 +21,7 @@ const NAV = [
   { label: "Contacts", href: "/leads/contacts", icon: Users },
   { label: "Lists", href: "/leads/lists", icon: List },
   { label: "Campaigns", href: "/leads/campaigns", icon: Mail },
+  { label: "Unsubscribes", href: "/leads/unsubscribes", icon: UserMinus },
 ];
 
 export default function LeadsLayout({ children }: { children: React.ReactNode }) {

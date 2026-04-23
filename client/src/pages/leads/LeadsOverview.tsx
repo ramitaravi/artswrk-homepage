@@ -82,7 +82,7 @@ function CampaignMiniCard({ c }: { c: any }) {
           {c.status}
         </span>
         <a
-          href={`https://app.brevo.com/campaigns/email/${c.id}/report`}
+          href={`https://app.brevo.com/marketing-reports/email/${c.id}/overview`}
           target="_blank"
           rel="noopener noreferrer"
           className="p-1 rounded-lg text-gray-300 hover:text-[#0B5FFF] hover:bg-blue-50 transition-colors"
