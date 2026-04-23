@@ -353,7 +353,7 @@ function JobCard({
             </Link>
           ) : (
             <button
-              className="flex-shrink-0 flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold text-white bg-[#F25722] hover:bg-[#d44a1a] transition-colors"
+              className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-[#F25722] hover:bg-[#d44a1a] transition-colors"
               onClick={(e) => { e.stopPropagation(); onPaywall(); }}
             >
               <Lock size={10} /> Apply
@@ -800,7 +800,7 @@ export default function Jobs() {
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all ${
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
                   tab === t.id
                     ? "bg-[#111] text-white"
                     : "text-gray-500 hover:text-[#111] hover:bg-gray-100"
@@ -817,7 +817,7 @@ export default function Jobs() {
                 {t.label}
                 {t.count !== undefined && (
                   <span
-                    className={`text-xs px-1.5 py-0.5 rounded-full ${
+                    className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
                       tab === t.id
                         ? "bg-white/20 text-white"
                         : "bg-gray-100 text-gray-500"
@@ -847,7 +847,7 @@ export default function Jobs() {
                     placeholder="Search Jobs..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] focus:bg-white transition-all"
+                    className="w-full pl-8 pr-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] focus:bg-white transition-all"
                   />
                 </div>
                 <div className="relative flex-1">
@@ -857,7 +857,7 @@ export default function Jobs() {
                     placeholder="New York, NY, USA"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
-                    className="w-full pl-8 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] focus:bg-white transition-all"
+                    className="w-full pl-8 pr-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] focus:bg-white transition-all"
                   />
                 </div>
               </div>
@@ -927,7 +927,7 @@ export default function Jobs() {
                     <Zap size={14} className="text-white fill-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-[#111]">Subscribe to apply to jobs</p>
+                    <p className="text-xs font-semibold text-[#111]">Subscribe to apply to jobs</p>
                     <p className="text-[11px] text-gray-500">Get Basic or PRO to unlock applications</p>
                   </div>
                   <ArrowRight size={14} className="text-[#F25722] flex-shrink-0" />
