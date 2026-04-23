@@ -5,7 +5,7 @@
  * Main: Greeting, Affiliations, Tasks, Profile Boost, PRO Jobs, Jobs for You
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import ArtistProfilePage from "./artist/ArtistProfilePage";
 import ArtistSettingsPlan from "./artist/ArtistSettingsPlan";
@@ -96,7 +96,31 @@ function StudioAvatar({ name, logo, size = "md" }: { name: string; logo?: string
   }
 
   return (
-    <div className={`${sizeClass} rounded-full flex-shrink-0 flex items-center justify-center font-bold text-white hirer-grad-bg`}>
+    <div className={`${sizeClass} rounded-full flex-shrink-0 flex items-center justify-center font-semibold text-white hirer-grad-bg`}>
+      {initials}
+    </div>
+  );
+}
+
+// ─── Square Avatar (for /jobs-style cards) ────────────────────────────────────
+
+function SquareAvatar({ name, logo }: { name: string; logo?: string | null }) {
+  const [imgError, setImgError] = useState(false);
+  const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+
+  if (logo && !imgError) {
+    return (
+      <img
+        src={logo.startsWith("//") ? `https:${logo}` : logo}
+        alt={name}
+        className="flex-shrink-0 w-11 h-11 rounded-xl object-cover border border-gray-100"
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+
+  return (
+    <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center font-semibold text-gray-500 text-sm">
       {initials}
     </div>
   );
@@ -104,145 +128,327 @@ function StudioAvatar({ name, logo, size = "md" }: { name: string; logo?: string
 
 // ─── Dashboard Tab ────────────────────────────────────────────────────────────
 
+function postedAgo(date: Date | string | null): string {
+  if (!date) return "";
+  const ms = Date.now() - new Date(date).getTime();
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return `${mins} min${mins !== 1 ? "s" : ""} ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs !== 1 ? "s" : ""} ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days} day${days !== 1 ? "s" : ""} ago`;
+  const mos = Math.floor(days / 30);
+  if (mos < 12) return `${mos} month${mos !== 1 ? "s" : ""} ago`;
+  return `${Math.floor(mos / 12)} year${Math.floor(mos / 12) !== 1 ? "s" : ""} ago`;
+}
+
+function formatJobDate(job: any): string {
+  if (job.dateType === "Ongoing") return "Ongoing";
+  if (job.dateType === "Recurring") return "Recurring";
+  if (!job.startDate) return job.dateType ?? "";
+  const s = new Date(job.startDate);
+  if (isNaN(s.getTime())) return "";
+  const datePart = s.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" });
+  const startTime = s.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  if (job.endDate) {
+    const e = new Date(job.endDate);
+    if (!isNaN(e.getTime())) {
+      const endTime = e.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+      // Same day: "4/23/26, 9:15 PM – 12:00 AM"
+      const sameDay = s.toDateString() === e.toDateString();
+      if (sameDay) return `${datePart}, ${startTime} – ${endTime}`;
+      const endDate = e.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" });
+      return `${datePart}, ${startTime} – ${endDate}, ${endTime}`;
+    }
+  }
+  return `${datePart}, ${startTime}`;
+}
+
+function formatRate(job: any): string {
+  if (job.openRate) return "Open rate";
+  if (job.artistHourlyRate) return `$${Number(job.artistHourlyRate).toFixed(2)}/hr`;
+  return "";
+}
+
 function DashboardTab({ user }: { user: any }) {
   const firstName = user?.firstName || user?.name?.split(" ")[0] || "there";
+  const isPro = !!(user?.artswrkPro);
+  const [tasksOpen, setTasksOpen] = useState(true);
+  const [appliedIds, setAppliedIds] = useState<Set<number>>(new Set());
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => {} // silently fail — feed will load without radius filter
+      );
+    }
+  }, []);
+
+  const { data: affiliationsData } = trpc.artistDashboard.getMyAffiliations.useQuery();
+  const { data: jobsFeed, isLoading: feedLoading } = trpc.artistDashboard.getJobsFeed.useQuery(
+    { limit: 20, offset: 0, lat: coords?.lat, lng: coords?.lng },
+    { enabled: true }
+  );
+  const { data: proJobs, isLoading: proLoading } = trpc.artistDashboard.getProJobsFeed.useQuery({ limit: 10, offset: 0 });
+
+  const applyMutation = trpc.artistDashboard.applyToProJob.useMutation({
+    onSuccess: (_data, variables) => {
+      setAppliedIds(prev => { const next = new Set(prev); next.add(variables.premiumJobId); return next; });
+    },
+  });
+
+  const affiliations = affiliationsData?.map(a => a.display) ?? [];
+  const nearbyJobs = jobsFeed ?? [];
+  // If fewer than 2 nearby jobs, show PRO jobs in the main jobs section instead
+  const showProJobsAsPrimary = !feedLoading && nearbyJobs.length < 2;
 
   return (
-    <div className="space-y-8">
-      {/* Greeting + Profile */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <StudioAvatar name={user?.name || "Artist"} logo={user?.profilePicture} size="lg" />
-            <div>
-              <h1 className="text-2xl font-black text-[#111]">Hey, {firstName} 🎉</h1>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+    <div className="flex flex-col lg:flex-row gap-6 items-start">
+
+      {/* ── Left column: profile + tasks ──────────────────────────────── */}
+      <div className="w-full lg:w-72 lg:flex-shrink-0 space-y-4">
+
+        {/* Profile card */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+          <div className="flex items-center gap-4 lg:flex-col lg:items-center lg:text-center">
+            {user?.profilePicture ? (
+              <img src={user.profilePicture.startsWith("//") ? `https:${user.profilePicture}` : user.profilePicture} alt={user.name} className="w-16 h-16 lg:w-20 lg:h-20 rounded-full object-cover ring-2 ring-gray-100 flex-shrink-0 lg:mb-3" />
+            ) : (
+              <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-full hirer-grad-bg flex items-center justify-center text-white text-2xl font-semibold flex-shrink-0 lg:mb-3">
+                {(firstName[0] || "A").toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0">
+              <h1 className="text-lg lg:text-xl font-semibold text-[#111]">Hey, {firstName} 🎉</h1>
+              {user?.artswrkPro && (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 mt-1.5">
                   <Star size={11} className="fill-amber-500 text-amber-500" /> Artswrk PRO Member
                 </span>
-              </div>
-              <div className="mt-3">
-                <p className="text-xs font-semibold text-gray-500 mb-2">My Affiliations</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {AFFILIATIONS.map(aff => (
-                    <span key={aff} className="text-xs bg-gray-50 border border-gray-200 text-gray-700 px-2 py-0.5 rounded-full">{aff}</span>
-                  ))}
-                </div>
-              </div>
+              )}
             </div>
           </div>
+
+          <hr className="my-4 border-gray-100" />
+          <p className="text-xs font-semibold text-gray-500 mb-2">My Affiliations</p>
+          {affiliations.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {affiliations.map((aff: string) => (
+                <span key={aff} className="text-xs bg-gray-50 border border-gray-200 text-gray-700 px-2 py-0.5 rounded-full">{aff}</span>
+              ))}
+            </div>
+          ) : (
+            <a href="/app/profile" className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#F25722] transition-colors">
+              <span className="text-base leading-none">+</span> Add affiliations to your profile
+            </a>
+          )}
+
           <a
-            href={`https://artswrk.com/artist/${user?.slug || "ramita-ravi"}`}
+            href={user?.slug ? `/book/${user.slug}` : "/app/profile"}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-shrink-0 flex items-center gap-1.5 text-sm font-semibold text-gray-700 border border-gray-200 px-4 py-2 rounded-full hover:bg-gray-50 transition-colors"
+            className="mt-4 w-full flex items-center justify-center gap-1.5 text-sm font-semibold text-white bg-[#111] px-4 py-2.5 rounded-xl hover:opacity-80 transition-opacity"
           >
-            View Profile <ExternalLink size={13} />
+            View Profile <ArrowRight size={14} />
           </a>
         </div>
-      </div>
 
-      {/* Your Tasks */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <h2 className="text-base font-bold text-[#111]">Your Tasks</h2>
-          <span className="w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">1</span>
-        </div>
-        <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-          <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-[#111]">Mark as complete (1)</p>
-            <p className="text-xs text-gray-500 mt-0.5">1 booking must be marked as complete</p>
-          </div>
-          <button className="ml-auto text-xs font-semibold text-amber-700 hover:underline flex-shrink-0">View →</button>
-        </div>
-      </div>
-
-      {/* Profile Boost */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-base font-bold text-[#111] flex items-center gap-2">
-              Profile Boost <span className="text-amber-500">⭐️</span>
-            </h2>
-            <p className="text-sm text-gray-500 mt-1 max-w-md">
-              Want to get in front of studios like you do on Facebook? Create a boosted post to directly reach hundreds of studios near you.
-            </p>
-          </div>
-          <button className="flex-shrink-0 flex items-center gap-1.5 text-sm font-semibold text-white px-4 py-2 rounded-full transition-opacity hover:opacity-90 hirer-grad-bg">
-            Get started <ArrowRight size={13} />
-          </button>
-        </div>
-      </div>
-
-      {/* PRO Jobs */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-bold text-[#111] flex items-center gap-2">
-            Jobs <span className="text-xs font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">PRO ⭐️</span>
-          </h2>
-          <button className="text-sm font-semibold text-gray-600 hover:text-[#111] flex items-center gap-1">
-            View PRO Jobs <ChevronRight size={14} />
-          </button>
-        </div>
-        <div className="space-y-2">
-          {PRO_JOBS.map(job => (
-            <div key={job.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-[#111] truncate">{job.title}</p>
-                <p className="text-xs text-gray-500">{job.company}</p>
-                <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                  <MapPin size={10} /> {job.location}
-                </p>
-              </div>
-              {job.applied ? (
-                <span className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
-                  <CheckCircle2 size={11} /> Applied!
-                </span>
-              ) : (
-                <button className="flex-shrink-0 text-xs font-semibold text-gray-700 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-50 transition-colors flex items-center gap-1">
-                  Apply <ArrowRight size={11} />
-                </button>
-              )}
+        {/* Your Tasks */}
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <button
+            onClick={() => setTasksOpen(o => !o)}
+            className="w-full flex items-center justify-between px-5 py-4"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-[#111]">Your Tasks</span>
+              <span className="w-5 h-5 rounded-full bg-[#111] text-white text-[10px] font-semibold flex items-center justify-center">1</span>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Jobs for You */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-bold text-[#111]">Jobs for You</h2>
-          <button className="text-sm font-semibold text-gray-600 hover:text-[#111] flex items-center gap-1">
-            View All <ChevronRight size={14} />
+            <ChevronRight size={16} className={`text-gray-400 transition-transform ${tasksOpen ? "rotate-90" : ""}`} />
           </button>
-        </div>
-        <div className="space-y-3">
-          {JOBS_FOR_YOU.map(job => (
-            <div key={job.id} className="flex items-start gap-3 py-3 border-b border-gray-50 last:border-0">
-              <StudioAvatar name={job.studio} logo={job.logo} size="md" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-[#111]">{job.studio}</p>
-                <p className="text-sm text-gray-700">{job.serviceType}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{job.location} · Posted {job.postedAgo}</p>
-                <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                  <span className="flex items-center gap-1"><Clock size={10} /> {job.date}</span>
-                  <span className="flex items-center gap-1">
-                    <CreditCard size={10} /> {job.rate}
-                  </span>
+          {tasksOpen && (
+            <div className="px-5 pb-4 space-y-2">
+              <div
+                className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                onClick={() => window.location.href = "/app/messages"}
+              >
+                <MessageSquare size={16} className="text-[#F25722] flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-[#111]">New Messages (1 unread messages)</p>
+                  <p className="text-xs text-gray-500 mt-0.5">You have 1 new message</p>
                 </div>
+                <ChevronRight size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
               </div>
-              {job.applied ? (
-                <span className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
-                  <CheckCircle2 size={11} /> Applied!
-                </span>
-              ) : (
-                <button className="flex-shrink-0 text-xs font-semibold text-white bg-[#111] px-3 py-1.5 rounded-full hover:opacity-80 transition-opacity">
-                  Apply
-                </button>
-              )}
             </div>
-          ))}
+          )}
+        </div>
+      </div>
+
+      {/* ── Right column: jobs (primary CTA) ──────────────────────────── */}
+      <div className="flex-1 min-w-0 w-full overflow-x-hidden space-y-6">
+
+        {/* PRO Jobs — horizontal scroll cards */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-[#111] flex items-center gap-2">
+              Jobs PRO <span className="text-base">⭐</span>
+            </h2>
+            <a href="/app/pro-jobs" className="text-sm font-semibold text-gray-600 hover:text-[#111] flex items-center gap-1">
+              View PRO Jobs <ArrowRight size={14} />
+            </a>
+          </div>
+
+          {proLoading ? (
+            <div className="flex gap-3 overflow-hidden">
+              {[1,2,3].map(i => <div key={i} className="flex-shrink-0 w-56 h-36 bg-white rounded-2xl border border-gray-100 animate-pulse" />)}
+            </div>
+          ) : (
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
+              {(proJobs?.length ? proJobs : PRO_JOBS).map((job: any) => {
+                const isApplied = appliedIds.has(job.id) || job.hasApplied || job.applied;
+                const title = job.serviceType || job.title || "Job";
+                const company = job.companyName || job.company || "";
+                const location = job.workFromAnywhere ? "Work From Anywhere" : (job.location && !job.location.includes("[object") ? job.location : "Work From Anywhere");
+                return (
+                  <div key={job.id} className="flex-shrink-0 w-52 bg-white rounded-2xl border border-gray-100 p-4 flex flex-col justify-between relative">
+                    {/* PRO badge */}
+                    <span className="absolute top-3 right-3 flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                      <Star size={9} className="fill-amber-500 text-amber-500" /> PRO
+                    </span>
+                    <div>
+                      {/* Blurred avatar for non-PRO */}
+                      <div className={!isPro ? "blur-sm pointer-events-none" : ""}>
+                        <StudioAvatar name={company || title} logo={job.logo} size="sm" />
+                      </div>
+                      <p className="text-sm font-semibold text-[#111] mt-2 line-clamp-2 leading-tight pr-10">{title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">{company}</p>
+                      <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
+                        <MapPin size={9} /> {location}
+                      </p>
+                    </div>
+                    {isPro ? (
+                      isApplied ? (
+                        <span className="mt-3 flex items-center justify-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-3 py-2 rounded-lg">
+                          <CheckCircle2 size={11} /> Applied!
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => job.id && typeof job.id === "number" && applyMutation.mutate({ premiumJobId: job.id })}
+                          className="mt-3 w-full text-xs font-semibold text-white bg-[#111] px-3 py-2 rounded-lg hover:opacity-80 transition-opacity flex items-center justify-center gap-1"
+                        >
+                          Apply <ArrowRight size={11} />
+                        </button>
+                      )
+                    ) : (
+                      <a href="/app/pro-jobs" className="mt-3 w-full text-xs font-semibold text-white bg-[#111] px-3 py-2 rounded-lg hover:opacity-80 transition-opacity flex items-center justify-center gap-1">
+                        Apply <ArrowRight size={11} />
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Jobs for You (or PRO fallback if < 2 nearby) */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-[#111]">
+              {showProJobsAsPrimary ? "Jobs PRO ⭐" : "Jobs for You"}
+            </h2>
+            <a href="/app/jobs" className="text-sm font-semibold text-gray-600 hover:text-[#111]">View All</a>
+          </div>
+
+          <div className="space-y-2">
+            {feedLoading || (showProJobsAsPrimary && proLoading) ? (
+              <div className="p-8 text-center bg-white rounded-2xl border border-gray-100">
+                <div className="w-6 h-6 border-2 border-gray-200 border-t-[#F25722] rounded-full animate-spin mx-auto" />
+              </div>
+            ) : showProJobsAsPrimary ? (
+              // PRO jobs as list fallback
+              (proJobs?.length ? proJobs : []).map((job: any) => {
+                const isApplied = appliedIds.has(job.id) || job.hasApplied;
+                const title = job.serviceType || job.title || "Job";
+                const company = job.companyName || job.company || "";
+                const location = job.workFromAnywhere ? "Work From Anywhere" : (job.location && !job.location.includes("[object") ? job.location : "");
+                const ago = postedAgo(job.createdAt);
+                const rate = formatRate(job);
+                const dateLabel = formatJobDate(job);
+                return (
+                  <div key={job.id} className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm transition-all duration-150">
+                    <SquareAvatar name={company || title} logo={job.logo} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <div className="min-w-0">
+                          <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{title}</h3>
+                          <p className="text-xs text-gray-500 truncate">{company}</p>
+                        </div>
+                        {isPro ? (
+                          isApplied ? (
+                            <span className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
+                              <CheckCircle2 size={10} /> Applied!
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => applyMutation.mutate({ premiumJobId: job.id })}
+                              className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity"
+                            >
+                              Apply →
+                            </button>
+                          )
+                        ) : (
+                          <a href="/app/settings" className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold text-white hirer-grad-bg hover:opacity-90 transition-opacity">
+                            Upgrade →
+                          </a>
+                        )}
+                      </div>
+                      {location && (
+                        <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
+                          <MapPin size={10} /><span>{location}</span>{ago && <><span>·</span><span>Posted {ago}</span></>}
+                        </div>
+                      )}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs">
+                        {dateLabel && <span className="flex items-center gap-1 text-[#F25722] font-medium"><Clock size={10} />{dateLabel}</span>}
+                        <span className="font-medium border rounded-full px-2 py-0.5 text-gray-600 border-gray-200 self-start">{rate || "Open rate"}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : nearbyJobs.map((job: any) => {
+              const studio = job.clientCompanyName || job.clientName || "Studio";
+              const serviceType = job.serviceType || "";
+              const location = job.locationAddress && !job.locationAddress.includes("[object") ? job.locationAddress : "";
+              const ago = postedAgo(job.createdAt);
+              const rate = formatRate(job);
+              const dateLabel = job.dateType === "Ongoing" ? "Ongoing" : formatJobDate(job);
+              return (
+                <div key={job.id} className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm transition-all duration-150">
+                  <SquareAvatar name={studio} logo={job.clientLogo} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{serviceType || studio}</h3>
+                        <p className="text-xs text-gray-500 truncate">{studio}</p>
+                      </div>
+                      <button className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity">
+                        Apply →
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
+                      {location && <><MapPin size={10} /><span>{location}</span></>}
+                      {ago && <><span>·</span><span>Posted {ago}</span></>}
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs">
+                      {dateLabel && <span className="flex items-center gap-1 text-[#F25722] font-medium"><Clock size={10} />{dateLabel}</span>}
+                      <span className="font-medium border rounded-full px-2 py-0.5 text-gray-600 border-gray-200 self-start">{rate || "Open rate"}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -281,14 +487,16 @@ function JobsTab({ user }: { user: any }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-black text-[#111]">Jobs</h2>
+        <h2 className="text-xl font-semibold text-[#111]">Jobs</h2>
       </div>
 
       {/* Sub-tab bar */}
-      <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-full w-fit">
-        {subTabBtn("jobs-for-you", "Jobs For You")}
-        {subTabBtn("pro-jobs", "PRO Jobs ⭐️")}
-        {subTabBtn("applications", "Applications")}
+      <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0" style={{ scrollbarWidth: "none" }}>
+        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-full w-fit min-w-max">
+          {subTabBtn("jobs-for-you", "Jobs For You")}
+          {subTabBtn("pro-jobs", "PRO Jobs ⭐️")}
+          {subTabBtn("applications", "Applications")}
+        </div>
       </div>
 
       {/* Jobs For You */}
@@ -301,7 +509,7 @@ function JobsTab({ user }: { user: any }) {
               <Briefcase size={36} className="mx-auto text-gray-300 mb-3" />
               <p className="text-sm font-semibold text-gray-700 mb-1">No jobs right now</p>
               <p className="text-sm text-gray-500 mb-4">Make sure your profile is complete so hirers can find you.</p>
-              <a href="/app/artists" className="inline-flex items-center px-4 py-2 rounded-full text-xs font-bold text-white bg-[#111] hover:opacity-80 transition-opacity">
+              <a href="/app/artists" className="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity">
                 Browse artist profiles →
               </a>
             </div>
@@ -311,7 +519,7 @@ function JobsTab({ user }: { user: any }) {
                 <div key={job.id} className="flex items-start gap-3 p-4">
                   <StudioAvatar name={job.studioName || job.creatorName || "Studio"} logo={job.logo} size="md" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-[#111]">{job.studioName || job.creatorName}</p>
+                    <p className="text-sm font-semibold text-[#111]">{job.studioName || job.creatorName}</p>
                     <p className="text-sm text-gray-700">{job.serviceType}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
                       {job.location && !job.location.includes("[object") ? job.location : (job.workFromAnywhere ? "Work From Anywhere" : "Location TBD")}
@@ -343,7 +551,7 @@ function JobsTab({ user }: { user: any }) {
               <p className="text-sm text-gray-500 mb-4">New PRO jobs are posted regularly. Check back soon!</p>
               <a
                 href="/app/settings"
-                className="inline-flex items-center px-4 py-2 rounded-full text-xs font-bold text-white hirer-grad-bg hover:opacity-80 transition-opacity"
+                className="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white hirer-grad-bg hover:opacity-80 transition-opacity"
               >
                 Upgrade to PRO →
               </a>
@@ -357,7 +565,7 @@ function JobsTab({ user }: { user: any }) {
                     <div className="flex items-center gap-3 min-w-0">
                       <StudioAvatar name={job.companyName || "Company"} logo={job.logo} size="sm" />
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-[#111] truncate">{job.serviceType}</p>
+                        <p className="text-sm font-semibold text-[#111] truncate">{job.serviceType}</p>
                         <p className="text-xs text-gray-500">{job.companyName}</p>
                         <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
                           <MapPin size={10} /> {job.workFromAnywhere ? "Work From Anywhere" : (job.location && !job.location.includes("[object") ? job.location : "Location TBD")}
@@ -397,7 +605,7 @@ function JobsTab({ user }: { user: any }) {
               <p className="text-sm text-gray-500 mb-4">Browse PRO jobs and apply to start tracking here.</p>
               <button
                 onClick={() => setSubTab("pro-jobs")}
-                className="inline-flex items-center px-4 py-2 rounded-full text-xs font-bold text-white bg-[#111] hover:opacity-80 transition-opacity"
+                className="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity"
               >
                 Browse PRO jobs →
               </button>
@@ -409,7 +617,7 @@ function JobsTab({ user }: { user: any }) {
                   <div className="flex items-center gap-3 min-w-0">
                     <StudioAvatar name={app.companyName || "Company"} logo={app.logo} size="sm" />
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-[#111] truncate">{app.jobTitle}</p>
+                      <p className="text-sm font-semibold text-[#111] truncate">{app.jobTitle}</p>
                       <p className="text-xs text-gray-500">{app.companyName}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{app.appliedAt ? new Date(app.appliedAt).toLocaleDateString() : ""}</p>
                     </div>
@@ -476,13 +684,15 @@ function BookingsTab() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-black text-[#111]">Bookings</h2>
+      <h2 className="text-xl font-semibold text-[#111]">Bookings</h2>
 
-      <div className="flex flex-wrap items-center gap-1 bg-gray-100 p-1 rounded-2xl w-fit">
-        {subTabBtn("mark-complete", "Mark as Complete")}
-        {subTabBtn("payment-pending", "Payment Pending")}
-        {subTabBtn("upcoming", "Upcoming")}
-        {subTabBtn("completed", "Completed")}
+      <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0" style={{ scrollbarWidth: "none" }}>
+        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-2xl w-fit min-w-max">
+          {subTabBtn("mark-complete", "Mark as Complete")}
+          {subTabBtn("payment-pending", "Payment Pending")}
+          {subTabBtn("upcoming", "Upcoming")}
+          {subTabBtn("completed", "Completed")}
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100">
@@ -491,29 +701,29 @@ function BookingsTab() {
             <Calendar size={36} className="mx-auto text-gray-300 mb-3" />
             <p className="text-sm font-semibold text-gray-700 mb-1">No bookings here</p>
             <p className="text-sm text-gray-500 mb-4">Apply to jobs to start getting booked by hirers.</p>
-            <a href="/app/jobs" className="inline-flex items-center px-4 py-2 rounded-full text-xs font-bold text-white bg-[#111] hover:opacity-80 transition-opacity">
+            <a href="/app/jobs" className="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity">
               Browse jobs →
             </a>
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
             {filtered.map(booking => (
-              <div key={booking.id} className="flex items-center justify-between p-4">
+              <div key={booking.id} className="flex items-start sm:items-center justify-between gap-3 p-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <StudioAvatar name={booking.company} logo={booking.logo} size="sm" />
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-[#111] truncate">{booking.jobTitle}</p>
+                    <p className="text-sm font-semibold text-[#111] truncate">{booking.jobTitle}</p>
                     <p className="text-xs text-gray-500">{booking.company}</p>
-                    <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
+                    <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-gray-400">
                       <span className="flex items-center gap-1"><Calendar size={10} /> {booking.date}</span>
                       <span className="flex items-center gap-1"><CreditCard size={10} /> {booking.rate}</span>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 flex-shrink-0">
                   {statusBadge(booking.status)}
                   {booking.status === "mark-complete" && (
-                    <button className="text-xs font-semibold text-white bg-[#111] px-3 py-1.5 rounded-full hover:bg-gray-700 transition-colors">
+                    <button className="text-xs font-semibold text-white bg-[#111] px-3 py-1.5 rounded-full hover:bg-gray-700 transition-colors whitespace-nowrap">
                       Mark Complete
                     </button>
                   )}
@@ -541,18 +751,18 @@ function PaymentsTab() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-black text-[#111]">Payments</h2>
+      <h2 className="text-xl font-semibold text-[#111]">Payments</h2>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <p className="text-xs text-gray-500 mb-1">Total Earned</p>
-          <p className="text-2xl font-black text-[#111]">${totalEarned.toFixed(2)}</p>
+          <p className="text-2xl font-semibold text-[#111]">${totalEarned.toFixed(2)}</p>
           <p className="text-xs text-green-600 mt-1 font-semibold">↑ All time</p>
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <p className="text-xs text-gray-500 mb-1">Pending</p>
-          <p className="text-2xl font-black text-[#111]">${totalPending.toFixed(2)}</p>
+          <p className="text-2xl font-semibold text-[#111]">${totalPending.toFixed(2)}</p>
           <p className="text-xs text-amber-600 mt-1 font-semibold">Awaiting payment</p>
         </div>
       </div>
@@ -560,18 +770,18 @@ function PaymentsTab() {
       {/* Payment history */}
       <div className="bg-white rounded-2xl border border-gray-100">
         <div className="px-5 py-4 border-b border-gray-50">
-          <h3 className="text-sm font-bold text-[#111]">Payment History</h3>
+          <h3 className="text-sm font-semibold text-[#111]">Payment History</h3>
         </div>
         <div className="divide-y divide-gray-50">
           {SAMPLE_PAYMENTS.map(payment => (
             <div key={payment.id} className="flex items-center justify-between p-4">
               <div className="min-w-0">
-                <p className="text-sm font-bold text-[#111] truncate">{payment.jobTitle}</p>
+                <p className="text-sm font-semibold text-[#111] truncate">{payment.jobTitle}</p>
                 <p className="text-xs text-gray-500">{payment.company}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{payment.date} · {payment.method}</p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <p className="text-sm font-bold text-[#111]">{payment.amount}</p>
+                <p className="text-sm font-semibold text-[#111]">{payment.amount}</p>
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
                   payment.status === "paid" ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
                 }`}>
@@ -585,7 +795,7 @@ function PaymentsTab() {
 
       {/* Connect Stripe CTA */}
       <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-5 text-white">
-        <h3 className="text-sm font-bold mb-1">Set Up Direct Deposit</h3>
+        <h3 className="text-sm font-semibold mb-1">Set Up Direct Deposit</h3>
         <p className="text-xs text-gray-400 mb-3">Connect your bank account to receive payments directly from hirers.</p>
         <button className="text-xs font-semibold text-[#111] bg-white px-4 py-2 rounded-full hover:bg-gray-100 transition-colors">
           Connect Bank Account
@@ -609,7 +819,7 @@ function MessagesTab() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-black text-[#111]">Messages</h2>
+      <h2 className="text-xl font-semibold text-[#111]">Messages</h2>
 
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
         {!selected ? (
@@ -620,7 +830,7 @@ function MessagesTab() {
                 <MessageSquare size={36} className="mx-auto text-gray-300 mb-3" />
                 <p className="text-sm font-semibold text-gray-700 mb-1">No messages yet</p>
                 <p className="text-sm text-gray-500 mb-4">Apply to jobs to start conversations with hirers.</p>
-                <a href="/app/jobs" className="inline-flex items-center px-4 py-2 rounded-full text-xs font-bold text-white bg-[#111] hover:opacity-80 transition-opacity">
+                <a href="/app/jobs" className="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity">
                   Browse jobs →
                 </a>
               </div>
@@ -652,7 +862,7 @@ function MessagesTab() {
                 <ChevronRight size={18} className="rotate-180" />
               </button>
               <StudioAvatar name={selectedMsg?.from || ""} logo={selectedMsg?.avatar} size="sm" />
-              <p className="text-sm font-bold text-[#111]">{selectedMsg?.from}</p>
+              <p className="text-sm font-semibold text-[#111]">{selectedMsg?.from}</p>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               <div className="flex justify-start">
@@ -689,7 +899,7 @@ function ProfileTab({ user }: { user: any }) {
       <div className="flex items-start gap-5 mb-6">
         <StudioAvatar name={user?.name || "Artist"} logo={user?.profilePicture} size="lg" />
         <div className="flex-1">
-          <h2 className="text-xl font-black text-[#111]">{user?.name || "Your Name"}</h2>
+          <h2 className="text-xl font-semibold text-[#111]">{user?.name || "Your Name"}</h2>
           <p className="text-sm text-gray-500 mt-0.5">{user?.email}</p>
           {user?.bio && (
             <p className="text-sm text-gray-600 mt-3 leading-relaxed line-clamp-4">{user.bio}</p>
@@ -734,8 +944,8 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-black text-[#111] flex items-center gap-2">
-            PRO Jobs <span className="text-xs font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">⭐️</span>
+          <h2 className="text-lg font-semibold text-[#111] flex items-center gap-2">
+            PRO Jobs <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">⭐️</span>
           </h2>
         </div>
 
@@ -746,7 +956,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
               <Star size={22} className="text-amber-600 fill-amber-400" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-base font-black text-[#111]">Unlock PRO Jobs</p>
+              <p className="text-base font-semibold text-[#111]">Unlock PRO Jobs</p>
               <p className="text-sm text-gray-600 mt-1 leading-relaxed">
                 PRO jobs are exclusive listings from top companies — competitions, touring productions, and enterprise studios. Upgrade to PRO to apply to all of them.
               </p>
@@ -761,7 +971,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
               <div className="mt-5 flex items-center gap-3">
                 <button
                   onClick={onGoToSettings}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90 hirer-grad-bg"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 hirer-grad-bg"
                 >
                   <Sparkles size={15} />
                   {proMonthlyPrice ? `Upgrade to PRO — from ${proMonthlyPrice}/mo` : "Upgrade to PRO"}
@@ -781,7 +991,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
             {PRO_JOBS.slice(0, 5).map(job => (
               <div key={job.id} className="flex items-center justify-between p-4 select-none">
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-[#111] blur-sm">{job.title}</p>
+                  <p className="text-sm font-semibold text-[#111] blur-sm">{job.title}</p>
                   <p className="text-xs text-gray-500 blur-sm">{job.company}</p>
                   <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5 blur-sm">
                     <MapPin size={10} /> {job.location}
@@ -808,10 +1018,10 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-black text-[#111] flex items-center gap-2">
-          PRO Jobs <span className="text-xs font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">⭐️</span>
+        <h2 className="text-lg font-semibold text-[#111] flex items-center gap-2">
+          PRO Jobs <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">⭐️</span>
         </h2>
-        <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full flex items-center gap-1">
+        <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full flex items-center gap-1">
           <Star size={11} className="fill-amber-400" /> PRO Access
         </span>
       </div>
@@ -819,7 +1029,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
         {PRO_JOBS.map(job => (
           <div key={job.id} className="flex items-center justify-between p-4">
             <div className="min-w-0">
-              <p className="text-sm font-bold text-[#111]">{job.title}</p>
+              <p className="text-sm font-semibold text-[#111]">{job.title}</p>
               <p className="text-xs text-gray-500">{job.company}</p>
               <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
                 <MapPin size={10} /> {job.location}
@@ -847,7 +1057,7 @@ function ComingSoonTab({ icon, title }: { icon: React.ReactNode; title: string }
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
       <div className="w-12 h-12 mx-auto text-gray-300 mb-3">{icon}</div>
-      <h2 className="text-lg font-bold text-[#111] mb-1">{title}</h2>
+      <h2 className="text-lg font-semibold text-[#111] mb-1">{title}</h2>
       <p className="text-sm text-gray-500">Coming soon. Data integration in progress.</p>
     </div>
   );
@@ -876,7 +1086,7 @@ export default function ArtistDashboard() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8">
+    <div className="max-w-5xl mx-auto px-4 py-4 md:px-6 md:py-8">
       {renderContent()}
     </div>
   );

@@ -593,7 +593,7 @@ function ApplicantsTab({
             )}
             <div className="flex items-center gap-3 mt-3 flex-wrap text-xs text-gray-400" onClick={(e) => e.stopPropagation()}>
               {rate && <span>{rate}</span>}
-              {a.converted && (
+              {!!a.converted && (
                 <span className="flex items-center gap-1 text-green-500 font-medium">
                   <CheckCircle2 size={10} /> Converted
                 </span>

@@ -157,6 +157,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     .toUpperCase()
     .slice(0, 2);
 
+  const rawPic = artswrkUser?.profilePicture || (user as any)?.profilePicture;
+  const avatarSrc = rawPic ? (rawPic.startsWith("//") ? `https:${rawPic}` : rawPic) : null;
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
@@ -181,14 +184,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* User info card */}
       <div className="mx-3 mb-4 p-3 rounded-xl bg-gray-50 border border-gray-100 flex items-center gap-3">
-        {artswrkUser?.profilePicture ? (
+        {avatarSrc ? (
           <img
-            src={artswrkUser.profilePicture}
+            src={avatarSrc}
             alt={displayName}
             className="w-9 h-9 rounded-full object-cover flex-shrink-0"
           />
         ) : (
-          <div className="w-9 h-9 rounded-full hirer-grad-bg flex items-center justify-center text-white text-xs font-black flex-shrink-0">
+          <div className="w-9 h-9 rounded-full hirer-grad-bg flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
             {avatarInitials}
           </div>
         )}
@@ -313,14 +316,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
 
             {/* Avatar */}
-            {artswrkUser?.profilePicture ? (
+            {avatarSrc ? (
               <img
-                src={artswrkUser.profilePicture}
+                src={avatarSrc}
                 alt={displayName}
                 className="w-8 h-8 rounded-full object-cover cursor-pointer"
               />
             ) : (
-              <div className="w-8 h-8 rounded-full hirer-grad-bg flex items-center justify-center text-white text-xs font-black cursor-pointer">
+              <div className="w-8 h-8 rounded-full hirer-grad-bg flex items-center justify-center text-white text-xs font-semibold cursor-pointer">
                 {avatarInitials}
               </div>
             )}
