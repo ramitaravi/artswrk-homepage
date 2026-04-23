@@ -644,3 +644,15 @@
 - [x] Admin sidebar link to Leads Dashboard
 - [x] Routes registered in App.tsx
 - [x] Vitest integration tests (4 tests passing)
+
+## PostJob Step 2 Upgrades (Apr 23)
+- [x] Company dropdown (logo cards) in Step 2 — select from saved companies
+- [x] Auto-select most recent company on load
+- [x] Auto-populate location from selected company
+- [x] Auto-populate transportation reimbursed + instructions from company's transportReimbursed/transportDetails
+- [x] New date types: Single Date, Weekly, Multiple Dates, Dates Flexible (replaces old Recurring)
+- [x] Transportation Instructions textarea (saved to job)
+- [x] getLastJobDefaults tRPC procedure — returns rate, transportation, location from most recent job
+- [x] Auto-populate rate and transportation from last job for returning hirers
+- [x] Add CRM nav link to client dashboard sidebar
+- [x] Fix email.test.ts to match current HTML email implementation (7 tests passing)

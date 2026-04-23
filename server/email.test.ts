@@ -70,61 +70,67 @@ describe("email.ts", () => {
   });
 
   describe("sendJobPostedEmail", () => {
-    it("should map all fields correctly to SendGrid dynamic template data", async () => {
+    it("should send an HTML email with job details", async () => {
       const sgMail = await import("@sendgrid/mail");
       const result = await sendJobPostedEmail({
         to: "studio@artswrk.com",
         firstName: "Phyllis",
-        service: "Ballet Teacher",
-        artistType: "Dancer",
+        serviceType: "Ballet Teacher",
         date: "Saturday, April 15",
         location: "New York, NY",
-        transportDetails: "Subway accessible",
-        transportReimbursed: "Yes",
+        rate: "$50/hr",
         description: "Looking for a ballet teacher for Saturday class.",
         jobLink: "https://artswrk.com/jobs/123",
+        transportation: true,
       });
       expect(result).toBe(true);
       expect(sgMail.default.send).toHaveBeenCalledWith(
         expect.objectContaining({
           to: "studio@artswrk.com",
-          templateId: SENDGRID_TEMPLATES.JOB_POSTED,
-          dynamicTemplateData: expect.objectContaining({
-            FirstName: "Phyllis",
-            Service: "Ballet Teacher",
-            ArtistType: "Dancer",
-            Date: "Saturday, April 15",
-            Location: "New York, NY",
-            TransportDetails: "Subway accessible",
-            TransportReimbursed: "Yes",
-            Description: "Looking for a ballet teacher for Saturday class.",
-            joblink: "https://artswrk.com/jobs/123",
-            subject: "Your job has been posted!",
+          from: expect.objectContaining({
+            email: "contact@artswrk.com",
           }),
+          subject: expect.stringContaining("live"),
+          html: expect.stringContaining("Phyllis"),
         })
       );
     });
 
-    it("should use default values for optional transport fields", async () => {
+    it("should include transportation info when transportation is true", async () => {
       const sgMail = await import("@sendgrid/mail");
       await sendJobPostedEmail({
         to: "studio@artswrk.com",
         firstName: "Nick",
-        service: "Hip Hop Teacher",
-        artistType: "Dancer",
+        serviceType: "Hip Hop Teacher",
         date: "Flexible",
         location: "Chicago, IL",
+        rate: "Open rate",
         description: "Need a hip hop teacher.",
         jobLink: "https://artswrk.com/jobs/456",
+        transportation: true,
       });
       expect(sgMail.default.send).toHaveBeenCalledWith(
         expect.objectContaining({
-          dynamicTemplateData: expect.objectContaining({
-            TransportDetails: "N/A",
-            TransportReimbursed: "No",
-          }),
+          html: expect.stringContaining("Reimbursed"),
         })
       );
+    });
+
+    it("should not include transport row when transportation is false", async () => {
+      const sgMail = await import("@sendgrid/mail");
+      await sendJobPostedEmail({
+        to: "studio@artswrk.com",
+        firstName: "Nick",
+        serviceType: "Hip Hop Teacher",
+        date: "Flexible",
+        location: "Chicago, IL",
+        rate: "Open rate",
+        description: "Need a hip hop teacher.",
+        jobLink: "https://artswrk.com/jobs/456",
+        transportation: false,
+      });
+      const callArg = vi.mocked(sgMail.default.send).mock.calls[0][0] as { html: string };
+      expect(callArg.html).not.toContain("Reimbursed");
     });
   });
 });

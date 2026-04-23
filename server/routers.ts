@@ -6,7 +6,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail } from "./email";
 import crypto from "crypto";
@@ -1555,7 +1555,7 @@ Fields to extract:
 - title: string (short job title, e.g. "Ballet Substitute Teacher", "Hip Hop Choreographer", "Competition Judge")
 - description: string (the original text, cleaned up)
 - locationAddress: string or null (full address or city/state)
-- dateType: "Single Date" | "Ongoing" | "Recurring" (infer from context)
+- dateType: "Single Date" | "Weekly" | "Multiple Dates" | "Dates Flexible" | "Ongoing" (infer from context; use "Weekly" for recurring weekly classes, "Multiple Dates" for multiple specific dates, "Dates Flexible" if no specific date is mentioned)
 - startDate: ISO 8601 datetime string or null
 - endDate: ISO 8601 datetime string or null (for single date jobs, this is the end time same day)
 - isHourly: boolean (true if hourly rate, false if flat rate)
@@ -1578,7 +1578,7 @@ Fields to extract:
                   title: { type: ["string", "null"] },
                   description: { type: "string" },
                   locationAddress: { type: ["string", "null"] },
-                  dateType: { type: "string", enum: ["Single Date", "Ongoing", "Recurring"] },
+                  dateType: { type: "string", enum: ["Single Date", "Weekly", "Multiple Dates", "Dates Flexible", "Ongoing"] },
                   startDate: { type: ["string", "null"] },
                   endDate: { type: ["string", "null"] },
                   isHourly: { type: "boolean" },
@@ -1608,14 +1608,17 @@ Fields to extract:
         locationAddress: z.string().optional(),
         locationLat: z.string().optional(),
         locationLng: z.string().optional(),
-        dateType: z.enum(["Single Date", "Ongoing", "Recurring"]).default("Single Date"),
+        dateType: z.enum(["Single Date", "Weekly", "Multiple Dates", "Dates Flexible", "Ongoing", "Recurring"]).default("Single Date"),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
+        multipleDates: z.array(z.string()).optional(),
         isHourly: z.boolean().default(true),
         openRate: z.boolean().default(false),
         clientHourlyRate: z.number().optional(),
         clientFlatRate: z.number().optional(),
         transportation: z.boolean().default(false),
+        transportationInstructions: z.string().optional(),
+        studioName: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
@@ -1675,14 +1678,17 @@ Fields to extract:
         locationAddress: z.string().optional(),
         locationLat: z.string().optional(),
         locationLng: z.string().optional(),
-        dateType: z.enum(["Single Date", "Ongoing", "Recurring"]).default("Single Date"),
+        dateType: z.enum(["Single Date", "Weekly", "Multiple Dates", "Dates Flexible", "Ongoing", "Recurring"]).default("Single Date"),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
+        multipleDates: z.array(z.string()).optional(),
         isHourly: z.boolean().default(true),
         openRate: z.boolean().default(false),
         clientHourlyRate: z.number().optional(),
         clientFlatRate: z.number().optional(),
         transportation: z.boolean().default(false),
+        transportationInstructions: z.string().optional(),
+        studioName: z.string().optional(),
         plan: z.enum(["one_time", "subscription"]).default("one_time"),
         origin: z.string().url(),
       }))
@@ -1724,6 +1730,66 @@ Fields to extract:
         return { jobId: job.id, checkoutUrl: url, sessionId };
       }),
 
+     /**
+     * Get all companies for the logged-in user (for the "posting on behalf of" dropdown).
+     * Falls back to the user's clientCompanyName if no client_companies rows exist.
+     */
+    getMyCompanies: protectedProcedure
+      .query(async ({ ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const companies = await getClientCompaniesByUserId(user.id);
+        return {
+          companies,
+          primaryCompanyName: user.clientCompanyName ?? null,
+          userFullName: user.name ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
+          userLocation: user.location ?? null,
+        };
+      }),
+    /**
+     * Get defaults from the user's most recent job post (rate, transport details, location).
+     * Used to auto-populate Step 2 fields for returning hirers.
+     */
+    getLastJobDefaults: protectedProcedure
+      .query(async ({ ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const jobList = await getJobsByUserId(user.id, 1);
+        if (!jobList || jobList.length === 0) return null;
+        const last = jobList[0];
+        return {
+          isHourly: last.isHourly ?? true,
+          openRate: last.openRate ?? false,
+          clientHourlyRate: last.clientHourlyRate ?? null,
+          transportation: last.transportation ?? false,
+          locationAddress: last.locationAddress ?? null,
+        };
+      }),
+    /**
+     * Add a new company to the logged-in user's profile.
+     */
+    addCompany: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        logo: z.string().optional(),
+        locationAddress: z.string().optional(),
+        website: z.string().optional(),
+        description: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const newId = await createClientCompany({
+          ownerUserId: user.id,
+          name: input.name,
+          logo: input.logo ?? null,
+          locationAddress: input.locationAddress ?? null,
+          website: input.website ?? null,
+          description: input.description ?? null,
+        });
+        const companies = await getClientCompaniesByUserId(user.id);
+        return { success: true, newCompanyId: newId, companies };
+      }),
     /**
      * Verify a completed Stripe checkout session and activate the job.
      * Called from the success page.
@@ -1733,14 +1799,11 @@ Fields to extract:
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
-
         const stripe = getStripe();
         const session = await stripe.checkout.sessions.retrieve(input.sessionId);
-
         if (session.payment_status !== "paid" && session.status !== "complete") {
           throw new Error("Payment not completed");
         }
-
         const jobId = session.metadata?.job_id ? parseInt(session.metadata.job_id) : null;
         if (jobId) {
           await activateJob(jobId);

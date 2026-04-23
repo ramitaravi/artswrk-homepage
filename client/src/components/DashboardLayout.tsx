@@ -30,6 +30,7 @@ import {
   Sparkles,
   CheckCircle2,
   LayoutGrid,
+  ContactRound,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
@@ -51,6 +52,7 @@ const CLIENT_CORE_NAV: NavItem[] = [
   { label: "Payments", icon: <CreditCard size={18} />, href: "/app/payments" },
   { label: "Artists", icon: <Users size={18} />, href: "/app/artists" },
   { label: "Messages", icon: <MessageSquare size={18} />, href: "/app/messages" },
+  { label: "CRM", icon: <ContactRound size={18} />, href: "/leads" },
 ];
 
 const CLIENT_PREMIUM_NAV: NavItem[] = [

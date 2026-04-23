@@ -2933,3 +2933,26 @@ export async function getUsersByEmails(emails: string[]): Promise<Map<string, {
   }
   return result;
 }
+
+/** Create a new client company for a user */
+export async function createClientCompany(data: {
+  ownerUserId: number;
+  name: string;
+  logo?: string | null;
+  locationAddress?: string | null;
+  website?: string | null;
+  description?: string | null;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(clientCompanies).values({
+    ownerUserId: data.ownerUserId,
+    name: data.name,
+    logo: data.logo ?? null,
+    locationAddress: data.locationAddress ?? null,
+    website: data.website ?? null,
+    description: data.description ?? null,
+  });
+  // @ts-ignore
+  return result[0].insertId as number;
+}

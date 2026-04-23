@@ -1,4 +1,4 @@
-/**
+/*
  * Post a Job — 3-step flow (redesigned)
  * Step 1: Natural language input
  * Step 2: AI-autofilled summary form (editable) → "Post Job Free"
@@ -8,7 +8,7 @@
  * Optional +$15 boost for priority placement. Or $29/mo PRO for unlimited.
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import SharedNavbar from "@/components/Navbar";
 import { trpc } from "@/lib/trpc";
@@ -39,16 +39,23 @@ import {
   Lock,
   Unlock,
   TrendingUp,
+  Building2,
+  Plus,
+  AlertTriangle,
+  CalendarDays,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type DateType = "Single Date" | "Weekly" | "Multiple Dates" | "Dates Flexible" | "Ongoing";
+
 interface ParsedJob {
   title: string | null;
   description: string;
   locationAddress: string | null;
-  dateType: "Single Date" | "Ongoing" | "Recurring";
+  dateType: DateType;
   startDate: string | null;
   endDate: string | null;
   isHourly: boolean;
@@ -63,16 +70,34 @@ interface FormData {
   description: string;
   title: string;
   studioName: string;
+  selectedCompanyId: number | null;
   locationAddress: string;
-  dateType: "Single Date" | "Ongoing" | "Recurring";
+  dateType: DateType;
   startDate: string;
   endDate: string;
+  multipleDates: string[];
   isHourly: boolean;
   openRate: boolean;
   clientHourlyRate: string;
   clientFlatRate: string;
   transportation: boolean;
+  transportationInstructions: string;
   serviceType: string;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Convert an ISO UTC date string to a local datetime-local input value.
+ * Avoids the UTC offset bug where "4:30 PM" shows as "8:30 PM".
+ */
+function isoToLocalDatetimeInput(isoString: string | null): string {
+  if (!isoString) return "";
+  // Parse the ISO string as a Date, then format in local time
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 // ─── Example prompts ──────────────────────────────────────────────────────────
@@ -261,38 +286,112 @@ function Step2({
   onNext: (form: FormData, jobId: number) => void;
   onBack: () => void;
 }) {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
-  const [form, setForm] = useState<FormData>({
+  // ── Queries ──
+  const companiesQuery = trpc.postJob.getMyCompanies.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
+  const lastJobQuery = trpc.postJob.getLastJobDefaults.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
+
+  const companies = companiesQuery.data?.companies ?? [];
+  const userFullName = companiesQuery.data?.userFullName ?? (user?.name || user?.firstName || "");
+
+  // ── Form state ──
+  const [form, setForm] = useState<FormData>(() => ({
     description: parsed.description || rawText,
     title: parsed.title || "",
     studioName: user?.clientCompanyName || "",
+    selectedCompanyId: null,
     locationAddress: parsed.locationAddress || user?.location || "",
-    dateType: parsed.dateType || "Single Date",
-    startDate: parsed.startDate
-      ? new Date(parsed.startDate).toISOString().slice(0, 16)
-      : "",
-    endDate: parsed.endDate
-      ? new Date(parsed.endDate).toISOString().slice(0, 16)
-      : "",
+    dateType: (parsed.dateType as DateType) || "Single Date",
+    startDate: isoToLocalDatetimeInput(parsed.startDate),
+    endDate: isoToLocalDatetimeInput(parsed.endDate),
+    multipleDates: [],
     isHourly: parsed.isHourly,
     openRate: parsed.openRate,
     clientHourlyRate: parsed.clientHourlyRate?.toString() || "",
     clientFlatRate: parsed.clientFlatRate?.toString() || "",
     transportation: parsed.transportation,
+    transportationInstructions: "",
     serviceType: parsed.serviceType || "",
+  }));
+
+  // ── Auto-populate from last job on first load ──
+  const [lastJobApplied, setLastJobApplied] = useState(false);
+  useEffect(() => {
+    if (lastJobApplied || !lastJobQuery.data) return;
+    const d = lastJobQuery.data;
+    setForm((f) => ({
+      ...f,
+      isHourly: d.isHourly ?? f.isHourly,
+      openRate: d.openRate ?? f.openRate,
+      clientHourlyRate: d.clientHourlyRate ? String(d.clientHourlyRate) : f.clientHourlyRate,
+      transportation: d.transportation ?? f.transportation,
+    }));
+    setLastJobApplied(true);
+  }, [lastJobQuery.data, lastJobApplied]);
+
+     // Auto-select first company on load ──
+  const [companyAutoSelected, setCompanyAutoSelected] = useState(false);
+  useEffect(() => {
+    if (companyAutoSelected || companies.length === 0) return;
+    // Auto-select the first (most recently used) company
+    const first = companies[0];
+    setForm((f) => ({
+      ...f,
+      studioName: first.name,
+      selectedCompanyId: first.id,
+      locationAddress: first.locationAddress || f.locationAddress,
+      // Auto-populate transport from company settings
+      transportation: first.transportReimbursed ?? f.transportation,
+      transportationInstructions: first.transportDetails || f.transportationInstructions,
+    }));
+    setCompanyAutoSelected(true);
+  }, [companies, companyAutoSelected]);
+
+  // ── Location conflict flag ──
+  const selectedCompany = useMemo(
+    () => companies.find((c) => c.id === form.selectedCompanyId) ?? null,
+    [companies, form.selectedCompanyId]
+  );
+  const locationConflict = useMemo(() => {
+    if (!selectedCompany?.locationAddress || !parsed.locationAddress) return false;
+    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return normalize(selectedCompany.locationAddress) !== normalize(parsed.locationAddress);
+  }, [selectedCompany, parsed.locationAddress]);
+
+  // ── Add Company inline form ──
+  const [showAddCompany, setShowAddCompany] = useState(false);
+  const [newCompanyName, setNewCompanyName] = useState("");
+  const [newCompanyLocation, setNewCompanyLocation] = useState("");
+  const addCompanyMutation = trpc.postJob.addCompany.useMutation({
+    onSuccess: (data) => {
+      const newCompany = data.companies.find((c: { id: number; name: string; locationAddress: string | null; transportReimbursed: boolean | null; transportDetails: string | null }) => c.id === data.newCompanyId);
+      if (newCompany) {
+        setForm((f) => ({
+          ...f,
+          studioName: newCompany.name,
+          selectedCompanyId: newCompany.id,
+          locationAddress: newCompany.locationAddress || f.locationAddress,
+        }));
+      }
+      setShowAddCompany(false);
+      setNewCompanyName("");
+      setNewCompanyLocation("");
+      companiesQuery.refetch();
+      toast.success("Company added!");
+    },
+    onError: (err: { message: string }) => toast.error(`Failed to add company: ${err.message}`),
   });
 
-  useEffect(() => {
-    if (user?.clientCompanyName && !form.studioName) {
-      setForm((f) => ({ ...f, studioName: user.clientCompanyName || "" }));
-    }
-  }, [user]);
+  // ── Multiple dates picker ──
+  const [newMultiDate, setNewMultiDate] = useState("");
 
-  const set = (key: keyof FormData, value: string | boolean) =>
+  const set = (key: keyof FormData, value: string | boolean | number | null | string[]) =>
     setForm((f) => ({ ...f, [key]: value }));
-
-  const { isAuthenticated } = useAuth();
 
   const createFreeJob = trpc.postJob.createFreeJob.useMutation({
     onSuccess: (data) => {
@@ -316,7 +415,7 @@ function Step2({
     createFreeJob.mutate({
       description: form.description,
       locationAddress: form.locationAddress || undefined,
-      dateType: form.dateType,
+      dateType: form.dateType as any,
       startDate: form.startDate || undefined,
       endDate: form.endDate || undefined,
       isHourly: form.isHourly,
@@ -324,10 +423,22 @@ function Step2({
       clientHourlyRate: form.clientHourlyRate ? parseFloat(form.clientHourlyRate) : undefined,
       clientFlatRate: form.clientFlatRate ? parseFloat(form.clientFlatRate) : undefined,
       transportation: form.transportation,
+      transportationInstructions: form.transportationInstructions || undefined,
+      studioName: form.studioName || undefined,
     });
   }
 
-  const isOngoing = form.dateType === "Ongoing" || form.dateType === "Recurring";
+  const isFlexible = form.dateType === "Dates Flexible" || form.dateType === "Ongoing";
+  const isWeekly = form.dateType === "Weekly";
+  const isMultiple = form.dateType === "Multiple Dates";
+  const isSingle = form.dateType === "Single Date";
+
+  const DATE_TYPES: { key: DateType; label: string; hint: string }[] = [
+    { key: "Single Date", label: "Single Date", hint: "One specific date/time" },
+    { key: "Weekly", label: "Weekly", hint: "Recurring weekly classes" },
+    { key: "Multiple Dates", label: "Multiple Dates", hint: "Several specific dates" },
+    { key: "Dates Flexible", label: "Dates Flexible", hint: "No specific date yet" },
+  ];
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -358,64 +469,171 @@ function Step2({
           />
         </div>
 
-        {/* Studio / Company — "posting on behalf of" dropdown for logged-in users */}
+        {/* Studio / Company — logo-card dropdown for logged-in users */}
         <div className="p-5">
           <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
             Posting On Behalf Of
           </label>
           {user ? (
-            <div className="space-y-2">
-              {/* Company options as selectable pills */}
-              <div className="flex flex-wrap gap-2">
-                {/* Primary company */}
-                {user.clientCompanyName && (
+            <div className="space-y-3">
+              {/* Company cards */}
+              {companiesQuery.isLoading ? (
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <Loader2 size={12} className="animate-spin" />
+                  Loading your companies...
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {/* Each company as a card */}
+                  {companies.map((company: import('../../../drizzle/schema').ClientCompany) => (
+                    <button
+                      key={company.id}
+                      type="button"
+                      onClick={() => {
+                        setForm((f) => ({
+                          ...f,
+                          studioName: company.name,
+                          selectedCompanyId: company.id,
+                          locationAddress: company.locationAddress || f.locationAddress,
+                          // Auto-populate transport from company settings
+                          transportation: company.transportReimbursed ?? f.transportation,
+                          transportationInstructions: company.transportDetails || f.transportationInstructions,
+                        }));
+                      }}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all text-left ${
+                        form.selectedCompanyId === company.id
+                          ? "border-[#F25722] bg-orange-50"
+                          : "border-gray-200 hover:border-gray-300 bg-white"
+                      }`}
+                    >
+                      {company.logo ? (
+                        <img
+                          src={company.logo}
+                          alt={company.name}
+                          className="w-7 h-7 rounded-lg object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-7 h-7 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
+                          <Building2 size={14} className="text-[#F25722]" />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className={`text-xs font-semibold truncate max-w-[140px] ${
+                          form.selectedCompanyId === company.id ? "text-[#F25722]" : "text-[#111]"
+                        }`}>
+                          {company.name}
+                        </p>
+                        {company.locationAddress && (
+                          <p className="text-[10px] text-gray-400 truncate max-w-[140px]">
+                            {company.locationAddress}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+
+                  {/* Post as individual */}
                   <button
                     type="button"
-                    onClick={() => set("studioName", user.clientCompanyName || "")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      form.studioName === user.clientCompanyName
-                        ? "hirer-grad-bg text-white border-transparent"
-                        : "border-gray-200 text-gray-700 hover:border-[#F25722] hover:text-[#F25722]"
+                    onClick={() => {
+                      setForm((f) => ({
+                        ...f,
+                        studioName: userFullName,
+                        selectedCompanyId: null,
+                      }));
+                    }}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
+                      form.selectedCompanyId === null && form.studioName === userFullName
+                        ? "border-[#F25722] bg-orange-50"
+                        : "border-gray-200 hover:border-gray-300 bg-white"
                     }`}
                   >
-                    {user.clientCompanyName}
+                    <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                      <Users size={14} className="text-gray-500" />
+                    </div>
+                    <p className={`text-xs font-semibold ${
+                      form.selectedCompanyId === null && form.studioName === userFullName
+                        ? "text-[#F25722]"
+                        : "text-[#111]"
+                    }`}>
+                      {userFullName} (Individual)
+                    </p>
                   </button>
-                )}
-                {/* Post as individual */}
-                <button
-                  type="button"
-                  onClick={() => set("studioName", user.name || user.firstName || "")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                    form.studioName === (user.name || user.firstName || "")
-                      ? "hirer-grad-bg text-white border-transparent"
-                      : "border-gray-200 text-gray-700 hover:border-[#F25722] hover:text-[#F25722]"
-                  }`}
-                >
-                  {user.firstName || user.name} (Individual)
-                </button>
-                {/* Custom name option */}
-                <button
-                  type="button"
-                  onClick={() => set("studioName", "")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                    form.studioName !== user.clientCompanyName && form.studioName !== (user.name || user.firstName || "")
-                      ? "hirer-grad-bg text-white border-transparent"
-                      : "border-gray-200 text-gray-500 hover:border-[#F25722] hover:text-[#F25722]"
-                  }`}
-                >
-                  + Different name
-                </button>
-              </div>
-              {/* Show text input when custom name is selected */}
-              {form.studioName !== user.clientCompanyName && form.studioName !== (user.name || user.firstName || "") && (
-                <Input
-                  value={form.studioName}
-                  onChange={(e) => set("studioName", e.target.value)}
-                  placeholder="Enter studio or company name"
-                  className="border-gray-200 focus:border-[#F25722] mt-2"
-                  autoFocus
-                />
+
+                  {/* Add New Company */}
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCompany(true)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-gray-300 hover:border-[#F25722] hover:text-[#F25722] transition-all text-gray-400"
+                  >
+                    <Plus size={14} />
+                    <span className="text-xs font-semibold">Add Company</span>
+                  </button>
+                </div>
               )}
+
+              {/* Add Company inline form */}
+              {showAddCompany && (
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-[#111]">New Company</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddCompany(false)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <Input
+                    value={newCompanyName}
+                    onChange={(e) => setNewCompanyName(e.target.value)}
+                    placeholder="Company / Studio name"
+                    className="border-gray-200 text-sm"
+                    autoFocus
+                  />
+                  <Input
+                    value={newCompanyLocation}
+                    onChange={(e) => setNewCompanyLocation(e.target.value)}
+                    placeholder="City, State (optional)"
+                    className="border-gray-200 text-sm"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (!newCompanyName.trim()) {
+                        toast.error("Company name is required");
+                        return;
+                      }
+                      addCompanyMutation.mutate({
+                        name: newCompanyName.trim(),
+                        locationAddress: newCompanyLocation.trim() || undefined,
+                      });
+                    }}
+                    disabled={addCompanyMutation.isPending}
+                    className="hirer-grad-bg border-0 hover:opacity-90 text-xs"
+                  >
+                    {addCompanyMutation.isPending ? (
+                      <Loader2 size={12} className="animate-spin mr-1" />
+                    ) : (
+                      <Plus size={12} className="mr-1" />
+                    )}
+                    Add Company
+                  </Button>
+                </div>
+              )}
+
+              {/* Custom name input if not matching any company or individual */}
+              {form.selectedCompanyId === null &&
+                form.studioName !== userFullName &&
+                !showAddCompany && (
+                  <Input
+                    value={form.studioName}
+                    onChange={(e) => set("studioName", e.target.value)}
+                    placeholder="Enter studio or company name"
+                    className="border-gray-200 focus:border-[#F25722]"
+                  />
+                )}
             </div>
           ) : (
             <Input
@@ -451,6 +669,17 @@ function Step2({
             placeholder="City, State or full address"
             className="border-gray-200 focus:border-[#F25722]"
           />
+          {/* Location conflict flag */}
+          {locationConflict && selectedCompany?.locationAddress && (
+            <div className="mt-2 flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
+              <AlertTriangle size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-700">
+                Your AI-parsed location differs from{" "}
+                <span className="font-semibold">{selectedCompany.name}</span>'s address (
+                {selectedCompany.locationAddress}). The field above shows the AI-parsed location — update it if needed.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Date type */}
@@ -460,26 +689,27 @@ function Step2({
             Date Type
           </label>
           <div className="flex gap-2 flex-wrap">
-            {(["Single Date", "Recurring", "Ongoing"] as const).map((dt) => (
+            {DATE_TYPES.map((dt) => (
               <button
-                key={dt}
-                onClick={() => set("dateType", dt)}
+                key={dt.key}
+                onClick={() => set("dateType", dt.key)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                  form.dateType === dt
+                  form.dateType === dt.key
                     ? "hirer-grad-bg text-white border-transparent"
                     : "border-gray-200 text-gray-600 hover:border-[#F25722] hover:text-[#F25722]"
                 }`}
+                title={dt.hint}
               >
-                {dt}
+                {dt.label}
               </button>
             ))}
           </div>
-          {!isOngoing && (
+
+          {/* Single Date inputs */}
+          {isSingle && (
             <div className="grid grid-cols-2 gap-3 mt-3">
               <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Start
-                </label>
+                <label className="text-xs text-gray-400 block mb-1">Start</label>
                 <Input
                   type="datetime-local"
                   value={form.startDate}
@@ -488,9 +718,7 @@ function Step2({
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  End (optional)
-                </label>
+                <label className="text-xs text-gray-400 block mb-1">End (optional)</label>
                 <Input
                   type="datetime-local"
                   value={form.endDate}
@@ -499,6 +727,105 @@ function Step2({
                 />
               </div>
             </div>
+          )}
+
+          {/* Weekly date inputs */}
+          {isWeekly && (
+            <div className="mt-3 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Start Date</label>
+                  <Input
+                    type="date"
+                    value={form.startDate ? form.startDate.slice(0, 10) : ""}
+                    onChange={(e) => set("startDate", e.target.value)}
+                    className="border-gray-200 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">End Date (optional)</label>
+                  <Input
+                    type="date"
+                    value={form.endDate ? form.endDate.slice(0, 10) : ""}
+                    onChange={(e) => set("endDate", e.target.value)}
+                    className="border-gray-200 text-sm"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-400">
+                <CalendarDays size={11} className="inline mr-1" />
+                Weekly recurring — artists will see this as an ongoing weekly commitment.
+              </p>
+            </div>
+          )}
+
+          {/* Multiple Dates picker */}
+          {isMultiple && (
+            <div className="mt-3 space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  type="datetime-local"
+                  value={newMultiDate}
+                  onChange={(e) => setNewMultiDate(e.target.value)}
+                  className="border-gray-200 text-sm flex-1"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (!newMultiDate) return;
+                    setForm((f) => ({
+                      ...f,
+                      multipleDates: [...f.multipleDates, newMultiDate],
+                    }));
+                    setNewMultiDate("");
+                  }}
+                  className="flex-shrink-0"
+                >
+                  <Plus size={14} />
+                  Add
+                </Button>
+              </div>
+              {form.multipleDates.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {form.multipleDates.map((d, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-orange-50 text-[#F25722] text-xs font-medium"
+                    >
+                      {new Date(d).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            multipleDates: f.multipleDates.filter((_, j) => j !== i),
+                          }))
+                        }
+                        className="hover:opacity-70"
+                      >
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {form.multipleDates.length === 0 && (
+                <p className="text-xs text-gray-400">Add each date/time above.</p>
+              )}
+            </div>
+          )}
+
+          {/* Dates Flexible */}
+          {isFlexible && (
+            <p className="mt-3 text-xs text-gray-500 italic">
+              No specific date — artists will see "Dates Flexible" on the listing.
+            </p>
           )}
         </div>
 
@@ -540,9 +867,7 @@ function Step2({
           </div>
           {!form.openRate && form.isHourly && (
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                $
-              </span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
               <Input
                 type="number"
                 value={form.clientHourlyRate}
@@ -550,16 +875,12 @@ function Step2({
                 placeholder="0.00"
                 className="pl-7 border-gray-200"
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                /hr
-              </span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">/hr</span>
             </div>
           )}
           {!form.openRate && !form.isHourly && (
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                $
-              </span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
               <Input
                 type="number"
                 value={form.clientFlatRate}
@@ -567,9 +888,7 @@ function Step2({
                 placeholder="0.00"
                 className="pl-7 border-gray-200"
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                flat
-              </span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">flat</span>
             </div>
           )}
           {form.openRate && (
@@ -580,32 +899,49 @@ function Step2({
         </div>
 
         {/* Transportation */}
-        <div className="p-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
-              <Car size={16} className="text-blue-500" />
+        <div className="p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+                <Car size={16} className="text-blue-500" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[#111]">
+                  Travel / Transportation Covered
+                </p>
+                <p className="text-xs text-gray-400">
+                  Artists will see this as a perk
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-semibold text-[#111]">
-                Travel / Transportation Covered
-              </p>
-              <p className="text-xs text-gray-400">
-                Artists will see this as a perk
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => set("transportation", !form.transportation)}
-            className={`w-12 h-6 rounded-full transition-all relative ${
-              form.transportation ? "hirer-grad-bg" : "bg-gray-200"
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${
-                form.transportation ? "left-6" : "left-0.5"
+            <button
+              onClick={() => set("transportation", !form.transportation)}
+              className={`w-12 h-6 rounded-full transition-all relative flex-shrink-0 ${
+                form.transportation ? "hirer-grad-bg" : "bg-gray-200"
               }`}
-            />
-          </button>
+            >
+              <span
+                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${
+                  form.transportation ? "left-6" : "left-0.5"
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Transportation instructions */}
+          {form.transportation && (
+            <div className="mt-3">
+              <label className="text-xs text-gray-400 block mb-1">
+                Transportation / Parking Instructions (optional)
+              </label>
+              <Textarea
+                value={form.transportationInstructions}
+                onChange={(e) => set("transportationInstructions", e.target.value)}
+                placeholder="e.g. Free parking in lot B, take the Red Line to Clark/Division..."
+                className="min-h-[70px] border-gray-200 focus:border-[#F25722] resize-none text-sm"
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -635,9 +971,7 @@ function Step2({
             </p>
             <div className="flex gap-2 mt-2 flex-wrap">
               {form.openRate ? (
-                <Badge className="bg-orange-100 text-[#F25722] border-0 text-xs">
-                  Open rate
-                </Badge>
+                <Badge className="bg-orange-100 text-[#F25722] border-0 text-xs">Open rate</Badge>
               ) : form.isHourly && form.clientHourlyRate ? (
                 <Badge className="bg-orange-100 text-[#F25722] border-0 text-xs">
                   ${form.clientHourlyRate}/hr
@@ -651,9 +985,7 @@ function Step2({
                 {form.dateType}
               </Badge>
               {form.transportation && (
-                <Badge className="bg-blue-50 text-blue-600 border-0 text-xs">
-                  Travel covered
-                </Badge>
+                <Badge className="bg-blue-50 text-blue-600 border-0 text-xs">Travel covered</Badge>
               )}
             </div>
           </div>
@@ -688,55 +1020,31 @@ function Step2({
 // ─── Step 3: Indeed-style "almost ready" + sponsor flow ──────────────────────
 
 // Budget tier config
-const BUDGET_TIERS = [
-  { daily: 0,  label: "Free",        days: 0,  performance: "Standard",    perfColor: "text-gray-500",   needle: 5 },
-  { daily: 5,  label: "$5/day",      days: 7,  performance: "Good",         perfColor: "text-yellow-600", needle: 30 },
-  { daily: 10, label: "$10/day",     days: 14, performance: "Strong",       perfColor: "text-orange-500", needle: 60 },
-  { daily: 20, label: "$20/day",     days: 21, performance: "Very Strong",  perfColor: "text-green-600",  needle: 85 },
+const TIERS = [
+  {
+    id: "connect",
+    label: "Connect",
+    price: 30,
+    priceLabel: "$30",
+    description: "Unlock all applicants for this job",
+    features: ["View all applicants", "Message artists directly", "One-time fee"],
+    icon: <Unlock size={20} className="text-white" />,
+    gradient: "hirer-grad-bg",
+    plan: "one_time" as const,
+  },
+  {
+    id: "pro",
+    label: "PRO",
+    price: 29,
+    priceLabel: "$29/mo",
+    description: "Unlimited unlocks for all your jobs",
+    features: ["Unlimited applicant unlocks", "Priority listing placement", "Cancel anytime"],
+    icon: <Crown size={20} className="text-white" />,
+    gradient: "hirer-grad-bg",
+    plan: "subscription" as const,
+    badge: "Best Value",
+  },
 ];
-
-function getTierForBudget(daily: number) {
-  if (daily <= 0) return BUDGET_TIERS[0];
-  if (daily < 10) return BUDGET_TIERS[1];
-  if (daily < 20) return BUDGET_TIERS[2];
-  return BUDGET_TIERS[3];
-}
-
-// SVG Speedometer gauge
-function Gauge({ needleDeg }: { needleDeg: number }) {
-  // Arc from 180° to 0° (left to right), needle rotates from -90 to +90
-  const r = 70;
-  const cx = 90;
-  const cy = 90;
-  // Arc segments: red (0-33%), yellow (33-66%), green (66-100%)
-  function arcPath(startDeg: number, endDeg: number) {
-    const toRad = (d: number) => ((d - 180) * Math.PI) / 180;
-    const x1 = cx + r * Math.cos(toRad(startDeg));
-    const y1 = cy + r * Math.sin(toRad(startDeg));
-    const x2 = cx + r * Math.cos(toRad(endDeg));
-    const y2 = cy + r * Math.sin(toRad(endDeg));
-    return `M ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2}`;
-  }
-  // Needle: needleDeg is 0-100 mapped to -90 to +90 degrees from top
-  const needleAngle = -90 + (needleDeg / 100) * 180;
-  const needleRad = (needleAngle * Math.PI) / 180;
-  const nx = cx + 55 * Math.sin(needleRad);
-  const ny = cy - 55 * Math.cos(needleRad);
-  return (
-    <svg width="180" height="100" viewBox="0 0 180 100">
-      <path d={arcPath(0, 60)} fill="none" stroke="#fca5a5" strokeWidth="12" strokeLinecap="round" />
-      <path d={arcPath(60, 120)} fill="none" stroke="#fcd34d" strokeWidth="12" strokeLinecap="round" />
-      <path d={arcPath(120, 180)} fill="none" stroke="#86efac" strokeWidth="12" strokeLinecap="round" />
-      <line
-        x1={cx} y1={cy}
-        x2={nx} y2={ny}
-        stroke="#111" strokeWidth="3" strokeLinecap="round"
-        style={{ transition: "all 0.5s ease" }}
-      />
-      <circle cx={cx} cy={cy} r="5" fill="#111" />
-    </svg>
-  );
-}
 
 function Step3({
   form,
@@ -747,70 +1055,105 @@ function Step3({
   jobId: number | null;
   onBack: () => void;
 }) {
-  const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
-  const isPro = user?.clientPremium;
+  const [selectedTier, setSelectedTier] = useState<string>("connect");
+  const [isLoading, setIsLoading] = useState(false);
+
   // sub-step: "almost_ready" → "sponsor"
   const [subStep, setSubStep] = useState<"almost_ready" | "sponsor">("almost_ready");
-  const [dailyBudget, setDailyBudget] = useState(5);
-  const [duration, setDuration] = useState<"7" | "14" | "30" | "continuous">("7");
 
-  const boostCheckout = trpc.boost.createCheckout.useMutation({
+  const createAndCheckout = trpc.postJob.createAndCheckout.useMutation({
     onSuccess: (data) => {
-      window.open(data.checkoutUrl, "_blank");
-      toast.success("Redirecting to secure checkout...");
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      }
     },
     onError: (err) => {
+      setIsLoading(false);
       toast.error(`Checkout failed: ${err.message}`);
     },
   });
 
+  // boost.createCheckout is available via trpc.boost.createCheckout
+
   function handleSponsor() {
     if (!jobId) {
-      toast.error("Job not found. Please go back and try again.");
+      toast.error("Job ID missing — please try again.");
       return;
     }
-    const days = duration === "continuous" ? 30 : parseInt(duration);
-    boostCheckout.mutate({
-      jobId,
-      dailyBudget,
-      durationDays: days,
+    setIsLoading(true);
+    const tier = TIERS.find((t) => t.id === selectedTier);
+    if (!tier) return;
+
+    createAndCheckout.mutate({
+      description: form.description,
+      locationAddress: form.locationAddress || undefined,
+      dateType: form.dateType as "Single Date" | "Weekly" | "Multiple Dates" | "Dates Flexible" | "Ongoing" | "Recurring",
+      startDate: form.startDate || undefined,
+      endDate: form.endDate || undefined,
+      isHourly: form.isHourly,
+      openRate: form.openRate,
+      clientHourlyRate: form.clientHourlyRate ? parseFloat(form.clientHourlyRate) : undefined,
+      clientFlatRate: form.clientFlatRate ? parseFloat(form.clientFlatRate) : undefined,
+      transportation: form.transportation,
+      plan: tier.plan,
       origin: window.location.origin,
     });
   }
 
-  const isLoading = boostCheckout.isPending;
-  const tier = getTierForBudget(dailyBudget);
-  const durationDays = duration === "continuous" ? null : parseInt(duration);
-  const totalCost = durationDays ? dailyBudget * durationDays : null;
-
   // ── Sub-step: Almost Ready ──────────────────────────────────────────────────
   if (subStep === "almost_ready") {
     return (
-      <div className="max-w-lg mx-auto">
-        <h1 className="text-3xl font-black text-[#111] mb-6">Your job is live!</h1>
-        <div className="mb-8">
-          <p className="font-bold text-[#111] mb-3">With your job, here's what happens next:</p>
-          <ul className="space-y-3">
-            {[
-              "Your listing goes live immediately on Artswrk.",
-              "Artists in our network will be notified about your post.",
-              "You'll receive applicants directly in your dashboard.",
-              "Sponsor your post to stay pinned at the top of search results.",
-            ].map((item) => (
-              <li key={item} className="flex items-start gap-3 text-gray-700">
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-2 flex-shrink-0" />
-                {item}
-              </li>
-            ))}
-          </ul>
+      <div className="max-w-2xl mx-auto">
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 rounded-full hirer-grad-bg flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <CheckCircle2 size={28} className="text-white" />
+          </div>
+          <h2 className="text-3xl font-black text-[#111] mb-2">Your job is live!</h2>
+          <p className="text-gray-500 text-base max-w-md mx-auto">
+            Artists are already seeing your listing. Unlock applicants to start messaging them directly.
+          </p>
         </div>
-        <div className="flex justify-end">
+
+        <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-100 p-5 mb-6">
+          <p className="text-xs font-semibold text-[#F25722] uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Eye size={11} />
+            Your listing is now live
+          </p>
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl hirer-grad-bg flex items-center justify-center text-white font-black text-sm flex-shrink-0">
+              {(form.studioName || form.title || "J")[0].toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-[#111] text-sm">{form.title || "Your Job"}</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {form.studioName || "Your Studio"}
+                {form.locationAddress && ` · ${form.locationAddress}`}
+              </p>
+              <div className="flex gap-2 mt-2 flex-wrap">
+                <Badge variant="secondary" className="text-xs">{form.dateType}</Badge>
+                {form.transportation && (
+                  <Badge className="bg-blue-50 text-blue-600 border-0 text-xs">Travel covered</Badge>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/app/jobs")}
+            className="flex-1 py-4"
+          >
+            View My Jobs
+          </Button>
           <Button
             onClick={() => setSubStep("sponsor")}
-            className="hirer-grad-bg border-0 hover:opacity-90 font-bold px-8 py-5 rounded-xl text-base"
+            className="flex-1 py-4 hirer-grad-bg border-0 hover:opacity-90 font-bold"
           >
-            Continue
+            Unlock Applicants
+            <ChevronRight size={16} className="ml-1" />
           </Button>
         </div>
       </div>
@@ -820,133 +1163,52 @@ function Step3({
   // ── Sub-step: Sponsor ───────────────────────────────────────────────────────
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-black text-[#111]">Sponsor job</h1>
-        <button
-          onClick={() => navigate("/pricing")}
-          className="text-sm text-[#F25722] font-semibold flex items-center gap-1 hover:underline"
-        >
-          <TrendingUp size={14} /> Switch to plans
-        </button>
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-black text-[#111] mb-1">Unlock your applicants</h2>
+        <p className="text-gray-500 text-sm">
+          Choose a plan to see who applied and start messaging them.
+        </p>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 mb-6">
-        <div className="flex flex-col md:flex-row gap-8">
-          {/* Left: budget controls */}
-          <div className="flex-1">
-            <h2 className="font-bold text-[#111] mb-1">Choose your daily budget</h2>
-            <p className="text-sm text-gray-500 mb-4">
-              We recommend starting at{" "}
-              <span className="font-bold text-[#111] underline decoration-dotted">$5.00 average daily budget.</span>
-            </p>
-
-            {/* Budget input */}
-            <div className="flex items-stretch border border-gray-300 rounded-xl overflow-hidden mb-4 focus-within:border-[#F25722] transition-colors">
-              <span className="flex items-center px-4 text-gray-500 bg-gray-50 border-r border-gray-300 font-medium">$</span>
-              <input
-                type="number"
-                min={5}
-                step={1}
-                value={dailyBudget}
-                onChange={(e) => setDailyBudget(Math.max(5, parseInt(e.target.value) || 5))}
-                className="flex-1 px-4 py-3 text-lg font-bold text-[#111] outline-none"
-              />
-              <span className="flex items-center px-4 text-gray-500 bg-gray-50 border-l border-gray-300 text-sm">daily average</span>
-            </div>
-
-            {/* Quick budget buttons */}
-            <div className="flex gap-2 mb-6">
-              {[5, 10, 20, 50].map((amt) => (
-                <button
-                  key={amt}
-                  onClick={() => setDailyBudget(amt)}
-                  className={`flex-1 py-1.5 rounded-lg text-sm font-semibold border transition-all ${
-                    dailyBudget === amt
-                      ? "hirer-grad-bg text-white border-transparent"
-                      : "border-gray-200 text-gray-600 hover:border-[#F25722] hover:text-[#F25722]"
-                  }`}
-                >
-                  ${amt}
-                </button>
-              ))}
-            </div>
-
-            {/* Duration */}
-            <div>
-              <label className="block text-sm font-bold text-[#111] mb-2">Ad duration</label>
-              <select
-                value={duration}
-                onChange={(e) => setDuration(e.target.value as typeof duration)}
-                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm font-medium text-[#111] focus:outline-none focus:border-[#F25722] transition-colors"
-              >
-                <option value="7">7 days</option>
-                <option value="14">14 days</option>
-                <option value="30">30 days</option>
-                <option value="continuous">Runs continuously</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Right: gauge + performance card */}
-          <div className="flex flex-col items-center justify-start md:w-48">
-            <Gauge needleDeg={tier.needle} />
-            <div className="w-full bg-gray-50 rounded-xl p-4 mt-2 text-sm">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-gray-600">Ad performance:</span>
-                <span className={`font-bold ${tier.perfColor}`}>{tier.performance}</span>
+      <div className="space-y-3 mb-6">
+        {TIERS.map((tier) => (
+          <div
+            key={tier.id}
+            onClick={() => setSelectedTier(tier.id)}
+            className={`relative rounded-2xl border-2 p-5 cursor-pointer transition-all ${
+              selectedTier === tier.id
+                ? "border-[#F25722] bg-orange-50"
+                : "border-gray-200 hover:border-gray-300"
+            }`}
+          >
+            {tier.badge && (
+              <span className="absolute -top-2.5 right-4 px-2.5 py-0.5 rounded-full hirer-grad-bg text-white text-[10px] font-bold">
+                {tier.badge}
+              </span>
+            )}
+            <div className="flex items-start gap-4">
+              <div className={`w-10 h-10 rounded-xl ${tier.gradient} flex items-center justify-center flex-shrink-0`}>
+                {tier.icon}
               </div>
-              {dailyBudget >= 5 ? (
-                <p className="text-gray-600">
-                  Your post will be{" "}
-                  <span className="font-bold text-[#111]">
-                    pinned for {durationDays ?? "continuous"}{durationDays ? " days" : ""}
-                  </span>.
-                </p>
-              ) : (
-                <p className="text-gray-500">Set a daily budget to pin your post to the top.</p>
-              )}
-              {dailyBudget >= 20 && (
-                <p className="text-gray-500 mt-2 text-xs">
-                  Looking to hire even faster?{" "}
-                  <button
-                    onClick={() => setDailyBudget(dailyBudget + 10)}
-                    className="text-[#F25722] font-semibold hover:underline"
-                  >
-                    Add $10/day
-                  </button>{" "}
-                  for maximum visibility.
-                </p>
-              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-black text-[#111] text-base">{tier.label}</p>
+                  <p className="font-black text-[#F25722] text-lg">{tier.priceLabel}</p>
+                </div>
+                <p className="text-sm text-gray-500 mt-0.5">{tier.description}</p>
+                <ul className="mt-2 space-y-1">
+                  {tier.features.map((f) => (
+                    <li key={f} className="flex items-center gap-1.5 text-xs text-gray-600">
+                      <CheckCircle2 size={11} className="text-green-500 flex-shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Budget summary */}
-        {totalCost && (
-          <div className="mt-5 pt-5 border-t border-gray-100">
-            <p className="text-sm text-gray-700">
-              <span className="font-bold">Max budget:</span> ${totalCost.toFixed(2)} total for {durationDays} days
-            </p>
-            <p className="text-xs text-gray-400 mt-0.5">You can change the amount, pause, or close your job at any time.</p>
-          </div>
-        )}
-        {duration === "continuous" && (
-          <div className="mt-5 pt-5 border-t border-gray-100">
-            <p className="text-sm text-gray-700">
-              <span className="font-bold">Max budget:</span> ${(dailyBudget * 7).toFixed(2)} per week
-            </p>
-            <p className="text-xs text-gray-400 mt-0.5">You can change the amount, pause, or close your job at any time.</p>
-          </div>
-        )}
+        ))}
       </div>
-
-      {/* Not logged in warning */}
-      {!isAuthenticated && (
-        <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-2 text-sm text-amber-800">
-          <span>⚠️</span>
-          You'll be asked to log in or create a free account before checkout.
-        </div>
-      )}
 
       {/* Action buttons */}
       <div className="flex items-center justify-between">
