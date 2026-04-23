@@ -1,6 +1,6 @@
 /**
  * Leads Dashboard — Contacts
- * Card-based layout with search, pagination, and detail drawer.
+ * Compact list-style rows with Artswrk user cross-reference (artist/client badge).
  */
 import { useState, useCallback } from "react";
 import LeadsLayout from "@/components/LeadsLayout";
@@ -20,9 +20,11 @@ import {
   AlertTriangle,
   ExternalLink,
   Users,
+  CheckCircle2,
+  Clock,
 } from "lucide-react";
 
-const PAGE_SIZE = 24;
+const PAGE_SIZE = 50;
 
 function avatarColor(email: string) {
   const colors = [
@@ -43,7 +45,25 @@ function initials(email: string, attrs: Record<string, any>) {
   const last = attrs?.LASTNAME ?? "";
   if (first && last) return `${first[0]}${last[0]}`.toUpperCase();
   if (first) return first[0].toUpperCase();
-  return email[0].toUpperCase();
+  return email.slice(0, 2).toUpperCase();
+}
+
+function ArtswrkBadge({ userRole }: { userRole: string | null | undefined }) {
+  if (!userRole) return null;
+  const map: Record<string, { label: string; color: string; bg: string }> = {
+    Artist: { label: "Artist", color: "#ec008c", bg: "#fdf2f8" },
+    Client: { label: "Client", color: "#F25722", bg: "#fff5f0" },
+    Admin:  { label: "Admin",  color: "#0B5FFF", bg: "#eff6ff" },
+  };
+  const style = map[userRole] ?? { label: userRole, color: "#6b7280", bg: "#f3f4f6" };
+  return (
+    <span
+      className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
+      style={{ color: style.color, backgroundColor: style.bg }}
+    >
+      {style.label}
+    </span>
+  );
 }
 
 function EventIcon({ event }: { event: string }) {
@@ -56,11 +76,13 @@ function EventIcon({ event }: { event: string }) {
   return <Mail size={12} className="text-gray-400" />;
 }
 
+// ── Contact detail drawer ─────────────────────────────────────────────────────
 function ContactDrawer({ email, onClose }: { email: string; onClose: () => void }) {
   const { data, isLoading } = trpc.leads.getContact.useQuery({ email });
   const av = avatarColor(email);
   const attrs = data?.contact?.attributes ?? {};
   const name = [attrs.FIRSTNAME, attrs.LASTNAME].filter(Boolean).join(" ") || null;
+  const artswrkUser = (data?.contact as any)?.artswrkUser;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -88,12 +110,59 @@ function ContactDrawer({ email, onClose }: { email: string; onClose: () => void 
               </div>
               {name && <p className="font-black text-[#111] text-base">{name}</p>}
               <p className="text-sm text-gray-400 mt-0.5">{data.contact.email}</p>
-              <div className="flex items-center gap-2 mt-3">
+              <div className="flex items-center gap-2 mt-3 flex-wrap">
                 <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${data.contact.emailBlacklisted ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-600"}`}>
                   {data.contact.emailBlacklisted ? "Unsubscribed" : "Subscribed"}
                 </span>
+                {artswrkUser && (
+                  <>
+                    <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-[#EEF3FF] text-[#0B5FFF] flex items-center gap-1">
+                      <CheckCircle2 size={10} /> On Artswrk
+                    </span>
+                    <ArtswrkBadge userRole={artswrkUser.userRole} />
+                  </>
+                )}
               </div>
             </div>
+
+            {/* Artswrk account info */}
+            {artswrkUser && (
+              <div className="px-6 py-4 border-b border-gray-100">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Artswrk Account</p>
+                <div className="space-y-2">
+                  {artswrkUser.name && (
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-xs text-gray-400">Name</span>
+                      <span className="text-xs font-medium text-[#111]">{artswrkUser.name}</span>
+                    </div>
+                  )}
+                  {artswrkUser.userRole && (
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-xs text-gray-400">Role</span>
+                      <ArtswrkBadge userRole={artswrkUser.userRole} />
+                    </div>
+                  )}
+                  {artswrkUser.clientCompanyName && (
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-xs text-gray-400">Company</span>
+                      <span className="text-xs font-medium text-[#111]">{artswrkUser.clientCompanyName}</span>
+                    </div>
+                  )}
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-xs text-gray-400">Joined</span>
+                    <span className="text-xs text-gray-600">
+                      {new Date(artswrkUser.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </span>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-xs text-gray-400">Last seen</span>
+                    <span className="text-xs text-gray-600">
+                      {new Date(artswrkUser.lastSignedIn).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Actions */}
             <div className="px-6 py-4 border-b border-gray-100 flex gap-2">
@@ -120,7 +189,7 @@ function ContactDrawer({ email, onClose }: { email: string; onClose: () => void 
             {/* Attributes */}
             {Object.keys(attrs).length > 0 && (
               <div className="px-6 py-4 border-b border-gray-100">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Attributes</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Brevo Attributes</p>
                 <div className="space-y-2">
                   {Object.entries(attrs).filter(([, v]) => v !== null && v !== "").map(([k, v]) => (
                     <div key={k} className="flex items-start justify-between gap-3">
@@ -161,41 +230,7 @@ function ContactDrawer({ email, onClose }: { email: string; onClose: () => void 
   );
 }
 
-function ContactCard({ contact, onSelect }: { contact: any; onSelect: (email: string) => void }) {
-  const attrs = contact.attributes ?? {};
-  const first = attrs.FIRSTNAME ?? "";
-  const last = attrs.LASTNAME ?? "";
-  const name = [first, last].filter(Boolean).join(" ") || null;
-  const av = avatarColor(contact.email);
-  const subscribed = !contact.emailBlacklisted;
-
-  return (
-    <button
-      onClick={() => onSelect(contact.email)}
-      className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-all p-4 flex flex-col gap-3 text-left w-full"
-    >
-      <div className="flex items-start justify-between">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black flex-shrink-0 ${av}`}>
-          {initials(contact.email, attrs)}
-        </div>
-        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${subscribed ? "bg-emerald-50 text-emerald-600" : "bg-gray-100 text-gray-400"}`}>
-          {subscribed ? "subscribed" : "unsub"}
-        </span>
-      </div>
-      <div className="min-w-0">
-        {name && <p className="text-sm font-bold text-[#111] truncate">{name}</p>}
-        <p className="text-xs text-gray-400 truncate">{contact.email}</p>
-      </div>
-      {contact.listIds && contact.listIds.length > 0 && (
-        <div className="flex items-center gap-1 text-[10px] text-gray-400">
-          <Tag size={9} />
-          <span>{contact.listIds.length} list{contact.listIds.length !== 1 ? "s" : ""}</span>
-        </div>
-      )}
-    </button>
-  );
-}
-
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function LeadsContacts() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -211,13 +246,14 @@ export default function LeadsContacts() {
     }, 400);
   }, []);
 
-  const { data, isLoading } = trpc.leads.getContacts.useQuery(
+  const { data, isLoading, isFetching } = trpc.leads.getContacts.useQuery(
     { limit: PAGE_SIZE, offset, email: debouncedSearch || undefined, sort: "desc" },
     { staleTime: 5 * 60 * 1000 }
   );
 
   const totalPages = Math.ceil((data?.count ?? 0) / PAGE_SIZE);
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
+  const contacts = data?.contacts ?? [];
 
   return (
     <LeadsLayout>
@@ -236,43 +272,113 @@ export default function LeadsContacts() {
         </div>
 
         {/* Search */}
-        <div className="relative mb-6 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by email address…"
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="w-full pl-9 pr-9 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0B5FFF] transition-all"
-          />
-          {search && (
-            <button onClick={() => { setSearch(""); setDebouncedSearch(""); setOffset(0); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500">
-              <X size={14} />
-            </button>
-          )}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="relative max-w-sm flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by email address…"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="w-full pl-9 pr-9 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#0B5FFF] transition-all"
+            />
+            {search && (
+              <button onClick={() => { setSearch(""); setDebouncedSearch(""); setOffset(0); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          {isFetching && !isLoading && <Loader2 size={13} className="animate-spin text-gray-400" />}
         </div>
 
-        {/* Cards */}
+        {/* Legend */}
+        <div className="flex items-center gap-4 mb-3 text-[10px] text-gray-400">
+          <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" /> Subscribed</span>
+          <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" /> Unsubscribed</span>
+          <span className="flex items-center gap-1"><CheckCircle2 size={9} className="text-[#0B5FFF]" /> On Artswrk</span>
+        </div>
+
+        {/* List */}
         {isLoading ? (
           <div className="flex items-center justify-center py-24">
             <Loader2 size={28} className="animate-spin text-[#0B5FFF]" />
           </div>
-        ) : (data?.contacts ?? []).length === 0 ? (
+        ) : contacts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-gray-400">
             <Users size={32} className="mb-3 opacity-30" />
             <p className="text-sm">{search ? "No contacts match your search" : "No contacts found"}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-            {(data?.contacts ?? []).map((c: any) => (
-              <ContactCard key={c.id} contact={c} onSelect={setSelectedEmail} />
-            ))}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            {contacts.map((c: any, i: number) => {
+              const attrs = c.attributes ?? {};
+              const name = [attrs.FIRSTNAME, attrs.LASTNAME].filter(Boolean).join(" ") || c.artswrkUser?.name || null;
+              const subscribed = !c.emailBlacklisted;
+              const av = avatarColor(c.email ?? "");
+
+              return (
+                <button
+                  key={c.id ?? i}
+                  onClick={() => setSelectedEmail(c.email)}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 last:border-b-0"
+                >
+                  {/* Avatar */}
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black flex-shrink-0 ${av}`}>
+                    {initials(c.email ?? "?", attrs)}
+                  </div>
+
+                  {/* Status dot */}
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${subscribed ? "bg-emerald-400" : "bg-red-400"}`}
+                    title={subscribed ? "Subscribed" : "Unsubscribed"}
+                  />
+
+                  {/* Email + name */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-[#111] truncate">{c.email}</p>
+                    {name && <p className="text-[10px] text-gray-400 truncate">{name}</p>}
+                  </div>
+
+                  {/* Artswrk status */}
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {c.artswrkUser ? (
+                      <>
+                        <CheckCircle2 size={10} className="text-[#0B5FFF]" />
+                        <ArtswrkBadge userRole={c.artswrkUser.userRole} />
+                        {c.artswrkUser.clientCompanyName && (
+                          <span className="text-[10px] text-gray-400 max-w-[90px] truncate hidden md:block">
+                            {c.artswrkUser.clientCompanyName}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-[10px] text-gray-300 hidden sm:block">Not on platform</span>
+                    )}
+                  </div>
+
+                  {/* List count */}
+                  {c.listIds && c.listIds.length > 0 && (
+                    <span className="text-[10px] text-gray-400 flex-shrink-0 hidden lg:flex items-center gap-1">
+                      <Tag size={9} /> {c.listIds.length}
+                    </span>
+                  )}
+
+                  {/* Last modified */}
+                  {c.modifiedAt && (
+                    <span className="text-[10px] text-gray-300 flex-shrink-0 hidden xl:flex items-center gap-1">
+                      <Clock size={9} />
+                      {new Date(c.modifiedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
 
         {/* Pagination */}
         {(data?.count ?? 0) > PAGE_SIZE && (
-          <div className="mt-8 flex items-center justify-between">
+          <div className="mt-5 flex items-center justify-between">
             <p className="text-xs text-gray-400">
               Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, data?.count ?? 0)} of {(data?.count ?? 0).toLocaleString()}
             </p>

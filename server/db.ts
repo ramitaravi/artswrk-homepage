@@ -2848,3 +2848,54 @@ export async function getJobApplicantsWithDetails(jobId: number) {
   );
   return (rows[0] as unknown as any[]);
 }
+
+/**
+ * Bulk lookup users by a list of email addresses.
+ * Returns a map of email (lowercase) → partial user record.
+ * Used by the Leads Dashboard to cross-reference Brevo contacts with Artswrk users.
+ */
+export async function getUsersByEmails(emails: string[]): Promise<Map<string, {
+  id: number;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  name: string | null;
+  userRole: "Client" | "Artist" | "Admin" | null;
+  role: "user" | "admin";
+  profilePicture: string | null;
+  createdAt: Date;
+  lastSignedIn: Date;
+  clientCompanyName: string | null;
+  optionAvailability: string | null;
+}>> {
+  const db = await getDb();
+  const result = new Map<string, any>();
+  if (!db || emails.length === 0) return result;
+
+  const batchSize = 500;
+  for (let i = 0; i < emails.length; i += batchSize) {
+    const batch = emails.slice(i, i + batchSize).map((e) => e.toLowerCase());
+    const rows = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        name: users.name,
+        userRole: users.userRole,
+        role: users.role,
+        profilePicture: users.profilePicture,
+        createdAt: users.createdAt,
+        lastSignedIn: users.lastSignedIn,
+        clientCompanyName: users.clientCompanyName,
+        optionAvailability: users.optionAvailability,
+      })
+      .from(users)
+      .where(inArray(users.email, batch));
+
+    for (const row of rows) {
+      if (row.email) result.set(row.email.toLowerCase(), row);
+    }
+  }
+  return result;
+}

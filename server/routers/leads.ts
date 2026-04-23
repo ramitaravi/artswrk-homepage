@@ -25,6 +25,7 @@ import {
   addSendGridUnsubscribe,
   syncSuppressionGaps,
 } from "../suppressions";
+import { getUsersByEmails } from "../db";
 
 // ── Admin guard ───────────────────────────────────────────────────────────────
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -42,6 +43,7 @@ export const leadsRouter = router({
   }),
 
   // Contacts list (paginated + optional email search + optional listId filter)
+  // Cross-references each contact against the Artswrk user DB to show artist/client status.
   getContacts: adminProcedure
     .input(
       z.object({
@@ -53,7 +55,28 @@ export const leadsRouter = router({
       })
     )
     .query(async ({ input }) => {
-      return getContacts(input);
+      const brevoResult = await getContacts(input);
+      // Cross-reference emails against Artswrk user DB
+      const emails = brevoResult.contacts.map((c: any) => c.email).filter(Boolean);
+      const userMap = await getUsersByEmails(emails);
+      const enriched = brevoResult.contacts.map((c: any) => {
+        const artswrkUser = c.email ? userMap.get(c.email.toLowerCase()) : undefined;
+        return {
+          ...c,
+          artswrkUser: artswrkUser
+            ? {
+                id: artswrkUser.id,
+                userRole: artswrkUser.userRole,   // "Artist" | "Client" | "Admin" | null
+                name: artswrkUser.name,
+                profilePicture: artswrkUser.profilePicture,
+                clientCompanyName: artswrkUser.clientCompanyName,
+                lastSignedIn: artswrkUser.lastSignedIn,
+                createdAt: artswrkUser.createdAt,
+              }
+            : null,
+        };
+      });
+      return { ...brevoResult, contacts: enriched };
     }),
 
   // Single contact detail + email history

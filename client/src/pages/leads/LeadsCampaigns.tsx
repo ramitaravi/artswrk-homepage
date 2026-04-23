@@ -1,6 +1,6 @@
 /**
  * Leads Dashboard — Campaigns
- * Card-based layout with status filter, full historical stats per card.
+ * Compact list-style rows with status filter and inline historical stats.
  */
 import { useState } from "react";
 import LeadsLayout from "@/components/LeadsLayout";
@@ -18,7 +18,7 @@ import {
   Calendar,
 } from "lucide-react";
 
-const PAGE_SIZE = 18;
+const PAGE_SIZE = 50;
 
 type Status = "sent" | "draft" | "queued" | "archive" | "all";
 
@@ -47,131 +47,7 @@ function fmtNum(n: number) {
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return null;
-  return new Date(d).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function StatPill({
-  icon,
-  label,
-  value,
-  color,
-  hasData,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  color: string;
-  hasData: boolean;
-}) {
-  return (
-    <div className="flex flex-col items-center gap-0.5 min-w-[56px]">
-      <div className={`text-xs font-black ${hasData ? color : "text-gray-300"}`}>{value}</div>
-      <div className="flex items-center gap-0.5 text-[10px] text-gray-400">
-        <span className={hasData ? color : "text-gray-300"}>{icon}</span>
-        {label}
-      </div>
-    </div>
-  );
-}
-
-function CampaignCard({ c }: { c: any }) {
-  const gs = c.statistics?.globalStats ?? {};
-  const delivered = gs.delivered ?? 0;
-  const sent = gs.sent ?? 0;
-  const opens = gs.uniqueViews ?? 0;
-  const clicks = gs.uniqueClicks ?? 0;
-  const bounces = (gs.hardBounces ?? 0) + (gs.softBounces ?? 0);
-  const opensRate = gs.opensRate ?? 0;
-  const hasData = sent > 0 || delivered > 0;
-
-  const openRatePct = hasData && delivered > 0
-    ? ((opens / delivered) * 100).toFixed(1)
-    : opensRate > 0 ? opensRate.toFixed(1) : null;
-  const clickRatePct = hasData && delivered > 0
-    ? ((clicks / delivered) * 100).toFixed(1)
-    : null;
-
-  const sc = STATUS_COLORS[c.status] ?? STATUS_COLORS.draft;
-
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col gap-4">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${sc.bg} ${sc.text}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-              {c.status}
-            </span>
-            {c.tag && (
-              <span className="text-[10px] bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full font-medium">
-                {c.tag}
-              </span>
-            )}
-          </div>
-          <h3 className="font-bold text-[#111] text-sm leading-snug line-clamp-2">{c.name}</h3>
-          {c.subject && (
-            <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{c.subject}</p>
-          )}
-        </div>
-        <a
-          href={`https://app.brevo.com/campaigns/email/${c.id}/report`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex-shrink-0 p-1.5 rounded-lg text-gray-300 hover:text-[#0B5FFF] hover:bg-blue-50 transition-colors"
-          title="View in Brevo"
-        >
-          <ExternalLink size={13} />
-        </a>
-      </div>
-
-      {/* Sent date */}
-      {c.sentDate && (
-        <div className="flex items-center gap-1.5 text-xs text-gray-400">
-          <Calendar size={11} />
-          <span>Sent {fmtDate(c.sentDate)}</span>
-        </div>
-      )}
-
-      {/* Stats row */}
-      <div className="border-t border-gray-50 pt-3">
-        {hasData ? (
-          <div className="flex items-center justify-between">
-            <StatPill icon={<Send size={9} />} label="Sent" value={fmtNum(sent)} color="text-[#111]" hasData={true} />
-            <div className="w-px h-6 bg-gray-100" />
-            <StatPill icon={<Mail size={9} />} label="Delivered" value={fmtNum(delivered)} color="text-[#111]" hasData={true} />
-            <div className="w-px h-6 bg-gray-100" />
-            <StatPill
-              icon={<Eye size={9} />}
-              label="Opens"
-              value={openRatePct ? `${openRatePct}%` : fmtNum(opens)}
-              color={parseFloat(openRatePct ?? "0") >= 20 ? "text-emerald-600" : parseFloat(openRatePct ?? "0") >= 10 ? "text-amber-600" : "text-gray-500"}
-              hasData={true}
-            />
-            <div className="w-px h-6 bg-gray-100" />
-            <StatPill
-              icon={<MousePointerClick size={9} />}
-              label="Clicks"
-              value={clickRatePct ? `${clickRatePct}%` : fmtNum(clicks)}
-              color="text-[#0B5FFF]"
-              hasData={true}
-            />
-            <div className="w-px h-6 bg-gray-100" />
-            <StatPill icon={<AlertCircle size={9} />} label="Bounces" value={fmtNum(bounces)} color="text-red-400" hasData={bounces > 0} />
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-xs text-gray-300">
-            <AlertCircle size={12} />
-            <span>Stats not available for this campaign</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 export default function LeadsCampaigns() {
@@ -179,17 +55,13 @@ export default function LeadsCampaigns() {
   const [status, setStatus] = useState<Status>("all");
 
   const { data, isLoading } = trpc.leads.getCampaigns.useQuery(
-    {
-      limit: PAGE_SIZE,
-      offset,
-      status: status === "all" ? undefined : status,
-      sort: "desc",
-    },
+    { limit: PAGE_SIZE, offset, status: status === "all" ? undefined : status, sort: "desc" },
     { staleTime: 5 * 60 * 1000 }
   );
 
   const totalPages = Math.ceil((data?.count ?? 0) / PAGE_SIZE);
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
+  const campaigns = data?.campaigns ?? [];
 
   return (
     <LeadsLayout>
@@ -213,15 +85,13 @@ export default function LeadsCampaigns() {
         </div>
 
         {/* Status tabs */}
-        <div className="flex items-center gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
+        <div className="flex items-center gap-1 mb-5 bg-gray-100 rounded-xl p-1 w-fit">
           {STATUS_TABS.map((t) => (
             <button
               key={t.value}
               onClick={() => { setStatus(t.value); setOffset(0); }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                status === t.value
-                  ? "bg-white text-[#111] shadow-sm"
-                  : "text-gray-500 hover:text-[#111]"
+                status === t.value ? "bg-white text-[#111] shadow-sm" : "text-gray-500 hover:text-[#111]"
               }`}
             >
               {t.label}
@@ -229,47 +99,126 @@ export default function LeadsCampaigns() {
           ))}
         </div>
 
-        {/* Cards grid */}
+        {/* Campaign rows */}
         {isLoading ? (
           <div className="flex items-center justify-center py-24">
             <Loader2 size={28} className="animate-spin text-[#0B5FFF]" />
           </div>
-        ) : (data?.campaigns ?? []).length === 0 ? (
+        ) : campaigns.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-gray-400">
             <Mail size={32} className="mb-3 opacity-30" />
             <p className="text-sm">No campaigns found</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {(data?.campaigns ?? []).map((c) => (
-              <CampaignCard key={c.id} c={c} />
-            ))}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            {campaigns.map((c: any) => {
+              const gs = c.statistics?.globalStats ?? {};
+              const sent = gs.sent ?? 0;
+              const delivered = gs.delivered ?? 0;
+              const opens = gs.uniqueViews ?? 0;
+              const clicks = gs.uniqueClicks ?? 0;
+              const bounces = (gs.hardBounces ?? 0) + (gs.softBounces ?? 0);
+              const opensRate = gs.opensRate ?? 0;
+              const hasData = sent > 0 || delivered > 0;
+              const openRatePct = hasData && delivered > 0
+                ? ((opens / delivered) * 100).toFixed(1)
+                : opensRate > 0 ? opensRate.toFixed(1) : null;
+              const clickRatePct = hasData && delivered > 0
+                ? ((clicks / delivered) * 100).toFixed(1)
+                : null;
+              const sc = STATUS_COLORS[c.status] ?? STATUS_COLORS.draft;
+
+              return (
+                <div
+                  key={c.id}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-b-0"
+                >
+                  {/* Status dot */}
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${sc.dot}`} title={c.status} />
+
+                  {/* Name + subject */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-[#111] truncate">{c.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {c.sentDate && (
+                        <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                          <Calendar size={8} />
+                          {fmtDate(c.sentDate)}
+                        </span>
+                      )}
+                      {c.subject && (
+                        <span className="text-[10px] text-gray-400 truncate hidden sm:block">
+                          · {c.subject}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Stats — shown when available */}
+                  {hasData ? (
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <div className="flex items-center gap-1 text-[10px] text-gray-500" title="Sent">
+                        <Send size={9} className="text-gray-400" />
+                        <span className="font-medium">{fmtNum(sent)}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] text-gray-500 hidden sm:flex" title="Delivered">
+                        <Mail size={9} className="text-gray-400" />
+                        <span className="font-medium">{fmtNum(delivered)}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px]" title="Open rate">
+                        <Eye size={9} className={openRatePct && parseFloat(openRatePct) >= 20 ? "text-emerald-500" : "text-gray-400"} />
+                        <span className={`font-medium ${openRatePct && parseFloat(openRatePct) >= 20 ? "text-emerald-600" : "text-gray-500"}`}>
+                          {openRatePct ? `${openRatePct}%` : "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] text-[#0B5FFF] hidden md:flex" title="Click rate">
+                        <MousePointerClick size={9} />
+                        <span className="font-medium">{clickRatePct ? `${clickRatePct}%` : "—"}</span>
+                      </div>
+                      {bounces > 0 && (
+                        <div className="flex items-center gap-1 text-[10px] text-red-400 hidden lg:flex" title="Bounces">
+                          <AlertCircle size={9} />
+                          <span className="font-medium">{fmtNum(bounces)}</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-gray-300 flex-shrink-0 hidden sm:block">No stats</span>
+                  )}
+
+                  {/* Status badge */}
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 hidden md:inline-flex items-center gap-1 ${sc.bg} ${sc.text}`}>
+                    {c.status}
+                  </span>
+
+                  {/* Brevo link */}
+                  <a
+                    href={`https://app.brevo.com/marketing-reports/email/${c.id}/overview`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 rounded-lg text-gray-300 hover:text-[#0B5FFF] hover:bg-[#EEF3FF] transition-colors flex-shrink-0"
+                    title="View in Brevo"
+                  >
+                    <ExternalLink size={11} />
+                  </a>
+                </div>
+              );
+            })}
           </div>
         )}
 
         {/* Pagination */}
-        {(data?.count ?? 0) > PAGE_SIZE && (
-          <div className="mt-8 flex items-center justify-between">
+        {totalPages > 1 && (
+          <div className="mt-5 flex items-center justify-between">
             <p className="text-xs text-gray-400">
-              Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, data?.count ?? 0)} of{" "}
-              {(data?.count ?? 0).toLocaleString()} campaigns
+              Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, data?.count ?? 0)} of {(data?.count ?? 0).toLocaleString()}
             </p>
             <div className="flex items-center gap-2">
-              <button
-                disabled={offset === 0}
-                onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-                className="p-2 rounded-xl border border-gray-200 disabled:opacity-30 hover:bg-gray-50 transition-colors"
-              >
+              <button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))} className="p-2 rounded-xl border border-gray-200 disabled:opacity-30 hover:bg-gray-50 transition-colors">
                 <ChevronLeft size={14} />
               </button>
-              <span className="text-xs text-gray-500 font-semibold px-2">
-                {currentPage} / {totalPages}
-              </span>
-              <button
-                disabled={offset + PAGE_SIZE >= (data?.count ?? 0)}
-                onClick={() => setOffset(offset + PAGE_SIZE)}
-                className="p-2 rounded-xl border border-gray-200 disabled:opacity-30 hover:bg-gray-50 transition-colors"
-              >
+              <span className="text-xs text-gray-500 font-semibold px-2">{currentPage} / {totalPages}</span>
+              <button disabled={offset + PAGE_SIZE >= (data?.count ?? 0)} onClick={() => setOffset(offset + PAGE_SIZE)} className="p-2 rounded-xl border border-gray-200 disabled:opacity-30 hover:bg-gray-50 transition-colors">
                 <ChevronRight size={14} />
               </button>
             </div>
