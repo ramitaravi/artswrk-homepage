@@ -3,9 +3,14 @@
  * All calls are server-side only — the API key is never exposed to the client.
  *
  * Docs: https://developers.brevo.com/reference
+ *
+ * Note: Uses Node.js https module instead of native fetch to avoid TLS
+ * compatibility issues with undici (Node's built-in fetch) and Brevo's servers.
  */
+import https from "https";
 
-const BASE = "https://api.brevo.com/v3";
+const BASE_HOST = "api.brevo.com";
+const BASE_PATH = "/v3";
 
 function apiKey(): string {
   const key = process.env.BREVO_API_KEY;
@@ -13,24 +18,49 @@ function apiKey(): string {
   return key;
 }
 
+/** Make an HTTPS request using Node's https module to avoid undici TLS issues */
+function httpsRequest(
+  method: string,
+  path: string,
+  headers: Record<string, string>,
+  body?: string
+): Promise<{ status: number; data: string }> {
+  return new Promise((resolve, reject) => {
+    const options: https.RequestOptions = {
+      hostname: BASE_HOST,
+      path: `${BASE_PATH}${path}`,
+      method,
+      headers,
+    };
+    const req = https.request(options, (res) => {
+      let data = "";
+      res.on("data", (chunk) => { data += chunk; });
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, data }));
+    });
+    req.on("error", reject);
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
 async function brevoFetch<T>(
   path: string,
-  options: RequestInit = {}
+  options: { method?: string; body?: string } = {}
 ): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers: {
-      "api-key": apiKey(),
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      ...(options.headers ?? {}),
-    },
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Brevo API error ${res.status}: ${body}`);
+  const method = options.method ?? "GET";
+  const headers: Record<string, string> = {
+    "api-key": apiKey(),
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+  if (options.body) headers["Content-Length"] = Buffer.byteLength(options.body).toString();
+
+  const { status, data } = await httpsRequest(method, path, headers, options.body);
+
+  if (status < 200 || status >= 300) {
+    throw new Error(`Brevo API error ${status}: ${data}`);
   }
-  return res.json() as Promise<T>;
+  return JSON.parse(data) as T;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────

@@ -135,13 +135,13 @@ function CampaignMiniCard({ c }: { c: any }) {
 }
 
 export default function LeadsOverview() {
-  const { data: overview, isLoading: ovLoading, refetch: refetchOv } =
-    trpc.leads.getOverview.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
+  const { data: overview, isLoading: ovLoading, error: ovError, refetch: refetchOv } =
+    trpc.leads.getOverview.useQuery(undefined, { staleTime: 5 * 60 * 1000, retry: 1 });
 
   const { data: campaigns, isLoading: campLoading } =
     trpc.leads.getCampaigns.useQuery(
       { limit: 9, offset: 0, status: "sent", sort: "desc" },
-      { staleTime: 5 * 60 * 1000 }
+      { staleTime: 5 * 60 * 1000, retry: 1, enabled: !ovError }
     );
 
   const loading = ovLoading || campLoading;
@@ -163,7 +163,26 @@ export default function LeadsOverview() {
           </button>
         </div>
 
-        {loading ? (
+        {ovError ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center mb-4">
+              <AlertCircle size={24} className="text-amber-500" />
+            </div>
+            <h3 className="text-base font-bold text-[#111] mb-1">Brevo API Unavailable</h3>
+            <p className="text-sm text-gray-400 max-w-sm mb-2">
+              The Brevo API cannot be reached from the dev preview. This is a network restriction in the sandbox environment.
+            </p>
+            <p className="text-xs text-gray-300 max-w-sm mb-5">
+              The Leads Dashboard works correctly on the <strong>published site</strong> at artswrk-ayegfhxr.manus.space.
+            </p>
+            <button
+              onClick={() => refetchOv()}
+              className="flex items-center gap-1.5 text-xs font-semibold text-white bg-[#111] hover:bg-gray-800 px-4 py-2 rounded-xl transition-colors"
+            >
+              <RefreshCw size={12} /> Retry
+            </button>
+          </div>
+        ) : loading ? (
           <div className="flex items-center justify-center py-24">
             <Loader2 size={28} className="animate-spin text-[#0B5FFF]" />
           </div>

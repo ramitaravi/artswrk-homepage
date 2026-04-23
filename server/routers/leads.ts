@@ -25,7 +25,7 @@ import {
   addSendGridUnsubscribe,
   syncSuppressionGaps,
 } from "../suppressions";
-import { getUsersByEmails } from "../db";
+import { getUserByEmail } from "../db";
 
 // ── Admin guard ───────────────────────────────────────────────────────────────
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -35,11 +35,24 @@ const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next({ ctx });
 });
 
+/** Wrap Brevo errors with a friendly message */
+function brevoError(e: unknown): never {
+  const msg = e instanceof Error ? e.message : String(e);
+  throw new TRPCError({
+    code: "INTERNAL_SERVER_ERROR",
+    message: `Brevo API unavailable: ${msg}`,
+  });
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 export const leadsRouter = router({
   // Overview KPIs
   getOverview: adminProcedure.query(async () => {
-    return getOverviewStats();
+    try {
+      return await getOverviewStats();
+    } catch (e) {
+      brevoError(e);
+    }
   }),
 
   // Contacts list (paginated + optional email search + optional listId filter)
@@ -55,27 +68,37 @@ export const leadsRouter = router({
       })
     )
     .query(async ({ input }) => {
-      const brevoResult = await getContacts(input);
-      // Cross-reference emails against Artswrk user DB
-      const emails = brevoResult.contacts.map((c: any) => c.email).filter(Boolean);
-      const userMap = await getUsersByEmails(emails);
-      const enriched = brevoResult.contacts.map((c: any) => {
-        const artswrkUser = c.email ? userMap.get(c.email.toLowerCase()) : undefined;
-        return {
-          ...c,
-          artswrkUser: artswrkUser
-            ? {
-                id: artswrkUser.id,
-                userRole: artswrkUser.userRole,   // "Artist" | "Client" | "Admin" | null
-                name: artswrkUser.name,
-                profilePicture: artswrkUser.profilePicture,
-                clientCompanyName: artswrkUser.clientCompanyName,
-                lastSignedIn: artswrkUser.lastSignedIn,
-                createdAt: artswrkUser.createdAt,
-              }
-            : null,
-        };
-      });
+      let brevoResult: Awaited<ReturnType<typeof getContacts>>;
+      try {
+        brevoResult = await getContacts(input);
+      } catch (e) {
+        brevoError(e);
+      }
+      // Cross-reference emails against Artswrk user DB (one at a time to avoid missing export)
+      const enriched = await Promise.all(
+        brevoResult.contacts.map(async (c: any) => {
+          if (!c.email) return { ...c, artswrkUser: null };
+          try {
+            const artswrkUser = await getUserByEmail(c.email);
+            return {
+              ...c,
+              artswrkUser: artswrkUser
+                ? {
+                    id: artswrkUser.id,
+                    userRole: artswrkUser.userRole,
+                    name: artswrkUser.name,
+                    profilePicture: artswrkUser.profilePicture,
+                    clientCompanyName: artswrkUser.clientCompanyName,
+                    lastSignedIn: artswrkUser.lastSignedIn,
+                    createdAt: artswrkUser.createdAt,
+                  }
+                : null,
+            };
+          } catch {
+            return { ...c, artswrkUser: null };
+          }
+        })
+      );
       return { ...brevoResult, contacts: enriched };
     }),
 
@@ -83,12 +106,17 @@ export const leadsRouter = router({
   getContact: adminProcedure
     .input(z.object({ email: z.string().email() }))
     .query(async ({ input }) => {
-      const [contact, history] = await Promise.all([
-        getContactByEmail(input.email),
-        getContactEmailHistory(input.email, 30),
-      ]);
-      if (!contact) throw new TRPCError({ code: "NOT_FOUND" });
-      return { contact, history };
+      try {
+        const [contact, history] = await Promise.all([
+          getContactByEmail(input.email),
+          getContactEmailHistory(input.email, 30),
+        ]);
+        if (!contact) throw new TRPCError({ code: "NOT_FOUND" });
+        return { contact, history };
+      } catch (e) {
+        if (e instanceof TRPCError) throw e;
+        brevoError(e);
+      }
     }),
 
   // Lists (paginated)
@@ -101,29 +129,45 @@ export const leadsRouter = router({
       })
     )
     .query(async ({ input }) => {
-      return getLists(input);
+      try {
+        return await getLists(input);
+      } catch (e) {
+        brevoError(e);
+      }
     }),
 
   // Single list detail
   getList: adminProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
-      return getListById(input.id);
+      try {
+        return await getListById(input.id);
+      } catch (e) {
+        brevoError(e);
+      }
     }),
 
   // Create a new list
   createList: adminProcedure
     .input(z.object({ name: z.string().min(1).max(100) }))
     .mutation(async ({ input }) => {
-      return createList(input.name);
+      try {
+        return await createList(input.name);
+      } catch (e) {
+        brevoError(e);
+      }
     }),
 
   // Delete a list
   deleteList: adminProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
-      await deleteList(input.id);
-      return { success: true };
+      try {
+        await deleteList(input.id);
+        return { success: true };
+      } catch (e) {
+        brevoError(e);
+      }
     }),
 
   // Campaigns (paginated + optional status filter)
@@ -139,14 +183,22 @@ export const leadsRouter = router({
       })
     )
     .query(async ({ input }) => {
-      return getCampaigns(input);
+      try {
+        return await getCampaigns(input);
+      } catch (e) {
+        brevoError(e);
+      }
     }),
 
   // Single campaign detail
   getCampaign: adminProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
-      return getCampaignById(input.id);
+      try {
+        return await getCampaignById(input.id);
+      } catch (e) {
+        brevoError(e);
+      }
     }),
 
   // ── Suppression / Unsubscribes ──────────────────────────────────────────────
@@ -161,7 +213,12 @@ export const leadsRouter = router({
       })
     )
     .query(async ({ input }) => {
-      const result = await getMergedUnsubscribes(input.limit);
+      let result: Awaited<ReturnType<typeof getMergedUnsubscribes>>;
+      try {
+        result = await getMergedUnsubscribes(input.limit);
+      } catch (e) {
+        brevoError(e);
+      }
       let contacts = result.contacts;
 
       // Apply source filter
@@ -194,15 +251,23 @@ export const leadsRouter = router({
   addUnsubscribe: adminProcedure
     .input(z.object({ email: z.string().email() }))
     .mutation(async ({ input }) => {
-      const [brevoOk, sgOk] = await Promise.all([
-        addBrevoUnsubscribe(input.email),
-        addSendGridUnsubscribe(input.email),
-      ]);
-      return { brevoOk, sgOk };
+      try {
+        const [brevoOk, sgOk] = await Promise.all([
+          addBrevoUnsubscribe(input.email),
+          addSendGridUnsubscribe(input.email),
+        ]);
+        return { brevoOk, sgOk };
+      } catch (e) {
+        brevoError(e);
+      }
     }),
 
   // Sync gaps: push Brevo-only emails to SendGrid and vice versa
   syncUnsubscribes: adminProcedure.mutation(async () => {
-    return syncSuppressionGaps();
+    try {
+      return await syncSuppressionGaps();
+    } catch (e) {
+      brevoError(e);
+    }
   }),
 });
