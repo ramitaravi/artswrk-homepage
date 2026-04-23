@@ -78,6 +78,59 @@
     @apply bg-background text-foreground;
     font-family: 'Poppins', sans-serif;
   }
+  /* ── Global heading scale ───────────────────────────────────────────────────
+   * These are defaults. Per-component Tailwind classes (e.g. text-4xl) will
+   * still override these — remove the Tailwind class to let the base rule win.
+   * Font: Poppins (loaded in index.html). Color: near-black #111 (--foreground).
+   * ─────────────────────────────────────────────────────────────────────── */
+  h1 {
+    font-family: 'Poppins', sans-serif;
+    font-size: clamp(2.5rem, 5vw, 4rem);   /* 40px → 64px fluid */
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    color: #111;
+  }
+  h2 {
+    font-family: 'Poppins', sans-serif;
+    font-size: clamp(1.75rem, 3.5vw, 2.75rem); /* 28px → 44px fluid */
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: #111;
+  }
+  h3 {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.25rem;   /* 20px */
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    color: #111;
+  }
+  h4 {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1rem;      /* 16px */
+    font-weight: 600;
+    line-height: 1.3;
+    color: #111;
+  }
+  h5 {
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.875rem;  /* 14px */
+    font-weight: 600;
+    line-height: 1.4;
+    color: #111;
+  }
+  h6 {
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.75rem;   /* 12px */
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #111;
+  }
+
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
   [type="button"]:not(:disabled),
