@@ -44,6 +44,10 @@ import MusicTeachers from "./pages/MusicTeachers";
 import Production from "./pages/Production";
 import ClientJobDetail from "./pages/dashboard/ClientJobDetail";
 import PublicArtistProfile from "./pages/ArtistProfile";
+import LeadsOverview from "./pages/leads/LeadsOverview";
+import LeadsContacts from "./pages/leads/LeadsContacts";
+import LeadsLists from "./pages/leads/LeadsLists";
+import LeadsCampaigns from "./pages/leads/LeadsCampaigns";
 import { useAuth } from "./_core/hooks/useAuth";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 
@@ -232,6 +236,13 @@ function Router() {
 
       {/* Admin — separate path, admin-only */}
       <Route path="/admin-dashboard" component={Admin} />
+
+      {/* Leads Dashboard — standalone admin-only CRM powered by Brevo */}
+      <Route path="/leads" component={LeadsOverview} />
+      <Route path="/leads/contacts" component={LeadsContacts} />
+      <Route path="/leads/lists" component={LeadsLists} />
+      <Route path="/leads/campaigns" component={LeadsCampaigns} />
+
       {/* Legacy /admin redirect */}
       <Route path="/admin">
         {() => { window.location.replace("/admin-dashboard"); return null; }}

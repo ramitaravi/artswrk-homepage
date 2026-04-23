@@ -17,6 +17,7 @@ import { artistResumes } from "../drizzle/schema";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import { z } from "zod";
+import { leadsRouter } from "./routers/leads";
 
 const SALT_ROUNDS = 12;
 
@@ -25,6 +26,7 @@ export const appRouter = router({
   acquisition: acquisitionRouter,
   artistProfile: artistProfileRouter,
   bubble: bubbleRouter,
+  leads: leadsRouter,
 
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),

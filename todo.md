@@ -632,3 +632,15 @@
 - [ ] Build public artist profile page at /book/:slug
 - [ ] Wire /app/jobs/:id route for client dashboard
 - [ ] Wire /app/enterprise/jobs/:id route for enterprise dashboard
+
+## Leads Dashboard (Brevo CRM)
+- [x] Brevo API helper (server/brevo.ts) — contacts, lists, campaigns, overview stats
+- [x] tRPC leads router (server/routers/leads.ts) — admin-only procedures
+- [x] Leads Dashboard layout with sidebar (LeadsLayout.tsx)
+- [x] Overview page at /leads — KPI cards + recent campaigns table
+- [x] Contacts page at /leads/contacts — search, pagination, detail drawer
+- [x] Lists page at /leads/lists — create/delete lists
+- [x] Campaigns page at /leads/campaigns — status filter, stats bars
+- [x] Admin sidebar link to Leads Dashboard
+- [x] Routes registered in App.tsx
+- [x] Vitest integration tests (4 tests passing)
