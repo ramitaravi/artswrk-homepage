@@ -338,7 +338,7 @@ function JobCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2 mb-1">
           <div className="min-w-0">
-            <h3 className="font-bold text-[#111] text-sm leading-tight truncate">{job.title}</h3>
+            <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{job.title}</h3>
             {job.companyName && (
               <p className="text-xs text-gray-500 truncate">{job.companyName}</p>
             )}
@@ -418,7 +418,7 @@ function ProJobCard({ job }: { job: DisplayProJob }) {
                 <Star size={11} className="text-yellow-500 fill-yellow-500 flex-shrink-0" />
                 <span className="text-[10px] font-bold text-yellow-600 uppercase tracking-wide">PRO</span>
               </div>
-              <h3 className="font-bold text-[#111] text-sm leading-tight truncate">{job.title}</h3>
+              <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{job.title}</h3>
               {job.company && (
                 <p className="text-xs text-gray-500 truncate">{job.company}</p>
               )}
@@ -500,7 +500,7 @@ function ApplicationCard({ job, status }: { job: DisplayApplication; status: App
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2 mb-1">
           <div className="min-w-0">
-            <h3 className="font-bold text-[#111] text-sm leading-tight truncate">{job.title}</h3>
+            <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{job.title}</h3>
             {job.companyName && (
               <p className="text-xs text-gray-500 truncate">{job.companyName}</p>
             )}
