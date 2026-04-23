@@ -26,6 +26,13 @@ import {
   syncSuppressionGaps,
 } from "../suppressions";
 import { getUserByEmail } from "../db";
+import {
+  syncLeadsFromBrevo,
+  getLeadsContacts,
+  getLeadsContact,
+  getLastSyncInfo,
+  getLeadsCrmStats,
+} from "../leadsSync";
 
 // ── Admin guard ───────────────────────────────────────────────────────────────
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -270,4 +277,52 @@ export const leadsRouter = router({
       brevoError(e);
     }
   }),
+
+  // ── CRM Cache (leads_contacts table) ────────────────────────────────────────
+
+  // Trigger a full Brevo sync — populates leads_contacts from Brevo + Artswrk DB
+  syncCrm: adminProcedure.mutation(async () => {
+    try {
+      return await syncLeadsFromBrevo();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: msg });
+    }
+  }),
+
+  // Get last sync info (timestamp, counts)
+  getCrmSyncInfo: adminProcedure.query(async () => {
+    return await getLastSyncInfo();
+  }),
+
+  // Get CRM overview stats (total, artswrk users, not on platform, etc.)
+  getCrmStats: adminProcedure.query(async () => {
+    return await getLeadsCrmStats();
+  }),
+
+  // Get paginated, filtered list of cached contacts
+  getCrmContacts: adminProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(200).default(50),
+        offset: z.number().min(0).default(0),
+        search: z.string().optional(),
+        userRole: z.enum(["Artist", "Client"]).optional(),
+        hiringCategory: z.string().optional(),
+        isArtswrkUser: z.boolean().optional(),
+        hasPostedJobs: z.boolean().optional(),
+        isPremium: z.boolean().optional(),
+        sort: z.enum(["newest", "oldest", "most_opens", "most_clicks"]).optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      return await getLeadsContacts(input);
+    }),
+
+  // Get a single cached contact by email
+  getCrmContact: adminProcedure
+    .input(z.object({ email: z.string().email() }))
+    .query(async ({ input }) => {
+      return await getLeadsContact(input.email);
+    }),
 });

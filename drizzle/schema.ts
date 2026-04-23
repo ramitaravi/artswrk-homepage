@@ -1183,3 +1183,108 @@ export const clientJobUnlocks = mysqlTable("client_job_unlocks", {
 });
 export type ClientJobUnlock = typeof clientJobUnlocks.$inferSelect;
 export type InsertClientJobUnlock = typeof clientJobUnlocks.$inferInsert;
+
+// ─── Leads CRM Cache ──────────────────────────────────────────────────────────
+
+/**
+ * Cached snapshot of Brevo contacts, enriched with Artswrk user data.
+ * Synced on-demand via the admin Leads Dashboard "Sync from Brevo" button.
+ *
+ * This is the single source of truth for the Leads CRM — never query Brevo
+ * live for list/filter views; always read from this table.
+ */
+export const leadsContacts = mysqlTable("leads_contacts", {
+  id: int("id").autoincrement().primaryKey(),
+
+  // ── Brevo identity ──────────────────────────────────────────────────────────
+  brevoId: int("brevoId").unique(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  emailBlacklisted: boolean("emailBlacklisted").default(false),
+
+  // ── Brevo contact attributes ────────────────────────────────────────────────
+  firstName: varchar("firstName", { length: 128 }),
+  lastName: varchar("lastName", { length: 128 }),
+  fullName: varchar("fullName", { length: 256 }),
+  companyName: varchar("companyName", { length: 256 }),
+
+  /** CITY attribute from Brevo (may include state, e.g. "Chicago, IL, USA") */
+  city: varchar("city", { length: 256 }),
+  state: varchar("state", { length: 128 }),
+  country: varchar("country", { length: 128 }),
+
+  /** USERROLE from Brevo: "Artist" | "Client" | null */
+  brevoUserRole: varchar("brevoUserRole", { length: 64 }),
+
+  /** HIRING_CATEGORY from Brevo: "Dance Studio" | "Dance Competition" | "Music School" | "Other Business" | etc. */
+  hiringCategory: varchar("hiringCategory", { length: 128 }),
+
+  /** JSON array of Brevo list IDs this contact belongs to */
+  brevoListIds: text("brevoListIds"),
+
+  // ── Brevo engagement stats (cached from /contacts/{email}/campaignStats) ────
+  /** Total campaigns received */
+  totalCampaignsReceived: int("totalCampaignsReceived").default(0),
+  /** Total unique opens */
+  totalOpens: int("totalOpens").default(0),
+  /** Total unique clicks */
+  totalClicks: int("totalClicks").default(0),
+  /** Last campaign open date */
+  lastOpenedAt: timestamp("lastOpenedAt"),
+  /** Last campaign click date */
+  lastClickedAt: timestamp("lastClickedAt"),
+  /** Last campaign received date */
+  lastCampaignAt: timestamp("lastCampaignAt"),
+  /** Whether this contact has ever unsubscribed */
+  hasUnsubscribed: boolean("hasUnsubscribed").default(false),
+
+  // ── Artswrk user cross-reference ────────────────────────────────────────────
+  /** FK → users.id — null if not on Artswrk */
+  artswrkUserId: int("artswrkUserId"),
+  /** Whether this email has an Artswrk account */
+  isArtswrkUser: boolean("isArtswrkUser").default(false),
+  /** "Artist" | "Client" | "Admin" | null */
+  artswrkUserRole: varchar("artswrkUserRole", { length: 32 }),
+  /** Artswrk hiringCategory: "Dance Studio" | "Dance Competition" | "Music School" | "Other Business" | etc. */
+  artswrkHiringCategory: varchar("artswrkHiringCategory", { length: 128 }),
+
+  // ── Artswrk activity (denormalized for fast list queries) ───────────────────
+  /** Number of jobs posted on Artswrk */
+  jobsPostedCount: int("jobsPostedCount").default(0),
+  /** Number of bookings made on Artswrk */
+  bookingCount: int("bookingCount").default(0),
+  /** Whether on Artswrk Pro */
+  artswrkPro: boolean("artswrkPro").default(false),
+  /** Whether on Artswrk Basic */
+  artswrkBasic: boolean("artswrkBasic").default(false),
+  /** Whether on Client Premium */
+  clientPremium: boolean("clientPremium").default(false),
+
+  // ── Sync metadata ───────────────────────────────────────────────────────────
+  /** When this record was last synced from Brevo */
+  lastSyncedAt: timestamp("lastSyncedAt").defaultNow().notNull(),
+  /** When this contact was first added to Brevo */
+  brevoCreatedAt: timestamp("brevoCreatedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type LeadsContact = typeof leadsContacts.$inferSelect;
+export type InsertLeadsContact = typeof leadsContacts.$inferInsert;
+
+/**
+ * Tracks the last time a full Brevo sync was run.
+ * Used to show "Last synced X minutes ago" in the UI.
+ */
+export const leadsSyncLog = mysqlTable("leads_sync_log", {
+  id: int("id").autoincrement().primaryKey(),
+  /** "full" = all contacts, "stats" = engagement stats only */
+  syncType: mysqlEnum("syncType", ["full", "stats"]).notNull().default("full"),
+  /** How many contacts were upserted */
+  contactsUpserted: int("contactsUpserted").default(0),
+  /** How many contacts were enriched with Artswrk data */
+  artswrkMatched: int("artswrkMatched").default(0),
+  /** Error message if sync failed */
+  error: text("error"),
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+});
+export type LeadsSyncLog = typeof leadsSyncLog.$inferSelect;

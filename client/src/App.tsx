@@ -49,6 +49,7 @@ import LeadsContacts from "./pages/leads/LeadsContacts";
 import LeadsLists from "./pages/leads/LeadsLists";
 import LeadsCampaigns from "./pages/leads/LeadsCampaigns";
 import LeadsUnsubscribes from "./pages/leads/LeadsUnsubscribes";
+import LeadsCRM from "./pages/leads/LeadsCRM";
 import { useAuth } from "./_core/hooks/useAuth";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 
@@ -244,6 +245,7 @@ function Router() {
       <Route path="/leads/lists" component={LeadsLists} />
       <Route path="/leads/campaigns" component={LeadsCampaigns} />
       <Route path="/leads/unsubscribes" component={LeadsUnsubscribes} />
+      <Route path="/leads/crm" component={LeadsCRM} />
 
       {/* Legacy /admin redirect */}
       <Route path="/admin">
