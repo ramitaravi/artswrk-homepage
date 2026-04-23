@@ -90,7 +90,7 @@ function StepIndicator({ step }: { step: 1 | 2 | 3 }) {
   const steps = [
     { n: 1, label: "Describe" },
     { n: 2, label: "Review" },
-    { n: 3, label: "Connect" },
+    { n: 3, label: "Share" },
   ];
   return (
     <div className="flex items-center justify-center gap-0 mb-8">
@@ -169,15 +169,14 @@ function Step1({
       <div className="text-center mb-8">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 text-[#F25722] text-xs font-semibold mb-4">
           <Sparkles size={12} />
-          AI-Powered Job Posting
+          HIRE NOW ON ARTSWRK
         </div>
         <h1 className="text-3xl md:text-4xl font-black text-[#111] mb-3">
-          Describe your job in plain English
+          Post Your Job on Artswrk
         </h1>
         <p className="text-gray-500 text-base">
-          Just tell us what you need — we'll turn it into a professional listing
-          and send it to{" "}
-          <span className="font-semibold text-[#111]">5,000+ artists</span>.
+          Describe your job below — we'll turn it into a professional listing and send it to our vetted network of{" "}
+          <span className="font-semibold text-[#111]">5,000+ artists</span> looking for work.
         </p>
       </div>
 
@@ -241,13 +240,8 @@ function Step1({
         </span>
         <span className="w-1 h-1 rounded-full bg-gray-300" />
         <span className="flex items-center gap-1.5">
-          <Zap size={12} />
-          Avg. 3 applicants in 24hrs
-        </span>
-        <span className="w-1 h-1 rounded-full bg-gray-300" />
-        <span className="flex items-center gap-1.5">
           <CheckCircle2 size={12} />
-          Free to post
+          Pay Only When You Match
         </span>
       </div>
     </div>
@@ -364,17 +358,73 @@ function Step2({
           />
         </div>
 
-        {/* Studio / Company */}
+        {/* Studio / Company — "posting on behalf of" dropdown for logged-in users */}
         <div className="p-5">
           <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
-            Studio / Company Name
+            Posting On Behalf Of
           </label>
-          <Input
-            value={form.studioName}
-            onChange={(e) => set("studioName", e.target.value)}
-            placeholder="Your studio or company name"
-            className="border-gray-200 focus:border-[#F25722]"
-          />
+          {user ? (
+            <div className="space-y-2">
+              {/* Company options as selectable pills */}
+              <div className="flex flex-wrap gap-2">
+                {/* Primary company */}
+                {user.clientCompanyName && (
+                  <button
+                    type="button"
+                    onClick={() => set("studioName", user.clientCompanyName || "")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      form.studioName === user.clientCompanyName
+                        ? "hirer-grad-bg text-white border-transparent"
+                        : "border-gray-200 text-gray-700 hover:border-[#F25722] hover:text-[#F25722]"
+                    }`}
+                  >
+                    {user.clientCompanyName}
+                  </button>
+                )}
+                {/* Post as individual */}
+                <button
+                  type="button"
+                  onClick={() => set("studioName", user.name || user.firstName || "")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    form.studioName === (user.name || user.firstName || "")
+                      ? "hirer-grad-bg text-white border-transparent"
+                      : "border-gray-200 text-gray-700 hover:border-[#F25722] hover:text-[#F25722]"
+                  }`}
+                >
+                  {user.firstName || user.name} (Individual)
+                </button>
+                {/* Custom name option */}
+                <button
+                  type="button"
+                  onClick={() => set("studioName", "")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    form.studioName !== user.clientCompanyName && form.studioName !== (user.name || user.firstName || "")
+                      ? "hirer-grad-bg text-white border-transparent"
+                      : "border-gray-200 text-gray-500 hover:border-[#F25722] hover:text-[#F25722]"
+                  }`}
+                >
+                  + Different name
+                </button>
+              </div>
+              {/* Show text input when custom name is selected */}
+              {form.studioName !== user.clientCompanyName && form.studioName !== (user.name || user.firstName || "") && (
+                <Input
+                  value={form.studioName}
+                  onChange={(e) => set("studioName", e.target.value)}
+                  placeholder="Enter studio or company name"
+                  className="border-gray-200 focus:border-[#F25722] mt-2"
+                  autoFocus
+                />
+              )}
+            </div>
+          ) : (
+            <Input
+              value={form.studioName}
+              onChange={(e) => set("studioName", e.target.value)}
+              placeholder="Your studio or company name"
+              className="border-gray-200 focus:border-[#F25722]"
+            />
+          )}
         </div>
 
         {/* Description */}
