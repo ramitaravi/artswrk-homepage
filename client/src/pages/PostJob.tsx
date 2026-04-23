@@ -738,7 +738,7 @@ function Step3({
   if (subStep === "almost_ready") {
     return (
       <div className="max-w-lg mx-auto">
-        <h1 className="text-3xl font-black text-[#111] mb-6">Your job is almost ready</h1>
+        <h1 className="text-3xl font-black text-[#111] mb-6">Your job is live!</h1>
         <div className="mb-8">
           <p className="font-bold text-[#111] mb-3">With your job, here's what happens next:</p>
           <ul className="space-y-3">
