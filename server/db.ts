@@ -3103,13 +3103,82 @@ export async function confirmDirectPayment(bookingId: number, artistUserId: numb
 /**
  * Mark an artist's Artswrk invoice as submitted.
  */
-export async function markArtswrkInvoiceSubmitted(bookingId: number, artistUserId: number): Promise<boolean> {
+export async function markArtswrkInvoiceSubmitted(
+  bookingId: number,
+  artistUserId: number,
+  opts?: {
+    invoicePaymentToken?: string;
+    invoiceStripeCheckoutUrl?: string;
+    invoiceTotalCents?: number;
+  }
+): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
   await db
     .update(bookings)
-    .set({ artswrkInvoiceSubmittedAt: new Date() })
+    .set({
+      artswrkInvoiceSubmittedAt: new Date(),
+      ...(opts?.invoicePaymentToken ? { invoicePaymentToken: opts.invoicePaymentToken } : {}),
+      ...(opts?.invoiceStripeCheckoutUrl ? { invoiceStripeCheckoutUrl: opts.invoiceStripeCheckoutUrl } : {}),
+      ...(opts?.invoiceTotalCents !== undefined ? { invoiceTotalCents: opts.invoiceTotalCents } : {}),
+    })
     .where(and(eq(bookings.id, bookingId), eq(bookings.artistUserId, artistUserId)));
+  return true;
+}
+
+/**
+ * Get a booking by its invoice payment token (public, for studio payment page).
+ */
+export async function getBookingByInvoiceToken(token: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db
+    .select({
+      id: bookings.id,
+      jobId: bookings.jobId,
+      clientUserId: bookings.clientUserId,
+      artistUserId: bookings.artistUserId,
+      paymentMethod: bookings.paymentMethod,
+      artistRate: bookings.artistRate,
+      invoicePaymentToken: bookings.invoicePaymentToken,
+      invoiceStripeCheckoutUrl: bookings.invoiceStripeCheckoutUrl,
+      invoiceTotalCents: bookings.invoiceTotalCents,
+      invoicePaidAt: bookings.invoicePaidAt,
+      artswrkInvoiceSubmittedAt: bookings.artswrkInvoiceSubmittedAt,
+      bookingStatus: bookings.bookingStatus,
+      paymentStatus: bookings.paymentStatus,
+      startDate: bookings.startDate,
+      jobDescription: jobs.description,
+      jobLocation: jobs.locationAddress,
+      artistName: users.name,
+      artistFirstName: users.firstName,
+      artistPhoto: users.profilePicture,
+    })
+    .from(bookings)
+    .leftJoin(jobs, eq(bookings.jobId, jobs.id))
+    .leftJoin(users, eq(bookings.artistUserId, users.id))
+    .where(eq(bookings.invoicePaymentToken, token))
+    .limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+/**
+ * Mark an invoice as paid (called from Stripe webhook).
+ */
+export async function markInvoicePaid(
+  bookingId: number,
+  stripePaymentIntentId: string
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  await db
+    .update(bookings)
+    .set({
+      invoicePaidAt: new Date(),
+      invoiceStripePaymentIntentId: stripePaymentIntentId,
+      paymentStatus: "Paid",
+    })
+    .where(eq(bookings.id, bookingId));
   return true;
 }
 

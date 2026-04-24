@@ -972,6 +972,7 @@ function ConfirmationCard({ booking }: { booking: any }) {
                       bookingId: booking.id,
                       artistRate: rate || undefined,
                       notes: invoiceNotes || undefined,
+                      origin: window.location.origin,
                     })}
                     disabled={submitInvoice.isPending || rate <= 0}
                     className="w-full py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FFBC5D] to-[#F25722] hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"

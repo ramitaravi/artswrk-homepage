@@ -151,6 +151,51 @@ async function startServer() {
             await saveClientStripeCustomerId(userId, session.customer);
           }
         }
+
+        // ── Artswrk Invoice Payment ──────────────────────────────────────────
+        if (eventType === "artswrk_invoice") {
+          const bookingId = session.metadata?.booking_id ? parseInt(session.metadata.booking_id) : null;
+          const paymentIntentId = session.payment_intent ?? null;
+          if (bookingId) {
+            const { markInvoicePaid, getBookingById, getUserById: getUser } = await import("../db");
+            await markInvoicePaid(bookingId, paymentIntentId ?? "");
+            console.log(`[Webhook] Invoice paid for booking ${bookingId}`);
+
+            // Notify the artist that they've been paid
+            try {
+              const booking = await getBookingById(bookingId);
+              if (booking?.artistUserId) {
+                const artist = await getUser(booking.artistUserId);
+                if (artist?.email) {
+                  const { sendSimpleEmail } = await import("../email");
+                  const totalDollars = (session.amount_total ?? 0) / 100;
+                  await sendSimpleEmail({
+                    to: artist.email,
+                    subject: `Payment Received — Booking #${bookingId}`,
+                    html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px">
+                      <div style="text-align:center;margin-bottom:24px">
+                        <span style="font-size:22px;font-weight:900">
+                          <span style="background:linear-gradient(90deg,#FFBC5D,#F25722);-webkit-background-clip:text;-webkit-text-fill-color:transparent">ARTS</span><span style="background:#111;color:#fff;padding:2px 8px;border-radius:4px;margin-left:2px">WRK</span>
+                        </span>
+                      </div>
+                      <h2 style="color:#111;margin:0 0 16px">Your payment has been received!</h2>
+                      <p style="color:#444;font-size:15px;margin:0 0 12px">Hi ${artist.firstName ?? artist.name ?? "there"},</p>
+                      <p style="color:#444;font-size:15px;margin:0 0 20px">Great news — the studio has paid your invoice for Booking #${bookingId}.</p>
+                      <div style="background:#f9f9f9;border-radius:8px;padding:16px 20px;margin-bottom:20px">
+                        <p style="margin:0;font-size:15px;color:#111"><strong>Amount:</strong> $${totalDollars.toFixed(2)}</p>
+                        <p style="margin:4px 0 0;font-size:13px;color:#666">Booking #${bookingId}</p>
+                      </div>
+                      <p style="color:#444;font-size:14px">Best,<br>The Artswrk Team</p>
+                    </div>`,
+                  });
+                  console.log(`[Webhook] Sent payment confirmation to artist ${artist.email}`);
+                }
+              }
+            } catch (notifyErr: any) {
+              console.error("[Webhook] Artist payment notification failed:", notifyErr.message);
+            }
+          }
+        }
       }
 
       // Handle subscription cancellation / expiry (Basic, PRO, or Enterprise)

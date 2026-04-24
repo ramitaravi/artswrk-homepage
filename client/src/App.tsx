@@ -35,6 +35,7 @@ import JobDetail from "./pages/JobDetail";
 import ProJobDetail from "./pages/ProJobDetail";
 import ApplyPage from "./pages/ApplyPage";
 import About from "./pages/About";
+import InvoicePayment from "./pages/InvoicePayment";
 import DanceCompetitions from "./pages/DanceCompetitions";
 import DanceStudios from "./pages/DanceStudios";
 import MusicSchools from "./pages/MusicSchools";
@@ -254,6 +255,9 @@ function Router() {
       <Route path="/admin">
         {() => { window.location.replace("/admin-dashboard"); return null; }}
       </Route>
+
+      {/* Public invoice payment page */}
+      <Route path="/invoice/:token" component={InvoicePayment} />
 
       {/* Fallback */}
       <Route path="/404" component={NotFound} />

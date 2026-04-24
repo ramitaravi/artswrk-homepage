@@ -385,6 +385,16 @@ export const bookings = mysqlTable("bookings", {
   directPayConfirmedAt: timestamp("directPayConfirmedAt"),
   /** Timestamp when the artist submitted their Artswrk invoice */
   artswrkInvoiceSubmittedAt: timestamp("artswrkInvoiceSubmittedAt"),
+  /** Unique token for the studio payment link (e.g. /invoice/:token) */
+  invoicePaymentToken: varchar("invoicePaymentToken", { length: 64 }),
+  /** Stripe Checkout session URL generated at invoice submission */
+  invoiceStripeCheckoutUrl: text("invoiceStripeCheckoutUrl"),
+  /** Total invoice amount in cents at submission time */
+  invoiceTotalCents: int("invoiceTotalCents"),
+  /** Timestamp when the studio paid the invoice via Stripe */
+  invoicePaidAt: timestamp("invoicePaidAt"),
+  /** Stripe payment intent ID for this invoice payment */
+  invoiceStripePaymentIntentId: varchar("invoiceStripePaymentIntentId", { length: 128 }),
 
   // ── Flags ──────────────────────────────────────────────────────────────────
   addedToSpreadsheet: boolean("addedToSpreadsheet").default(false),

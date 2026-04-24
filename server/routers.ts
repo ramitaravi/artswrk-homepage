@@ -6,7 +6,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, markInvoicePaid } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail } from "./email";
 import crypto from "crypto";
@@ -2511,53 +2511,182 @@ Fields to extract:
 
     /**
      * Submit the Artswrk invoice for a booking.
-     * Sends an email to contact@artswrk.com with the reimbursement details.
+     * 1. Creates a Stripe Checkout session for the total amount.
+     * 2. Generates a unique invoice payment token.
+     * 3. Saves both on the booking record.
+     * 4. Emails the studio with booking details + "Continue to Payment" button.
      */
     submitArtswrkInvoice: protectedProcedure
       .input(z.object({
         bookingId: z.number(),
         artistRate: z.number().optional(),
         notes: z.string().max(1000).optional(),
+        origin: z.string().url().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
+
+        // Fetch the booking to get the client's info
+        const booking = await getBookingById(input.bookingId);
+        if (!booking) throw new Error("Booking not found");
+        if (booking.artistUserId !== user.id) throw new Error("Not authorized");
+
+        // Fetch the client (studio) user
+        const clientUser = booking.clientUserId ? await getUserById(booking.clientUserId) : null;
+
         const reimbList = await getReimbursementsByBookingId(input.bookingId);
-        const totalReimb = reimbList.reduce((s, r) => s + (r.value ?? 0), 0);
+        const totalReimb = reimbList.reduce((s: number, r: any) => s + (r.value ?? 0), 0);
         const artistRate = input.artistRate ?? 0;
         const processingFee = Math.round((artistRate + totalReimb) * 0.04);
-        const total = artistRate + totalReimb + processingFee;
-        // Send invoice email to Artswrk
+        const totalDollars = artistRate + totalReimb + processingFee;
+        const totalCents = Math.round(totalDollars * 100);
+
+        // Generate a unique invoice payment token
+        const { randomBytes } = await import("crypto");
+        const invoicePaymentToken = randomBytes(24).toString("hex");
+
+        // Determine origin for redirect URLs
+        const origin = input.origin ?? "https://artswrk-ayegfhxr.manus.space";
+        const paymentPageUrl = `${origin}/invoice/${invoicePaymentToken}`;
+
+        // Create Stripe Checkout session (minimum $0.50)
+        let stripeCheckoutUrl: string | undefined;
+        if (totalCents >= 50) {
+          try {
+            const stripe = getStripe();
+            const artistName = user.name ?? user.firstName ?? "Artist";
+            const jobTitle = (booking.description ?? "").split("\n")[0].slice(0, 80) || `Booking #${input.bookingId}`;
+            const session = await stripe.checkout.sessions.create({
+              mode: "payment",
+              line_items: [{
+                price_data: {
+                  currency: "usd",
+                  unit_amount: totalCents,
+                  product_data: {
+                    name: `Payment for ${artistName}`,
+                    description: jobTitle,
+                  },
+                },
+                quantity: 1,
+              }],
+              customer_email: clientUser?.email ?? undefined,
+              allow_promotion_codes: true,
+              metadata: {
+                booking_id: String(input.bookingId),
+                invoice_payment_token: invoicePaymentToken,
+                artist_id: String(user.id),
+                client_id: String(booking.clientUserId ?? ""),
+                type: "artswrk_invoice",
+              },
+              success_url: `${paymentPageUrl}?paid=1`,
+              cancel_url: paymentPageUrl,
+            });
+            stripeCheckoutUrl = session.url ?? undefined;
+          } catch (e) {
+            console.error("[submitArtswrkInvoice] Stripe session creation failed:", e);
+            // Don't block invoice submission if Stripe fails
+          }
+        }
+
+        // Persist token + checkout URL on the booking
+        await markArtswrkInvoiceSubmitted(input.bookingId, user.id, {
+          invoicePaymentToken,
+          invoiceStripeCheckoutUrl: stripeCheckoutUrl,
+          invoiceTotalCents: totalCents,
+        });
+
+        // Format date for email
+        const bookingDate = booking.startDate
+          ? new Date(booking.startDate).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" })
+          : new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" });
+
+        const artistDisplayName = user.name ?? user.firstName ?? "Your artist";
+        const studioName = clientUser?.clientCompanyName ?? clientUser?.firstName ?? "there";
+        const reimbText = totalReimb > 0
+          ? `$${totalReimb.toFixed(2)} (${reimbList.length} item${reimbList.length !== 1 ? "s" : ""})`
+          : "No reimbursements added";
+
+        // Build the studio payment email (matches the design in the screenshot)
+        const emailHtml = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Georgia,serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:32px 0">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;max-width:600px">
+  <!-- Header -->
+  <tr><td style="padding:28px 40px 20px;border-bottom:1px solid #eee;text-align:center">
+    <span style="font-size:22px;font-weight:900;letter-spacing:-0.5px">
+      <span style="background:linear-gradient(90deg,#FFBC5D,#F25722);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">ARTS</span><span style="background:#111;color:#fff;padding:2px 8px;border-radius:4px;margin-left:2px;font-size:20px">WRK</span>
+    </span>
+  </td></tr>
+  <!-- Title -->
+  <tr><td style="padding:32px 40px 0">
+    <h1 style="margin:0;font-size:24px;font-weight:700;color:#111">Payment Request for ${artistDisplayName} ${bookingDate}</h1>
+  </td></tr>
+  <!-- Divider -->
+  <tr><td style="padding:20px 40px"><hr style="border:none;border-top:1px solid #eee;margin:0"></td></tr>
+  <!-- Greeting -->
+  <tr><td style="padding:0 40px 20px">
+    <p style="margin:0 0 16px;font-size:16px;color:#444">Hi ${studioName},</p>
+    <p style="margin:0;font-size:16px;color:#444">Your booking has been completed by ${artistDisplayName} and requires payment.</p>
+  </td></tr>
+  <!-- Booking details block -->
+  <tr><td style="padding:0 40px 24px">
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-left:3px solid #ec008c;padding-left:16px">
+      <tr><td style="padding-bottom:12px">
+        <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#999;letter-spacing:1px;text-transform:uppercase">YOUR BOOKING:</p>
+        <p style="margin:0 0 4px;font-size:15px;color:#333"><strong>Date:</strong> ${bookingDate}</p>
+        <p style="margin:0 0 4px;font-size:15px;color:#333"><strong>Total Base Rate:</strong> $${artistRate.toFixed(2)}</p>
+        <p style="margin:0 0 4px;font-size:15px;color:#333"><strong>Reimbursements:</strong> ${reimbText}</p>
+        <p style="margin:0;font-size:15px;color:#333"><strong>Total Payment Amount:</strong> $${totalDollars.toFixed(2)}</p>
+      </td></tr>
+    </table>
+  </td></tr>
+  <!-- Divider -->
+  <tr><td style="padding:0 40px 24px"><hr style="border:none;border-top:1px solid #eee;margin:0"></td></tr>
+  <!-- Payment details -->
+  <tr><td style="padding:0 40px 24px">
+    <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#999;letter-spacing:1px;text-transform:uppercase">PAYMENT DETAILS</p>
+    <p style="margin:0;font-size:16px;color:#444;line-height:1.6">If you need to edit your payment details, you can do so on Artswrk by following the link below. You will be able to pay digitally with a card or Apple Pay, and will receive a receipt upon payment.</p>
+  </td></tr>
+  <!-- CTA Button -->
+  <tr><td style="padding:0 40px 32px;text-align:center">
+    <a href="${paymentPageUrl}" style="display:inline-block;background:#111;color:#fff;font-size:18px;font-weight:600;padding:18px 48px;border-radius:50px;text-decoration:none;letter-spacing:0.3px">Continue to Payment →</a>
+  </td></tr>
+  <!-- Divider -->
+  <tr><td style="padding:0 40px 24px"><hr style="border:none;border-top:1px solid #eee;margin:0"></td></tr>
+  <!-- Footer -->
+  <tr><td style="padding:0 40px 32px">
+    <p style="margin:0 0 16px;font-size:15px;color:#444">As always, if you have any questions or concerns, don't hesitate to reach out to us.</p>
+    <p style="margin:0;font-size:15px;color:#444">Best,<br>The Artswrk Team</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+
+        // Send to the studio (client) + CC Artswrk
+        const studioEmail = clientUser?.email;
         try {
+          if (studioEmail) {
+            await sendSimpleEmail({
+              to: studioEmail,
+              subject: `Payment Request for ${artistDisplayName} ${bookingDate}`,
+              html: emailHtml,
+            });
+          }
+          // Always CC Artswrk
           await sendSimpleEmail({
             to: "contact@artswrk.com",
-            subject: `Invoice Request from ${user.name ?? user.email} — Booking #${input.bookingId}`,
-            html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-              <div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:20px 28px;border-radius:12px 12px 0 0">
-                <span style="font-size:18px;font-weight:900;color:#fff">ARTS</span><span style="font-size:18px;font-weight:900;background:#111;color:#fff;padding:2px 8px;border-radius:4px;margin-left:2px">WRK</span>
-                <span style="color:rgba(255,255,255,0.85);font-size:13px;margin-left:12px">Invoice Request</span>
-              </div>
-              <div style="padding:28px;background:#fff;border:1px solid #f0f0f0;border-radius:0 0 12px 12px">
-                <h2 style="margin:0 0 16px;font-size:18px;color:#111">Invoice Request — Booking #${input.bookingId}</h2>
-                <table style="width:100%;border-collapse:collapse;font-size:14px">
-                  <tr><td style="padding:8px 0;color:#666;border-bottom:1px solid #f0f0f0">Artist</td><td style="padding:8px 0;font-weight:600;color:#111;border-bottom:1px solid #f0f0f0">${user.name ?? user.email}</td></tr>
-                  <tr><td style="padding:8px 0;color:#666;border-bottom:1px solid #f0f0f0">Artist Email</td><td style="padding:8px 0;color:#111;border-bottom:1px solid #f0f0f0">${user.email ?? ""}</td></tr>
-                  <tr><td style="padding:8px 0;color:#666;border-bottom:1px solid #f0f0f0">Artist Rate</td><td style="padding:8px 0;color:#111;border-bottom:1px solid #f0f0f0">$${artistRate}</td></tr>
-                  <tr><td style="padding:8px 0;color:#666;border-bottom:1px solid #f0f0f0">Reimbursements</td><td style="padding:8px 0;color:#111;border-bottom:1px solid #f0f0f0">$${totalReimb} (${reimbList.length} item${reimbList.length !== 1 ? "s" : ""})</td></tr>
-                  <tr><td style="padding:8px 0;color:#666;border-bottom:1px solid #f0f0f0">4% Processing Fee</td><td style="padding:8px 0;color:#111;border-bottom:1px solid #f0f0f0">$${processingFee}</td></tr>
-                  <tr><td style="padding:8px 0;color:#111;font-weight:700">Total to Invoice Client</td><td style="padding:8px 0;color:#F25722;font-weight:700;font-size:16px">$${total}</td></tr>
-                </table>
-                ${reimbList.length > 0 ? `<h3 style="font-size:14px;color:#111;margin:20px 0 8px">Reimbursement Items</h3><ul style="margin:0;padding:0 0 0 16px;color:#555;font-size:13px">${reimbList.map(r => `<li>${r.note ?? "Expense"}: $${r.value}${r.fileUrl ? ` — <a href="${r.fileUrl}">Receipt</a>` : ""}</li>`).join("")}</ul>` : ""}
-                ${input.notes ? `<div style="margin-top:16px;background:#f9f9f9;border-radius:8px;padding:12px 16px"><p style="margin:0;font-size:13px;color:#555"><strong>Notes:</strong> ${input.notes}</p></div>` : ""}
-              </div>
-            </div>`,
+            subject: `[Invoice] ${artistDisplayName} → ${studioName} — $${totalDollars.toFixed(2)} — Booking #${input.bookingId}`,
+            html: emailHtml,
           });
         } catch (e) {
           console.error("[submitArtswrkInvoice] Email send failed:", e);
-          throw new Error("Failed to send invoice email. Please try again.");
+          // Don't throw — invoice is already saved
         }
-        await markArtswrkInvoiceSubmitted(input.bookingId, user.id);
-        return { success: true };
+
+        return { success: true, paymentPageUrl, invoicePaymentToken };
       }),
 
     /** Upload a reimbursement receipt file to S3 and return the URL. */
@@ -3008,6 +3137,17 @@ Fields to extract:
         return getConfirmedBookingsForJob(input.jobId);
       }),
   }),
+  /** Public invoice payment page — fetches booking data by token for studio payment */
+  invoice: router({
+    getByToken: publicProcedure
+      .input(z.object({ token: z.string() }))
+      .query(async ({ input }) => {
+        const booking = await getBookingByInvoiceToken(input.token);
+        if (!booking) throw new Error("Invoice not found");
+        return booking;
+      }),
+  }),
+
   /** Benefits / Partner perks — filtered by audience type */
   benefits: router({
     list: protectedProcedure
