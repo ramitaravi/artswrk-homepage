@@ -67,7 +67,6 @@ const CLIENT_PREMIUM_NAV: NavItem[] = [
 const ARTIST_CORE_NAV: NavItem[] = [
   { label: "Dashboard", icon: <LayoutDashboard size={18} />, href: "/app" },
   { label: "Jobs", icon: <Briefcase size={18} />, href: "/app/jobs" },
-  { label: "Confirmations", icon: <UserCheck size={18} />, href: "/app/confirmations" },
   { label: "Bookings", icon: <Calendar size={18} />, href: "/app/bookings" },
   { label: "Payments", icon: <CreditCard size={18} />, href: "/app/payments" },
   { label: "Messages", icon: <MessageSquare size={18} />, href: "/app/messages" },

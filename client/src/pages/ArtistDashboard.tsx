@@ -655,98 +655,40 @@ function JobsTab({ user }: { user: any }) {
 
 // ─── Bookings Tab ─────────────────────────────────────────────────────────────────
 
-type BookingsSubTab = "mark-complete" | "payment-pending" | "upcoming" | "completed";
-
-const SAMPLE_BOOKINGS = [
-  { id: 1, jobTitle: "Hip Hop Instructor", company: "Elevation on Tour", logo: "", date: "May 1–3, 2025", rate: "$20/hr", location: "Sicklerville, NJ", status: "upcoming" as const },
-  { id: 2, jobTitle: "Event Assistant", company: "Journey Dance Competition", logo: "", date: "Apr 20, 2025", rate: "$20/hr", location: "Chicago, IL", status: "payment-pending" as const },
-  { id: 3, jobTitle: "Dance Judge", company: "REVEL Dance", logo: "", date: "Mar 15, 2025", rate: "$150 flat", location: "Los Angeles, CA", status: "mark-complete" as const },
-  { id: 4, jobTitle: "Ballet Teacher", company: "Artswrk Studio", logo: "", date: "Feb 10, 2025", rate: "$40/hr", location: "New York, NY", status: "completed" as const },
-];
-
 function BookingsTab() {
-  const [subTab, setSubTab] = useState<BookingsSubTab>("upcoming");
+  const { data, isLoading } = trpc.artistDashboard.myConfirmations.useQuery();
+  const confirmations = data ?? [];
 
-  const subTabBtn = (tab: BookingsSubTab, label: string) => (
-    <button
-      onClick={() => setSubTab(tab)}
-      className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors ${
-        subTab === tab ? "bg-[#111] text-white" : "text-gray-600 hover:bg-gray-100"
-      }`}
-    >
-      {label}
-    </button>
-  );
-
-  const filtered = SAMPLE_BOOKINGS.filter(b => b.status === subTab);
-
-  const statusBadge = (status: string) => {
-    const map: Record<string, string> = {
-      upcoming: "bg-blue-50 text-blue-700",
-      "payment-pending": "bg-amber-50 text-amber-700",
-      "mark-complete": "bg-orange-50 text-orange-700",
-      completed: "bg-green-50 text-green-700",
-    };
-    const labels: Record<string, string> = {
-      upcoming: "Upcoming",
-      "payment-pending": "Payment Pending",
-      "mark-complete": "Mark Complete",
-      completed: "Completed",
-    };
-    return <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${map[status] || "bg-gray-50 text-gray-600"}`}>{labels[status] || status}</span>;
-  };
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 size={24} className="animate-spin text-gray-300" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-semibold text-[#111]">Bookings</h2>
-
-      <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0" style={{ scrollbarWidth: "none" }}>
-        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-2xl w-fit min-w-max">
-          {subTabBtn("mark-complete", "Mark as Complete")}
-          {subTabBtn("payment-pending", "Payment Pending")}
-          {subTabBtn("upcoming", "Upcoming")}
-          {subTabBtn("completed", "Completed")}
+      <p className="text-sm text-gray-400">
+        Jobs you have been confirmed for. Manage payment and reimbursements here.
+      </p>
+      {confirmations.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+          <Calendar size={36} className="mx-auto text-gray-300 mb-3" />
+          <p className="text-sm font-semibold text-gray-700 mb-1">No bookings yet</p>
+          <p className="text-sm text-gray-500 mb-4">When a studio confirms you for a job, it will appear here.</p>
+          <a href="/app/jobs" className="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity">
+            Browse jobs →
+          </a>
         </div>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-gray-100">
-        {filtered.length === 0 ? (
-          <div className="p-8 text-center">
-            <Calendar size={36} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-sm font-semibold text-gray-700 mb-1">No bookings here</p>
-            <p className="text-sm text-gray-500 mb-4">Apply to jobs to start getting booked by hirers.</p>
-            <a href="/app/jobs" className="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity">
-              Browse jobs →
-            </a>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {filtered.map(booking => (
-              <div key={booking.id} className="flex items-start sm:items-center justify-between gap-3 p-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <StudioAvatar name={booking.company} logo={booking.logo} size="sm" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[#111] truncate">{booking.jobTitle}</p>
-                    <p className="text-xs text-gray-500">{booking.company}</p>
-                    <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-gray-400">
-                      <span className="flex items-center gap-1"><Calendar size={10} /> {booking.date}</span>
-                      <span className="flex items-center gap-1"><CreditCard size={10} /> {booking.rate}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 flex-shrink-0">
-                  {statusBadge(booking.status)}
-                  {booking.status === "mark-complete" && (
-                    <button className="text-xs font-semibold text-white bg-[#111] px-3 py-1.5 rounded-full hover:bg-gray-700 transition-colors whitespace-nowrap">
-                      Mark Complete
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      ) : (
+        <div className="space-y-3">
+          {confirmations.map((b: any) => (
+            <ConfirmationCard key={b.id} booking={b} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1423,7 +1365,7 @@ export default function ArtistDashboard() {
 
   function renderContent() {
     if (location.startsWith("/app/jobs")) return <JobsTab user={user} />;
-    if (location.startsWith("/app/confirmations")) return <ConfirmationsTab />;
+    if (location.startsWith("/app/confirmations")) { window.location.replace("/app/bookings"); return null; }
     if (location.startsWith("/app/bookings")) return <BookingsTab />;
     if (location.startsWith("/app/payments")) return <PaymentsTab />;
     if (location.startsWith("/app/messages")) return <MessagesTab />;
