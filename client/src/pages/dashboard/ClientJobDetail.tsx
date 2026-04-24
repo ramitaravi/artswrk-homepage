@@ -393,10 +393,12 @@ function ApplicantDetailView({
 function ApplicantsTab({
   jobId,
   isEnterprise,
+  isPremium,
   onSelectApplicant,
 }: {
   jobId: number;
   isEnterprise: boolean;
+  isPremium: boolean;
   onSelectApplicant: (id: number, allIds: number[]) => void;
 }) {
   const [msgOpen, setMsgOpen] = useState<number | null>(null);
@@ -432,8 +434,11 @@ function ApplicantsTab({
 
   if (!data) return null;
 
+  // Premium clients bypass the paywall entirely
+  const effectiveLocked = data.locked && !isPremium;
+
   // Locked state
-  if (data.locked) {
+  if (effectiveLocked) {
     return (
       <div className="space-y-5">
         <p className="text-xs text-gray-400 font-medium">{data.applicantCount} applicant{data.applicantCount !== 1 ? "s" : ""}</p>
@@ -1001,6 +1006,8 @@ export default function ClientJobDetail() {
   const [tab, setTab] = useState<Tab>("applicants");
   const [selectedApplicant, setSelectedApplicant] = useState<{ id: number; allIds: number[] } | null>(null);
 
+  const { user } = useAuth();
+  const isPremium = !!(user as any)?.clientPremium;
   const { data: job, isLoading } = trpc.clientJobs.getDetail.useQuery({ jobId });
 
   const handleSelectApplicant = useCallback((id: number, allIds: number[]) => {
@@ -1149,6 +1156,7 @@ export default function ClientJobDetail() {
         <ApplicantsTab
           jobId={jobId}
           isEnterprise={isEnterprise}
+          isPremium={isPremium}
           onSelectApplicant={handleSelectApplicant}
         />
       )}
