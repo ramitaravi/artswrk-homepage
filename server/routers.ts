@@ -2813,7 +2813,7 @@ Fields to extract:
         if (!job) throw new Error("Job not found");
         if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
         const applicants = await getJobApplicantsWithDetails(input.jobId);
-        const unlocked = user.role === "admin" || await isClientJobUnlocked(user.id, input.jobId);
+        const unlocked = user.role === "admin" || !!(user as any).clientPremium || await isClientJobUnlocked(user.id, input.jobId);
         if (!unlocked) {
           return {
             locked: true,
