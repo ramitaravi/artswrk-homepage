@@ -440,9 +440,12 @@ function DashboardTab({ user }: { user: any }) {
                         <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{serviceType || studio}</h3>
                         <p className="text-xs text-gray-500 truncate">{studio}</p>
                       </div>
-                      <button className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity">
+                      <a
+                        href={job.slug ? `/jobs/${job.slug}` : `/jobs/arts-job-${job.id}`}
+                        className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity"
+                      >
                         Apply →
-                      </button>
+                      </a>
                     </div>
                     <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
                       {location && <><MapPin size={10} /><span>{location}</span></>}
@@ -537,9 +540,12 @@ function JobsTab({ user }: { user: any }) {
                       {job.rate && <span className="flex items-center gap-1"><CreditCard size={10} /> {job.rate}</span>}
                     </div>
                   </div>
-                  <button className="flex-shrink-0 text-xs font-semibold text-white bg-[#111] px-3 py-1.5 rounded-full hover:opacity-80 transition-opacity">
+                  <a
+                    href={job.slug ? `/jobs/${job.slug}` : `/jobs/arts-job-${job.id}`}
+                    className="flex-shrink-0 text-xs font-semibold text-white bg-[#111] px-3 py-1.5 rounded-full hover:opacity-80 transition-opacity"
+                  >
                     Apply
-                  </button>
+                  </a>
                 </div>
               ))}
             </div>

@@ -213,11 +213,14 @@ function ResumeCard({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ApplyPage() {
-  const params = useParams<{ locationSlug: string; jobSlug: string }>();
+  // Supports both /jobs/:jobSlug/apply (new) and /jobs/:locationSlug/:jobSlug/apply (legacy)
+  const params = useParams<{ locationSlug?: string; jobSlug?: string; legacyJobSlug?: string }>();
   const [, navigate] = useLocation();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
 
-  const jobId = extractIdFromSlug(params.jobSlug ?? "");
+  // In the new pattern, jobSlug is the full slug. In legacy, it's the second segment.
+  const rawSlug = params.jobSlug ?? params.legacyJobSlug ?? params.locationSlug ?? "";
+  const jobId = extractIdFromSlug(rawSlug);
 
   const { data: job, isLoading: jobLoading } = trpc.jobs.getDetail.useQuery(
     { id: jobId! },

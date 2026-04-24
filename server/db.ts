@@ -204,6 +204,7 @@ export async function getPublicJobs(limit = 50, offset = 0) {
  */
 export async function getPublicJobsEnriched(limit = 100, offset = 0): Promise<{
   id: number;
+  slug: string | null;
   requestStatus: string | null;
   startDate: Date | null;
   endDate: Date | null;
@@ -226,7 +227,7 @@ export async function getPublicJobsEnriched(limit = 100, offset = 0): Promise<{
   const db = await getDb();
   if (!db) return [];
   const rows = await db.execute(
-    `SELECT j.id, j.requestStatus, j.startDate, j.endDate, j.dateType,
+    `SELECT j.id, j.slug, j.requestStatus, j.startDate, j.endDate, j.dateType,
        j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate,
        j.locationAddress, j.locationLat, j.locationLng,
        j.description, j.direct, j.bubbleCreatedAt,
@@ -248,6 +249,7 @@ export async function getPublicJobsEnriched(limit = 100, offset = 0): Promise<{
  */
 export async function getJobDetailById(id: number): Promise<{
   id: number;
+  slug: string | null;
   requestStatus: string | null;
   startDate: Date | null;
   endDate: Date | null;
@@ -270,7 +272,7 @@ export async function getJobDetailById(id: number): Promise<{
   const db = await getDb();
   if (!db) return null;
   const rows = await db.execute(
-    `SELECT j.id, j.requestStatus, j.startDate, j.endDate, j.dateType,
+    `SELECT j.id, j.slug, j.requestStatus, j.startDate, j.endDate, j.dateType,
        j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate,
        j.locationAddress, j.locationLat, j.locationLng,
        j.description, j.direct, j.bubbleCreatedAt, j.clientUserId,
@@ -2247,6 +2249,7 @@ export async function getArtistJobsFeed(
   locationAddress: string | null;
   locationLat: string | null;
   locationLng: string | null;
+  slug: string | null;
 }[]> {
   const db = await getDb();
   if (!db) return [];
@@ -2259,7 +2262,7 @@ export async function getArtistJobsFeed(
     : "";
 
   const rows = await db.execute(
-    `SELECT j.id, j.dateType, j.startDate, j.endDate, j.isHourly, j.openRate, j.artistHourlyRate, j.createdAt,
+     `SELECT j.id, j.slug, j.dateType, j.startDate, j.endDate, j.isHourly, j.openRate, j.artistHourlyRate, j.createdAt,
      j.locationAddress, j.locationLat, j.locationLng,
      u.clientCompanyName, u.name as clientName,
      COALESCE(u.enterpriseLogoUrl, u.profilePicture) as clientLogo,

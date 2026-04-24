@@ -114,14 +114,15 @@ function timeAgo(date: Date | string | null | undefined): string {
 
 export function toJobUrl(job: {
   id: number;
-  locationAddress: string | null;
-  description: string | null;
+  slug?: string | null;
+  locationAddress?: string | null;
+  description?: string | null;
 }): string {
-  const city = job.locationAddress
-    ? job.locationAddress.split(",")[0].trim()
-    : "remote";
-  const title = extractTitleFromDescription(job.description);
-  return `/jobs/${slugify(city)}/${slugify(title)}-${job.id}`;
+  // Prefer the DB slug (already has the ID embedded)
+  if (job.slug) return `/jobs/${job.slug}`;
+  // Fallback: generate from description/location
+  const title = extractTitleFromDescription(job.description ?? null);
+  return `/jobs/${slugify(title)}-${job.id}`;
 }
 
 // ─── JSON-LD helpers ──────────────────────────────────────────────────────────
@@ -214,11 +215,14 @@ function Breadcrumbs({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function JobDetail() {
-  const params = useParams<{ locationSlug: string; jobSlug: string }>();
+  // Supports both /jobs/:jobSlug (new) and /jobs/:locationSlug/:jobSlug (legacy)
+  const params = useParams<{ locationSlug?: string; jobSlug?: string }>();
   const [, navigate] = useLocation();
   const { user } = useAuth();
 
-  const jobId = extractIdFromSlug(params.jobSlug ?? "");
+  // The jobSlug param holds the slug in both patterns
+  const rawSlug = params.jobSlug ?? params.locationSlug ?? "";
+  const jobId = extractIdFromSlug(rawSlug);
 
   const { data: job, isLoading, error } = trpc.jobs.getDetail.useQuery(
     { id: jobId! },
@@ -245,7 +249,9 @@ export default function JobDetail() {
   useEffect(() => {
     if (!job) return;
     const canonical = toJobUrl(job);
-    if (typeof window !== "undefined" && window.location.pathname !== canonical) {
+    const current = typeof window !== "undefined" ? window.location.pathname : "";
+    // Only redirect if we're on the old two-segment pattern
+    if (current.match(/^\/jobs\/[^/]+\/[^/]+$/) && current !== canonical) {
       navigate(canonical, { replace: true });
     }
   }, [job, navigate]);

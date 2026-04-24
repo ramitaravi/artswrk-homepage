@@ -105,11 +105,14 @@ function Router() {
       {/* Public routes */}
       <Route path="/" component={Home} />
       <Route path="/jobs" component={Jobs} />
-      {/* Job detail pages — PRO route MUST come before the generic :locationSlug route */}
+      {/* Job detail pages — PRO route MUST come before generic slug routes */}
       <Route path="/jobs/pro/:companySlug/:jobSlug" component={ProJobDetail} />
-      {/* Apply route MUST come before the generic :jobSlug route */}
-      <Route path="/jobs/:locationSlug/:jobSlug/apply" component={ApplyPage} />
-      <Route path="/jobs/:locationSlug/:jobSlug" component={JobDetail} />
+      {/* New simplified URL: /jobs/:jobSlug and /jobs/:jobSlug/apply */}
+      <Route path="/jobs/:jobSlug/apply" component={ApplyPage} />
+      <Route path="/jobs/:jobSlug" component={JobDetail} />
+      {/* Legacy two-segment URLs — kept for backward compat, JobDetail redirects to canonical */}
+      <Route path="/jobs/:locationSlug/:legacyJobSlug/apply" component={ApplyPage} />
+      <Route path="/jobs/:locationSlug/:legacyJobSlug" component={JobDetail} />
       <Route path="/login" component={Login} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />

@@ -682,7 +682,7 @@ export default function Jobs() {
       lng: j.locationLng ? parseFloat(j.locationLng) : null,
       isDirect: j.direct ?? false,
       clientProfilePicture: j.clientProfilePicture ?? null,
-      detailUrl: toJobUrl({ id: j.id, locationAddress: j.locationAddress, description: j.description }),
+      detailUrl: toJobUrl({ id: j.id, slug: j.slug, locationAddress: j.locationAddress, description: j.description }),
     }));
   }, [rawJobs]);
 
