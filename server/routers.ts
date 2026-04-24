@@ -2799,7 +2799,7 @@ Fields to extract:
         const job = await getAdminJobById(input.jobId);
         if (!job) return null;
         if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
-        const unlocked = await isClientJobUnlocked(user.id, input.jobId);
+        const unlocked = !!(user as any).clientPremium || await isClientJobUnlocked(user.id, input.jobId);
         const bookings = await getAdminJobBookings(input.jobId);
         return { ...job, unlocked, bookingCount: bookings.length };
       }),
@@ -2842,7 +2842,7 @@ Fields to extract:
         const job = await getAdminJobById(applicant.jobId);
         if (!job) throw new Error("Job not found");
         if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
-        const unlocked = user.role === "admin" || await isClientJobUnlocked(user.id, applicant.jobId);
+        const unlocked = user.role === "admin" || !!(user as any).clientPremium || await isClientJobUnlocked(user.id, applicant.jobId);
         if (!unlocked) throw new Error("Job must be unlocked to view applicant details");
         return applicant;
       }),
@@ -2925,7 +2925,7 @@ Fields to extract:
         const job = await getAdminJobById(applicant.jobId);
         if (!job) throw new Error("Job not found");
         if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
-        const unlocked = user.role === "admin" || await isClientJobUnlocked(user.id, applicant.jobId);
+        const unlocked = user.role === "admin" || !!(user as any).clientPremium || await isClientJobUnlocked(user.id, applicant.jobId);
         if (!unlocked) throw new Error("Job must be unlocked to message applicants");
         const conversation = await getOrCreateConversation(user.id, applicant.artistId);
         const msg = await sendMessageToConversation({ conversationId: conversation.id, senderUserId: user.id, content: input.message });
@@ -2960,7 +2960,7 @@ Fields to extract:
         const job = await getAdminJobById(applicant.jobId);
         if (!job) throw new Error("Job not found");
         if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
-        const unlocked = user.role === "admin" || await isClientJobUnlocked(user.id, applicant.jobId);
+        const unlocked = user.role === "admin" || !!(user as any).clientPremium || await isClientJobUnlocked(user.id, applicant.jobId);
         if (!unlocked) throw new Error("Job must be unlocked to confirm artists");
         const existing = await getBookingByApplicantId(input.applicantId);
         if (existing) return { success: true, bookingId: existing.id, alreadyConfirmed: true };
