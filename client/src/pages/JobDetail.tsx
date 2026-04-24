@@ -219,6 +219,8 @@ export default function JobDetail() {
   const params = useParams<{ locationSlug?: string; jobSlug?: string }>();
   const [, navigate] = useLocation();
   const { user } = useAuth();
+  // Must be declared before any conditional returns (Rules of Hooks)
+  const [gateOpen, setGateOpen] = useState(false);
 
   // The jobSlug param holds the slug in both patterns
   const rawSlug = params.jobSlug ?? params.locationSlug ?? "";
@@ -325,7 +327,6 @@ export default function JobDetail() {
   );
 
   const applyUrl = `${toJobUrl(job)}/apply`;
-  const [gateOpen, setGateOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-gray-50" style={{ fontFamily: "Poppins, sans-serif" }}>
