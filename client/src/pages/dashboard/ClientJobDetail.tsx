@@ -149,14 +149,18 @@ function MessageModal({
 function ApplicantDetailView({
   applicantId,
   allApplicantIds,
+  jobId,
   onBack,
 }: {
   applicantId: number;
   allApplicantIds: number[];
+  jobId: number;
   onBack: () => void;
 }) {
   const [currentId, setCurrentId] = useState(applicantId);
   const [msgOpen, setMsgOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const utils = trpc.useUtils();
   const { data: applicant, isLoading } = trpc.clientJobs.getApplicantDetail.useQuery({ applicantId: currentId });
 
   const idx = allApplicantIds.indexOf(currentId);
@@ -266,6 +270,13 @@ function ApplicantDetailView({
           </div>
           {/* Actions */}
           <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              onClick={() => setConfirmOpen(true)}
+              className="bg-[#F25722] hover:bg-orange-600 text-white gap-2"
+              size="sm"
+            >
+              <UserCheck size={14} /> Confirm Artist
+            </Button>
             <Button
               onClick={() => setMsgOpen(true)}
               className="bg-[#111] hover:bg-gray-800 text-white gap-2"
@@ -384,6 +395,20 @@ function ApplicantDetailView({
           <MessageModal applicant={applicant} onClose={() => setMsgOpen(false)} />
         </DialogContent>
       </Dialog>
+
+      {/* Confirm modal */}
+      {confirmOpen && (
+        <ConfirmModal
+          applicant={applicant}
+          jobId={jobId}
+          onClose={() => setConfirmOpen(false)}
+          onConfirmed={() => {
+            setConfirmOpen(false);
+            utils.clientJobs.getConfirmedArtists.invalidate({ jobId });
+            utils.clientJobs.getApplicants.invalidate({ jobId });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1055,6 +1080,7 @@ export default function ClientJobDetail() {
         <ApplicantDetailView
           applicantId={selectedApplicant.id}
           allApplicantIds={selectedApplicant.allIds}
+          jobId={jobId}
           onBack={() => setSelectedApplicant(null)}
         />
       </div>

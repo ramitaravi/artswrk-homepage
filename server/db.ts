@@ -2742,8 +2742,18 @@ export async function getOrCreateConversation(clientUserId: number, artistUserId
     unreadCount: 0,
   });
   const newId = (result as any).insertId as number;
-  const created = await db.select().from(conversations).where(eq(conversations.id, newId)).limit(1);
-  return created[0];
+  if (newId) {
+    const created = await db.select().from(conversations).where(eq(conversations.id, newId)).limit(1);
+    if (created[0]) return created[0];
+  }
+  // Fallback: re-query by clientUserId + artistUserId (handles race conditions or insertId issues)
+  const refetch = await db
+    .select()
+    .from(conversations)
+    .where(and(eq(conversations.clientUserId, clientUserId), eq(conversations.artistUserId, artistUserId)))
+    .limit(1);
+  if (!refetch[0]) throw new Error("Failed to create or find conversation");
+  return refetch[0];
 }
 
 /**
