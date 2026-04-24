@@ -373,6 +373,19 @@ export const bookings = mysqlTable("bookings", {
   description: text("description"),
   stripeCheckoutUrl: text("stripeCheckoutUrl"),
 
+  // ── Payment Method ────────────────────────────────────────────────────────
+  /**
+   * How the artist will be paid:
+   *   "artswrk" — client pays via Artswrk invoice (4% processing fee)
+   *   "direct"  — client pays artist directly outside Artswrk
+   * Null = not yet decided (legacy/Bubble bookings).
+   */
+  paymentMethod: varchar("paymentMethod", { length: 16 }),
+  /** Timestamp when the artist confirmed they received direct payment */
+  directPayConfirmedAt: timestamp("directPayConfirmedAt"),
+  /** Timestamp when the artist submitted their Artswrk invoice */
+  artswrkInvoiceSubmittedAt: timestamp("artswrkInvoiceSubmittedAt"),
+
   // ── Flags ──────────────────────────────────────────────────────────────────
   addedToSpreadsheet: boolean("addedToSpreadsheet").default(false),
   deleted: boolean("deleted").default(false),

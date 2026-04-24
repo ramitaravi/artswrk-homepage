@@ -656,3 +656,24 @@
 - [x] Auto-populate rate and transportation from last job for returning hirers
 - [x] Add CRM nav link to client dashboard sidebar
 - [x] Fix email.test.ts to match current HTML email implementation (7 tests passing)
+
+## Confirmation + Reimbursement Flow (Apr 23)
+- [x] Add paymentMethod field to bookings schema ("artswrk" | "direct" | null)
+- [x] Add directPayConfirmedAt timestamp to bookings schema
+- [x] Run pnpm db:push to migrate schema
+- [x] DB helpers: createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, getReimbursementsByBooking, createReimbursement
+- [x] tRPC clientJobs.confirmArtist — confirm applicant, choose payment method, create booking
+- [x] tRPC clientJobs.getConfirmedArtists — list confirmed bookings for a job
+- [x] tRPC artistDashboard.myConfirmations — artist's confirmed bookings with job + client details
+- [x] tRPC artistDashboard.confirmDirectPayment — artist marks direct payment received
+- [x] tRPC artistDashboard.submitReimbursement — artist uploads receipt + amount (S3 upload)
+- [x] tRPC artistDashboard.getReimbursements — list artist's reimbursements for a booking
+- [x] Email: send confirmation email to artist when confirmed
+- [x] Email: send reimbursement invoice email to contact@artswrk.com
+- [x] Client: "Confirm Artist" button on applicant cards in ClientJobDetail (unlocked only)
+- [x] Client: Confirm modal — payment method choice (Artswrk invoice 4% fee vs direct)
+- [x] Client: "Confirmed Artists" tab on ClientJobDetail showing confirmed bookings list
+- [x] Artist: "Confirmations" tab in ArtistDashboard showing confirmed jobs
+- [x] Artist: Pay-via-Artswrk flow — upload reimbursements (receipt + amount + note), submit invoice
+- [x] Artist: Pay-directly flow — "Confirm you got paid" button with confirmation dialog
+- [x] Write vitest tests for confirmation and reimbursement logic (7 tests, 129 total passing)

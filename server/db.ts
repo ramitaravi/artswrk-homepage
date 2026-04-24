@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, isNotNull, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, benefits, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, masterServiceTypes, messages, payments, premiumJobInterestedArtists, premiumJobs, users } from "../drizzle/schema";
+import { ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, benefits, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, masterServiceTypes, messages, payments, premiumJobInterestedArtists, premiumJobs, reimbursements, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -689,6 +689,9 @@ export async function getBookingsByClientId(
       locationLng: bookings.locationLng,
       description: bookings.description,
       stripeCheckoutUrl: bookings.stripeCheckoutUrl,
+      paymentMethod: bookings.paymentMethod,
+      directPayConfirmedAt: bookings.directPayConfirmedAt,
+      artswrkInvoiceSubmittedAt: bookings.artswrkInvoiceSubmittedAt,
       addedToSpreadsheet: bookings.addedToSpreadsheet,
       deleted: bookings.deleted,
       createdAt: bookings.createdAt,
@@ -2955,4 +2958,196 @@ export async function createClientCompany(data: {
   });
   // @ts-ignore
   return result[0].insertId as number;
+}
+
+// ─── Confirmation & Reimbursement Helpers ─────────────────────────────────────
+
+/**
+ * Create a booking from an interested artist (confirm the artist for a job).
+ * Sets bookingStatus = "Confirmed", paymentStatus = "Unpaid".
+ */
+export async function createBookingFromApplicant(data: {
+  jobId: number;
+  interestedArtistId: number;
+  clientUserId: number;
+  artistUserId: number;
+  paymentMethod: "artswrk" | "direct";
+  artistRate?: number | null;
+  clientRate?: number | null;
+  startDate?: Date | null;
+  endDate?: Date | null;
+  locationAddress?: string | null;
+  description?: string | null;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(bookings).values({
+    jobId: data.jobId,
+    interestedArtistId: data.interestedArtistId,
+    clientUserId: data.clientUserId,
+    artistUserId: data.artistUserId,
+    bookingStatus: "Confirmed",
+    paymentStatus: "Unpaid",
+    paymentMethod: data.paymentMethod,
+    artistRate: data.artistRate ?? null,
+    clientRate: data.clientRate ?? null,
+    startDate: data.startDate ?? null,
+    endDate: data.endDate ?? null,
+    locationAddress: data.locationAddress ?? null,
+    description: data.description ?? null,
+    externalPayment: data.paymentMethod === "direct",
+  });
+  // @ts-ignore
+  return result[0].insertId as number;
+}
+
+/**
+ * Get all confirmed bookings for a job (for the client's "Confirmed Artists" tab).
+ */
+export async function getConfirmedBookingsForJob(jobId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      id: bookings.id,
+      jobId: bookings.jobId,
+      interestedArtistId: bookings.interestedArtistId,
+      clientUserId: bookings.clientUserId,
+      artistUserId: bookings.artistUserId,
+      bookingStatus: bookings.bookingStatus,
+      paymentStatus: bookings.paymentStatus,
+      paymentMethod: bookings.paymentMethod,
+      artistRate: bookings.artistRate,
+      clientRate: bookings.clientRate,
+      startDate: bookings.startDate,
+      endDate: bookings.endDate,
+      directPayConfirmedAt: bookings.directPayConfirmedAt,
+      artswrkInvoiceSubmittedAt: bookings.artswrkInvoiceSubmittedAt,
+      createdAt: bookings.createdAt,
+      artistFirstName: users.firstName,
+      artistLastName: users.lastName,
+      artistName: users.name,
+      artistPhoto: users.profilePicture,
+      artistEmail: users.email,
+    })
+    .from(bookings)
+    .leftJoin(users, eq(bookings.artistUserId, users.id))
+    .where(and(eq(bookings.jobId, jobId), eq(bookings.bookingStatus, "Confirmed"), eq(bookings.deleted, false)))
+    .orderBy(desc(bookings.createdAt));
+  return rows;
+}
+
+/**
+ * Get all bookings for an artist (for the artist's "Confirmations" tab).
+ */
+export async function getArtistConfirmedBookings(artistUserId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      id: bookings.id,
+      jobId: bookings.jobId,
+      bookingStatus: bookings.bookingStatus,
+      paymentStatus: bookings.paymentStatus,
+      paymentMethod: bookings.paymentMethod,
+      artistRate: bookings.artistRate,
+      clientRate: bookings.clientRate,
+      startDate: bookings.startDate,
+      endDate: bookings.endDate,
+      directPayConfirmedAt: bookings.directPayConfirmedAt,
+      artswrkInvoiceSubmittedAt: bookings.artswrkInvoiceSubmittedAt,
+      createdAt: bookings.createdAt,
+      jobDescription: jobs.description,
+      jobLocation: jobs.locationAddress,
+      jobServiceType: jobs.masterServiceTypeId,
+      jobStartDate: jobs.startDate,
+      clientName: users.name,
+      clientFirstName: users.firstName,
+      clientCompanyName: users.clientCompanyName,
+      clientPhoto: users.profilePicture,
+    })
+    .from(bookings)
+    .leftJoin(jobs, eq(bookings.jobId, jobs.id))
+    .leftJoin(users, eq(bookings.clientUserId, users.id))
+    .where(and(eq(bookings.artistUserId, artistUserId), eq(bookings.deleted, false)))
+    .orderBy(desc(bookings.createdAt));
+  return rows;
+}
+
+/**
+ * Mark an artist's direct payment as confirmed.
+ */
+export async function confirmDirectPayment(bookingId: number, artistUserId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  await db
+    .update(bookings)
+    .set({ directPayConfirmedAt: new Date(), paymentStatus: "Paid" })
+    .where(and(eq(bookings.id, bookingId), eq(bookings.artistUserId, artistUserId)));
+  return true;
+}
+
+/**
+ * Mark an artist's Artswrk invoice as submitted.
+ */
+export async function markArtswrkInvoiceSubmitted(bookingId: number, artistUserId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  await db
+    .update(bookings)
+    .set({ artswrkInvoiceSubmittedAt: new Date() })
+    .where(and(eq(bookings.id, bookingId), eq(bookings.artistUserId, artistUserId)));
+  return true;
+}
+
+/**
+ * Get all reimbursements for a booking.
+ */
+export async function getReimbursementsByBookingId(bookingId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(reimbursements)
+    .where(eq(reimbursements.bookingId, bookingId))
+    .orderBy(desc(reimbursements.createdAt));
+}
+
+/**
+ * Create a reimbursement record for an artist.
+ */
+export async function createReimbursement(data: {
+  bookingId: number;
+  artistUserId: number;
+  value: number;
+  note?: string | null;
+  fileUrl?: string | null;
+  expenseDate?: Date | null;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(reimbursements).values({
+    bookingId: data.bookingId,
+    artistUserId: data.artistUserId,
+    value: data.value,
+    note: data.note ?? null,
+    fileUrl: data.fileUrl ?? null,
+    expenseDate: data.expenseDate ?? new Date(),
+  });
+  // @ts-ignore
+  return result[0].insertId as number;
+}
+
+/**
+ * Check if a booking already exists for a given interested artist record.
+ */
+export async function getBookingByApplicantId(interestedArtistId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(bookings)
+    .where(eq(bookings.interestedArtistId, interestedArtistId))
+    .limit(1);
+  return rows[0] ?? null;
 }

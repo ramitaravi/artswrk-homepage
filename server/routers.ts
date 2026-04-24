@@ -6,7 +6,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail } from "./email";
 import crypto from "crypto";
@@ -2457,6 +2457,126 @@ Fields to extract:
         });
         return { success: true, alreadyApplied: false };
       }),
+
+
+    /** Get all confirmed bookings for the logged-in artist. */
+    myConfirmations: protectedProcedure
+      .query(async ({ ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        return getArtistConfirmedBookings(user.id);
+      }),
+
+    /** Artist confirms they received direct payment for a booking. */
+    confirmDirectPayment: protectedProcedure
+      .input(z.object({ bookingId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        await confirmDirectPayment(input.bookingId, user.id);
+        return { success: true };
+      }),
+
+    /** Get all reimbursements for a booking (artist view). */
+    getReimbursements: protectedProcedure
+      .input(z.object({ bookingId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        return getReimbursementsByBookingId(input.bookingId);
+      }),
+
+    /** Add a reimbursement item for a booking. */
+    addReimbursement: protectedProcedure
+      .input(z.object({
+        bookingId: z.number(),
+        value: z.number().positive(),
+        note: z.string().max(500).optional(),
+        fileUrl: z.string().url().optional(),
+        expenseDate: z.date().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const id = await createReimbursement({
+          bookingId: input.bookingId,
+          artistUserId: user.id,
+          value: input.value,
+          note: input.note ?? null,
+          fileUrl: input.fileUrl ?? null,
+          expenseDate: input.expenseDate ?? null,
+        });
+        return { success: true, id };
+      }),
+
+    /**
+     * Submit the Artswrk invoice for a booking.
+     * Sends an email to contact@artswrk.com with the reimbursement details.
+     */
+    submitArtswrkInvoice: protectedProcedure
+      .input(z.object({
+        bookingId: z.number(),
+        artistRate: z.number().optional(),
+        notes: z.string().max(1000).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const reimbList = await getReimbursementsByBookingId(input.bookingId);
+        const totalReimb = reimbList.reduce((s, r) => s + (r.value ?? 0), 0);
+        const artistRate = input.artistRate ?? 0;
+        const processingFee = Math.round((artistRate + totalReimb) * 0.04);
+        const total = artistRate + totalReimb + processingFee;
+        // Send invoice email to Artswrk
+        try {
+          await sendSimpleEmail({
+            to: "contact@artswrk.com",
+            subject: `Invoice Request from ${user.name ?? user.email} — Booking #${input.bookingId}`,
+            html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+              <div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:20px 28px;border-radius:12px 12px 0 0">
+                <span style="font-size:18px;font-weight:900;color:#fff">ARTS</span><span style="font-size:18px;font-weight:900;background:#111;color:#fff;padding:2px 8px;border-radius:4px;margin-left:2px">WRK</span>
+                <span style="color:rgba(255,255,255,0.85);font-size:13px;margin-left:12px">Invoice Request</span>
+              </div>
+              <div style="padding:28px;background:#fff;border:1px solid #f0f0f0;border-radius:0 0 12px 12px">
+                <h2 style="margin:0 0 16px;font-size:18px;color:#111">Invoice Request — Booking #${input.bookingId}</h2>
+                <table style="width:100%;border-collapse:collapse;font-size:14px">
+                  <tr><td style="padding:8px 0;color:#666;border-bottom:1px solid #f0f0f0">Artist</td><td style="padding:8px 0;font-weight:600;color:#111;border-bottom:1px solid #f0f0f0">${user.name ?? user.email}</td></tr>
+                  <tr><td style="padding:8px 0;color:#666;border-bottom:1px solid #f0f0f0">Artist Email</td><td style="padding:8px 0;color:#111;border-bottom:1px solid #f0f0f0">${user.email ?? ""}</td></tr>
+                  <tr><td style="padding:8px 0;color:#666;border-bottom:1px solid #f0f0f0">Artist Rate</td><td style="padding:8px 0;color:#111;border-bottom:1px solid #f0f0f0">$${artistRate}</td></tr>
+                  <tr><td style="padding:8px 0;color:#666;border-bottom:1px solid #f0f0f0">Reimbursements</td><td style="padding:8px 0;color:#111;border-bottom:1px solid #f0f0f0">$${totalReimb} (${reimbList.length} item${reimbList.length !== 1 ? "s" : ""})</td></tr>
+                  <tr><td style="padding:8px 0;color:#666;border-bottom:1px solid #f0f0f0">4% Processing Fee</td><td style="padding:8px 0;color:#111;border-bottom:1px solid #f0f0f0">$${processingFee}</td></tr>
+                  <tr><td style="padding:8px 0;color:#111;font-weight:700">Total to Invoice Client</td><td style="padding:8px 0;color:#F25722;font-weight:700;font-size:16px">$${total}</td></tr>
+                </table>
+                ${reimbList.length > 0 ? `<h3 style="font-size:14px;color:#111;margin:20px 0 8px">Reimbursement Items</h3><ul style="margin:0;padding:0 0 0 16px;color:#555;font-size:13px">${reimbList.map(r => `<li>${r.note ?? "Expense"}: $${r.value}${r.fileUrl ? ` — <a href="${r.fileUrl}">Receipt</a>` : ""}</li>`).join("")}</ul>` : ""}
+                ${input.notes ? `<div style="margin-top:16px;background:#f9f9f9;border-radius:8px;padding:12px 16px"><p style="margin:0;font-size:13px;color:#555"><strong>Notes:</strong> ${input.notes}</p></div>` : ""}
+              </div>
+            </div>`,
+          });
+        } catch (e) {
+          console.error("[submitArtswrkInvoice] Email send failed:", e);
+          throw new Error("Failed to send invoice email. Please try again.");
+        }
+        await markArtswrkInvoiceSubmitted(input.bookingId, user.id);
+        return { success: true };
+      }),
+
+    /** Upload a reimbursement receipt file to S3 and return the URL. */
+    uploadReimbursementReceipt: protectedProcedure
+      .input(z.object({
+        fileName: z.string(),
+        fileBase64: z.string(),
+        mimeType: z.string(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const { storagePut } = await import("./storage");
+        const buffer = Buffer.from(input.fileBase64, "base64");
+        const suffix = Date.now().toString(36);
+        const key = `reimbursements/${user.id}/${suffix}-${input.fileName}`;
+        const { url } = await storagePut(key, buffer, input.mimeType);
+        return { url };
+      }),
   }),
 
   artswrkUsers: router({
@@ -2821,6 +2941,71 @@ Fields to extract:
           }
         }
         return { success: true, conversationId: conversation.id, messageId: msg.id };
+      }),
+
+
+    /**
+     * Confirm an artist for a job — creates a booking record.
+     */
+    confirmArtist: protectedProcedure
+      .input(z.object({
+        applicantId: z.number(),
+        paymentMethod: z.enum(["artswrk", "direct"]),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const applicant = await getApplicantDetail(input.applicantId);
+        if (!applicant) throw new Error("Applicant not found");
+        const job = await getAdminJobById(applicant.jobId);
+        if (!job) throw new Error("Job not found");
+        if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
+        const unlocked = user.role === "admin" || await isClientJobUnlocked(user.id, applicant.jobId);
+        if (!unlocked) throw new Error("Job must be unlocked to confirm artists");
+        const existing = await getBookingByApplicantId(input.applicantId);
+        if (existing) return { success: true, bookingId: existing.id, alreadyConfirmed: true };
+        const bookingId = await createBookingFromApplicant({
+          jobId: applicant.jobId,
+          interestedArtistId: input.applicantId,
+          clientUserId: user.id,
+          artistUserId: applicant.artistId,
+          paymentMethod: input.paymentMethod,
+          artistRate: applicant.artistHourlyRate ?? applicant.artistFlatRate ?? null,
+          clientRate: applicant.clientHourlyRate ?? applicant.clientFlatRate ?? null,
+          startDate: applicant.startDate ?? null,
+          endDate: applicant.endDate ?? null,
+          locationAddress: job.locationAddress ?? null,
+          description: job.description ?? null,
+        });
+        try {
+          if (applicant.artistEmail) {
+            const studioName = (user as any).clientCompanyName ?? user.name ?? "A studio";
+            const jobTitle = (job.description ?? "").split("\n")[0].slice(0, 60);
+            const payMethodText = input.paymentMethod === "artswrk"
+              ? "Invoice via Artswrk (4% processing fee)"
+              : "Direct payment from studio";
+            await sendSimpleEmail({
+              to: applicant.artistEmail,
+              subject: `You have been confirmed for: ${jobTitle}`,
+              html: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto"><div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:24px 32px;border-radius:12px 12px 0 0"><span style="font-size:18px;font-weight:900;color:#fff">ARTS</span><span style="font-size:18px;font-weight:900;background:#111;color:#fff;padding:2px 8px;border-radius:4px;margin-left:2px">WRK</span></div><div style="padding:32px;background:#fff;border:1px solid #f0f0f0;border-radius:0 0 12px 12px"><h1 style="font-size:22px;font-weight:900;color:#111;margin:0 0 8px">You have been confirmed!</h1><p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 20px">Hi ${applicant.artistFirstName ?? "there"}, <strong>${studioName}</strong> has confirmed you for <strong>${jobTitle}</strong>.</p><div style="background:#f9f9f9;border-radius:10px;padding:16px 20px;margin-bottom:20px"><p style="margin:0 0 6px;font-size:13px;color:#999;font-weight:700;text-transform:uppercase">Payment Method</p><p style="margin:0;font-size:15px;color:#111;font-weight:600">${payMethodText}</p></div><p style="color:#555;font-size:14px">Log in to your Artswrk dashboard to view your confirmation and manage payment.</p><a href="https://artswrk.com/app" style="display:inline-block;background:linear-gradient(90deg,#FFBC5D,#F25722);color:#fff;font-weight:800;font-size:14px;padding:12px 28px;border-radius:10px;text-decoration:none;margin-top:8px">View Dashboard</a></div></div>`,
+            });
+          }
+        } catch (e) {
+          console.error("[confirmArtist] Email send failed (non-fatal):", e);
+        }
+        return { success: true, bookingId, alreadyConfirmed: false };
+      }),
+
+    /** Get all confirmed bookings for a job (client Confirmed Artists tab). */
+    getConfirmedArtists: protectedProcedure
+      .input(z.object({ jobId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const job = await getAdminJobById(input.jobId);
+        if (!job) throw new Error("Job not found");
+        if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
+        return getConfirmedBookingsForJob(input.jobId);
       }),
   }),
   /** Benefits / Partner perks — filtered by audience type */

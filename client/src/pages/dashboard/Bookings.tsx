@@ -11,7 +11,37 @@ import {
   TrendingUp, Loader2
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import type { Booking } from "../../../../drizzle/schema";
+// Flexible type for both raw Booking schema rows and enriched query results
+type AnyBooking = {
+  id: number;
+  bookingStatus?: string | null;
+  paymentStatus?: string | null;
+  artistUserId?: number | null;
+  startDate?: Date | null;
+  endDate?: Date | null;
+  locationAddress?: string | null;
+  description?: string | null;
+  artistRate?: number | null;
+  clientRate?: number | null;
+  totalClientRate?: number | null;
+  totalArtistRate?: number | null;
+  grossProfit?: number | null;
+  stripeFee?: number | null;
+  stripeCheckoutUrl?: string | null;
+  externalPayment?: boolean | null;
+  hours?: number | null;
+  bubbleArtistId?: string | null;
+  bubbleRequestId?: string | null;
+  paymentMethod?: string | null;
+  directPayConfirmedAt?: Date | null;
+  artswrkInvoiceSubmittedAt?: Date | null;
+  // enriched artist fields (from join)
+  artistFirstName?: string | null;
+  artistLastName?: string | null;
+  artistName?: string | null;
+  artistProfilePicture?: string | null;
+  artistSlug?: string | null;
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -59,7 +89,7 @@ const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, { label: string; className: s
 
 // ── Booking Row ───────────────────────────────────────────────────────────────
 
-function BookingRow({ booking }: { booking: Booking }) {
+function BookingRow({ booking }: { booking: AnyBooking }) {
   const [expanded, setExpanded] = useState(false);
   const [, navigate] = useLocation();
   const artistUserId = (booking as any).artistUserId as number | null | undefined;

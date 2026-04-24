@@ -16,6 +16,7 @@ import {
   Calendar, Lock, Unlock, ExternalLink, MessageCircle,
   CheckCircle2, Users, Loader2, Star, X, Send,
   Building2, Clock, FileText, Globe, Instagram,
+  UserCheck, CreditCard, Banknote,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -399,6 +400,7 @@ function ApplicantsTab({
   onSelectApplicant: (id: number, allIds: number[]) => void;
 }) {
   const [msgOpen, setMsgOpen] = useState<number | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState<any | null>(null);
   const utils = trpc.useUtils();
   const { data, isLoading } = trpc.clientJobs.getApplicants.useQuery({ jobId });
 
@@ -625,6 +627,12 @@ function ApplicantsTab({
               >
                 <MessageCircle size={10} /> Message
               </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setConfirmOpen(a); }}
+                className="flex items-center gap-1 text-green-600 font-semibold hover:text-green-700 transition-colors"
+              >
+                <UserCheck size={10} /> Confirm
+              </button>
             </div>
             {/* Inline message modal */}
             {msgOpen === a.id && (
@@ -632,6 +640,219 @@ function ApplicantsTab({
                 <MessageModal applicant={a} onClose={() => setMsgOpen(null)} />
               </div>
             )}
+          </div>
+        );
+      })}
+    {/* Confirm modal */}
+    {confirmOpen && (
+      <ConfirmModal
+        applicant={confirmOpen}
+        jobId={jobId}
+        onClose={() => setConfirmOpen(null)}
+        onConfirmed={() => {
+          utils.clientJobs.getApplicants.invalidate({ jobId });
+          utils.clientJobs.getConfirmedArtists.invalidate({ jobId });
+        }}
+      />
+    )}
+    </div>
+  );
+}
+
+// ─── Confirm Modal ────────────────────────────────────────────────────────────
+
+function ConfirmModal({
+  applicant,
+  jobId,
+  onClose,
+  onConfirmed,
+}: {
+  applicant: any;
+  jobId: number;
+  onClose: () => void;
+  onConfirmed: () => void;
+}) {
+  const [paymentMethod, setPaymentMethod] = useState<"artswrk" | "direct" | null>(null);
+  const confirmMutation = trpc.clientJobs.confirmArtist.useMutation({
+    onSuccess: (res) => {
+      if (res.alreadyConfirmed) {
+        toast.info("Artist was already confirmed.");
+      } else {
+        toast.success("Artist confirmed! A confirmation email has been sent.");
+      }
+      onConfirmed();
+      onClose();
+    },
+    onError: (e) => toast.error(e.message || "Failed to confirm artist"),
+  });
+
+  const name = displayName(applicant);
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <UserCheck size={18} className="text-[#F25722]" />
+            Confirm {name}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-1">
+          <p className="text-sm text-gray-500">
+            How will you pay <strong>{name}</strong> for this job?
+          </p>
+          {/* Payment method options */}
+          <div className="grid grid-cols-1 gap-3">
+            <button
+              onClick={() => setPaymentMethod("artswrk")}
+              className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${
+                paymentMethod === "artswrk"
+                  ? "border-[#F25722] bg-orange-50"
+                  : "border-gray-100 hover:border-gray-200"
+              }`}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                paymentMethod === "artswrk" ? "bg-[#F25722]" : "bg-gray-100"
+              }`}>
+                <CreditCard size={15} className={paymentMethod === "artswrk" ? "text-white" : "text-gray-500"} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-[#111]">Invoice via Artswrk</p>
+                <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                  Receive an invoice from Artswrk to pay the artist. 4% processing fee — saves you the hassle of adding to payroll.
+                </p>
+              </div>
+              {paymentMethod === "artswrk" && (
+                <CheckCircle2 size={16} className="text-[#F25722] flex-shrink-0 mt-0.5" />
+              )}
+            </button>
+
+            <button
+              onClick={() => setPaymentMethod("direct")}
+              className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${
+                paymentMethod === "direct"
+                  ? "border-[#111] bg-gray-50"
+                  : "border-gray-100 hover:border-gray-200"
+              }`}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                paymentMethod === "direct" ? "bg-[#111]" : "bg-gray-100"
+              }`}>
+                <Banknote size={15} className={paymentMethod === "direct" ? "text-white" : "text-gray-500"} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-[#111]">Pay Artist Directly</p>
+                <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                  You will handle payment directly with the artist outside of Artswrk.
+                </p>
+              </div>
+              {paymentMethod === "direct" && (
+                <CheckCircle2 size={16} className="text-[#111] flex-shrink-0 mt-0.5" />
+              )}
+            </button>
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <Button variant="outline" className="flex-1" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              className="flex-1 bg-[#F25722] hover:opacity-90 text-white"
+              disabled={!paymentMethod || confirmMutation.isPending}
+              onClick={() => {
+                if (!paymentMethod) return;
+                confirmMutation.mutate({ applicantId: applicant.id, paymentMethod });
+              }}
+            >
+              {confirmMutation.isPending ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <UserCheck size={14} />
+              )}
+              Confirm Artist
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Confirmed Artists Tab ─────────────────────────────────────────────────────
+
+function ConfirmedArtistsTab({ jobId }: { jobId: number }) {
+  const { data, isLoading } = trpc.clientJobs.getConfirmedArtists.useQuery({ jobId });
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 size={24} className="animate-spin text-gray-300" />
+      </div>
+    );
+  }
+
+  const confirmed = data ?? [];
+
+  if (confirmed.length === 0) {
+    return (
+      <div className="text-center py-16 text-gray-400">
+        <UserCheck size={32} className="mx-auto mb-3 opacity-20" />
+        <p className="text-sm">No confirmed artists yet</p>
+        <p className="text-xs mt-1 text-gray-300">Confirm artists from the Applicants tab</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-gray-400 font-medium">{confirmed.length} confirmed artist{confirmed.length !== 1 ? "s" : ""}</p>
+      {confirmed.map((b: any) => {
+        const name = b.artistFirstName && b.artistLastName
+          ? `${b.artistFirstName} ${b.artistLastName}`
+          : b.artistName ?? `Artist #${b.artistUserId}`;
+        const payBadge = b.paymentMethod === "artswrk"
+          ? { label: "Invoice via Artswrk", cls: "bg-orange-50 text-[#F25722]" }
+          : { label: "Direct Payment", cls: "bg-gray-100 text-gray-600" };
+        return (
+          <div key={b.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                {b.artistPhoto ? (
+                  <img src={b.artistPhoto} alt={name} className="w-10 h-10 rounded-full object-cover border border-gray-100" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-sm font-black flex-shrink-0">
+                    {(name[0] || "?").toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm font-bold text-[#111]">{name}</p>
+                  {b.artistEmail && (
+                    <p className="text-xs text-gray-400">{b.artistEmail}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-green-600">
+                  <CheckCircle2 size={10} /> Confirmed
+                </span>
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${payBadge.cls}`}>
+                  {payBadge.label}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 mt-3 text-xs text-gray-400 flex-wrap">
+              {b.startDate && (
+                <span className="flex items-center gap-1">
+                  <Calendar size={10} /> {fmtDate(b.startDate)}
+                </span>
+              )}
+              {b.artistRate && (
+                <span className="flex items-center gap-1">
+                  <DollarSign size={10} /> Artist rate: ${b.artistRate}
+                </span>
+              )}
+              <span className="ml-auto text-gray-300">Confirmed {fmtDate(b.createdAt)}</span>
+            </div>
           </div>
         );
       })}
@@ -776,7 +997,7 @@ export default function ClientJobDetail() {
   const backLabel = isEnterprise ? "Dashboard" : "Jobs";
   const backPath = isEnterprise ? "/enterprise" : "/app/jobs";
   const [, navigate] = useLocation();
-  type Tab = "applicants" | "overview" | "bookings";
+  type Tab = "applicants" | "confirmed" | "overview" | "bookings";
   const [tab, setTab] = useState<Tab>("applicants");
   const [selectedApplicant, setSelectedApplicant] = useState<{ id: number; allIds: number[] } | null>(null);
 
@@ -843,6 +1064,7 @@ export default function ClientJobDetail() {
 
   const TABS: { id: Tab; label: string }[] = [
     { id: "applicants", label: "Applicants" },
+    { id: "confirmed", label: "Confirmed" },
     { id: "overview", label: "Overview" },
     ...(showBookings ? [{ id: "bookings" as Tab, label: `Bookings (${job.bookingCount})` }] : []),
   ];
@@ -930,6 +1152,7 @@ export default function ClientJobDetail() {
           onSelectApplicant={handleSelectApplicant}
         />
       )}
+      {tab === "confirmed" && <ConfirmedArtistsTab jobId={jobId} />}
       {tab === "overview" && <OverviewTab job={job} />}
       {tab === "bookings" && <BookingsTab jobId={jobId} />}
     </div>

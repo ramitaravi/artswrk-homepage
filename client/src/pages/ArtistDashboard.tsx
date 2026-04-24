@@ -5,7 +5,7 @@
  * Main: Greeting, Affiliations, Tasks, Profile Boost, PRO Jobs, Jobs for You
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import ArtistProfilePage from "./artist/ArtistProfilePage";
 import ArtistSettingsPlan from "./artist/ArtistSettingsPlan";
@@ -27,6 +27,14 @@ import {
   ExternalLink,
   ArrowRight,
   Sparkles,
+  UserCheck,
+  Banknote,
+  Upload,
+  Loader2,
+  Plus,
+  Trash2,
+  FileText,
+  DollarSign,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
@@ -737,7 +745,343 @@ function BookingsTab() {
   );
 }
 
-// ─── Payments Tab ─────────────────────────────────────────────────────────────────
+// ─── Confirmations Tab ─────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ConfirmationCard — shows a single confirmed booking for the artist.
+ * - If paymentMethod === "artswrk": show reimbursement upload + invoice submission
+ * - If paymentMethod === "direct": show "Confirm you got paid" button
+ */
+function ConfirmationCard({ booking }: { booking: any }) {
+  const utils = trpc.useUtils();
+  const [expanded, setExpanded] = useState(false);
+  const [reimbNote, setReimbNote] = useState("");
+  const [reimbValue, setReimbValue] = useState("");
+  const [reimbFile, setReimbFile] = useState<File | null>(null);
+  const [invoiceNotes, setInvoiceNotes] = useState("");
+  const [artistRate, setArtistRate] = useState(booking.artistRate?.toString() ?? "");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const addReimbursement = trpc.artistDashboard.addReimbursement.useMutation({
+    onSuccess: () => {
+      utils.artistDashboard.myConfirmations.invalidate();
+      utils.artistDashboard.getReimbursements.invalidate({ bookingId: booking.id });
+      setReimbNote("");
+      setReimbValue("");
+      setReimbFile(null);
+    },
+    onError: (e: any) => alert(e.message || "Failed to add reimbursement"),
+  });
+
+  const uploadReceipt = trpc.artistDashboard.uploadReimbursementReceipt.useMutation();
+
+  const submitInvoice = trpc.artistDashboard.submitArtswrkInvoice.useMutation({
+    onSuccess: () => {
+      utils.artistDashboard.myConfirmations.invalidate();
+      alert("Invoice submitted! Artswrk will send the invoice to the studio.");
+    },
+    onError: (e: any) => alert(e.message || "Failed to submit invoice"),
+  });
+
+  const confirmDirectPay = trpc.artistDashboard.confirmDirectPayment.useMutation({
+    onSuccess: () => {
+      utils.artistDashboard.myConfirmations.invalidate();
+    },
+    onError: (e: any) => alert(e.message || "Failed to confirm payment"),
+  });
+
+  const { data: reimbursements } = trpc.artistDashboard.getReimbursements.useQuery(
+    { bookingId: booking.id },
+    { enabled: expanded && booking.paymentMethod === "artswrk" }
+  );
+
+  const studioName = booking.clientCompanyName ?? booking.clientFirstName ?? `Studio #${booking.clientUserId}`;
+  const jobTitle = (booking.jobDescription ?? "").split("\n")[0].slice(0, 60) || `Job #${booking.jobId}`;
+  const isArtswrk = booking.paymentMethod === "artswrk";
+  const isDirect = booking.paymentMethod === "direct";
+  const isInvoiceSubmitted = !!booking.artswrkInvoiceSubmittedAt;
+  const isDirectConfirmed = !!booking.directPayConfirmedAt;
+
+  async function handleAddReimbursement() {
+    if (!reimbValue || isNaN(parseFloat(reimbValue))) return;
+    let fileUrl: string | undefined;
+    if (reimbFile) {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve) => {
+        reader.onload = (e) => resolve((e.target?.result as string).split(",")[1]);
+        reader.readAsDataURL(reimbFile);
+      });
+      const res = await uploadReceipt.mutateAsync({
+        fileName: reimbFile.name,
+        fileBase64: base64,
+        mimeType: reimbFile.type,
+      });
+      fileUrl = res.url;
+    }
+    addReimbursement.mutate({
+      bookingId: booking.id,
+      value: parseFloat(reimbValue),
+      note: reimbNote || undefined,
+      fileUrl,
+    });
+  }
+
+  const totalReimb = (reimbursements ?? []).reduce((s: number, r: any) => s + (r.value ?? 0), 0);
+  const rate = parseFloat(artistRate) || 0;
+  const processingFee = Math.round((rate + totalReimb) * 0.04);
+  const invoiceTotal = rate + totalReimb + processingFee;
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="p-4 flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-sm flex-shrink-0">
+            {(studioName[0] || "?").toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-[#111] truncate">{jobTitle}</p>
+            <p className="text-xs text-gray-400">{studioName}</p>
+            {booking.jobLocation && (
+              <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                <MapPin size={9} /> {booking.jobLocation}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+          <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-green-600">
+            <UserCheck size={9} /> Confirmed
+          </span>
+          {isArtswrk && (
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722]">
+              Invoice via Artswrk
+            </span>
+          )}
+          {isDirect && (
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+              Direct Payment
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Direct pay flow */}
+      {isDirect && (
+        <div className="border-t border-gray-50 px-4 py-3">
+          {isDirectConfirmed ? (
+            <div className="flex items-center gap-2 text-sm text-green-600 font-semibold">
+              <CheckCircle2 size={15} /> Payment confirmed on {new Date(booking.directPayConfirmedAt).toLocaleDateString()}
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-gray-500">Did you receive payment from {studioName} for this job?</p>
+              <button
+                onClick={() => confirmDirectPay.mutate({ bookingId: booking.id })}
+                disabled={confirmDirectPay.isPending}
+                className="flex items-center gap-1.5 text-xs font-bold text-white bg-[#111] px-3 py-2 rounded-lg hover:bg-gray-800 transition-colors whitespace-nowrap"
+              >
+                {confirmDirectPay.isPending ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                Yes, I got paid
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Artswrk invoice flow */}
+      {isArtswrk && (
+        <div className="border-t border-gray-50">
+          {isInvoiceSubmitted ? (
+            <div className="px-4 py-3 flex items-center gap-2 text-sm text-green-600 font-semibold">
+              <CheckCircle2 size={15} /> Invoice submitted to Artswrk on {new Date(booking.artswrkInvoiceSubmittedAt).toLocaleDateString()}
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="w-full px-4 py-3 flex items-center justify-between text-sm font-semibold text-[#F25722] hover:bg-orange-50 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <FileText size={14} /> Submit Invoice to Artswrk
+                </span>
+                <ChevronRight size={14} className={`transition-transform ${expanded ? "rotate-90" : ""}`} />
+              </button>
+
+              {expanded && (
+                <div className="px-4 pb-4 space-y-4">
+                  {/* Artist rate */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Your Rate for This Job ($)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={artistRate}
+                      onChange={(e) => setArtistRate(e.target.value)}
+                      placeholder="e.g. 150"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-colors"
+                    />
+                  </div>
+
+                  {/* Reimbursements */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 mb-2">Reimbursements (optional)</p>
+                    {(reimbursements ?? []).length > 0 && (
+                      <div className="space-y-1.5 mb-3">
+                        {(reimbursements ?? []).map((r: any) => (
+                          <div key={r.id} className="flex items-center justify-between text-xs bg-gray-50 rounded-lg px-3 py-2">
+                            <span className="text-gray-600">{r.note || "Expense"}</span>
+                            <div className="flex items-center gap-2">
+                              {r.fileUrl && (
+                                <a href={r.fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                                  <FileText size={11} />
+                                </a>
+                              )}
+                              <span className="font-semibold text-[#111]">${r.value}</span>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="text-xs text-gray-400 text-right">Total reimbursements: ${totalReimb}</div>
+                      </div>
+                    )}
+
+                    {/* Add reimbursement */}
+                    <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Description (e.g. Gas, Parking)"
+                          value={reimbNote}
+                          onChange={(e) => setReimbNote(e.target.value)}
+                          className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#F25722]"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="$"
+                          value={reimbValue}
+                          onChange={(e) => setReimbValue(e.target.value)}
+                          className="w-20 px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#F25722]"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#F25722] transition-colors"
+                        >
+                          <Upload size={12} /> {reimbFile ? reimbFile.name.slice(0, 20) : "Attach receipt"}
+                        </button>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*,application/pdf"
+                          className="hidden"
+                          onChange={(e) => setReimbFile(e.target.files?.[0] ?? null)}
+                        />
+                        <button
+                          onClick={handleAddReimbursement}
+                          disabled={addReimbursement.isPending || uploadReceipt.isPending || !reimbValue}
+                          className="ml-auto flex items-center gap-1 text-xs font-bold text-white bg-[#F25722] px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                        >
+                          {(addReimbursement.isPending || uploadReceipt.isPending) ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Invoice summary */}
+                  <div className="bg-orange-50 rounded-xl p-3 space-y-1.5 text-xs">
+                    <p className="font-semibold text-[#111] mb-2">Invoice Summary</p>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Artist rate</span><span>${rate}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Reimbursements</span><span>${totalReimb}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>4% processing fee</span><span>${processingFee}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-[#111] border-t border-orange-100 pt-1.5 mt-1.5">
+                      <span>Total to invoice client</span><span className="text-[#F25722]">${invoiceTotal}</span>
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Additional Notes (optional)</label>
+                    <textarea
+                      value={invoiceNotes}
+                      onChange={(e) => setInvoiceNotes(e.target.value)}
+                      rows={2}
+                      placeholder="Any notes for Artswrk..."
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#F25722] resize-none"
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => submitInvoice.mutate({
+                      bookingId: booking.id,
+                      artistRate: rate || undefined,
+                      notes: invoiceNotes || undefined,
+                    })}
+                    disabled={submitInvoice.isPending || rate <= 0}
+                    className="w-full py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FFBC5D] to-[#F25722] hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {submitInvoice.isPending ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                    Submit Invoice to Artswrk
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConfirmationsTab() {
+  const { data, isLoading } = trpc.artistDashboard.myConfirmations.useQuery();
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 size={24} className="animate-spin text-gray-300" />
+      </div>
+    );
+  }
+
+  const confirmations = data ?? [];
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-semibold text-[#111]">Confirmations</h2>
+      <p className="text-sm text-gray-400">
+        Jobs you have been confirmed for. Manage payment and reimbursements here.
+      </p>
+
+      {confirmations.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+          <UserCheck size={36} className="mx-auto text-gray-300 mb-3" />
+          <p className="text-sm font-semibold text-gray-700 mb-1">No confirmations yet</p>
+          <p className="text-sm text-gray-500 mb-4">When a studio confirms you for a job, it will appear here.</p>
+          <a href="/app/jobs" className="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity">
+            Browse jobs →
+          </a>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {confirmations.map((b: any) => (
+            <ConfirmationCard key={b.id} booking={b} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Payments Tab ─────────────────────────────────────────────────────────────────────────────────────
 
 const SAMPLE_PAYMENTS = [
   { id: 1, jobTitle: "Hip Hop Instructor", company: "Elevation on Tour", amount: "$160.00", date: "May 5, 2025", status: "paid" as const, method: "Direct Deposit" },
@@ -1073,6 +1417,7 @@ export default function ArtistDashboard() {
 
   function renderContent() {
     if (location.startsWith("/app/jobs")) return <JobsTab user={user} />;
+    if (location.startsWith("/app/confirmations")) return <ConfirmationsTab />;
     if (location.startsWith("/app/bookings")) return <BookingsTab />;
     if (location.startsWith("/app/payments")) return <PaymentsTab />;
     if (location.startsWith("/app/messages")) return <MessagesTab />;

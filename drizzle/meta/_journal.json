@@ -197,6 +197,13 @@
       "when": 1776978132534,
       "tag": "0027_faithful_microchip",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "5",
+      "when": 1776991333420,
+      "tag": "0028_regular_ogun",
+      "breakpoints": true
     }
   ]
 }
