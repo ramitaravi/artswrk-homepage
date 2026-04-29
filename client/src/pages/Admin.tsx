@@ -17,12 +17,11 @@ import {
   MapPin, Clock, ArrowUpRight, UserCog, ArrowLeft, Sparkles, Globe, ExternalLink, Megaphone,
   Plus, Edit2, Mail, ChevronDown, ToggleLeft, ToggleRight, Instagram, Link as LinkIcon, Send,
 } from "lucide-react";
-import AcquisitionSection from "./admin/Acquisition";
 import { ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE } from "@shared/const";
 import { Link } from "wouter";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type AdminSection = "dashboard" | "artists" | "clients" | "jobs" | "pro-jobs" | "enterprise-clients" | "bookings" | "payments" | "subscriptions" | "acquisition" | "settings";
+type AdminSection = "dashboard" | "artists" | "clients" | "jobs" | "pro-jobs" | "enterprise-clients" | "bookings" | "payments" | "subscriptions" | "settings";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmt$(cents: number) {
@@ -52,7 +51,6 @@ const NAV_ITEMS: { id: AdminSection; label: string; icon: React.ReactNode }[] = 
   { id: "bookings", label: "Bookings", icon: <BookOpen size={16} /> },
   { id: "payments", label: "Payments", icon: <CreditCard size={16} /> },
   { id: "subscriptions", label: "Subscriptions", icon: <TrendingUp size={16} /> },
-  { id: "acquisition", label: "Acquisition", icon: <Megaphone size={16} /> },
   { id: "settings", label: "Settings", icon: <Settings size={16} /> },
 ];
 
@@ -4197,7 +4195,6 @@ export default function Admin() {
           {section === "bookings" && <BookingsSection onViewPayment={goToPayment} initialDetailId={pendingBookingId} />}
           {section === "payments" && <PaymentsSection onViewBooking={goToBooking} initialDetailId={pendingPaymentId} />}
           {section === "subscriptions" && <SubscriptionsSection />}
-          {section === "acquisition" && <AcquisitionSection />}
           {section === "settings" && <SettingsSection user={user} />}
         </div>
       </main>

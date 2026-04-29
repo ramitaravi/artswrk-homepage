@@ -51,6 +51,7 @@ import LeadsLists from "./pages/leads/LeadsLists";
 import LeadsCampaigns from "./pages/leads/LeadsCampaigns";
 import LeadsUnsubscribes from "./pages/leads/LeadsUnsubscribes";
 import LeadsCRM from "./pages/leads/LeadsCRM";
+import LeadsFacebook from "./pages/leads/LeadsFacebook";
 import { useAuth } from "./_core/hooks/useAuth";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 
@@ -245,6 +246,7 @@ function Router() {
 
       {/* Leads Dashboard — standalone admin-only CRM powered by Brevo */}
       <Route path="/leads" component={LeadsOverview} />
+      <Route path="/leads/facebook" component={LeadsFacebook} />
       <Route path="/leads/contacts" component={LeadsContacts} />
       <Route path="/leads/lists" component={LeadsLists} />
       <Route path="/leads/campaigns" component={LeadsCampaigns} />

@@ -14,10 +14,12 @@ import {
   ArrowLeft,
   Loader2,
   UserMinus,
+  Megaphone,
 } from "lucide-react";
 
 const NAV = [
   { label: "Overview", href: "/leads", icon: LayoutDashboard },
+  { label: "Facebook Leads", href: "/leads/facebook", icon: Megaphone },
   { label: "Contacts", href: "/leads/contacts", icon: Users },
   { label: "Lists", href: "/leads/lists", icon: List },
   { label: "Campaigns", href: "/leads/campaigns", icon: Mail },
