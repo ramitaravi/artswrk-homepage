@@ -721,6 +721,8 @@ export const acquisitionLeads = mysqlTable("acquisition_leads", {
   // ── Parsed fields (populated by AI) ──────────────────────────────────────
   /** Person or company name */
   name: varchar("name", { length: 256 }),
+  /** Studio or company affiliation (for artists) */
+  studioName: varchar("studioName", { length: 256 }),
   /** For jobs: role/title. For artists: primary discipline */
   title: varchar("title", { length: 256 }),
   /** Location string */

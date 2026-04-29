@@ -211,6 +211,13 @@
       "when": 1777002819913,
       "tag": "0029_closed_wraith",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "5",
+      "when": 1777486947040,
+      "tag": "0030_icy_warhawk",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `acquisition_leads` ADD `studioName` varchar(256);
