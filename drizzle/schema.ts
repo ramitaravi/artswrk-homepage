@@ -718,38 +718,86 @@ export const acquisitionLeads = mysqlTable("acquisition_leads", {
   /** "job" or "artist" */
   leadType: mysqlEnum("leadType", ["job", "artist"]).notNull(),
 
-  // ── Parsed fields (populated by AI) ──────────────────────────────────────
+  // ── Source ────────────────────────────────────────────────────────────────
+  /** Which Facebook group this lead came from (group name label) */
+  sourceGroup: varchar("sourceGroup", { length: 256 }),
+
+  // ── Poster Identity ───────────────────────────────────────────────────────
   /** Person or company name */
   name: varchar("name", { length: 256 }),
-  /** Studio or company affiliation (for artists) */
+  /** Direct link to the poster's Facebook profile */
+  posterFacebookUrl: text("posterFacebookUrl"),
+  /** Email address extracted from post or contact info */
+  email: varchar("email", { length: 320 }),
+  /** Instagram handle (e.g. @username) */
+  instagram: varchar("instagram", { length: 128 }),
+  /** All contact info in one string (fallback / extra detail) */
+  contactInfo: varchar("contactInfo", { length: 512 }),
+
+  // ── Studio / Company ──────────────────────────────────────────────────────
+  /** Studio or company affiliation */
   studioName: varchar("studioName", { length: 256 }),
+  /** Studio Facebook page or website URL */
+  studioUrl: text("studioUrl"),
+  /** Studio physical address */
+  studioAddress: text("studioAddress"),
+
+  // ── Location ──────────────────────────────────────────────────────────────
+  /** Full location string (e.g. "Lincoln Park, Chicago, IL") */
+  location: varchar("location", { length: 256 }),
+  /** City only — for filtering */
+  city: varchar("city", { length: 128 }),
+  /** State abbreviation — for filtering */
+  state: varchar("state", { length: 32 }),
+
+  // ── Job Details ───────────────────────────────────────────────────────────
   /** For jobs: role/title. For artists: primary discipline */
   title: varchar("title", { length: 256 }),
-  /** Location string */
-  location: varchar("location", { length: 256 }),
-  /** Rate/budget string */
-  rate: varchar("rate", { length: 128 }),
-  /** Contact info (email, Instagram handle, etc.) */
-  contactInfo: varchar("contactInfo", { length: 512 }),
-  /** Disciplines / skills (JSON array string) */
-  disciplines: text("disciplines"),
-  /** Full description / original post text excerpt */
-  description: text("description"),
+  /** AI-generated 1-2 sentence summary of the post */
+  jobSummary: text("jobSummary"),
+  /** Clean extracted job description (plain text, no fluff) */
+  jobDescription: text("jobDescription"),
   /** Raw original post text */
   rawPostText: text("rawPostText"),
+  /** Full description / original post text excerpt (legacy) */
+  description: text("description"),
+
+  // ── Scheduling ────────────────────────────────────────────────────────────
+  /** Date string as written in the post (e.g. "Saturday 3/15", "April - June") */
+  jobDate: varchar("jobDate", { length: 256 }),
+  /** Single Date | Recurring | Ongoing */
+  jobDateType: mysqlEnum("jobDateType", ["single", "recurring", "ongoing"]),
+
+  // ── Rates ─────────────────────────────────────────────────────────────────
+  /** Rate string as written in the post (e.g. "$50/hr", "$500 flat") */
+  rate: varchar("rate", { length: 128 }),
+  /** Parsed rate amount in cents (e.g. 5000 = $50.00) */
+  rateAmount: int("rateAmount"),
+  /** hourly | flat | open */
+  rateType: mysqlEnum("rateType", ["hourly", "flat", "open"]),
+
+  // ── Disciplines ───────────────────────────────────────────────────────────
+  /** Disciplines / skills (JSON array string) */
+  disciplines: text("disciplines"),
 
   // ── Outreach ──────────────────────────────────────────────────────────────
   /** AI-generated DM message */
   outreachMessage: text("outreachMessage"),
   /** Magic link token for pre-filled onboarding */
   magicLinkToken: varchar("magicLinkToken", { length: 128 }),
+  /** Free-text notes from your team */
+  notes: text("notes"),
 
-  // ── Status tracking ───────────────────────────────────────────────────────
+  // ── Status & Funnel Tracking ──────────────────────────────────────────────
   /** "new" | "outreach_sent" | "clicked" | "joined" */
   status: mysqlEnum("status", ["new", "outreach_sent", "clicked", "joined"]).default("new").notNull(),
+  /** Full funnel stage: lead → outreach_sent → signed_up → job_posted → booking_made */
+  funnelStage: mysqlEnum("funnelStage", ["lead", "outreach_sent", "signed_up", "job_posted", "booking_made"]).default("lead"),
   outreachSentAt: timestamp("outreachSentAt"),
   /** FK → users.id if they signed up via magic link */
   convertedUserId: int("convertedUserId"),
+  /** FK → jobs.id once this lead posts a job on the platform */
+  convertedJobId: int("convertedJobId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

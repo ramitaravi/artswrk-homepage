@@ -16,19 +16,68 @@ function adminOnly(role: string) {
   if (role !== "admin") throw new Error("Forbidden: admin only");
 }
 
+// ─── Text Pre-processing ────────────────────────────────────────────────────
+
+/**
+ * Cleans raw Facebook group text before sending to the AI parser.
+ * Removes UI chrome, reaction noise, and normalizes whitespace so the model
+ * sees clean post content only.
+ */
+function cleanFacebookText(raw: string): string {
+  return raw
+    // Remove Facebook UI reaction/engagement lines
+    // e.g. "👍 Like · 💬 Comment · ↗ Share", "Like · Reply · Share"
+    .replace(/\b(Like|Comment|Share|Reply|Follow|Save|Report|Hide|Unfollow|Turn off)\b\s*[·•|]?\s*/gi, "")
+    // Remove emoji-only lines or lines that are just reaction counts
+    // e.g. "😂 14  ❤️ 3  👍 22"
+    .replace(/^[\s\p{Emoji}\d·•|,]+$/gmu, "")
+    // Remove "X comments · Y shares" style lines
+    .replace(/\d+\s*(comment|comments|share|shares|reaction|reactions|like|likes|view|views)\b[^\n]*/gi, "")
+    // Remove "See more" / "See less" links
+    .replace(/\bSee (more|less|translation|original)\b/gi, "")
+    // Remove "X members · X posts a day" group header lines
+    .replace(/\d[\d,]*\s*members?[^\n]*/gi, "")
+    // Remove timestamps like "3h", "2d", "April 21 at 3:45 PM", "Just now"
+    .replace(/\b(Just now|\d+[smhd]|\d{1,2}\s+(hours?|minutes?|days?|weeks?|months?)\s+ago)\b/gi, "")
+    .replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}(,?\s+\d{4})?\s+at\s+\d{1,2}:\d{2}\s*(AM|PM)?/gi, "")
+    // Remove "Write a comment…" / "Add a comment…" placeholder text
+    .replace(/^(Write|Add)\s+a\s+comment[.…]?$/gim, "")
+    // Remove lines that are just a URL (Facebook tracking links etc.)
+    .replace(/^https?:\/\/[^\s]+$/gm, "")
+    // Collapse 3+ consecutive blank lines into a single blank line (post separator)
+    .replace(/(\n\s*){3,}/g, "\n\n")
+    // Trim leading/trailing whitespace per line
+    .split("\n").map(l => l.trim()).join("\n")
+    // Final trim
+    .trim();
+}
+
 // ─── AI Parsing ──────────────────────────────────────────────────────────────
 
 interface ParsedLead {
   leadType: "job" | "artist";
   name: string;
-  studioName: string;
-  title: string;
-  location: string;
-  rate: string;
+  posterFacebookUrl: string;
+  email: string;
+  instagram: string;
   contactInfo: string;
+  studioName: string;
+  studioUrl: string;
+  studioAddress: string;
+  location: string;
+  city: string;
+  state: string;
+  title: string;
+  jobSummary: string;
+  jobDescription: string;
+  rawPostText: string;
+  jobDate: string;
+  jobDateType: "single" | "recurring" | "ongoing" | "";
+  rate: string;
+  rateAmount: number;
+  rateType: "hourly" | "flat" | "open" | "";
   disciplines: string[];
   description: string;
-  rawPostText: string;
 }
 
 async function parsePostsWithAI(rawText: string, groupName: string): Promise<ParsedLead[]> {
@@ -47,22 +96,36 @@ Given raw text from a Facebook group called "${groupName}", extract each distinc
 
 IMPORTANT LOCATION RULE: The group name suggests this is a regional group. If a post does not explicitly mention a city or state, use "${locationHint || groupName}" as the default location. Always try to extract the most specific location available from the post text first.
 
-For each post, extract:
+For each post, extract ALL of the following fields:
 - leadType: "job" or "artist"
-- name: The POSTER's name (person posting) OR their studio/company name if they are posting on behalf of an organization. For job posts, prefer the company/studio name. For artist posts, prefer the individual's name. Look for phrases like "I am", "My name is", "We are", "[Name] is looking for", or the name at the top/bottom of the post.
-- studioName: If the poster is an individual artist, also extract their studio or company affiliation if mentioned (e.g. "Dance Arts Academy"). Leave empty string if not mentioned.
-- title: For jobs: the role being hired (e.g. "Hip Hop Teacher", "Competition Choreographer"). For artists: their primary discipline or title (e.g. "Ballet Teacher", "Contemporary Dancer")
-- location: City, state or region. If not explicitly mentioned in the post, default to "${locationHint || groupName}"
-- rate: Pay rate or budget if mentioned (e.g. "$50/hr", "Open rate", "Competitive"). Empty string if not mentioned.
-- contactInfo: Any email, phone, Instagram handle, website, or other contact info mentioned. Empty string if none.
-- disciplines: Array of art disciplines mentioned (e.g. ["Ballet", "Hip Hop", "Jazz"])
-- description: A clean 1-3 sentence summary of the post
-- rawPostText: The original post text (trimmed to 500 chars)
+- name: The POSTER's name (person posting) OR their studio/company name if they are posting on behalf of an organization. For job posts, prefer the company/studio name. For artist posts, prefer the individual's name.
+- posterFacebookUrl: The Facebook profile URL of the poster if visible (e.g. "https://www.facebook.com/..."). Empty string if not visible.
+- email: Email address extracted from the post. Empty string if none.
+- instagram: Instagram handle (e.g. "@username") if mentioned. Empty string if none.
+- contactInfo: Any remaining contact info (phone, website, DM instructions). Empty string if none.
+- studioName: Studio or company name. For job posts: the hiring studio/org. For artist posts: their affiliation. Empty string if not mentioned.
+- studioUrl: Studio Facebook page URL or website URL if mentioned. Empty string if none.
+- studioAddress: Studio physical address if mentioned (e.g. "123 Main St, Chicago, IL"). Empty string if none.
+- location: Full location string (e.g. "Lincoln Park, Chicago, IL"). Default to "${locationHint || groupName}" if not mentioned.
+- city: City name only (e.g. "Chicago"). Empty string if unknown.
+- state: State abbreviation only (e.g. "IL"). Empty string if unknown.
+- title: For jobs: the role being hired (e.g. "Hip Hop Teacher"). For artists: their primary discipline (e.g. "Ballet Teacher").
+- jobSummary: A single sentence (max 20 words) summarizing what this post is about.
+- jobDescription: The clean job description in plain text — remove UI noise, timestamps, reaction counts. Keep all relevant details.
+- rawPostText: The original post text trimmed to 500 chars.
+- jobDate: Date or date range as written in the post (e.g. "Saturday 3/15", "April - June", "Mon/Wed evenings"). Empty string if not mentioned.
+- jobDateType: "single" if one specific date, "recurring" if weekly/monthly/ongoing schedule, "ongoing" if open-ended. Empty string if unknown.
+- rate: Pay rate string as written (e.g. "$50/hr", "$500 flat", "Open rate"). Empty string if not mentioned.
+- rateAmount: Numeric rate amount in cents (e.g. 5000 for $50). 0 if open/unknown.
+- rateType: "hourly" if per-hour rate, "flat" if flat/total fee, "open" if open rate. Empty string if unknown.
+- disciplines: Array of art disciplines mentioned (e.g. ["Ballet", "Hip Hop", "Jazz"]).
+- description: A clean 1-3 sentence summary of the post (legacy field, same as jobSummary but slightly longer).
 
 Return a JSON array of lead objects. If a section of text is not a distinct post (e.g. navigation text, timestamps, UI elements like "Like", "Reply", "Share", member counts), skip it.
 Only include real posts with meaningful content about hiring or artist availability.`;
 
-  const userPrompt = `Here is the raw text pasted from the Facebook group. Parse all distinct posts:\n\n${rawText.slice(0, 8000)}`;
+  const cleaned = cleanFacebookText(rawText);
+  const userPrompt = `Here is the cleaned text pasted from the Facebook group. Parse all distinct posts:\n\n${cleaned.slice(0, 8000)}`;
 
   const response = await invokeLLM({
     messages: [
@@ -84,16 +147,29 @@ Only include real posts with meaningful content about hiring or artist availabil
                   properties: {
                   leadType: { type: "string", enum: ["job", "artist"] },
                   name: { type: "string" },
-                  studioName: { type: "string" },
-                  title: { type: "string" },
-                  location: { type: "string" },
-                  rate: { type: "string" },
+                  posterFacebookUrl: { type: "string" },
+                  email: { type: "string" },
+                  instagram: { type: "string" },
                   contactInfo: { type: "string" },
+                  studioName: { type: "string" },
+                  studioUrl: { type: "string" },
+                  studioAddress: { type: "string" },
+                  location: { type: "string" },
+                  city: { type: "string" },
+                  state: { type: "string" },
+                  title: { type: "string" },
+                  jobSummary: { type: "string" },
+                  jobDescription: { type: "string" },
+                  rawPostText: { type: "string" },
+                  jobDate: { type: "string" },
+                  jobDateType: { type: "string", enum: ["single", "recurring", "ongoing", ""] },
+                  rate: { type: "string" },
+                  rateAmount: { type: "number" },
+                  rateType: { type: "string", enum: ["hourly", "flat", "open", ""] },
                   disciplines: { type: "array", items: { type: "string" } },
                   description: { type: "string" },
-                  rawPostText: { type: "string" },
                 },
-                required: ["leadType", "name", "studioName", "title", "location", "rate", "contactInfo", "disciplines", "description", "rawPostText"],
+                required: ["leadType", "name", "posterFacebookUrl", "email", "instagram", "contactInfo", "studioName", "studioUrl", "studioAddress", "location", "city", "state", "title", "jobSummary", "jobDescription", "rawPostText", "jobDate", "jobDateType", "rate", "rateAmount", "rateType", "disciplines", "description"],
                 additionalProperties: false,
               },
             },
@@ -195,16 +271,40 @@ export const acquisitionRouter = router({
       const leadsToInsert = parsedLeads.map(lead => ({
         sessionId,
         leadType: lead.leadType,
+        // Source
+        sourceGroup: input.groupName || null,
+        // Poster identity
         name: lead.name || null,
-        title: lead.title || null,
-        location: lead.location || null,
-        rate: lead.rate || null,
+        posterFacebookUrl: lead.posterFacebookUrl || null,
+        email: lead.email || null,
+        instagram: lead.instagram || null,
         contactInfo: lead.contactInfo || null,
-        disciplines: lead.disciplines?.length ? JSON.stringify(lead.disciplines) : null,
+        // Studio
+        studioName: lead.studioName || null,
+        studioUrl: lead.studioUrl || null,
+        studioAddress: lead.studioAddress || null,
+        // Location
+        location: lead.location || null,
+        city: lead.city || null,
+        state: lead.state || null,
+        // Job details
+        title: lead.title || null,
+        jobSummary: lead.jobSummary || null,
+        jobDescription: lead.jobDescription || null,
+        rawPostText: lead.rawPostText?.slice(0, 1000) || cleanFacebookText(input.rawText).slice(0, 500) || null,
         description: lead.description || null,
-        rawPostText: lead.rawPostText?.slice(0, 1000) || null,
+        // Scheduling
+        jobDate: lead.jobDate || null,
+        jobDateType: (lead.jobDateType || null) as "single" | "recurring" | "ongoing" | null,
+        // Rates
+        rate: lead.rate || null,
+        rateAmount: lead.rateAmount > 0 ? lead.rateAmount : null,
+        rateType: (lead.rateType || null) as "hourly" | "flat" | "open" | null,
+        // Disciplines
+        disciplines: lead.disciplines?.length ? JSON.stringify(lead.disciplines) : null,
         magicLinkToken: generateMagicToken(),
         status: "new" as const,
+        funnelStage: "lead" as const,
       }));
 
       if (leadsToInsert.length > 0) {
@@ -266,14 +366,27 @@ export const acquisitionRouter = router({
       const parsedLead: ParsedLead = {
         leadType: lead.leadType,
         name: lead.name || "",
-        studioName: "",
-        title: lead.title || "",
-        location: lead.location || "",
-        rate: lead.rate || "",
+        posterFacebookUrl: lead.posterFacebookUrl || "",
+        email: lead.email || "",
+        instagram: lead.instagram || "",
         contactInfo: lead.contactInfo || "",
+        studioName: lead.studioName || "",
+        studioUrl: lead.studioUrl || "",
+        studioAddress: lead.studioAddress || "",
+        location: lead.location || "",
+        city: lead.city || "",
+        state: lead.state || "",
+        title: lead.title || "",
+        jobSummary: lead.jobSummary || "",
+        jobDescription: lead.jobDescription || "",
+        rawPostText: lead.rawPostText || "",
+        jobDate: lead.jobDate || "",
+        jobDateType: (lead.jobDateType as "single" | "recurring" | "ongoing" | "") || "",
+        rate: lead.rate || "",
+        rateAmount: lead.rateAmount || 0,
+        rateType: (lead.rateType as "hourly" | "flat" | "open" | "") || "",
         disciplines: lead.disciplines ? JSON.parse(lead.disciplines) : [],
         description: lead.description || "",
-        rawPostText: lead.rawPostText || "",
       };
 
       const message = await generateOutreachMessage(parsedLead, groupName);
