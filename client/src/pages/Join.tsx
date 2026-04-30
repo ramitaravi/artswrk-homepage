@@ -131,6 +131,7 @@ export default function Join() {
   const [error,       setError]       = useState("");
   const [busy,        setBusy]        = useState(false);
   const [showPw,      setShowPw]      = useState(false);
+  const [pwTouched,   setPwTouched]   = useState(false);
 
   // account
   const [firstName, setFirstName]     = useState("");
@@ -153,6 +154,20 @@ export default function Join() {
   const onboardingMutation = trpc.signup.updateOnboarding.useMutation();
 
   const isArtist = role === "artist";
+
+  // ── Password strength ──────────────────────────────────────────────────────
+  const pwRules = {
+    length:    password.length >= 8,
+    mixed:     /[A-Z]/.test(password) && /[a-z]/.test(password),
+    number:    /[0-9]/.test(password),
+    special:   /[!@#$%^&*()\-_=+[\]{};':"\\|,.<>/?]/.test(password),
+  };
+  const pwScore   = Object.values(pwRules).filter(Boolean).length;
+  const pwAllPass = pwScore === 4;
+
+  // per-role accent helpers
+  const accentColor  = isArtist ? "#EC008C" : "#F25722";
+  const focusBorder  = isArtist ? "focus:border-[#EC008C]" : "focus:border-[#FFBC5D]";
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -318,13 +333,13 @@ export default function Join() {
                   <label className="block text-xs font-semibold text-gray-600 mb-1.5">First name</label>
                   <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)}
                     placeholder="Jane" required
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm placeholder-gray-300 focus:outline-none focus:border-[#FFBC5D] transition-all" />
+                    className={`w-full px-4 py-3 rounded-xl border border-gray-200 text-sm placeholder-gray-300 focus:outline-none ${focusBorder} transition-all`} />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1.5">Last name</label>
                   <input type="text" value={lastName} onChange={e => setLastName(e.target.value)}
                     placeholder="Smith" required
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm placeholder-gray-300 focus:outline-none focus:border-[#FFBC5D] transition-all" />
+                    className={`w-full px-4 py-3 rounded-xl border border-gray-200 text-sm placeholder-gray-300 focus:outline-none ${focusBorder} transition-all`} />
                 </div>
               </div>
 
@@ -332,25 +347,61 @@ export default function Join() {
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Email</label>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                   placeholder="you@email.com" required
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm placeholder-gray-300 focus:outline-none focus:border-[#FFBC5D] transition-all" />
+                  className={`w-full px-4 py-3 rounded-xl border border-gray-200 text-sm placeholder-gray-300 focus:outline-none ${focusBorder} transition-all`} />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Password</label>
                 <div className="relative">
-                  <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
+                  <input type={showPw ? "text" : "password"} value={password}
+                    onChange={e => { setPassword(e.target.value); setPwTouched(true); }}
                     placeholder="At least 8 characters" required minLength={8}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm placeholder-gray-300 focus:outline-none focus:border-[#FFBC5D] transition-all pr-11" />
+                    className={`w-full px-4 py-3 rounded-xl border border-gray-200 text-sm placeholder-gray-300 focus:outline-none ${focusBorder} transition-all pr-11`} />
                   <button type="button" onClick={() => setShowPw(!showPw)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
                     {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+
+                {/* Password strength */}
+                {pwTouched && (
+                  <div className="mt-3">
+                    {/* Strength bar */}
+                    <div className="flex gap-1 mb-3">
+                      {[1, 2, 3, 4].map(n => (
+                        <div key={n} className="h-1 flex-1 rounded-full transition-all duration-300"
+                          style={{ background: pwScore >= n
+                            ? pwScore <= 1 ? "#ef4444"
+                            : pwScore === 2 ? "#f97316"
+                            : pwScore === 3 ? "#eab308"
+                            : accentColor
+                            : "#e5e7eb"
+                          }} />
+                      ))}
+                    </div>
+                    {/* Rules */}
+                    <p className="text-xs text-gray-500 mb-2">Password must contain:</p>
+                    <ul className="space-y-1">
+                      {[
+                        { ok: pwRules.length,  label: "8 characters" },
+                        { ok: pwRules.mixed,   label: "Capital & lowercase letters" },
+                        { ok: pwRules.number,  label: "Number (e.g: 1,2,3)" },
+                        { ok: pwRules.special, label: "Special character (e.g: !@#)" },
+                      ].map(({ ok, label }) => (
+                        <li key={label} className="flex items-center gap-2 text-xs transition-colors"
+                          style={{ color: ok ? accentColor : "#9ca3af" }}>
+                          <CheckCircle2 size={12} style={{ color: ok ? accentColor : "#d1d5db" }} />
+                          {label}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               {error && <ErrorBox msg={error} />}
 
-              <button type="submit" disabled={busy}
+              <button type="submit" disabled={busy || (pwTouched && !pwAllPass)}
                 className={`w-full py-3.5 rounded-xl text-sm font-bold text-white transition-opacity flex items-center justify-center gap-2 disabled:opacity-60 ${
                   isArtist ? "artist-grad-bg hover:opacity-90" : "hirer-grad-bg hover:opacity-90"
                 }`}>
@@ -360,7 +411,8 @@ export default function Join() {
 
             <p className="text-center text-xs text-gray-400 mt-5">
               Already have an account?{" "}
-              <a href="/login" className="font-semibold text-[#F25722] hover:opacity-70 transition-opacity">Sign in</a>.
+              <a href="/login" className="font-semibold hover:opacity-70 transition-opacity"
+                style={{ color: accentColor }}>Sign in</a>.
             </p>
             <p className="text-center text-xs text-gray-300 mt-2">
               By joining you agree to our{" "}
@@ -383,8 +435,8 @@ export default function Join() {
                 <button key={t} onClick={() => toggleArtistType(t)}
                   className={`px-3.5 py-2 rounded-full text-xs font-semibold border-2 transition-all ${
                     artistTypes.includes(t)
-                      ? "border-[#F25722] bg-orange-50 text-[#F25722]"
-                      : "border-gray-200 text-gray-600 hover:border-pink-300"
+                      ? "border-[#EC008C] bg-pink-50 text-[#EC008C]"
+                      : "border-gray-200 text-gray-600 hover:border-[#EC008C]/40"
                   }`}>
                   {artistTypes.includes(t) && <CheckCircle2 size={11} className="inline mr-1" />}
                   {t}
@@ -408,21 +460,21 @@ export default function Join() {
 
             <div className="space-y-3 mb-5">
               {/* Basic */}
-              <div className="rounded-2xl border-2 border-[#F25722] bg-[#FFF8F5] p-5 relative">
-                <div className="absolute top-3 right-3 bg-[#F25722] text-white text-[10px] font-bold px-2.5 py-1 rounded-full">Most Popular</div>
+              <div className="rounded-2xl border-2 border-[#EC008C] bg-pink-50/40 p-5 relative">
+                <div className="absolute top-3 right-3 text-white text-[10px] font-bold px-2.5 py-1 rounded-full artist-grad-bg">Most Popular</div>
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#F25722] flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg artist-grad-bg flex items-center justify-center">
                     <Zap size={15} className="text-white fill-white" />
                   </div>
                   <p className="font-black text-[#111] text-sm">Artswrk Basic</p>
                 </div>
                 <ul className="space-y-1.5 text-xs text-gray-600 mb-4">
-                  <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-[#F25722]" /> Apply to all marketplace jobs</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-[#F25722]" /> Public artist profile</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-[#F25722]" /> Get discovered by hirers</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-[#EC008C]" /> Apply to all marketplace jobs</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-[#EC008C]" /> Public artist profile</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-[#EC008C]" /> Get discovered by hirers</li>
                 </ul>
                 <button onClick={() => handleArtistPlan("basic")}
-                  className="w-full py-3 rounded-xl text-sm font-bold text-white bg-[#F25722] hover:bg-[#d44a1a] transition-colors flex items-center justify-center gap-2">
+                  className="w-full py-3 rounded-xl text-sm font-bold text-white artist-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
                   Get Basic <ArrowRight size={15} />
                 </button>
               </div>
