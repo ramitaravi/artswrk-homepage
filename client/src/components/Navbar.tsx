@@ -105,7 +105,7 @@ export default function Navbar() {
               ) : (
                 <>
                   <Link href="/login" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">Login</Link>
-                  <Link href="/signup" className="text-sm font-semibold text-white bg-[#111] px-4 py-2 rounded-full hover:bg-gray-800 transition-colors">Join</Link>
+                  <Link href="/join" className="text-sm font-semibold text-white bg-[#111] px-4 py-2 rounded-full hover:bg-gray-800 transition-colors">Join</Link>
                 </>
               )}
             </div>
@@ -138,7 +138,7 @@ export default function Navbar() {
               ) : (
                 <>
                   <Link href="/login" className="text-sm font-medium text-gray-700">Login</Link>
-                  <Link href="/signup" className="text-sm font-semibold text-white bg-[#111] px-4 py-2 rounded-full">Join</Link>
+                  <Link href="/join" className="text-sm font-semibold text-white bg-[#111] px-4 py-2 rounded-full">Join</Link>
                 </>
               )}
             </div>

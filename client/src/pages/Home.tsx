@@ -94,9 +94,9 @@ function JobPostFlow() {
   const [, navigate] = useLocation();
 
   function handleCreateAccount() {
-    // Pre-fill the post-job flow with the job text, then redirect to signup
+    // Pre-fill the post-job flow with the job text, then redirect to join
     if (text) sessionStorage.setItem("postJobText", text);
-    navigate("/signup");
+    navigate("/join");
   }
 
   useEffect(() => {

@@ -23,7 +23,6 @@ import Community from "./pages/dashboard/Community";
 import Benefits from "./pages/dashboard/Benefits";
 import ArtistProfile from "./pages/dashboard/ArtistProfile";
 import PostJob from "./pages/PostJob";
-import Signup from "./pages/Signup";
 import Join from "./pages/Join";
 import ClientOnboarding from "./pages/ClientOnboarding";
 import ArtistOnboarding from "./pages/ArtistOnboarding";
@@ -121,7 +120,8 @@ function Router() {
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/post-job/success" component={PostJob} />
       <Route path="/post-job" component={PostJob} />
-      <Route path="/signup" component={Signup} />
+      {/* /signup redirects to /join for any old external links */}
+      <Route path="/signup">{() => { window.location.replace("/join"); return null; }}</Route>
       <Route path="/client-onboarding" component={ClientOnboarding} />
       <Route path="/artist-onboarding" component={ArtistOnboarding} />
       <Route path="/join" component={Join} />

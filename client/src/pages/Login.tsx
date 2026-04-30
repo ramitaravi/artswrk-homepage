@@ -395,7 +395,7 @@ export default function Login() {
 
               <div className="space-y-3">
                 <a
-                  href={`/signup?email=${encodeURIComponent(email)}${next ? `&next=${encodeURIComponent(next)}` : ""}`}
+                  href={`/join?email=${encodeURIComponent(email)}${next ? `&next=${encodeURIComponent(next)}` : ""}`}
                   className="w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                 >
                   <Building2 size={16} />
