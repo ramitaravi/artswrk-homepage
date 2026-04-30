@@ -14,6 +14,8 @@ export default function PrivacyPolicy() {
           <a href="/terms" className="hover:text-[#F25722] transition-colors">Terms of Service</a>
           <span>·</span>
           <a href="/privacy-policy" className="font-semibold text-[#111] border-b border-[#111]">Privacy Policy</a>
+          <span>·</span>
+          <a href="/cancellation-policy" className="hover:text-[#F25722] transition-colors">Cancellation Policy</a>
         </div>
 
         {/* Title */}
@@ -295,6 +297,7 @@ export default function PrivacyPolicy() {
         <div className="border-t border-gray-100 mt-14 pt-8 flex items-center gap-6 text-xs text-gray-400">
           <a href="/terms" className="hover:text-[#F25722] transition-colors">Terms of Service</a>
           <a href="/privacy-policy" className="font-semibold text-[#111]">Privacy Policy</a>
+          <a href="/cancellation-policy" className="hover:text-[#F25722] transition-colors">Cancellation Policy</a>
           <span className="ml-auto">{LAST_UPDATED}</span>
         </div>
 
