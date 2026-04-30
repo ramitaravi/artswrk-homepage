@@ -1891,6 +1891,7 @@ Fields to extract:
         phoneNumber: z.string().optional(),
         onboardingStep: z.number().optional(),
         userSignedUp: z.boolean().optional(),
+        userRole: z.enum(["Artist", "Client", "Admin"]).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
@@ -1938,6 +1939,7 @@ Fields to extract:
         profilePicture: z.string().optional(),
         onboardingStep: z.number().optional(),
         userSignedUp: z.boolean().optional(),
+        userRole: z.enum(["Artist", "Client", "Admin"]).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);

@@ -340,7 +340,7 @@ function Step2Profile({
 }: {
   initial: { profilePicture?: string | null; location?: string | null; phoneNumber?: string | null; bio?: string | null; instagram?: string | null; tiktok?: string | null; youtube?: string | null };
   onNext: (data: { profilePicture?: string; location: string; phoneNumber: string; bio: string; instagram: string; tiktok: string; youtube: string }) => void;
-  onBack: () => void;
+  onBack: (data: { profilePicture?: string; location: string; phoneNumber: string; bio: string; instagram: string; tiktok: string; youtube: string }) => void;
   uploadPicture: (base64: string, contentType: string) => Promise<string>;
 }) {
   const [profilePicture, setProfilePicture] = useState(initial.profilePicture ?? "");
@@ -541,7 +541,7 @@ function Step2Profile({
       <div className="mt-5 flex gap-3">
         <button
           type="button"
-          onClick={onBack}
+          onClick={() => onBack({ profilePicture: profilePicture || undefined, location, phoneNumber, bio, instagram, tiktok, youtube })}
           className="px-4 py-3.5 rounded-xl text-sm font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors flex items-center gap-1"
         >
           <ArrowLeft size={15} />
@@ -874,7 +874,7 @@ export default function ArtistOnboarding() {
       profilePicture: data.profilePicture ?? undefined,
       location: data.location ?? "",
       phoneNumber: data.phoneNumber ?? "",
-      bio: "",
+      bio: data.bio ?? "",
       instagram: data.instagram ?? "",
       tiktok: data.tiktok ?? "",
       youtube: data.youtube ?? "",
@@ -924,13 +924,28 @@ export default function ArtistOnboarding() {
   // ── Step handlers ──────────────────────────────────────────────────────────
 
   async function handleStep1Next() {
+    // Always confirm userRole = "Artist" here in case the join step was bypassed
     await updateOnboarding.mutateAsync({
       masterArtistTypes: selectedTypes,
       artistServices: selectedServices,
       onboardingStep: 2,
+      userRole: "Artist",
     });
     markComplete(1);
     setStep(2);
+  }
+
+  // Save step 1 silently when going back from step 2
+  async function handleStep2Back(currentData: typeof profileData) {
+    setProfileData(currentData);
+    // Persist any partial step-2 data + current types before going back
+    updateOnboarding.mutate({
+      ...currentData,
+      masterArtistTypes: selectedTypes,
+      artistServices: selectedServices,
+      onboardingStep: 1,
+    });
+    setStep(1);
   }
 
   async function handleStep2Next(data: typeof profileData) {
@@ -943,23 +958,33 @@ export default function ArtistOnboarding() {
     setStep(3);
   }
 
+  async function handleStep3Back() {
+    // Save step position when going back to step 2
+    updateOnboarding.mutate({ onboardingStep: 2 });
+    setStep(2);
+  }
+
   async function handleStep3Next() {
     await updateOnboarding.mutateAsync({ onboardingStep: 4 });
     markComplete(3);
     setStep(4);
   }
 
+  async function handleStep4Back() {
+    updateOnboarding.mutate({ onboardingStep: 3 });
+    setStep(3);
+  }
+
   async function handleGoToArtswrk() {
     await updateOnboarding.mutateAsync({ onboardingStep: 5, userSignedUp: true });
-    navigate("/app");
+    window.location.href = "/app";
   }
 
   async function handleChooseBasic() {
     setCheckoutLoading(true);
     try {
-      // Use existing artist basic checkout
       await updateOnboarding.mutateAsync({ userSignedUp: true });
-      navigate("/app/settings");
+      window.location.href = "/app/settings";
     } finally {
       setCheckoutLoading(false);
     }
@@ -969,7 +994,7 @@ export default function ArtistOnboarding() {
     setCheckoutLoading(true);
     try {
       await updateOnboarding.mutateAsync({ userSignedUp: true });
-      navigate("/app/settings");
+      window.location.href = "/app/settings";
     } finally {
       setCheckoutLoading(false);
     }
@@ -1010,21 +1035,21 @@ export default function ArtistOnboarding() {
               <Step2Profile
                 initial={profileData}
                 onNext={handleStep2Next}
-                onBack={() => setStep(1)}
+                onBack={handleStep2Back}
                 uploadPicture={uploadPicture}
               />
             )}
             {step === 3 && (
               <Step3Network
                 onNext={handleStep3Next}
-                onBack={() => setStep(2)}
+                onBack={handleStep3Back}
                 onSkip={handleStep3Next}
                 sendInvites={sendInvites}
               />
             )}
             {step === 4 && (
               <Step4Plan
-                onBack={() => setStep(3)}
+                onBack={handleStep4Back}
                 onGoToArtswrk={handleGoToArtswrk}
                 onChooseBasic={handleChooseBasic}
                 onChoosePro={handleChoosePro}

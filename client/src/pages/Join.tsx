@@ -190,7 +190,8 @@ export default function Join() {
         password,
       });
       if (isArtist) {
-        await onboardingMutation.mutateAsync({ businessOrIndividual: "Individual", onboardingStep: 1 });
+        // Mark account as Artist role immediately so the dashboard routes correctly
+        await onboardingMutation.mutateAsync({ userRole: "Artist", businessOrIndividual: "Individual", onboardingStep: 1 });
         // Hand off to the full artist onboarding flow (types → profile → network → plan)
         window.location.href = "/artist-onboarding";
         return;

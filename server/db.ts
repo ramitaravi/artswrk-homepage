@@ -1315,6 +1315,7 @@ export async function updateUserOnboarding(userId: number, data: {
   phoneNumber?: string;
   onboardingStep?: number;
   userSignedUp?: boolean;
+  userRole?: "Artist" | "Client" | "Admin";
   // Artist-specific
   masterArtistTypes?: string[];
   artistServices?: string[];
@@ -1335,6 +1336,7 @@ export async function updateUserOnboarding(userId: number, data: {
   if (data.phoneNumber !== undefined) updateData.phoneNumber = data.phoneNumber;
   if (data.onboardingStep !== undefined) updateData.onboardingStep = data.onboardingStep;
   if (data.userSignedUp !== undefined) updateData.userSignedUp = data.userSignedUp;
+  if (data.userRole !== undefined) updateData.userRole = data.userRole;
   if (data.masterArtistTypes !== undefined) updateData.masterArtistTypes = JSON.stringify(data.masterArtistTypes);
   if (data.artistServices !== undefined) updateData.artistServices = JSON.stringify(data.artistServices);
   if (data.bio !== undefined) updateData.bio = data.bio;
