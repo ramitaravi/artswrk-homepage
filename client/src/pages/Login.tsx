@@ -129,12 +129,12 @@ export default function Login() {
   });
 
   const passwordLogin = trpc.auth.passwordLogin.useMutation({
-    onSuccess: (data) => navigate(getDestination(data)),
+    onSuccess: (data) => { window.location.href = getDestination(data); },
     onError: (err) => setError(err.message || "Invalid email or password."),
   });
 
   const setInitialPassword = trpc.auth.setInitialPassword.useMutation({
-    onSuccess: (data) => navigate(getDestination(data)),
+    onSuccess: (data) => { window.location.href = getDestination(data); },
     onError: (err) => setError(err.message || "Something went wrong."),
   });
 
