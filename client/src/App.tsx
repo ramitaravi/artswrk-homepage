@@ -43,6 +43,8 @@ import DanceTeachers from "./pages/DanceTeachers";
 import DanceJudges from "./pages/DanceJudges";
 import MusicTeachers from "./pages/MusicTeachers";
 import Production from "./pages/Production";
+import Terms from "./pages/Terms";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import ClientJobDetail from "./pages/dashboard/ClientJobDetail";
 import PublicArtistProfile from "./pages/ArtistProfile";
 import LeadsOverview from "./pages/leads/LeadsOverview";
@@ -127,6 +129,8 @@ function Router() {
       <Route path="/join" component={Join} />
       {/* Legacy artist-only join — still works if linked directly */}
       <Route path="/join/artist" component={ArtistJoin} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/about" component={About} />
       <Route path="/dance-competitions" component={DanceCompetitions} />
       <Route path="/dance-studios" component={DanceStudios} />

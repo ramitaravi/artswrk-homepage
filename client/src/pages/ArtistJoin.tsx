@@ -216,9 +216,9 @@ export default function ArtistJoin() {
             </p>
             <p className="text-center text-xs text-gray-300 mt-3">
               By joining you agree to our{" "}
-              <a href="#" className="underline underline-offset-2 hover:text-gray-500 transition-colors">Terms</a>
+              <a href="/terms" className="underline underline-offset-2 hover:text-gray-500 transition-colors">Terms</a>
               {" "}and{" "}
-              <a href="#" className="underline underline-offset-2 hover:text-gray-500 transition-colors">Privacy Policy</a>
+              <a href="/privacy-policy" className="underline underline-offset-2 hover:text-gray-500 transition-colors">Privacy Policy</a>
             </p>
           </div>
         )}
