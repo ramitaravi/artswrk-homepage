@@ -332,6 +332,9 @@ function Step1ArtistTypes({
 
 // ─── Step 2: Profile ───────────────────────────────────────────────────────────
 
+const INPUT_CLS = "w-full pl-8 pr-3 py-3 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-300 focus:outline-none focus:border-[#EC008C] transition-all";
+const INPUT_CLS_SM = "w-full pl-8 pr-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-300 focus:outline-none focus:border-[#EC008C] transition-all";
+
 function Step2Profile({
   initial,
   onNext,
@@ -353,6 +356,39 @@ function Step2Profile({
   const [uploading, setUploading] = useState(false);
   const [locating, setLocating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const locationInputRef = useRef<HTMLInputElement>(null);
+  const acRef = useRef<any>(null);
+  const [mapsLoaded, setMapsLoaded] = useState(false);
+
+  // Wait for Google Maps to be available
+  useEffect(() => {
+    const check = () => {
+      if ((window as any).google?.maps?.places) { setMapsLoaded(true); return true; }
+      return false;
+    };
+    if (check()) return;
+    const iv = setInterval(() => { if (check()) clearInterval(iv); }, 300);
+    return () => clearInterval(iv);
+  }, []);
+
+  // Attach Places Autocomplete once Maps is ready
+  useEffect(() => {
+    if (!mapsLoaded || !locationInputRef.current || acRef.current) return;
+    acRef.current = new (window as any).google.maps.places.Autocomplete(locationInputRef.current, {
+      types: ["(cities)"],
+      fields: ["address_components", "formatted_address", "name"],
+    });
+    acRef.current.addListener("place_changed", () => {
+      const place = acRef.current.getPlace();
+      const components = place.address_components || [];
+      const city = components.find((c: any) => c.types.includes("locality"))?.long_name
+        || components.find((c: any) => c.types.includes("sublocality"))?.long_name
+        || place.name || "";
+      const state = components.find((c: any) => c.types.includes("administrative_area_level_1"))?.short_name || "";
+      const country = components.find((c: any) => c.types.includes("country"))?.long_name || "";
+      setLocation([city, state, country].filter(Boolean).join(", "));
+    });
+  }, [mapsLoaded]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -398,6 +434,9 @@ function Step2Profile({
     );
   }
 
+  const canContinue = location.trim().length > 0;
+  const currentData = { profilePicture: profilePicture || undefined, location, phoneNumber, bio, instagram, tiktok, youtube };
+
   return (
     <div>
       <h2 className="text-2xl font-black text-[#111] mb-1">Your Profile</h2>
@@ -441,39 +480,45 @@ function Step2Profile({
           </div>
         </div>
 
-        {/* Location */}
+        {/* Location — required */}
         <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1.5">Current Location</label>
+          <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+            Current Location <span className="text-[#EC008C]">*</span>
+          </label>
           <div className="relative flex gap-2">
             <div className="relative flex-1">
-              <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
               <input
+                ref={locationInputRef}
                 type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="City, State"
-                className="w-full pl-8 pr-3 py-3 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-300 focus:outline-none focus:border-[#FFBC5D] transition-all"
+                className={INPUT_CLS}
               />
             </div>
             <button
               type="button"
               onClick={autoDetectLocation}
               disabled={locating}
-              title="Auto-detect location"
-              className="px-3 py-3 rounded-xl border border-gray-200 text-gray-500 hover:border-[#EC008C] hover:text-[#EC008C] transition-all disabled:opacity-50 text-xs font-medium shrink-0"
+              title="Use my current location"
+              className="px-3 py-3 rounded-xl border border-gray-200 text-gray-500 hover:border-[#EC008C] hover:text-[#EC008C] transition-all disabled:opacity-50 shrink-0"
             >
               {locating ? (
-                <span className="w-4 h-4 border-2 border-gray-300 border-t-[#F25722] rounded-full animate-spin inline-block" />
+                <span className="w-4 h-4 border-2 border-gray-300 border-t-[#EC008C] rounded-full animate-spin inline-block" />
               ) : (
                 <MapPin size={16} />
               )}
             </button>
           </div>
+          {!canContinue && (
+            <p className="text-xs text-gray-400 mt-1">Required to continue</p>
+          )}
         </div>
 
         {/* Phone */}
         <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1.5">Phone Number</label>
+          <label className="block text-xs font-semibold text-gray-600 mb-1.5">Phone Number <span className="text-gray-400 font-normal">(optional)</span></label>
           <div className="relative">
             <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -481,7 +526,7 @@ function Step2Profile({
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
               placeholder="(555) 000-0000"
-              className="w-full pl-8 pr-3 py-3 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-300 focus:outline-none focus:border-[#FFBC5D] transition-all"
+              className={INPUT_CLS}
             />
           </div>
         </div>
@@ -489,14 +534,14 @@ function Step2Profile({
         {/* Bio */}
         <div>
           <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-            Bio <span className="text-gray-400 font-normal">({bio.length}/300)</span>
+            Bio <span className="text-gray-400 font-normal">({bio.length}/300, optional)</span>
           </label>
           <textarea
             value={bio}
             onChange={(e) => setBio(e.target.value.slice(0, 300))}
             placeholder="Tell clients a bit about yourself — your experience, style, and what makes you great..."
             rows={3}
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-300 focus:outline-none focus:border-[#FFBC5D] transition-all resize-none"
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-300 focus:outline-none focus:border-[#EC008C] transition-all resize-none"
           />
         </div>
 
@@ -511,7 +556,7 @@ function Step2Profile({
                 value={instagram}
                 onChange={(e) => setInstagram(e.target.value)}
                 placeholder="@yourusername"
-                className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-300 focus:outline-none focus:border-pink-300 transition-all"
+                className={INPUT_CLS_SM}
               />
             </div>
             <div className="relative">
@@ -521,7 +566,7 @@ function Step2Profile({
                 value={tiktok}
                 onChange={(e) => setTiktok(e.target.value)}
                 placeholder="@yourtiktok"
-                className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-300 focus:outline-none focus:border-gray-300 transition-all"
+                className={INPUT_CLS_SM}
               />
             </div>
             <div className="relative">
@@ -531,7 +576,7 @@ function Step2Profile({
                 value={youtube}
                 onChange={(e) => setYoutube(e.target.value)}
                 placeholder="YouTube channel URL"
-                className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-300 focus:outline-none focus:border-red-200 transition-all"
+                className={INPUT_CLS_SM}
               />
             </div>
           </div>
@@ -541,15 +586,16 @@ function Step2Profile({
       <div className="mt-5 flex gap-3">
         <button
           type="button"
-          onClick={() => onBack({ profilePicture: profilePicture || undefined, location, phoneNumber, bio, instagram, tiktok, youtube })}
+          onClick={() => onBack(currentData)}
           className="px-4 py-3.5 rounded-xl text-sm font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors flex items-center gap-1"
         >
           <ArrowLeft size={15} />
         </button>
         <button
           type="button"
-          onClick={() => onNext({ profilePicture: profilePicture || undefined, location, phoneNumber, bio, instagram, tiktok, youtube })}
-          className="flex-1 py-3.5 rounded-xl text-sm font-bold text-white artist-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+          disabled={!canContinue}
+          onClick={() => onNext(currentData)}
+          className="flex-1 py-3.5 rounded-xl text-sm font-bold text-white artist-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Continue <ArrowRight size={16} />
         </button>
