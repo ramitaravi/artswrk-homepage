@@ -156,7 +156,7 @@ function StepSidebar({ step, completedSteps }: { step: Step; completedSteps: Set
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all ${
                   done
-                    ? "bg-[#F25722] text-white"
+                    ? "bg-[#EC008C] text-white"
                     : current
                     ? "bg-[#111] text-white"
                     : "bg-gray-100 text-gray-400"
@@ -183,7 +183,7 @@ function StepSidebar({ step, completedSteps }: { step: Step; completedSteps: Set
         </div>
         <div className="h-1.5 bg-gray-100 rounded-full">
           <div
-            className="h-full rounded-full hirer-grad-bg transition-all duration-500"
+            className="h-full rounded-full artist-grad-bg transition-all duration-500"
             style={{ width: `${((step - 1) / STEPS.length) * 100}%` }}
           />
         </div>
@@ -201,7 +201,7 @@ function MobileProgress({ step }: { step: Step }) {
           <div
             key={i}
             className={`h-1.5 rounded-full transition-all ${
-              i + 1 <= step ? "w-6 hirer-grad-bg" : "w-3 bg-gray-200"
+              i + 1 <= step ? "w-6 artist-grad-bg" : "w-3 bg-gray-200"
             }`}
           />
         ))}
@@ -252,7 +252,7 @@ function Step1ArtistTypes({
               key={type.name}
               className={`rounded-xl border transition-all overflow-hidden ${
                 isSelected
-                  ? "border-[#F25722] bg-orange-50/50"
+                  ? "border-[#EC008C] bg-pink-50/40"
                   : "border-gray-100 bg-white hover:border-gray-200"
               }`}
             >
@@ -269,7 +269,7 @@ function Step1ArtistTypes({
                   {type.name}
                 </span>
                 {isSelected && (
-                  <span className="text-[10px] font-bold text-[#F25722] bg-orange-100 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold text-[#EC008C] bg-pink-100 px-2 py-0.5 rounded-full">
                     Selected
                   </span>
                 )}
@@ -289,7 +289,7 @@ function Step1ArtistTypes({
 
               {/* Service types */}
               {isExpanded && type.services.length > 0 && (
-                <div className="px-3 pb-3 pt-1 border-t border-orange-100">
+                <div className="px-3 pb-3 pt-1 border-t border-pink-100">
                   <p className="text-xs text-gray-400 mb-2">Select specific services:</p>
                   <div className="flex flex-wrap gap-1.5">
                     {type.services.map((svc) => {
@@ -301,8 +301,8 @@ function Step1ArtistTypes({
                           onClick={() => onToggleService(svc)}
                           className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all border ${
                             svcSelected
-                              ? "bg-[#F25722] text-white border-[#F25722]"
-                              : "bg-white text-gray-600 border-gray-200 hover:border-[#F25722] hover:text-[#F25722]"
+                              ? "bg-[#EC008C] text-white border-[#EC008C]"
+                              : "bg-white text-gray-600 border-gray-200 hover:border-[#EC008C] hover:text-[#EC008C]"
                           }`}
                         >
                           {svcSelected && <CheckCircle2 size={10} className="inline mr-1" />}
@@ -322,7 +322,7 @@ function Step1ArtistTypes({
         type="button"
         disabled={selected.length === 0}
         onClick={onNext}
-        className="mt-5 w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-40"
+        className="mt-5 w-full py-3.5 rounded-xl text-sm font-bold text-white artist-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-40"
       >
         Continue <ArrowRight size={16} />
       </button>
@@ -408,7 +408,7 @@ function Step2Profile({
         <div className="flex items-center gap-4">
           <div className="relative shrink-0">
             {profilePicture ? (
-              <img src={profilePicture} alt="Profile" className="w-20 h-20 rounded-full object-cover ring-2 ring-[#F25722]/30" />
+              <img src={profilePicture} alt="Profile" className="w-20 h-20 rounded-full object-cover ring-2 ring-[#EC008C]/30" />
             ) : (
               <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center text-gray-300">
                 <Camera size={28} />
@@ -418,7 +418,7 @@ function Step2Profile({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#F25722] text-white flex items-center justify-center shadow-sm hover:opacity-90 transition-opacity disabled:opacity-60"
+              className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#EC008C] text-white flex items-center justify-center shadow-sm hover:opacity-90 transition-opacity disabled:opacity-60"
             >
               {uploading ? (
                 <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -434,7 +434,7 @@ function Step2Profile({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="text-xs text-[#F25722] font-semibold mt-1 hover:opacity-70 transition-opacity"
+              className="text-xs text-[#EC008C] font-semibold mt-1 hover:opacity-70 transition-opacity"
             >
               {profilePicture ? "Change photo" : "Upload photo"}
             </button>
@@ -460,7 +460,7 @@ function Step2Profile({
               onClick={autoDetectLocation}
               disabled={locating}
               title="Auto-detect location"
-              className="px-3 py-3 rounded-xl border border-gray-200 text-gray-500 hover:border-[#F25722] hover:text-[#F25722] transition-all disabled:opacity-50 text-xs font-medium shrink-0"
+              className="px-3 py-3 rounded-xl border border-gray-200 text-gray-500 hover:border-[#EC008C] hover:text-[#EC008C] transition-all disabled:opacity-50 text-xs font-medium shrink-0"
             >
               {locating ? (
                 <span className="w-4 h-4 border-2 border-gray-300 border-t-[#F25722] rounded-full animate-spin inline-block" />
@@ -549,7 +549,7 @@ function Step2Profile({
         <button
           type="button"
           onClick={() => onNext({ profilePicture: profilePicture || undefined, location, phoneNumber, bio, instagram, tiktok, youtube })}
-          className="flex-1 py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+          className="flex-1 py-3.5 rounded-xl text-sm font-bold text-white artist-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
         >
           Continue <ArrowRight size={16} />
         </button>
@@ -623,7 +623,7 @@ function Step3Network({
 
       {sent ? (
         <div className="text-center py-6">
-          <CheckCircle2 size={40} className="text-[#F25722] mx-auto mb-2" />
+          <CheckCircle2 size={40} className="text-[#EC008C] mx-auto mb-2" />
           <p className="font-semibold text-[#111]">Invites sent!</p>
         </div>
       ) : (
@@ -658,7 +658,7 @@ function Step3Network({
             <button
               type="button"
               onClick={addEmail}
-              className="text-xs text-gray-500 hover:text-[#F25722] transition-colors flex items-center gap-1 mb-4"
+              className="text-xs text-gray-500 hover:text-[#EC008C] transition-colors flex items-center gap-1 mb-4"
             >
               <Plus size={13} /> Add another artist
             </button>
@@ -676,7 +676,7 @@ function Step3Network({
               type="button"
               onClick={handleSend}
               disabled={sending}
-              className="flex-1 py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60"
+              className="flex-1 py-3.5 rounded-xl text-sm font-bold text-white artist-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60"
             >
               {sending ? <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Sending...</> : <>Send Invites <ArrowRight size={16} /></>}
             </button>

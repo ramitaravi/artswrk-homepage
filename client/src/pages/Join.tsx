@@ -191,7 +191,9 @@ export default function Join() {
       });
       if (isArtist) {
         await onboardingMutation.mutateAsync({ businessOrIndividual: "Individual", onboardingStep: 1 });
-        setStage("artist-types");
+        // Hand off to the full artist onboarding flow (types → profile → network → plan)
+        window.location.href = "/artist-onboarding";
+        return;
       } else {
         setStage("client-biz");
       }
