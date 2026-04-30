@@ -90,39 +90,46 @@ async function parsePostsWithAI(rawText: string, groupName: string): Promise<Par
   const systemPrompt = `You are an expert at parsing Facebook group posts for an arts hiring platform called Artswrk.
 Artswrk connects dance studios, performing arts organizations, and entertainment companies with artists, teachers, choreographers, and performers.
 
-Given raw text from a Facebook group called "${groupName}", extract each distinct post and classify it as either:
+Given raw text from a Facebook group called "${groupName}", extract leads from both original posts AND comment threads.
+
+## LEAD TYPES
 - "job": A hiring request, job posting, or call for artists/teachers/performers
 - "artist": An artist, teacher, or performer introducing themselves or posting their availability
 
-IMPORTANT LOCATION RULE: The group name suggests this is a regional group. If a post does not explicitly mention a city or state, use "${locationHint || groupName}" as the default location. Always try to extract the most specific location available from the post text first.
+## COMMENTER LEADS RULE (IMPORTANT)
+Also scan comment threads below each post. If a commenter is clearly a studio owner or hirer (e.g. they mention their studio name, city, or share contact info like an email/phone), create a SEPARATE lead entry for them as a "job" lead. Their contact info belongs to THEM, not the original poster.
+Example: If an artist posts seeking work and a commenter says "We are in Ellicott City, email us at studio@example.com" — create a job lead for that studio commenter with their email, NOT the artist's lead.
+Do NOT attribute a commenter's email/phone to the original poster.
 
-For each post, extract ALL of the following fields:
+## LOCATION RULE
+If a post does not explicitly mention a city or state, use "${locationHint || groupName}" as the default location. Always extract the most specific location available first.
+
+## FIELDS TO EXTRACT FOR EACH LEAD
 - leadType: "job" or "artist"
-- name: The POSTER's name (person posting) OR their studio/company name if they are posting on behalf of an organization. For job posts, prefer the company/studio name. For artist posts, prefer the individual's name.
-- posterFacebookUrl: The Facebook profile URL of the poster if visible (e.g. "https://www.facebook.com/..."). Empty string if not visible.
-- email: Email address extracted from the post. Empty string if none.
+- name: The poster's name OR studio/company name. For job posts: prefer company name. For artist posts: prefer individual name.
+- posterFacebookUrl: Facebook profile URL if visible. Empty string if not.
+- email: Email address from THIS PERSON'S text only (not commenters, not other people). Empty string if none.
 - instagram: Instagram handle (e.g. "@username") if mentioned. Empty string if none.
-- contactInfo: Any remaining contact info (phone, website, DM instructions). Empty string if none.
-- studioName: Studio or company name. For job posts: the hiring studio/org. For artist posts: their affiliation. Empty string if not mentioned.
-- studioUrl: Studio Facebook page URL or website URL if mentioned. Empty string if none.
-- studioAddress: Studio physical address if mentioned (e.g. "123 Main St, Chicago, IL"). Empty string if none.
-- location: Full location string (e.g. "Lincoln Park, Chicago, IL"). Default to "${locationHint || groupName}" if not mentioned.
-- city: City name only (e.g. "Chicago"). Empty string if unknown.
-- state: State abbreviation only (e.g. "IL"). Empty string if unknown.
-- title: For jobs: the role being hired (e.g. "Hip Hop Teacher"). For artists: their primary discipline (e.g. "Ballet Teacher").
-- jobSummary: A single sentence (max 20 words) summarizing what this post is about.
-- jobDescription: The clean job description in plain text — remove UI noise, timestamps, reaction counts. Keep all relevant details.
-- rawPostText: The original post text trimmed to 500 chars.
-- jobDate: Date or date range as written in the post (e.g. "Saturday 3/15", "April - June", "Mon/Wed evenings"). Empty string if not mentioned.
-- jobDateType: "single" if one specific date, "recurring" if weekly/monthly/ongoing schedule, "ongoing" if open-ended. Empty string if unknown.
-- rate: Pay rate string as written (e.g. "$50/hr", "$500 flat", "Open rate"). Empty string if not mentioned.
-- rateAmount: Numeric rate amount in cents (e.g. 5000 for $50). 0 if open/unknown.
-- rateType: "hourly" if per-hour rate, "flat" if flat/total fee, "open" if open rate. Empty string if unknown.
-- disciplines: Array of art disciplines mentioned (e.g. ["Ballet", "Hip Hop", "Jazz"]).
-- description: A clean 1-3 sentence summary of the post (legacy field, same as jobSummary but slightly longer).
+- contactInfo: Phone numbers, website URLs, or DM instructions from THIS PERSON only. Include phone numbers like "443-226-3419" here. Empty string if none.
+- studioName: Studio or company name. Empty string if not mentioned.
+- studioUrl: Studio website or Facebook page URL. Empty string if none.
+- studioAddress: Studio physical address. Empty string if none.
+- location: Full location string. Default to "${locationHint || groupName}" if not mentioned.
+- city: City name only. Empty string if unknown.
+- state: State abbreviation only. Empty string if unknown.
+- title: For jobs: role being hired. For artists: primary discipline.
+- jobSummary: Single sentence (max 20 words) summarizing the post.
+- jobDescription: Clean plain text — all relevant details, no UI noise, no timestamps, no reaction counts.
+- rawPostText: Original post text trimmed to 400 chars.
+- jobDate: Date or schedule as written. Empty string if not mentioned.
+- jobDateType: "single", "recurring", "ongoing", or "".
+- rate: Pay rate as written. Empty string if not mentioned.
+- rateAmount: Numeric amount in cents. 0 if unknown.
+- rateType: "hourly", "flat", "open", or "".
+- disciplines: Array of art disciplines mentioned.
+- description: 1-3 sentence summary.
 
-Return a JSON array of lead objects. If a section of text is not a distinct post (e.g. navigation text, timestamps, UI elements like "Like", "Reply", "Share", member counts), skip it.
-Only include real posts with meaningful content about hiring or artist availability.`;
+Skip pure UI noise (navigation text, reaction buttons, member counts). Only include leads with meaningful hiring or availability content.`;
 
   const cleaned = cleanFacebookText(rawText);
   const userPrompt = `Here is the cleaned text pasted from the Facebook group. Parse all distinct posts:\n\n${cleaned.slice(0, 8000)}`;
