@@ -254,7 +254,7 @@ export default function Join() {
             <div className="grid grid-cols-2 gap-3 mb-5">
               {/* Artist card */}
               <button
-                onClick={() => selectRole("artist")}
+                onClick={() => setRole("artist")}
                 className={`rounded-2xl border-2 p-5 text-left transition-all hover:border-[#111] hover:shadow-sm ${
                   role === "artist" ? "border-[#111] bg-white shadow-sm" : "border-gray-200 bg-white"
                 }`}
@@ -265,7 +265,7 @@ export default function Join() {
 
               {/* Client card */}
               <button
-                onClick={() => selectRole("client")}
+                onClick={() => setRole("client")}
                 className={`rounded-2xl border-2 p-5 text-left transition-all hover:border-[#111] hover:shadow-sm ${
                   role === "client" ? "border-[#111] bg-white shadow-sm" : "border-gray-200 bg-white"
                 }`}
@@ -275,7 +275,7 @@ export default function Join() {
               </button>
             </div>
 
-            {/* JOIN button — always clickable but highlights role on click */}
+            {/* JOIN button — advances only after role is selected */}
             <div className="space-y-3">
               <button
                 onClick={() => role && setStage("account")}
@@ -290,7 +290,11 @@ export default function Join() {
 
             <p className="text-center text-xs text-gray-400 mt-5">
               Already have an account?{" "}
-              <a href="/login" className="font-semibold text-[#F25722] hover:opacity-70 transition-opacity">Sign In</a>.
+              <a
+                href="/login"
+                className="font-semibold hover:opacity-70 transition-opacity"
+                style={{ color: role === "artist" ? "#EC008C" : "#F25722" }}
+              >Sign In</a>.
             </p>
           </div>
         )}
