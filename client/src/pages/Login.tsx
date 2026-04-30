@@ -114,7 +114,8 @@ export default function Login() {
     onSuccess: (data) => {
       setError("");
       if (!data.exists) {
-        setStage("not-found");
+        // No account — send straight to join with email pre-filled
+        window.location.href = `/join?email=${encodeURIComponent(email)}${next ? `&next=${encodeURIComponent(next)}` : ""}`;
         return;
       }
       setUserInfo({
@@ -393,22 +394,12 @@ export default function Login() {
                 </p>
               </div>
 
-              <div className="space-y-3">
-                <a
-                  href={`/join?email=${encodeURIComponent(email)}${next ? `&next=${encodeURIComponent(next)}` : ""}`}
-                  className="w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-                >
-                  <Building2 size={16} />
-                  Join as a Client
-                </a>
-                <a
-                  href={`/join?email=${encodeURIComponent(email)}${next ? `&next=${encodeURIComponent(next)}` : ""}`}
-                  className="w-full py-3.5 rounded-xl text-sm font-bold text-[#111] bg-gray-100 hover:bg-gray-150 transition-colors flex items-center justify-center gap-2"
-                >
-                  <Music size={16} />
-                  Join as an Artist
-                </a>
-              </div>
+              <a
+                href={`/join?email=${encodeURIComponent(email)}${next ? `&next=${encodeURIComponent(next)}` : ""}`}
+                className="w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+              >
+                Join Artswrk — it's free
+              </a>
             </>
           )}
         </div>
