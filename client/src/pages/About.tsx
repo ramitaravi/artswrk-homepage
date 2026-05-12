@@ -63,7 +63,7 @@ export default function About() {
           <div className="grid md:grid-cols-2 gap-8">
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
               <div className="w-12 h-12 rounded-2xl hirer-grad-bg flex items-center justify-center mb-5 text-xl">
-                ❤️
+                ♡
               </div>
               <h3 className="text-xl font-black text-[#111] mb-3">Our Mission</h3>
               <p className="text-gray-500 leading-relaxed">
@@ -73,12 +73,12 @@ export default function About() {
             </div>
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
               <div className="w-12 h-12 rounded-2xl hirer-grad-bg flex items-center justify-center mb-5 text-xl">
-                ✨
+                ✩
               </div>
               <h3 className="text-xl font-black text-[#111] mb-3">Our Vision</h3>
               <p className="text-gray-500 leading-relaxed">
                 Our vision is to use technology to empower artists &amp; small
-                businesses in the 21st century.
+                businesses to connect and thrive.
               </p>
             </div>
           </div>
@@ -189,7 +189,7 @@ export default function About() {
           Artswrk is backed &amp; advised by leaders from
         </p>
         <div className="flex flex-wrap items-center justify-center gap-8 opacity-60 grayscale">
-          {["Google", "Meta", "Spotify", "Airbnb", "Stripe", "Sequoia"].map(
+          {["Google", "ClassPass", "CNN", "Martha Graham", "Tony-Winning Producers"].map(
             (co) => (
               <div
                 key={co}
@@ -203,67 +203,61 @@ export default function About() {
       </section>
 
       {/* ── Get In Touch ─────────────────────────────────────────────────── */}
-      <section className="py-20 bg-gray-50 px-5 lg:px-10">
-        <div className="max-w-3xl mx-auto text-center">
-          <p className="text-sm font-semibold hirer-grad-text uppercase tracking-widest mb-3">
-            Get In Touch
-          </p>
-          <h2 className="text-3xl md:text-4xl font-black text-[#111] mb-3">
-            Connect with us
-          </h2>
-          <p className="text-gray-500 mb-12">
-            Interested in working together? Reach out to us.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-            <a
-              href="mailto:contact@artswrk.com"
-              className="flex items-center gap-3 bg-white rounded-2xl px-6 py-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group"
-            >
-              <div className="w-10 h-10 rounded-xl hirer-grad-bg flex items-center justify-center">
-                <Mail size={18} className="text-white" />
-              </div>
-              <div className="text-left">
-                <p className="text-xs text-gray-400 font-medium">Email</p>
-                <p className="text-sm font-bold text-[#111]">
-                  contact@artswrk.com
-                </p>
-              </div>
-            </a>
-            <a
-              href="https://instagram.com/artswrkofficial"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 bg-white rounded-2xl px-6 py-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group"
-            >
-              <div className="w-10 h-10 rounded-xl artist-grad-bg flex items-center justify-center">
-                <Instagram size={18} className="text-white" />
-              </div>
-              <div className="text-left">
-                <p className="text-xs text-gray-400 font-medium">Instagram</p>
-                <p className="text-sm font-bold text-[#111]">
-                  @artswrkofficial
-                </p>
-              </div>
-            </a>
-            <a
-              href="https://linkedin.com/company/artswrk"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 bg-white rounded-2xl px-6 py-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-[#0077B5] flex items-center justify-center">
-                <Linkedin size={18} className="text-white" />
-              </div>
-              <div className="text-left">
-                <p className="text-xs text-gray-400 font-medium">LinkedIn</p>
-                <p className="text-sm font-bold text-[#111]">
-                  linkedin.com/company/artswrk
-                </p>
-              </div>
-            </a>
-          </div>
+<section className="py-20 bg-gray-50 px-5 lg:px-10">
+  <div className="max-w-3xl mx-auto text-center">
+    <p className="text-sm font-semibold hirer-grad-text uppercase tracking-widest mb-3">
+      Get In Touch
+    </p>
+    <h2 className="text-3xl md:text-4xl font-black text-[#111] mb-3">
+      Connect with us
+    </h2>
+    <p className="text-gray-500 mb-12">
+      Interested in working together? Reach out to us.
+    </p>
+    <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+      
+        href="mailto:contact@artswrk.com"
+        className="flex items-center gap-3 bg-white rounded-2xl px-6 py-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group w-56"
+      >
+        <div className="w-10 h-10 rounded-xl hirer-grad-bg flex items-center justify-center shrink-0">
+          <Mail size={18} className="text-white" />
         </div>
-      </section>
+        <div className="text-left">
+          <p className="text-xs text-gray-400 font-medium">Email</p>
+          <p className="text-sm font-bold text-[#111]">contact@artswrk.com</p>
+        </div>
+      </a>
+      
+        href="https://instagram.com/artswrkofficial"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-3 bg-white rounded-2xl px-6 py-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group w-56"
+      >
+        <div className="w-10 h-10 rounded-xl artist-grad-bg flex items-center justify-center shrink-0">
+          <Instagram size={18} className="text-white" />
+        </div>
+        <div className="text-left">
+          <p className="text-xs text-gray-400 font-medium">Instagram</p>
+          <p className="text-sm font-bold text-[#111]">@artswrkofficial</p>
+        </div>
+      </a>
+      
+        href="https://linkedin.com/company/artswrk"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-3 bg-white rounded-2xl px-6 py-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group w-56"
+      >
+        <div className="w-10 h-10 rounded-xl bg-[#0077B5] flex items-center justify-center shrink-0">
+          <Linkedin size={18} className="text-white" />
+        </div>
+        <div className="text-left">
+          <p className="text-xs text-gray-400 font-medium">LinkedIn</p>
+          <p className="text-sm font-bold text-[#111]">linkedin.com/company/artswrk</p>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
     </div>
   );
 }
