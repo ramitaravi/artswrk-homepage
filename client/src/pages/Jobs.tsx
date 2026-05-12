@@ -4,12 +4,12 @@
  * Map: real Google Maps with job pin markers
  * Data: real DB via tRPC (enriched jobs + PRO jobs + artist applications)
  */
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import {
   Search, MapPin, Clock, ChevronDown, X, Star, Loader2,
   Briefcase, CheckCircle, AlertCircle, Lock, ArrowRight, Zap,
 } from "lucide-react";
-import { Link, useSearch } from "wouter";
+import { Link, useSearch, useLocation as useWouterLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { MapView } from "@/components/Map";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -644,6 +644,15 @@ export default function Jobs() {
   const [selectedJob, setSelectedJob] = useState<DisplayJob | null>(null);
 
   const { user, isAuthenticated } = useAuth();
+  const [, navigate] = useWouterLocation();
+
+  // Redirect clients away from the artist jobs page — they have their own dashboard
+  useEffect(() => {
+    if (user && (user as any).role === "client") {
+      navigate("/app");
+    }
+  }, [user, navigate]);
+
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [gateJob, setGateJob] = useState<ApplyGateJob | null>(null);
 
@@ -672,7 +681,7 @@ export default function Jobs() {
       companyName: j.clientCompanyName ?? j.clientName ?? null,
       location: j.locationAddress
         ? j.locationAddress.split(",").slice(0, 2).join(",").trim()
-        : "Work From Anywhere",
+        : "Location TBD",
       postedAgo: timeAgo(j.bubbleCreatedAt),
       datetime: formatDatetime(j.startDate, j.dateType),
       rate: formatRate(j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate),
@@ -711,7 +720,7 @@ export default function Jobs() {
       companyName: a.clientCompanyName ?? null,
       location: a.locationAddress
         ? a.locationAddress.split(",").slice(0, 2).join(",").trim()
-        : "Work From Anywhere",
+        : "Location TBD",
       postedAgo: timeAgo(a.createdAt),
       datetime: formatDatetime(a.startDate, a.dateType),
       rate: formatRate(a.isHourly, a.openRate, a.artistHourlyRate, a.clientHourlyRate),
