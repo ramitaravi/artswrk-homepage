@@ -215,7 +215,7 @@ export default function About() {
       Interested in working together? Reach out to us.
     </p>
     <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-      
+      <a
         href="mailto:contact@artswrk.com"
         className="flex items-center gap-3 bg-white rounded-2xl px-6 py-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group w-56"
       >
@@ -227,7 +227,7 @@ export default function About() {
           <p className="text-sm font-bold text-[#111]">contact@artswrk.com</p>
         </div>
       </a>
-      
+      <a
         href="https://instagram.com/artswrkofficial"
         target="_blank"
         rel="noopener noreferrer"
@@ -241,7 +241,7 @@ export default function About() {
           <p className="text-sm font-bold text-[#111]">@artswrkofficial</p>
         </div>
       </a>
-      
+      <a
         href="https://linkedin.com/company/artswrk"
         target="_blank"
         rel="noopener noreferrer"
