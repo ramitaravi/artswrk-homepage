@@ -346,7 +346,7 @@ function Hero({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
         {tab === "hirers" ? (
           <>
             <p className="text-gray-400 text-base mb-0 max-w-lg mx-auto">
-              Describe your job below — we'll turn it into a listing and send it to 5,000+ artists instantly.
+              Describe your job below — we'll turn it into a listing and send it to 6,000+ artists instantly.
             </p>
             <JobPostFlow />
           </>
