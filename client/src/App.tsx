@@ -55,6 +55,7 @@ import LeadsCampaigns from "./pages/leads/LeadsCampaigns";
 import LeadsUnsubscribes from "./pages/leads/LeadsUnsubscribes";
 import LeadsCRM from "./pages/leads/LeadsCRM";
 import LeadsFacebook from "./pages/leads/LeadsFacebook";
+import BrowseArtists from "./pages/BrowseArtists";
 import { useAuth } from "./_core/hooks/useAuth";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 
@@ -134,6 +135,7 @@ function Router() {
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/cancellation-policy" component={CancellationPolicy} />
       <Route path="/about" component={About} />
+      <Route path="/browse" component={BrowseArtists} />
       <Route path="/dance-competitions" component={DanceCompetitions} />
       <Route path="/dance-studios" component={DanceStudios} />
       <Route path="/music-schools" component={MusicSchools} />

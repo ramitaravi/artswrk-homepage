@@ -677,3 +677,16 @@
 - [x] Artist: Pay-via-Artswrk flow — upload reimbursements (receipt + amount + note), submit invoice
 - [x] Artist: Pay-directly flow — "Confirm you got paid" button with confirmation dialog
 - [x] Write vitest tests for confirmation and reimbursement logic (7 tests, 129 total passing)
+
+## Public Browse Artists Page (/browse)
+- [x] Create public /browse page (BrowseArtists.tsx) accessible without login
+- [x] Artist grid with 3/4 aspect ratio cards, profile photos, PRO badge, location, role pill
+- [x] Search bar filtering by name/keyword
+- [x] Role filter pills (Dance Educator, Choreographer, Dancer, etc.)
+- [x] Service type dropdown in right sidebar
+- [x] First 24 artists visible, remaining blurred with "Join to view" overlay
+- [x] Sign-up CTA banner after first 24 cards (gradient, "Join Free — It's Quick")
+- [x] Right sidebar: "Post a Job" CTA, service type filter, platform stats
+- [x] Register /browse route in App.tsx
+- [x] Add "Browse Artists" link to Navbar (desktop + mobile)
+- [x] Uses existing publicProcedure artists.browse tRPC endpoint (no backend changes needed)

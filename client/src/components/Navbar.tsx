@@ -80,6 +80,7 @@ export default function Navbar() {
 
             <div className="hidden md:flex items-center gap-6">
               <Link href="/jobs" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">Jobs</Link>
+              <Link href="/browse" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">Browse Artists</Link>
               <Link href="/about" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">About</Link>
 
               {/* For Hirers dropdown */}
@@ -159,6 +160,7 @@ export default function Navbar() {
         {mobileOpen && (
           <div className="md:hidden bg-white border-t border-gray-100 px-5 py-4 space-y-3">
             <a href="/jobs" className="block text-sm font-medium text-gray-700 py-1">Jobs</a>
+            <a href="/browse" className="block text-sm font-medium text-gray-700 py-1">Browse Artists</a>
             <a href="/about" className="block text-sm font-medium text-gray-700 py-1">About</a>
             <a href="/dance-competitions" className="block text-sm font-medium text-gray-700 py-1">Dance Competitions</a>
             <a href="/dance-studios" className="block text-sm font-medium text-gray-700 py-1">Dance Studios</a>
