@@ -202,7 +202,7 @@ export default function About() {
         </div>
       </section>
 
-      {/* ── Get In Touch ─────────────────────────────────────────────────── */}
+     {/* ── Get In Touch ─────────────────────────────────────────────────── */}
 <section className="py-20 bg-gray-50 px-5 lg:px-10">
   <div className="max-w-3xl mx-auto text-center">
     <p className="text-sm font-semibold hirer-grad-text uppercase tracking-widest mb-3">
@@ -214,45 +214,45 @@ export default function About() {
     <p className="text-gray-500 mb-12">
       Interested in working together? Reach out to us.
     </p>
-    <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-      <a
+    <div className="flex flex-col sm:flex-row items-stretch justify-center gap-6">
+      
         href="mailto:contact@artswrk.com"
-        className="flex items-center gap-3 bg-white rounded-2xl px-6 py-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group w-56"
+        className="flex items-center gap-3 bg-white rounded-2xl px-6 py-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group min-w-0 sm:w-56"
       >
         <div className="w-10 h-10 rounded-xl hirer-grad-bg flex items-center justify-center shrink-0">
           <Mail size={18} className="text-white" />
         </div>
-        <div className="text-left">
+        <div className="text-left min-w-0">
           <p className="text-xs text-gray-400 font-medium">Email</p>
-          <p className="text-sm font-bold text-[#111]">contact@artswrk.com</p>
+          <p className="text-sm font-bold text-[#111] truncate">contact@artswrk.com</p>
         </div>
       </a>
-      <a
+      
         href="https://instagram.com/artswrkofficial"
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-3 bg-white rounded-2xl px-6 py-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group w-56"
+        className="flex items-center gap-3 bg-white rounded-2xl px-6 py-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group min-w-0 sm:w-56"
       >
         <div className="w-10 h-10 rounded-xl artist-grad-bg flex items-center justify-center shrink-0">
           <Instagram size={18} className="text-white" />
         </div>
-        <div className="text-left">
+        <div className="text-left min-w-0">
           <p className="text-xs text-gray-400 font-medium">Instagram</p>
-          <p className="text-sm font-bold text-[#111]">@artswrkofficial</p>
+          <p className="text-sm font-bold text-[#111] truncate">@artswrkofficial</p>
         </div>
       </a>
-      <a
+      
         href="https://linkedin.com/company/artswrk"
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-3 bg-white rounded-2xl px-6 py-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group w-56"
+        className="flex items-center gap-3 bg-white rounded-2xl px-6 py-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group min-w-0 sm:w-56"
       >
         <div className="w-10 h-10 rounded-xl bg-[#0077B5] flex items-center justify-center shrink-0">
           <Linkedin size={18} className="text-white" />
         </div>
-        <div className="text-left">
+        <div className="text-left min-w-0">
           <p className="text-xs text-gray-400 font-medium">LinkedIn</p>
-          <p className="text-sm font-bold text-[#111]">linkedin.com/company/artswrk</p>
+          <p className="text-sm font-bold text-[#111] truncate">linkedin.com/company/artswrk</p>
         </div>
       </a>
     </div>
