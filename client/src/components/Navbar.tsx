@@ -4,11 +4,14 @@
  * Login/Join buttons when logged out.
  */
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { ChevronDown, Menu, X, LogOut, LayoutDashboard } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+
+const LOGO_URL =
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/artswrk-logo-gradient_8e560567.png";
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -16,6 +19,25 @@ export default function Navbar() {
   const [artistsOpen, setArtistsOpen] = useState(false);
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
+
+  // Timeout refs to delay closing so users can move mouse into the dropdown
+  const hirersTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const artistsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function openHirers() {
+    if (hirersTimeout.current) clearTimeout(hirersTimeout.current);
+    setHirersOpen(true);
+  }
+  function closeHirers() {
+    hirersTimeout.current = setTimeout(() => setHirersOpen(false), 120);
+  }
+  function openArtists() {
+    if (artistsTimeout.current) clearTimeout(artistsTimeout.current);
+    setArtistsOpen(true);
+  }
+  function closeArtists() {
+    artistsTimeout.current = setTimeout(() => setArtistsOpen(false), 120);
+  }
 
   const logout = trpc.auth.logout.useMutation({
     onSuccess: () => {
@@ -51,21 +73,30 @@ export default function Navbar() {
       <nav className={`fixed left-0 right-0 z-50 bg-white border-b border-gray-100 ${isAuthenticated && user ? "top-7" : "top-0"}`}>
         <div className="mx-auto px-5 lg:px-10 max-w-7xl">
           <div className="flex items-center justify-between h-16">
+            {/* Logo */}
             <a href="/" className="flex items-center select-none">
-              <span className="font-black text-2xl tracking-tight hirer-grad-text">ARTS</span>
-              <span className="font-black text-2xl tracking-tight bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">WRK</span>
+              <img src={LOGO_URL} alt="Artswrk" className="h-9 w-auto" />
             </a>
 
             <div className="hidden md:flex items-center gap-6">
               <Link href="/jobs" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">Jobs</Link>
               <Link href="/about" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">About</Link>
 
-              <div className="relative" onMouseEnter={() => setHirersOpen(true)} onMouseLeave={() => setHirersOpen(false)}>
-                <button className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-black transition-colors">
+              {/* For Hirers dropdown */}
+              <div
+                className="relative"
+                onMouseEnter={openHirers}
+                onMouseLeave={closeHirers}
+              >
+                <button className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-black transition-colors py-2">
                   For Hirers <ChevronDown size={14} className={`transition-transform ${hirersOpen ? "rotate-180" : ""}`} />
                 </button>
                 {hirersOpen && (
-                  <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
+                  <div
+                    className="absolute top-full left-0 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50"
+                    onMouseEnter={openHirers}
+                    onMouseLeave={closeHirers}
+                  >
                     <a href="/post-job" className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">Post a Job</a>
                     <a href="/jobs" className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">Browse Artists</a>
                     <a href="/dance-competitions" className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">Dance Competitions</a>
@@ -75,12 +106,21 @@ export default function Navbar() {
                 )}
               </div>
 
-              <div className="relative" onMouseEnter={() => setArtistsOpen(true)} onMouseLeave={() => setArtistsOpen(false)}>
-                <button className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-black transition-colors">
+              {/* For Artists dropdown */}
+              <div
+                className="relative"
+                onMouseEnter={openArtists}
+                onMouseLeave={closeArtists}
+              >
+                <button className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-black transition-colors py-2">
                   For Artists <ChevronDown size={14} className={`transition-transform ${artistsOpen ? "rotate-180" : ""}`} />
                 </button>
                 {artistsOpen && (
-                  <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
+                  <div
+                    className="absolute top-full left-0 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50"
+                    onMouseEnter={openArtists}
+                    onMouseLeave={closeArtists}
+                  >
                     <a href="/login" className="block px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">Create Profile</a>
                     <a href="/jobs" className="block px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">Find Jobs</a>
                     <a href="/dance-teachers" className="block px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">Dance Teachers</a>
