@@ -486,7 +486,7 @@ function AudienceClarity() {
         <div className="text-center mb-14">
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Who Is Artswrk For?</p>
           <h2 className="text-4xl md:text-5xl font-black text-[#111] leading-tight">
-            Hire Artists. Find Work.
+            One platform. Every role in dance.
           </h2>
         </div>
 
