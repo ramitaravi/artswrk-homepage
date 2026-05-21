@@ -20,6 +20,12 @@ import ApplyGateModal, { type ApplyGateJob } from "@/components/ApplyGateModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+interface LocationFilter {
+  query: string;
+  lat?: number;
+  lng?: number;
+}
+
 interface DisplayJob {
   id: number;
   title: string;
@@ -148,18 +154,7 @@ function formatRate(
   return isHourly ? `$${rate}/hr` : `$${rate}`;
 }
 
-const ARTIST_TYPES = [
-  "Dance Teacher",
-  "Choreographer",
-  "Performer",
-  "Yoga Instructor",
-  "Pilates Instructor",
-  "Fitness Instructor",
-  "Music Teacher",
-  "Vocalist",
-  "Photographer",
-  "Videographer",
-];
+// Artist types are now loaded from the server via trpc.jobs.getFilterOptions
 
 // ─── Subscription Paywall Modal ───────────────────────────────────────────────
 
@@ -295,12 +290,14 @@ function JobCard({
   onClick,
   canApply,
   onPaywall,
+  isAuthenticated = false,
 }: {
   job: DisplayJob;
   isSelected: boolean;
   onClick: () => void;
   canApply: boolean;
   onPaywall: () => void;
+  isAuthenticated?: boolean;
 }) {
   return (
     <div
@@ -339,7 +336,8 @@ function JobCard({
         <div className="flex items-start justify-between gap-2 mb-1">
           <div className="min-w-0">
             <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{job.title}</h3>
-            {job.companyName && (
+            {/* Only show studio name to authenticated users */}
+            {isAuthenticated && job.companyName && (
               <p className="text-xs text-gray-500 truncate">{job.companyName}</p>
             )}
           </div>
@@ -351,12 +349,21 @@ function JobCard({
             >
               Apply →
             </Link>
-          ) : (
+          ) : isAuthenticated ? (
+            // Logged in but no subscription — show paywall
             <button
               className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-[#F25722] hover:bg-[#d44a1a] transition-colors"
               onClick={(e) => { e.stopPropagation(); onPaywall(); }}
             >
               <Lock size={10} /> Apply
+            </button>
+          ) : (
+            // Logged out — pink gradient apply button
+            <button
+              className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold text-white artist-grad-bg hover:opacity-90 transition-opacity"
+              onClick={(e) => { e.stopPropagation(); onPaywall(); }}
+            >
+              Apply →
             </button>
           )}
         </div>
@@ -501,7 +508,8 @@ function ApplicationCard({ job, status }: { job: DisplayApplication; status: App
         <div className="flex items-start justify-between gap-2 mb-1">
           <div className="min-w-0">
             <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{job.title}</h3>
-            {job.companyName && (
+            {/* Only show studio name to authenticated users */}
+            {isAuthenticated && job.companyName && (
               <p className="text-xs text-gray-500 truncate">{job.companyName}</p>
             )}
           </div>
@@ -638,10 +646,13 @@ export default function Jobs() {
 
   const [tab, setTab] = useState<Tab>(initialTab);
   const [search, setSearch] = useState("");
-  const [location, setLocation] = useState(searchParams.get("location") ?? "");
+  const [locationFilter, setLocationFilter] = useState<LocationFilter>({ query: searchParams.get("location") ?? "" });
   const [artistType, setArtistType] = useState("");
   const [serviceType, setServiceType] = useState("");
   const [selectedJob, setSelectedJob] = useState<DisplayJob | null>(null);
+  const [mobileView, setMobileView] = useState<"list" | "map">("list");
+  const locationInputRef = useRef<HTMLInputElement>(null);
+  const placesAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useWouterLocation();
@@ -653,6 +664,30 @@ export default function Jobs() {
     }
   }, [user, navigate]);
 
+  // Google Places Autocomplete for the location input
+  useEffect(() => {
+    if (!locationInputRef.current || typeof google === "undefined") return;
+    if (placesAutocompleteRef.current) return; // already initialised
+    try {
+      const autocomplete = new google.maps.places.Autocomplete(locationInputRef.current, {
+        types: ["(cities)"],
+        fields: ["geometry", "formatted_address"],
+      });
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (place.geometry?.location) {
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          const query = place.formatted_address ?? locationInputRef.current?.value ?? "";
+          setLocationFilter({ query, lat, lng });
+        }
+      });
+      placesAutocompleteRef.current = autocomplete;
+    } catch {
+      // Google Maps not yet loaded — will retry on next render
+    }
+  });
+
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [gateJob, setGateJob] = useState<ApplyGateJob | null>(null);
 
@@ -663,7 +698,19 @@ export default function Jobs() {
   const canApplyToProJobs = isPro;            // Only PRO can apply to PRO jobs
 
   // ── Data fetching ─────────────────────────────────────────────────────────
-  const { data: rawJobs, isLoading: jobsLoading } = trpc.jobs.publicListEnriched.useQuery({ limit: 200 });
+  const { data: filterOptions } = trpc.jobs.getFilterOptions.useQuery();
+
+  // Stable filter input to avoid infinite re-fetch
+  const filterInput = useMemo(() => ({
+    limit: 200,
+    artistType: artistType || undefined,
+    serviceType: serviceType || undefined,
+    locationLat: locationFilter.lat,
+    locationLng: locationFilter.lng,
+    locationQuery: !locationFilter.lat && locationFilter.query ? locationFilter.query : undefined,
+  }), [artistType, serviceType, locationFilter.lat, locationFilter.lng, locationFilter.query]);
+
+  const { data: rawJobs, isLoading: jobsLoading } = trpc.jobs.publicListEnriched.useQuery(filterInput);
   const { data: rawProJobs, isLoading: proJobsLoading } = trpc.artistDashboard.getProJobsFeed.useQuery({ limit: 50 });
   const { data: rawApplications, isLoading: appsLoading } = trpc.jobs.myApplications.useQuery(
     { limit: 50 },
@@ -681,7 +728,7 @@ export default function Jobs() {
       companyName: j.clientCompanyName ?? j.clientName ?? null,
       location: j.locationAddress
         ? j.locationAddress.split(",").slice(0, 2).join(",").trim()
-        : "Location TBD",
+        : (j.locationLat && j.locationLng ? "Chicago Area" : "Remote / Flexible"),
       postedAgo: timeAgo(j.bubbleCreatedAt),
       datetime: formatDatetime(j.startDate, j.dateType),
       rate: formatRate(j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate),
@@ -730,25 +777,18 @@ export default function Jobs() {
     }));
   }, [rawApplications]);
 
+  // Client-side text search only; location/artistType/serviceType are server-side
   const filtered = useMemo(() => {
-    return allJobs.filter((j) => {
-      if (search) {
-        const q = search.toLowerCase();
-        if (
-          !j.title.toLowerCase().includes(q) &&
-          !j.location.toLowerCase().includes(q) &&
-          !(j.description ?? "").toLowerCase().includes(q)
-        )
-          return false;
-      }
-      if (location) {
-        if (!j.location.toLowerCase().includes(location.toLowerCase())) return false;
-      }
-      return true;
-    });
-  }, [allJobs, search, location]);
+    if (!search) return allJobs;
+    const q = search.toLowerCase();
+    return allJobs.filter((j) =>
+      j.title.toLowerCase().includes(q) ||
+      j.location.toLowerCase().includes(q) ||
+      (j.description ?? "").toLowerCase().includes(q)
+    );
+  }, [allJobs, search]);
 
-  const hasFilters = !!(search || location || artistType || serviceType);
+  const hasFilters = !!(search || locationFilter.query || artistType || serviceType);
 
   const TABS: { id: Tab; label: string; count?: number }[] = [
     { id: "near-me", label: "Jobs Near Me", count: allJobs.length },
@@ -848,6 +888,7 @@ export default function Jobs() {
           <div className="w-full md:w-[420px] lg:w-[480px] flex flex-col border-r border-gray-100 flex-shrink-0">
             {/* Filters */}
             <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0 space-y-2">
+              {/* Row 1: Search + Location */}
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -862,32 +903,29 @@ export default function Jobs() {
                 <div className="relative flex-1">
                   <MapPin size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
+                    ref={locationInputRef}
                     type="text"
-                    placeholder="New York, NY, USA"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="City, State..."
+                    value={locationFilter.query}
+                    onChange={(e) => setLocationFilter({ query: e.target.value })}
                     className="w-full pl-8 pr-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] focus:bg-white transition-all"
                   />
                 </div>
               </div>
+              {/* Row 2: Artist Type + Service Type + Reset + Mobile Map Toggle */}
               <div className="flex gap-2 items-center">
                 <div className="relative flex-1">
                   <select
                     value={artistType}
-                    onChange={(e) => setArtistType(e.target.value)}
+                    onChange={(e) => { setArtistType(e.target.value); setServiceType(""); }}
                     className="w-full appearance-none pl-3 pr-7 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] text-gray-600 cursor-pointer"
                   >
                     <option value="">Artist Type</option>
-                    {ARTIST_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
+                    {(filterOptions?.artistTypes ?? []).map((t) => (
+                      <option key={t.bubbleId} value={t.name}>{t.name}</option>
                     ))}
                   </select>
-                  <ChevronDown
-                    size={12}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                  />
+                  <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 </div>
                 <div className="relative flex-1">
                   <select
@@ -896,23 +934,19 @@ export default function Jobs() {
                     className="w-full appearance-none pl-3 pr-7 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] text-gray-600 cursor-pointer"
                   >
                     <option value="">Service Type</option>
-                    <option value="teaching">Teaching</option>
-                    <option value="performance">Performance</option>
-                    <option value="choreography">Choreography</option>
-                    <option value="judging">Judging / Adjudicating</option>
-                    <option value="photography">Photography</option>
-                    <option value="videography">Videography</option>
+                    {(filterOptions?.serviceTypes ?? [])
+                      .filter((s) => !artistType || (filterOptions?.artistTypes ?? []).find((a) => a.name === artistType)?.bubbleId === s.artistTypeBubbleId || !s.artistTypeBubbleId)
+                      .map((s) => (
+                        <option key={s.bubbleId} value={s.name}>{s.name}</option>
+                      ))}
                   </select>
-                  <ChevronDown
-                    size={12}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                  />
+                  <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 </div>
                 {hasFilters && (
                   <button
                     onClick={() => {
                       setSearch("");
-                      setLocation("");
+                      setLocationFilter({ query: "" });
                       setArtistType("");
                       setServiceType("");
                     }}
@@ -921,6 +955,13 @@ export default function Jobs() {
                     <X size={12} /> Reset
                   </button>
                 )}
+                {/* Mobile map/list toggle */}
+                <button
+                  className="md:hidden flex items-center gap-1 text-xs font-semibold text-gray-600 border border-gray-200 rounded-lg px-2.5 py-2 hover:bg-gray-50 transition-colors whitespace-nowrap flex-shrink-0"
+                  onClick={() => setMobileView(mobileView === "list" ? "map" : "list")}
+                >
+                  <MapPin size={12} /> {mobileView === "list" ? "Map" : "List"}
+                </button>
               </div>
             </div>
 
@@ -967,14 +1008,15 @@ export default function Jobs() {
                     }
                     canApply={isAuthenticated ? canApplyToJobs : false}
                     onPaywall={() => isAuthenticated ? setPaywallOpen(true) : openGate(job)}
+                    isAuthenticated={isAuthenticated}
                   />
                 ))
               )}
             </div>
           </div>
 
-          {/* Right: Google Map */}
-          <div className="hidden md:flex flex-1 relative">
+          {/* Right: Google Map — desktop always visible, mobile only when mobileView=map */}
+          <div className={`${mobileView === "map" ? "flex" : "hidden"} md:flex flex-1 relative`}>
             {isLoading ? (
               <div className="w-full h-full flex items-center justify-center bg-gray-50">
                 <Loader2 size={24} className="animate-spin text-gray-300" />

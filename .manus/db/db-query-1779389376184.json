@@ -1,0 +1,19 @@
+{
+  "query": "SELECT COUNT(*) as cnt FROM master_artist_types; SELECT COUNT(*) as cnt FROM master_service_types; SELECT DISTINCT masterServiceTypeId FROM jobs WHERE masterServiceTypeId IS NOT NULL LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user FGYqDqdUZjFkzga.root --database AyEgFhxRkEopXHz25XyihS --execute SELECT COUNT(*) as cnt FROM master_artist_types; SELECT COUNT(*) as cnt FROM master_service_types; SELECT DISTINCT masterServiceTypeId FROM jobs WHERE masterServiceTypeId IS NOT NULL LIMIT 20;",
+  "rows": [
+    {
+      "cnt": "0"
+    },
+    {
+      "cnt": "cnt"
+    },
+    {
+      "cnt": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "cnt\n0\ncnt\n0\n",
+  "stderr": "",
+  "execution_time_ms": 320
+}

@@ -1,0 +1,9 @@
+{
+  "query": "SELECT DISTINCT masterServiceTypeId FROM jobs WHERE masterServiceTypeId IS NOT NULL LIMIT 20; SELECT * FROM master_service_types LIMIT 10; SELECT * FROM master_artist_types LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user FGYqDqdUZjFkzga.root --database AyEgFhxRkEopXHz25XyihS --execute SELECT DISTINCT masterServiceTypeId FROM jobs WHERE masterServiceTypeId IS NOT NULL LIMIT 20; SELECT * FROM master_service_types LIMIT 10; SELECT * FROM master_artist_types LIMIT 10;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 272
+}

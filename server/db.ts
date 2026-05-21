@@ -202,7 +202,18 @@ export async function getPublicJobs(limit = 50, offset = 0) {
  * Public job listings enriched with client info (company name + avatar).
  * Used by the /jobs listing page and the SEO job detail page.
  */
-export async function getPublicJobsEnriched(limit = 100, offset = 0): Promise<{
+export async function getPublicJobsEnriched(
+  limit = 100,
+  offset = 0,
+  filters?: {
+    artistType?: string;
+    serviceType?: string;
+    locationQuery?: string;
+    locationLat?: number;
+    locationLng?: number;
+    radiusMiles?: number;
+  }
+): Promise<{
   id: number;
   slug: string | null;
   requestStatus: string | null;
@@ -226,17 +237,48 @@ export async function getPublicJobsEnriched(limit = 100, offset = 0): Promise<{
 }[]> {
   const db = await getDb();
   if (!db) return [];
+
+  // Build WHERE clauses
+  const whereClauses: string[] = ["j.requestStatus IN ('Active', 'Confirmed', 'Submissions Paused')"];
+
+  if (filters?.serviceType) {
+    const escaped = filters.serviceType.replace(/'/g, "''");
+    whereClauses.push(`j.description LIKE '%${escaped}%'`);
+  } else if (filters?.artistType) {
+    // Map artist type to keywords that appear in job descriptions
+    const escaped = filters.artistType.replace(/'/g, "''");
+    whereClauses.push(`j.description LIKE '%${escaped}%'`);
+  }
+
+  if (filters?.locationQuery) {
+    const escaped = filters.locationQuery.replace(/'/g, "''");
+    whereClauses.push(`j.locationAddress LIKE '%${escaped}%'`);
+  }
+
+  // Haversine distance filter when lat/lng provided
+  let distanceSelect = '';
+  if (filters?.locationLat !== undefined && filters?.locationLng !== undefined) {
+    const lat = filters.locationLat;
+    const lng = filters.locationLng;
+    const radius = filters.radiusMiles ?? 50;
+    distanceSelect = `, (3959 * acos(cos(radians(${lat})) * cos(radians(CAST(j.locationLat AS DECIMAL(10,6)))) * cos(radians(CAST(j.locationLng AS DECIMAL(10,6))) - radians(${lng})) + sin(radians(${lat})) * sin(radians(CAST(j.locationLat AS DECIMAL(10,6)))))) AS distanceMiles`;
+    whereClauses.push(`j.locationLat IS NOT NULL AND j.locationLng IS NOT NULL`);
+    whereClauses.push(`(3959 * acos(cos(radians(${lat})) * cos(radians(CAST(j.locationLat AS DECIMAL(10,6)))) * cos(radians(CAST(j.locationLng AS DECIMAL(10,6))) - radians(${lng})) + sin(radians(${lat})) * sin(radians(CAST(j.locationLat AS DECIMAL(10,6)))))) <= ${radius}`);
+  }
+
+  const whereSQL = whereClauses.join(' AND ');
   const rows = await db.execute(
     `SELECT j.id, j.slug, j.requestStatus, j.startDate, j.endDate, j.dateType,
        j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate,
        j.locationAddress, j.locationLat, j.locationLng,
        j.description, j.direct, j.bubbleCreatedAt,
-       j.masterServiceTypeId,
+       j.masterServiceTypeId
+       ${distanceSelect},
        u.clientCompanyName, u.name as clientName,
        COALESCE(u.enterpriseLogoUrl, u.profilePicture) as clientProfilePicture
      FROM jobs j
      LEFT JOIN users u ON j.clientUserId = u.id
-     WHERE j.requestStatus IN ('Active', 'Confirmed', 'Submissions Paused')
+     WHERE ${whereSQL}
      ORDER BY j.bubbleCreatedAt DESC
      LIMIT ${limit} OFFSET ${offset}`
   );

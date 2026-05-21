@@ -1039,14 +1039,47 @@ export const appRouter = router({
     /**
      * Enriched public job listings (includes client company name + avatar).
      * Used by the /jobs page for richer cards and the map view.
+     * Supports filtering by artistType, serviceType, and location.
      */
     publicListEnriched: publicProcedure
       .input(z.object({
         limit: z.number().min(1).max(200).default(100),
         offset: z.number().min(0).default(0),
+        artistType: z.string().optional(),
+        serviceType: z.string().optional(),
+        locationQuery: z.string().optional(),
+        locationLat: z.number().optional(),
+        locationLng: z.number().optional(),
+        radiusMiles: z.number().optional(),
       }))
       .query(async ({ input }) => {
-        return getPublicJobsEnriched(input.limit, input.offset);
+        return getPublicJobsEnriched(input.limit, input.offset, {
+          artistType: input.artistType,
+          serviceType: input.serviceType,
+          locationQuery: input.locationQuery,
+          locationLat: input.locationLat,
+          locationLng: input.locationLng,
+          radiusMiles: input.radiusMiles,
+        });
+      }),
+
+    /**
+     * Returns the master artist types and service types for the filter dropdowns.
+     * Served from static reference data (master tables are empty in DB).
+     */
+    getFilterOptions: publicProcedure
+      .query(async () => {
+        const { MASTER_ARTIST_TYPES, MASTER_SERVICE_TYPES } = await import('../drizzle/seeds/reference_data');
+        const publicArtistTypes = MASTER_ARTIST_TYPES.filter((t: any) => t.isPublic !== false);
+        const publicServiceTypes = MASTER_SERVICE_TYPES.filter((t: any) => t.isPublic !== false);
+        return {
+          artistTypes: publicArtistTypes.map((t: any) => ({ name: t.name, bubbleId: t.bubbleId })),
+          serviceTypes: publicServiceTypes.map((t: any) => ({
+            name: t.name,
+            bubbleId: t.bubbleId,
+            artistTypeBubbleId: t.bubbleArtistTypeId ?? null,
+          })),
+        };
       }),
 
     /**

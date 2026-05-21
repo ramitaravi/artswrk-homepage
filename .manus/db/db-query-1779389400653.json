@@ -1,0 +1,70 @@
+{
+  "query": "SELECT DISTINCT masterArtistTypes FROM users WHERE masterArtistTypes IS NOT NULL AND masterArtistTypes != '' LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user FGYqDqdUZjFkzga.root --database AyEgFhxRkEopXHz25XyihS --execute SELECT DISTINCT masterArtistTypes FROM users WHERE masterArtistTypes IS NOT NULL AND masterArtistTypes != '' LIMIT 20;",
+  "rows": [
+    {
+      "masterArtistTypes": "[\"Vocal Coach\",\"Music Teacher\",\"Acting Coach\",\"Side Jobs\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Vocal Coach\",\"Dance Educator\",\"Side Jobs\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Acting Coach\",\"Vocal Coach\",\"Music Teacher\",\"Side Jobs\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Dance Adjudicator\",\"Photographer\",\"Videographer\",\"Side Jobs\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Photographer\",\"Videographer\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Dance Educator\",\"Dance Adjudicator\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Videographer\",\"Dance Educator\",\"Photographer\",\"Dance Adjudicator\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Acting Coach\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Dance Educator\",\"Acting Coach\",\"Vocal Coach\",\"Side Jobs\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Dance Educator\",\"Vocal Coach\",\"Acting Coach\",\"Side Jobs\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Side Jobs\",\"Dance Educator\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Videographer\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Dance Educator\",\"Photographer\",\"Side Jobs\",\"Videographer\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Videographer\",\"Dance Educator\",\"Side Jobs\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Acting Coach\",\"Vocal Coach\",\"Side Jobs\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Dance Educator\",\"Photographer\",\"Videographer\",\"Dance Adjudicator\",\"Side Jobs\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Dance Educator\",\"Dance Adjudicator\",\"Acting Coach\",\"Music Teacher\",\"Side Jobs\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Vocal Coach\",\"Music Teacher\",\"Side Jobs\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Dance Educator\",\"Acting Coach\",\"Vocal Coach\",\"Dance Adjudicator\"]"
+    },
+    {
+      "masterArtistTypes": "[\"Dance Educator\",\"Dance Adjudicator\",\"Vocal Coach\",\"Music Teacher\",\"Acting Coach\",\"Side Jobs\"]"
+    }
+  ],
+  "messages": [],
+  "stdout": "masterArtistTypes\n[\"Vocal Coach\",\"Music Teacher\",\"Acting Coach\",\"Side Jobs\"]\n[\"Vocal Coach\",\"Dance Educator\",\"Side Jobs\"]\n[\"Acting Coach\",\"Vocal Coach\",\"Music Teacher\",\"Side Jobs\"]\n[\"Dance Adjudicator\",\"Photographer\",\"Videographer\",\"Side Jobs\"]\n[\"Photographer\",\"Videographer\"]\n[\"Dance Educator\",\"Dance Adjudicator\"]\n[\"Videographer\",\"Dance Educator\",\"Photographer\",\"Dance Adjudicator\"]\n[\"Acting Coach\"]\n[\"Dance Educator\",\"Acting Coach\",\"Vocal Coach\",\"Side Jobs\"]\n[\"Dance Educator\",\"Vocal Coach\",\"Acting Coach\",\"Side Jobs\"]\n[\"Side Jobs\",\"Dance Educator\"]\n[\"Videographer\"]\n[\"Dance Educator\",\"Photographer\",\"Side Jobs\",\"Videographer\"]\n[\"Videographer\",\"Dance Educator\",\"Side Jobs\"]\n[\"Acting Coach\",\"Vocal Coach\",\"Side Jobs\"]\n[\"Dance Educator\",\"Photographer\",\"Videographer\",\"Dance Adjudicator\",\"Side Jobs\"]\n[\"Dance Educator\",\"Dance Adjudicator\",\"Acting Coach\",\"Music Teacher\",\"Side Jobs\"]\n[\"Vocal Coach\",\"Music Teacher\",\"Side Jobs\"]\n[\"Dance Educator\",\"Acting Coach\",\"Vocal Coach\",\"Dance Adjudicator\"]\n[\"Dance Educator\",\"Dance Adjudicator\",\"Vocal Coach\",\"Music Teacher\",\"Acting Coach\",\"Side Jobs\"]\n",
+  "stderr": "",
+  "execution_time_ms": 276
+}

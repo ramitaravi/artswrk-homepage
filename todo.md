@@ -704,3 +704,15 @@
 - [x] FAQ accordion (hirers/artists toggle)
 - [x] CTA banner
 - [x] Footer with logo
+
+## Jobs Page Public View Improvements (May 2026)
+- [x] Hide studio name for logged-out users on job cards
+- [x] Pink gradient Apply button for logged-out users
+- [x] Real Artist Type filter from master_artist_types reference data
+- [x] Real Service Type filter from master_service_types reference data
+- [x] Google Places autocomplete for location filter
+- [x] Mobile map toggle (list/map view switcher)
+- [x] Server-side filtering for artistType, serviceType, and location
+- [x] ApplyGateModal inline login (email → password → log in without redirect)
+- [x] Share button copies current URL to clipboard with toast confirmation
+- [x] About.tsx JSX balance fixed

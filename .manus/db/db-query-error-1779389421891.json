@@ -1,0 +1,8 @@
+{
+  "query": "SELECT DISTINCT serviceType FROM jobs WHERE serviceType IS NOT NULL AND serviceType != '' LIMIT 30;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user FGYqDqdUZjFkzga.root --database AyEgFhxRkEopXHz25XyihS --execute SELECT DISTINCT serviceType FROM jobs WHERE serviceType IS NOT NULL AND serviceType != '' LIMIT 30;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'servicetype' in 'where clause'"
+  ]
+}
