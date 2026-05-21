@@ -690,3 +690,17 @@
 - [x] Register /browse route in App.tsx
 - [x] Add "Browse Artists" link to Navbar (desktop + mobile)
 - [x] Uses existing publicProcedure artists.browse tRPC endpoint (no backend changes needed)
+
+## Homepage Redesign 2.0
+- [x] Bold dark hero with rotating audience words (Dance Studios / Competitions / Performing Artists)
+- [x] Floating job cards in hero (desktop)
+- [x] Audience clarity section (3 cards: Studio Owners / Competition Owners / Artists)
+- [x] Artist photo strip
+- [x] How It Works (3 steps + interactive job post demo)
+- [x] Live jobs ticker from real DB
+- [x] Features split (For Hirers / For Artists toggle)
+- [x] Testimonials section
+- [x] For Businesses section with logo ticker and image cards
+- [x] FAQ accordion (hirers/artists toggle)
+- [x] CTA banner
+- [x] Footer with logo
