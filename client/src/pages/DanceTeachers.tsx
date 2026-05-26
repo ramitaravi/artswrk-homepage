@@ -96,7 +96,7 @@ export default function DanceTeachers() {
             Join our dance<br />teacher network
           </h1>
           <p className="text-gray-500 text-lg mb-8">
-            Create your Artswrk profile and connect with studios &amp; competitions across the country.
+            Create your Artswrk profile and connect with studios, competitions, and conventions across the country for flexible and recurring work.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
             <a href="/login" className="inline-block border border-gray-200 text-gray-700 text-sm font-semibold px-7 py-3.5 rounded-full hover:bg-gray-50 transition-colors">Login</a>
