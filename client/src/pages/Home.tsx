@@ -989,14 +989,14 @@ function CTABanner() {
           The dance industry's hiring platform.
         </h2>
         <p className="text-white/80 text-xl mb-10 max-w-xl mx-auto">
-          Join 700+ studios and 6,000+ artists already connecting on Artswrk. Free to post.
+          Join 1000+ studios and 6,000+ artists already connecting on Artswrk. Free to post.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
             href="/join"
             className="inline-flex items-center gap-2 px-8 py-4 rounded-full text-base font-bold text-[#F25722] bg-white hover:bg-gray-50 transition-colors shadow-lg"
           >
-            Post Your First Job — Free <ArrowRight size={18} />
+            Post Your First Job <ArrowRight size={18} />
           </Link>
           <Link
             href="/browse"
