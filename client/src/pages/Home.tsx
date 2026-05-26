@@ -669,12 +669,12 @@ function LiveJobsTicker() {
 type Tab = "hirers" | "artists";
 
 const HIRER_FEATURES = [
-  { emoji: "⚡", title: "Post in 60 seconds", desc: "Describe your need in plain English — we do the rest." },
+  { emoji: "⚡", title: "Post in 60 seconds", desc: "Describe your job opportunity — we do the rest." },
   { emoji: "🎯", title: "AI-powered matching", desc: "Our parser reads your post and surfaces the right artists instantly." },
   { emoji: "👥", title: "6,000+ vetted artists", desc: "Every artist is reviewed before joining the platform." },
   { emoji: "💬", title: "Message applicants directly", desc: "No middleman. Chat, negotiate, and book in one thread." },
   { emoji: "📋", title: "Track all applications", desc: "One dashboard for every job you've posted and every applicant." },
-  { emoji: "💳", title: "Pay securely online", desc: "Send a payment link. Artists get direct deposit. You get a receipt." },
+  { emoji: "💳", title: "Optional and secure artist payments", desc: "Pay online or through your regular payroll." },
 ];
 
 const ARTIST_FEATURES = [
@@ -865,7 +865,7 @@ function ForBusinesses() {
           <h2 className="text-4xl md:text-5xl font-black text-[#111] leading-tight mb-3">
             Hiring tools for performing arts businesses
           </h2>
-          <p className="text-gray-500 text-lg">Join 700+ dance studios, music schools, and more hiring with Artswrk</p>
+          <p className="text-gray-500 text-lg">Join 1000+ dance studios, music schools, and more hiring with Artswrk</p>
         </div>
 
         <div className="overflow-hidden py-6 border-y border-gray-200 mb-10">
