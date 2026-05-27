@@ -238,21 +238,43 @@ export async function getPublicJobsEnriched(
   const db = await getDb();
   if (!db) return [];
 
-  // Build WHERE clauses
-  const whereClauses: string[] = ["j.requestStatus IN ('Active', 'Confirmed', 'Submissions Paused')"];
+  // Build WHERE clauses — only Active jobs for public view
+  const whereClauses: string[] = ["j.requestStatus = 'Active'"];
+
+  // Artist type keyword mapping — maps display names to keywords found in job descriptions
+  const ARTIST_TYPE_KEYWORDS: Record<string, string[]> = {
+    'Dance Educator': ['teacher', 'instructor', 'coach', 'sub', 'substitute', 'educator', 'faculty'],
+    'Dance Adjudicator': ['judge', 'adjudicat', 'adjudicator'],
+    'Photographer': ['photo', 'photographer', 'photography'],
+    'Videographer': ['video', 'videographer', 'videography', 'film'],
+    'Acting Coach': ['acting', 'actor', 'actress', 'drama', 'theater', 'theatre'],
+    'Vocal Coach': ['vocal', 'voice', 'singing', 'singer', 'choir'],
+    'Side Jobs': ['admin', 'assistant', 'coordinator', 'manager', 'front desk', 'office'],
+    'Music Teacher': ['music', 'piano', 'violin', 'guitar', 'drums', 'instrument'],
+    'Dance Competition Staff': ['competition', 'staff', 'emcee', 'mc', 'tabulator', 'registration'],
+  };
 
   if (filters?.serviceType) {
+    // Service type: search description for the service type name
     const escaped = filters.serviceType.replace(/'/g, "''");
     whereClauses.push(`j.description LIKE '%${escaped}%'`);
   } else if (filters?.artistType) {
-    // Map artist type to keywords that appear in job descriptions
-    const escaped = filters.artistType.replace(/'/g, "''");
-    whereClauses.push(`j.description LIKE '%${escaped}%'`);
+    // Artist type: use keyword mapping for broader matching
+    const keywords = ARTIST_TYPE_KEYWORDS[filters.artistType];
+    if (keywords && keywords.length > 0) {
+      const keywordClauses = keywords.map(k => `j.description LIKE '%${k.replace(/'/g, "''")}%'`).join(' OR ');
+      whereClauses.push(`(${keywordClauses})`);
+    } else {
+      // Fallback: search by the type name itself
+      const escaped = filters.artistType.replace(/'/g, "''");
+      whereClauses.push(`j.description LIKE '%${escaped}%'`);
+    }
   }
 
   if (filters?.locationQuery) {
     const escaped = filters.locationQuery.replace(/'/g, "''");
-    whereClauses.push(`j.locationAddress LIKE '%${escaped}%'`);
+    // Search both locationAddress AND description for the location query
+    whereClauses.push(`(j.locationAddress LIKE '%${escaped}%' OR j.description LIKE '%${escaped}%')`);
   }
 
   // Haversine distance filter when lat/lng provided

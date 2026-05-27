@@ -111,6 +111,25 @@ function formatDatetime(
   return dateType ?? "Flexible";
 }
 
+// Extract a city/state from job description text when locationAddress is not available
+function extractLocationFromDescription(description: string | null | undefined): string | null {
+  if (!description) return null;
+  const patterns = [
+    /\bin\s+([A-Z][a-zA-Z\s]+,\s*[A-Z]{2})\b/,
+    /\bat\s+([A-Z][a-zA-Z\s]+,\s*[A-Z]{2})\b/,
+    /\bnear\s+([A-Z][a-zA-Z\s]+,\s*[A-Z]{2})\b/,
+    /([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*,\s*[A-Z]{2})\b/,
+  ];
+  for (const pattern of patterns) {
+    const match = description.match(pattern);
+    if (match) {
+      const loc = (match[1] ?? match[0]).trim();
+      if (loc.length > 4 && loc.length < 50) return loc;
+    }
+  }
+  return null;
+}
+
 function extractTitle(description: string | null | undefined): string {
   if (!description) return "Open Position";
   const first = description.split("\n")[0].trim();
@@ -728,7 +747,7 @@ export default function Jobs() {
       companyName: j.clientCompanyName ?? j.clientName ?? null,
       location: j.locationAddress
         ? j.locationAddress.split(",").slice(0, 2).join(",").trim()
-        : (j.locationLat && j.locationLng ? "Chicago Area" : "Remote / Flexible"),
+        : (extractLocationFromDescription(j.description) ?? (j.locationLat && j.locationLng ? "See map" : "Remote / Flexible")),
       postedAgo: timeAgo(j.bubbleCreatedAt),
       datetime: formatDatetime(j.startDate, j.dateType),
       rate: formatRate(j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate),
@@ -838,7 +857,7 @@ export default function Jobs() {
                   : "Applications"}
               </h1>
               <p className="text-xs text-gray-400 mt-0.5">
-                Exclusive Discounts for Artswrk Subscribers
+                Browse open jobs for artists on Artswrk
               </p>
             </div>
           </div>
