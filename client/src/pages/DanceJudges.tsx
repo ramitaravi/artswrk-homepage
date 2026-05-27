@@ -106,7 +106,7 @@ export default function DanceJudges() {
             </div>
             <div className="rounded-3xl bg-gray-50 border border-gray-100 p-8">
               <p className="text-4xl font-black text-[#111] mb-1">Free</p>
-              <p className="text-sm font-semibold text-gray-600">To create your profile and apply to open jobs</p>
+              <p className="text-sm font-semibold text-gray-600">To create your profile and view open jobs</p>
             </div>
             <div className="rounded-3xl bg-gray-50 border border-gray-100 p-8">
               <p className="text-4xl font-black text-[#111] mb-1">50+</p>
