@@ -35,8 +35,8 @@ const JOB_TYPES = [
 const FAQS = [
   { q: "How do I get booked on Artswrk?", a: "Create your profile, list your services and rates, and apply to open jobs. Studios and clients can also find and book you directly from your profile." },
   { q: "Why do I need to share my rates, location, etc.?", a: "Sharing your rates and location helps studios find the right match quickly. You stay in control of what you share and can update it anytime." },
-  { q: "How do payments work?", a: "You'll receive payment directly to your bank account via direct deposit after each completed booking. Artswrk handles all payment processing securely." },
-  { q: "How do taxes work?", a: "Artswrk issues 1099-NEC forms to eligible artists according to the latest IRS guidelines. All your earnings are tracked in one place, making tax season much simpler." },
+  { q: "How do payments work?", a: "Artswrk works with your business. You can pay artists directly through Artswrk with seamless digital payment links, or you can process payment through your regular payroll." },
+  { q: "How do taxes work?", a: "If payment is processed through Artswrk, our partner Stripe Connect handles 1099-NEC tax documentation for eligible artists according to latest IRS guidelines. If payment is processed through your regular payroll, eligible tax documentation will come from your business." },
   { q: "Who are the Artswrk clients?", a: "Artswrk clients include dance studios, performing arts centers, competitions, conventions, and private clients across the country." },
 ];
 
@@ -127,12 +127,22 @@ export default function DanceTeachers() {
               ))}
             </div>
           </div>
-          <div className="relative">
-            <div className="aspect-[3/4] rounded-3xl overflow-hidden flex items-center justify-center" style={{ background: "linear-gradient(135deg, #ec008c, #ff7171)" }}>
-              <div className="text-center text-white/80 p-8">
-                <div className="text-6xl mb-4">💃</div>
-                <p className="text-sm font-semibold">Professional Dance Teachers</p>
-              </div>
+          <div className="relative flex flex-col gap-4">
+            <div className="rounded-3xl bg-pink-50 border border-pink-100 p-8">
+              <p className="text-4xl font-black text-[#ec008c] mb-1">1,000+</p>
+              <p className="text-sm font-semibold text-gray-600">Dance studios, competitions & conventions hiring now</p>
+            </div>
+            <div className="rounded-3xl bg-gray-50 border border-gray-100 p-8">
+              <p className="text-4xl font-black text-[#111] mb-1">Free</p>
+              <p className="text-sm font-semibold text-gray-600">To create your profile and apply to open jobs</p>
+            </div>
+            <div className="rounded-3xl bg-gray-50 border border-gray-100 p-8">
+              <p className="text-4xl font-black text-[#111] mb-1">50+</p>
+              <p className="text-sm font-semibold text-gray-600">Cities with active job opportunities on the platform</p>
+            </div>
+            <div className="rounded-3xl artist-grad-bg p-8">
+              <p className="text-4xl font-black text-white mb-1">Direct</p>
+              <p className="text-sm font-semibold text-white/80">Deposit payments — get paid fast after every booking</p>
             </div>
           </div>
         </div>

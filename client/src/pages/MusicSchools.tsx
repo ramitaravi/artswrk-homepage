@@ -113,12 +113,22 @@ export default function MusicSchools() {
               ))}
             </div>
           </div>
-          <div className="relative">
-            <div className="aspect-[3/4] rounded-3xl overflow-hidden flex items-center justify-center" style={{ background: "linear-gradient(135deg, #FFBC5D, #F25722)" }}>
-              <div className="text-center text-white/80 p-8">
-                <div className="text-6xl mb-4">🎹</div>
-                <p className="text-sm font-semibold">Professional Music Teachers</p>
-              </div>
+          <div className="relative flex flex-col gap-4">
+            <div className="rounded-3xl bg-orange-50 border border-orange-100 p-8">
+              <p className="text-4xl font-black text-[#F25722] mb-1">6,000+</p>
+              <p className="text-sm font-semibold text-gray-600">Vetted music teachers & performing artists ready to work</p>
+            </div>
+            <div className="rounded-3xl bg-gray-50 border border-gray-100 p-8">
+              <p className="text-4xl font-black text-[#111] mb-1">3</p>
+              <p className="text-sm font-semibold text-gray-600">Average applicants within 24 hours of posting</p>
+            </div>
+            <div className="rounded-3xl bg-gray-50 border border-gray-100 p-8">
+              <p className="text-4xl font-black text-[#111] mb-1">Free</p>
+              <p className="text-sm font-semibold text-gray-600">To post unlimited jobs — only pay to unlock applicants</p>
+            </div>
+            <div className="rounded-3xl hirer-grad-bg p-8">
+              <p className="text-4xl font-black text-white mb-1">50+</p>
+              <p className="text-sm font-semibold text-white/80">Cities with active artists on the platform</p>
             </div>
           </div>
         </div>

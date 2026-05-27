@@ -716,3 +716,10 @@
 - [x] ApplyGateModal inline login (email → password → log in without redirect)
 - [x] Share button copies current URL to clipboard with toast confirmation
 - [x] About.tsx JSX balance fixed
+
+## Content & Copy Updates (May 2026)
+- [x] FAQ copy synced across all 8 landing pages (cancellation policy removed, fees/payments/tax answers updated)
+- [x] DanceTeachers hero paragraph updated with conventions mention
+- [x] Home.tsx copy: studio count 1000+, button text, FAQ answers for fees/payments/taxes
+- [x] Empty gradient placeholder sections replaced with stats blocks on: DanceStudios, DanceCompetitions, MusicSchools, DanceJudges, DanceTeachers, MusicTeachers, Production
+- [x] FAQ answers (payments and taxes) updated on DanceTeachers, DanceJudges, MusicTeachers, Production to match canonical Home.tsx artist FAQ answers
