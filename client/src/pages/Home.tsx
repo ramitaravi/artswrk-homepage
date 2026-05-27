@@ -632,9 +632,13 @@ const SAMPLE_JOB_TICKERS = [
 ];
 
 function LiveJobsTicker() {
-  const { data: jobs } = trpc.jobs.list.useQuery({ limit: 20, offset: 0 });
-  const tickerItems = jobs?.jobs?.length
-    ? jobs.jobs.map((j) => `${j.title} · ${j.location || "Remote"}`)
+  const { data: jobs } = trpc.jobs.publicListEnriched.useQuery({ limit: 20, offset: 0 });
+  const tickerItems = jobs?.length
+    ? jobs.map((j: { description?: string | null; locationAddress?: string | null }) => {
+        const titleMatch = j.description?.match(/(?:looking for|hiring|need|seeking)\s+(?:a\s+)?([^.!?\n,]{3,40})/i);
+        const title = titleMatch ? titleMatch[1].trim() : (j.description?.slice(0, 40) || "Open Role");
+        return `${title} · ${j.locationAddress || "Remote"}`;
+      })
     : SAMPLE_JOB_TICKERS;
   const doubled = [...tickerItems, ...tickerItems];
 
