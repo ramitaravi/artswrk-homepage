@@ -35,32 +35,38 @@ const JOB_TYPES = [
 const FAQS = [
   { q: "How do I get booked on Artswrk?", a: "Create your profile, list your services and rates, and apply to open jobs. Clients can also find and book you directly from your profile." },
   { q: "Why do I need to share my rates, location, etc.?", a: "Sharing your rates and location helps clients find the right match quickly. You stay in control of what you share and can update it anytime." },
-  { q: "How do payments work?", a: "Artswrk works with your business. You can pay artists directly through Artswrk with seamless digital payment links, or you can process payment through your regular payroll." },
-  { q: "How do taxes work?", a: "If payment is processed through Artswrk, our partner Stripe Connect handles 1099-NEC tax documentation for eligible artists according to latest IRS guidelines. If payment is processed through your regular payroll, eligible tax documentation will come from your business." },
+  { q: "How do payments work?", a: "You can invoice clients directly through Artswrk with seamless digital payment links, or you may be paid through their regular payroll system. Either way, Artswrk ensures your payment is timely and accurate!" },
+  { q: "How do taxes work?", a: "If payment is processed through Artswrk, our partner Stripe Connect handles 1099-NEC tax documentation for eligible artists according to latest IRS guidelines. If payment is processed through regular payroll, eligible tax documentation will come from the hiring client." },
   { q: "Who are the Artswrk clients?", a: "Artswrk clients include performing arts organizations, dance studios, competitions, conventions, and private clients across the country." },
 ];
 
 const PRICING = [
   {
     name: "Free",
-    price: "$0",
-    period: "/month",
+    monthlyPrice: "$0",
+    annualPrice: "$0",
+    monthlyPeriod: "/month",
+    annualPeriod: "/year",
     features: ["Job Notifications", "Free Profile"],
     cta: "Get Started",
     highlight: false,
   },
   {
     name: "Basic",
-    price: "$1.99",
-    period: "/month",
+    monthlyPrice: "$30",
+    annualPrice: "$30",
+    monthlyPeriod: "/year",
+    annualPeriod: "/year",
     features: ["Apply to unlimited jobs", "Connect with clients", "Get booked & earn digitally"],
     cta: "Get Started",
     highlight: false,
   },
   {
     name: "PRO",
-    price: "$10.99",
-    period: "/month",
+    monthlyPrice: "$10.99",
+    annualPrice: "$110",
+    monthlyPeriod: "/month",
+    annualPeriod: "/year",
     features: ["All Basic Features", "Access to PRO Jobs", "Access to Benefits Suite", "1:1 Support from Artswrk Team"],
     cta: "Get Started",
     highlight: true,
@@ -82,6 +88,7 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 
 export default function Production() {
   const [activeJob, setActiveJob] = useState(0);
+  const [billingAnnual, setBillingAnnual] = useState(false);
 
   return (
     <div className="bg-white min-h-screen font-[Poppins,sans-serif]">
@@ -171,14 +178,18 @@ export default function Production() {
       {/* ── Pricing ── */}
       <section className="py-20 px-5 lg:px-10 max-w-7xl mx-auto">
         <p className="text-sm font-semibold artist-grad-text uppercase tracking-widest mb-3 text-center">PRICING</p>
-        <h2 className="text-3xl md:text-4xl font-black text-[#111] text-center mb-10">Affordable pricing for production artists</h2>
+        <h2 className="text-3xl md:text-4xl font-black text-[#111] text-center mb-4">Affordable pricing for production artists</h2>
+        <div className="flex justify-center gap-2 mb-10">
+          <button onClick={() => setBillingAnnual(false)} className={`text-sm font-semibold px-4 py-2 rounded-full transition-all ${!billingAnnual ? "bg-[#111] text-white" : "text-gray-500 hover:bg-gray-100"}`}>Monthly</button>
+          <button onClick={() => setBillingAnnual(true)} className={`text-sm font-semibold px-4 py-2 rounded-full transition-all ${billingAnnual ? "bg-[#111] text-white" : "text-gray-500 hover:bg-gray-100"}`}>Annually</button>
+        </div>
         <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
           {PRICING.map((plan) => (
             <div key={plan.name} className={`rounded-3xl p-8 border ${plan.highlight ? "artist-grad-bg border-transparent" : "border-gray-100 bg-white shadow-sm"}`}>
               <h3 className={`text-lg font-black mb-1 ${plan.highlight ? "text-white" : "text-[#111]"}`}>{plan.name}</h3>
               <div className="flex items-end gap-1 mb-6">
-                <span className={`text-4xl font-black ${plan.highlight ? "text-white" : "text-[#111]"}`}>{plan.price}</span>
-                <span className={`text-sm mb-1 ${plan.highlight ? "text-white/70" : "text-gray-400"}`}>{plan.period}</span>
+                <span className={`text-4xl font-black ${plan.highlight ? "text-white" : "text-[#111]"}`}>{billingAnnual ? plan.annualPrice : plan.monthlyPrice}</span>
+                <span className={`text-sm mb-1 ${plan.highlight ? "text-white/70" : "text-gray-400"}`}>{billingAnnual ? plan.annualPeriod : plan.monthlyPeriod}</span>
               </div>
               <ul className="space-y-2 mb-8">
                 {plan.features.map((f) => (

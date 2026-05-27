@@ -43,24 +43,30 @@ const FAQS = [
 const PRICING = [
   {
     name: "Free",
-    price: "$0",
-    period: "/month",
+    monthlyPrice: "$0",
+    annualPrice: "$0",
+    monthlyPeriod: "/month",
+    annualPeriod: "/year",
     features: ["Job Notifications", "Free Profile"],
     cta: "Get Started",
     highlight: false,
   },
   {
     name: "Basic",
-    price: "$1.99",
-    period: "/month",
+    monthlyPrice: "$30",
+    annualPrice: "$30",
+    monthlyPeriod: "/year",
+    annualPeriod: "/year",
     features: ["Apply to unlimited jobs", "Connect with clients", "Get booked & earn digitally"],
     cta: "Get Started",
     highlight: false,
   },
   {
     name: "PRO",
-    price: "$10.99",
-    period: "/month",
+    monthlyPrice: "$10.99",
+    annualPrice: "$110",
+    monthlyPeriod: "/month",
+    annualPeriod: "/year",
     features: ["All Basic Features", "Access to PRO Jobs", "Access to Benefits Suite", "1:1 Support from Artswrk Team"],
     cta: "Get Started",
     highlight: true,
@@ -182,8 +188,8 @@ export default function DanceTeachers() {
             <div key={plan.name} className={`rounded-3xl p-8 border ${plan.highlight ? "artist-grad-bg border-transparent" : "border-gray-100 bg-white shadow-sm"}`}>
               <h3 className={`text-lg font-black mb-1 ${plan.highlight ? "text-white" : "text-[#111]"}`}>{plan.name}</h3>
               <div className="flex items-end gap-1 mb-6">
-                <span className={`text-4xl font-black ${plan.highlight ? "text-white" : "text-[#111]"}`}>{plan.price}</span>
-                <span className={`text-sm mb-1 ${plan.highlight ? "text-white/70" : "text-gray-400"}`}>{plan.period}</span>
+                <span className={`text-4xl font-black ${plan.highlight ? "text-white" : "text-[#111]"}`}>{billingAnnual ? plan.annualPrice : plan.monthlyPrice}</span>
+                <span className={`text-sm mb-1 ${plan.highlight ? "text-white/70" : "text-gray-400"}`}>{billingAnnual ? plan.annualPeriod : plan.monthlyPeriod}</span>
               </div>
               <ul className="space-y-2 mb-8">
                 {plan.features.map((f) => (
