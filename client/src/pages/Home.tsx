@@ -903,10 +903,10 @@ function ForBusinesses() {
 
 // ─── FAQ ──────────────────────────────────────────────────────────────────────
 const HIRER_FAQS = [
-  { q: "Are there fees to hire on Artswrk?", a: "Artswrk charges a small service fee on bookings made through the platform. There are no upfront subscription costs to post jobs or browse artists — you only pay when you successfully hire." },
-  { q: "How do payments work?", a: "Payments are processed securely through Artswrk. Once you confirm a booking, you'll receive a simple payment link. Artists receive their payment after the booking is completed." },
+  { q: "Are there fees to hire on Artswrk?", a: "It is free to post unlimited jobs on Artswrk. We want you to receive as many candidates as possible! To unlock their applications, you can either do a one-time job unlock or subscribe for unlimited access." },
+  { q: "How do payments work?", a: "Artswrk works with your business. You can pay artists directly through Artswrk with seamless digital payment links, or you can process payment through your regular payroll." },
   { q: "Is there a cancellation policy?", a: "Yes. Cancellations made more than 48 hours before the scheduled booking are eligible for a full refund. Cancellations within 48 hours may be subject to a partial fee." },
-  { q: "Do I have to provide tax documentation?", a: "Artswrk handles 1099-NEC tax documentation for artists earning over $600 per year on the platform. As a hirer, you do not need to issue separate tax forms." },
+  { q: "Do I have to provide tax documentation?", a: "If payment is processed through Artswrk, our partner Stripe Connect handles 1099-NEC tax documentation for artists earning over $600 per year on the platform. If payment is processed through your regular payroll, eligible tax documentation will come from your business." },
   { q: "Who are the Artswrk artists?", a: "Artswrk artists are vetted performing arts professionals including dance teachers, dance judges, musicians, photographers, videographers, and event production staff." },
 ];
 
