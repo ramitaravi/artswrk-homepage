@@ -35,9 +35,8 @@ const JOB_TYPES = [
 const FAQS = [
   { q: "How do I get booked on Artswrk?", a: "Create your profile, list your services and rates, and apply to open jobs. Clients can also find and book you directly from your profile." },
   { q: "Why do I need to share my rates, location, etc.?", a: "Sharing your rates and location helps clients find the right match quickly. You stay in control of what you share and can update it anytime." },
-  { q: "Is there a cancellation policy?", a: "Yes. If you need to cancel, please do so at least 48 hours in advance to avoid any fees." },
-  { q: "How do payments work?", a: "All payments are processed securely through Artswrk. You receive direct deposits for completed bookings." },
-  { q: "How do taxes work?", a: "Artswrk issues a single 1099 at year end covering all your Artswrk earnings, making tax season simple." },
+  { q: "How do payments work?", a: "You'll receive payment directly to your bank account via direct deposit after each completed booking. Artswrk handles all payment processing securely." },
+  { q: "How do taxes work?", a: "Artswrk issues 1099-NEC forms to eligible artists according to the latest IRS guidelines. All your earnings are tracked in one place, making tax season much simpler." },
   { q: "Who are the Artswrk clients?", a: "Artswrk clients include performing arts organizations, dance studios, competitions, conventions, and private clients across the country." },
 ];
 

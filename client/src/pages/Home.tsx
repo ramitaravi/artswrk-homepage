@@ -905,7 +905,6 @@ function ForBusinesses() {
 const HIRER_FAQS = [
   { q: "Are there fees to hire on Artswrk?", a: "It is free to post unlimited jobs on Artswrk. We want you to receive as many candidates as possible! To unlock their applications, you can either do a one-time job unlock or subscribe for unlimited access." },
   { q: "How do payments work?", a: "Artswrk works with your business. You can pay artists directly through Artswrk with seamless digital payment links, or you can process payment through your regular payroll." },
-  { q: "Is there a cancellation policy?", a: "Yes. Cancellations made more than 48 hours before the scheduled booking are eligible for a full refund. Cancellations within 48 hours may be subject to a partial fee." },
   { q: "Do I have to provide tax documentation?", a: "If payment is processed through Artswrk, our partner Stripe Connect handles 1099-NEC tax documentation for eligible artists according to latest IRS guidelines. If payment is processed through your regular payroll, eligible tax documentation will come from your business." },
   { q: "Who are the Artswrk artists?", a: "Artswrk artists are vetted performing arts professionals including dance teachers, dance judges, musicians, photographers, videographers, and event production staff." },
 ];
@@ -914,7 +913,7 @@ const ARTIST_FAQS = [
   { q: "How do I get booked on Artswrk?", a: "Create your artist profile with your services, rates, and availability. Hirers can then find and book you directly through the platform, or you can apply to open job listings." },
   { q: "Why do I need to share my rates, location, etc.?", a: "Hirers use this information to find the right artist for their needs. Providing complete profile information significantly increases your chances of getting booked." },
   { q: "How do payments work?", a: "You'll receive payment directly to your bank account via direct deposit after each completed booking. Artswrk handles all payment processing securely." },
-  { q: "How do taxes work?", a: "Artswrk issues 1099-NEC forms to artists who earn over $600 in a calendar year on the platform, making tax season much simpler. All your earnings are tracked in one place." },
+  { q: "How do taxes work?", a: "Artswrk issues 1099-NEC forms to eligible artists according to the latest IRS guidelines. All your earnings are tracked in one place, making tax season much simpler." },
   { q: "Who are the Artswrk clients?", a: "Artswrk clients include dance studios, music schools, dance competitions, event production companies, and individual families looking to hire performing arts professionals." },
 ];
 

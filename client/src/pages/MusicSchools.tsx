@@ -33,11 +33,9 @@ const STAFF_TYPES = [
 ];
 
 const FAQS = [
-  { q: "Are there fees to hire on Artswrk?", a: "Posting jobs and browsing artists is completely free. We charge a small service fee only when a booking is completed." },
-  { q: "How do payments work?", a: "Artswrk handles all payments digitally. Once you book an artist, you pay through our secure platform and the artist receives their payment directly." },
-  { q: "Is there a cancellation policy?", a: "Yes. Cancellations made 48+ hours before the booking are fully refunded. Cancellations within 48 hours may incur a fee." },
-  { q: "Do I have to provide tax documentation?", a: "No. Artswrk handles all 1099 documentation for the artists you hire." },
-  { q: "Does Artswrk work with my existing payroll?", a: "Artswrk is a separate payment platform. Artists are paid as independent contractors through Artswrk." },
+  { q: "Are there fees to hire on Artswrk?", a: "It is free to post unlimited jobs on Artswrk. We want you to receive as many candidates as possible! To unlock their applications, you can either do a one-time job unlock or subscribe for unlimited access." },
+  { q: "How do payments work?", a: "Artswrk works with your business. You can pay artists directly through Artswrk with seamless digital payment links, or you can process payment through your regular payroll." },
+  { q: "Do I have to provide tax documentation?", a: "If payment is processed through Artswrk, our partner Stripe Connect handles 1099-NEC tax documentation for eligible artists according to latest IRS guidelines. If payment is processed through your regular payroll, eligible tax documentation will come from your business." },
   { q: "Who are the Artswrk artists?", a: "Artswrk artists are vetted professional music teachers, vocal coaches, and performers across the country." },
 ];
 
