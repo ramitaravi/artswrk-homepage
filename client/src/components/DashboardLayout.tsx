@@ -30,7 +30,6 @@ import {
   Sparkles,
   CheckCircle2,
   LayoutGrid,
-  ContactRound,
   UserCheck,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -53,7 +52,6 @@ const CLIENT_CORE_NAV: NavItem[] = [
   { label: "Payments", icon: <CreditCard size={18} />, href: "/app/payments" },
   { label: "Artists", icon: <Users size={18} />, href: "/app/artists" },
   { label: "Messages", icon: <MessageSquare size={18} />, href: "/app/messages" },
-  { label: "CRM", icon: <ContactRound size={18} />, href: "/leads" },
 ];
 
 const CLIENT_PREMIUM_NAV: NavItem[] = [
@@ -263,13 +261,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="w-56 bg-white border-r border-gray-100 flex flex-col shadow-xl">
-            <div className="flex items-center justify-between px-5 pt-5 pb-3">
-              <Link href="/">
-                <span className="font-black text-xl tracking-tight">
-                  <span className="hirer-grad-text">ARTS</span>
-                  <span className="bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">WRK</span>
-                </span>
-              </Link>
+            {/* Close button — sits above sidebarContent which already has the logo */}
+            <div className="flex justify-end px-3 pt-3">
               <button
                 onClick={() => setMobileOpen(false)}
                 className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
@@ -318,18 +311,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Bell size={18} />
             </button>
 
-            {/* Avatar */}
-            {avatarSrc ? (
-              <img
-                src={avatarSrc}
-                alt={displayName}
-                className="w-8 h-8 rounded-full object-cover cursor-pointer"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full hirer-grad-bg flex items-center justify-center text-white text-xs font-semibold cursor-pointer">
-                {avatarInitials}
-              </div>
-            )}
+            {/* Avatar — links to settings */}
+            <Link href="/app/settings">
+              {avatarSrc ? (
+                <img
+                  src={avatarSrc}
+                  alt={displayName}
+                  className="w-8 h-8 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-[#F25722] transition-all"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full hirer-grad-bg flex items-center justify-center text-white text-xs font-semibold cursor-pointer hover:ring-2 hover:ring-[#F25722] transition-all">
+                  {avatarInitials}
+                </div>
+              )}
+            </Link>
 
             {/* Mobile nav toggle (shown right of avatar on very small screens) */}
             <button

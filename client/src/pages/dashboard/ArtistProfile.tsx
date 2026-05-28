@@ -546,52 +546,45 @@ export default function ArtistProfile() {
 
       {/* Profile layout */}
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Left column — portrait + info */}
-        <div className="lg:w-72 flex-shrink-0">
-          {/* Portrait card */}
-          <div className="relative rounded-2xl overflow-hidden aspect-[3/4] bg-gray-100 shadow-sm mb-4">
-            {artist.profilePicture ? (
-              <>
-                <img
-                  src={artist.profilePicture}
-                  alt={displayName}
-                  className="w-full h-full object-cover object-top"
-                  onError={(e) => {
-                    const el = e.currentTarget;
-                    el.style.display = "none";
-                    const fb = el.nextElementSibling as HTMLElement;
-                    if (fb) fb.style.display = "flex";
-                  }}
-                />
+        {/* Left column — avatar + info */}
+        <div className="lg:w-64 flex-shrink-0">
+          {/* Compact profile header card */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+            <div className="flex items-center gap-4">
+              {/* Avatar — fixed 80px circle */}
+              <div className="relative flex-shrink-0">
+                {artist.profilePicture ? (
+                  <img
+                    src={artist.profilePicture}
+                    alt={displayName}
+                    className="w-20 h-20 rounded-full object-cover object-top ring-2 ring-gray-100"
+                    onError={(e) => {
+                      const el = e.currentTarget;
+                      el.style.display = "none";
+                      const fb = el.nextElementSibling as HTMLElement;
+                      if (fb) fb.style.display = "flex";
+                    }}
+                  />
+                ) : null}
                 <div
-                  className={`absolute inset-0 ${color} flex items-center justify-center text-white text-6xl font-black`}
-                  style={{ display: "none" }}
+                  className={`w-20 h-20 rounded-full ${color} flex items-center justify-center text-white text-2xl font-black ring-2 ring-gray-100 ${artist.profilePicture ? "hidden" : ""}`}
                 >
                   {initials}
                 </div>
-              </>
-            ) : (
-              <div className={`w-full h-full ${color} flex items-center justify-center text-white text-6xl font-black`}>
-                {initials}
+                {(artist.artswrkPro || artist.artswrkBasic) && (
+                  <span className="absolute -bottom-1 -right-1 bg-[#F25722] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full tracking-wide shadow-sm">
+                    {artist.artswrkPro ? "PRO" : "BASIC"}
+                  </span>
+                )}
               </div>
-            )}
-
-            {/* Name overlay at bottom */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4">
-              <h1 className="text-xl font-black text-white leading-tight">{displayName}</h1>
-              {artist.slug && (
-                <p className="text-white/70 text-sm mt-0.5">@{artist.slug}</p>
-              )}
+              {/* Name + slug */}
+              <div className="min-w-0">
+                <h1 className="text-base font-black text-[#111] leading-tight truncate">{displayName}</h1>
+                {artist.slug && (
+                  <p className="text-gray-400 text-xs mt-0.5">@{artist.slug}</p>
+                )}
+              </div>
             </div>
-
-            {/* PRO badge */}
-            {(artist.artswrkPro || artist.artswrkBasic) && (
-              <div className="absolute top-3 right-3">
-                <span className="bg-black/75 backdrop-blur-sm text-white text-[10px] font-black px-2 py-0.5 rounded-full tracking-wide">
-                  {artist.artswrkPro ? "PRO" : "BASIC"}
-                </span>
-              </div>
-            )}
           </div>
 
           {/* Quick info */}

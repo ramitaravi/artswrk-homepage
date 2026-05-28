@@ -9,9 +9,9 @@
  * Font: Poppins
  * Artist gradient: pink → purple (artist-grad-bg / artist-grad-text)
  */
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { Eye, EyeOff, ArrowRight, ArrowLeft, CheckCircle2, Zap, Star, Lock } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, ArrowLeft, CheckCircle2, Zap, Star, Lock, Upload } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import Navbar from "@/components/Navbar";
 
@@ -45,7 +45,21 @@ export default function ArtistJoin() {
   const searchStr = useSearch();
   const next = new URLSearchParams(searchStr).get("next") ?? "/jobs";
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  function handlePhotoFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setPhotoPreview(dataUrl);
+      setPhotoBase64(dataUrl.split(",")[1]);
+    };
+    reader.readAsDataURL(file);
+  }
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -58,6 +72,7 @@ export default function ArtistJoin() {
 
   const registerMutation = trpc.signup.register.useMutation();
   const updateOnboardingMutation = trpc.signup.updateOnboarding.useMutation();
+  const uploadProfilePicture = trpc.signup.uploadProfilePicture.useMutation();
 
   // ── Step 1: Account creation ───────────────────────────────────────────────
   async function handleRegister(e: React.FormEvent) {
@@ -100,7 +115,26 @@ export default function ArtistJoin() {
     setStep(3);
   }
 
-  // ── Step 3: Plan choice ────────────────────────────────────────────────────
+  // ── Step 3: Photo upload
+  async function handlePhotoUpload() {
+    setPhotoUploading(true);
+    try {
+      if (photoBase64) {
+        await uploadProfilePicture.mutateAsync({
+          base64: photoBase64,
+          contentType: "image/jpeg",
+        });
+      }
+      await updateOnboardingMutation.mutateAsync({ onboardingStep: 3 });
+      setStep(4);
+    } catch (err: any) {
+      setError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
+
+  // ── Step 4: Plan choice ────────────────────────────────────────────────────
   function handlePlan(plan: "basic" | "pro") {
     navigate(`/subscribe/${plan}?next=${encodeURIComponent(next)}`);
   }
@@ -271,11 +305,73 @@ export default function ArtistJoin() {
         )}
 
         {/* ── Step 3: Plan ─────────────────────────────────────────────────── */}
+        {/* ── Step 3: Profile Photo ──────────────────────────────────────────── */}
         {step === 3 && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
-            <StepDots current={3} total={3} />
+            <StepDots current={3} total={4} />
             <button
               onClick={() => setStep(2)}
+              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 mb-5 transition-colors"
+            >
+              <ArrowLeft size={14} /> Back
+            </button>
+            <h1 className="text-2xl font-black text-[#111] mb-1">Add your profile photo</h1>
+            <p className="text-gray-500 text-sm mb-7">Help hirers put a face to your name. You can always update this later.</p>
+
+            {/* Drop zone */}
+            <div
+              className="relative flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-2xl p-10 cursor-pointer hover:border-pink-400 hover:bg-pink-50/30 transition-all mb-6"
+              onClick={() => photoInputRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith("image/")) handlePhotoFile(file);
+              }}
+            >
+              {photoPreview ? (
+                <img src={photoPreview} alt="Profile preview" className="w-28 h-28 object-cover rounded-full mb-3 ring-4 ring-pink-100" />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-pink-50 flex items-center justify-center mb-3">
+                  <Upload size={28} className="text-pink-500" />
+                </div>
+              )}
+              <p className="text-sm font-semibold text-[#111]">{photoPreview ? "Click to change" : "Click to upload or drag & drop"}</p>
+              <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB</p>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handlePhotoFile(file);
+                }}
+              />
+            </div>
+
+            {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+
+            <button
+              onClick={handlePhotoUpload}
+              disabled={photoUploading}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold text-white artist-grad-bg hover:opacity-90 transition-opacity disabled:opacity-60"
+            >
+              {photoUploading ? (
+                <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Uploading...</>
+              ) : (
+                <>{photoPreview ? "Save & Continue" : "Skip for now"} <ArrowRight size={15} /></>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* ── Step 4: Plan Choice ──────────────────────────────────────────── */}
+        {step === 4 && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+            <StepDots current={4} total={4} />
+            <button
+              onClick={() => setStep(3)}
               className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 mb-5 transition-colors"
             >
               <ArrowLeft size={14} /> Back

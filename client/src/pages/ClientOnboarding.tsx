@@ -20,7 +20,7 @@ import Navbar from "@/components/Navbar";
 import {
   ArrowRight, ArrowLeft, CheckCircle2, Building2, User, Music, Trophy,
   Calendar, HelpCircle, MapPin, Globe, Phone, Star, Sparkles, Zap,
-  LayoutDashboard, Briefcase, CreditCard,
+  LayoutDashboard, Briefcase, CreditCard, Upload, Camera,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -85,7 +85,7 @@ const STEPS = [
   { n: 1, label: "Who are you?",     icon: User },
   { n: 2, label: "Business type",   icon: Building2 },
   { n: 3, label: "Your details",    icon: Briefcase },
-  // Step 4 (plan selection) is intentionally skipped — plan is chosen after posting first job
+  { n: 4, label: "Company logo",    icon: Camera },
   { n: 5, label: "All done!",       icon: Sparkles },
 ];
 
@@ -238,6 +238,25 @@ export default function ClientOnboarding() {
   const [artistTypes, setArtistTypes] = useState<string[]>([]);
 
   const updateOnboarding = trpc.signup.updateOnboarding.useMutation();
+  const uploadProfilePicture = trpc.signup.uploadProfilePicture.useMutation();
+  const addCompany = trpc.postJob.addCompany.useMutation();
+
+  // Logo upload state
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoBase64, setLogoBase64] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  function handleLogoFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setLogoPreview(dataUrl);
+      const base64 = dataUrl.split(",")[1];
+      setLogoBase64(base64);
+    };
+    reader.readAsDataURL(file);
+  }
 
   // ── Load saved state on mount ──────────────────────────────────────────────
   const { data: status } = trpc.signup.getOnboardingStatus.useQuery(undefined, {
@@ -310,9 +329,19 @@ export default function ClientOnboarding() {
         location: form.location,
         website: form.website,
         phoneNumber: form.phoneNumber,
-        onboardingStep: 5, // skip plan step
+        onboardingStep: 4,
       });
-      setStep(5);
+      // Auto-create company record from captured details
+      try {
+        await addCompany.mutateAsync({
+          name: form.clientCompanyName,
+          locationAddress: form.location || undefined,
+          website: form.website || undefined,
+        });
+      } catch {
+        // Non-fatal: company creation failure shouldn't block onboarding
+      }
+      setStep(4);
     } catch (err: any) {
       setError(err.message || "Something went wrong. Please try again.");
     } finally {
@@ -320,13 +349,26 @@ export default function ClientOnboarding() {
     }
   }
 
-  // ── Step 4: Pricing ───────────────────────────────────────────────────────
-  async function handlePricingContinue() {
-    await save({ onboardingStep: 5 });
-    setStep(5);
+  // ── Step 4: Logo upload ─────────────────────────────────────────
+  async function handleLogoUpload() {
+    setLogoUploading(true);
+    try {
+      if (logoBase64) {
+        await uploadProfilePicture.mutateAsync({
+          base64: logoBase64,
+          contentType: "image/jpeg",
+        });
+      }
+      await save({ onboardingStep: 5 });
+      setStep(5);
+    } catch (err: any) {
+      setError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setLogoUploading(false);
+    }
   }
 
-  // ── Step 5: Done ─────────────────────────────────────────────────────────
+    // ── Step 5: Done ─────────────────────────────────────────────────────────
   async function handleFinish(goPostJob = false) {
     await save({ onboardingStep: 6, userSignedUp: true });
     navigate(goPostJob ? "/post-job" : "/app");
@@ -609,81 +651,65 @@ export default function ClientOnboarding() {
             </div>
           )}
 
-          {/* ── Step 4: Choose a plan ────────────────────────────────────── */}
+          {/* ── Step 4: Company Logo Upload ─────────────────────────────────── */}
           {step === 4 && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
-              <button onClick={() => setStep(isIndividual ? 2 : 3)} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 mb-5 transition-colors">
-                <ArrowLeft size={14} /> Back
-              </button>
-              <h1 className="text-2xl font-black text-[#111] mb-1">Choose your plan</h1>
-              <p className="text-gray-500 text-sm mb-7">
-                {isEnterprise(form.hiringCategory)
-                  ? "Enterprise pricing for competitions, events, and companies"
-                  : "Simple, transparent pricing for studios and schools"}
-              </p>
+              <h1 className="text-2xl font-black text-[#111] mb-1">Upload your company logo</h1>
+              <p className="text-gray-500 text-sm mb-7">Help artists recognise your brand. You can always update this later.</p>
 
-              <div className="space-y-3 mb-6">
-                <div className="border-2 border-gray-100 rounded-2xl p-5 hover:border-[#FFBC5D] transition-all">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <p className="font-bold text-[#111] text-sm">Pay to Post</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Post jobs one at a time</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-black text-2xl text-[#111]">${isEnterprise(form.hiringCategory) ? "100" : "30"}</p>
-                      <p className="text-xs text-gray-400">per job post</p>
-                    </div>
-                  </div>
-                  <ul className="space-y-1.5 text-xs text-gray-600">
-                    <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500 shrink-0" /> Visible to 6,000+ artists</li>
-                    <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500 shrink-0" /> Avg. 3 applicants in 24 hrs</li>
-                    <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500 shrink-0" /> No subscription required</li>
-                  </ul>
-                </div>
-
-                <div className="border-2 border-[#FFBC5D] rounded-2xl p-5 relative overflow-hidden">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="inline-flex items-center gap-1 bg-[#F25722] text-white text-[10px] font-bold px-2.5 py-1 rounded-full">
-                      <Star size={9} /> Best Value
-                    </span>
-                    <div className="text-right">
-                      <p className="font-black text-2xl text-[#111]">${isEnterprise(form.hiringCategory) ? "250" : "50"}</p>
-                      <p className="text-xs text-gray-400">per month</p>
-                    </div>
-                  </div>
-                  <div className="mb-3">
-                    <p className="font-bold text-[#111] text-sm">Subscribe & Save</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Unlimited posts, cancel anytime</p>
-                  </div>
-                  <ul className="space-y-1.5 text-xs text-gray-600">
-                    <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500 shrink-0" /> Unlimited job posts</li>
-                    <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500 shrink-0" /> PRO badge on all posts</li>
-                    <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500 shrink-0" /> Priority placement in search</li>
-                    <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500 shrink-0" /> Card saved for future posts</li>
-                  </ul>
-                </div>
-
-                {isEnterprise(form.hiringCategory) && (
-                  <div className="border-2 border-gray-100 rounded-2xl p-5 bg-gray-50">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Zap size={16} className="text-[#F25722]" />
-                      <p className="font-bold text-[#111] text-sm">Talk to Sales</p>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-3">Custom pricing for high-volume hiring, white-label options, and dedicated support.</p>
-                    <a href="mailto:contact@artswrk.com" className="text-xs font-semibold text-[#F25722] hover:opacity-70 transition-opacity underline underline-offset-2">
-                      Contact us → contact@artswrk.com
-                    </a>
+              {/* Drop zone */}
+              <div
+                className="relative flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-2xl p-10 cursor-pointer hover:border-[#F25722] hover:bg-orange-50/30 transition-all mb-6"
+                onClick={() => logoInputRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const file = e.dataTransfer.files[0];
+                  if (file && file.type.startsWith("image/")) handleLogoFile(file);
+                }}
+              >
+                {logoPreview ? (
+                  <img src={logoPreview} alt="Logo preview" className="w-28 h-28 object-contain rounded-xl mb-3" />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-orange-50 flex items-center justify-center mb-3">
+                    <Upload size={28} className="text-[#F25722]" />
                   </div>
                 )}
+                <p className="text-sm font-semibold text-[#111]">{logoPreview ? "Click to change" : "Click to upload or drag & drop"}</p>
+                <p className="text-xs text-gray-400 mt-1">PNG, JPG, SVG up to 5MB</p>
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleLogoFile(file);
+                  }}
+                />
               </div>
 
-              <button
-                onClick={handlePricingContinue}
-                className="w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-              >
-                Continue <ArrowRight size={16} />
-              </button>
-              <p className="text-center text-xs text-gray-400 mt-3">You'll choose your plan when you post your first job</p>
+              {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setStep(3)}
+                  className="flex items-center gap-1.5 px-5 py-3 rounded-xl text-sm font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors"
+                >
+                  <ArrowLeft size={15} /> Back
+                </button>
+                <button
+                  onClick={handleLogoUpload}
+                  disabled={logoUploading}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity disabled:opacity-60"
+                >
+                  {logoUploading ? (
+                    <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Uploading...</>
+                  ) : (
+                    <>{logoPreview ? "Save & Continue" : "Skip for now"} <ArrowRight size={15} /></>
+                  )}
+                </button>
+              </div>
             </div>
           )}
 
