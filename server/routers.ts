@@ -3045,7 +3045,7 @@ Fields to extract:
       }),
     /** Start a Stripe checkout for a client monthly subscription ($50/mo). */
     createSubscriptionCheckout: protectedProcedure
-      .input(z.object({ jobId: z.number().optional(), origin: z.string() }))
+      .input(z.object({ jobId: z.number().optional(), origin: z.string(), interval: z.enum(["month", "year"]).optional() }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
@@ -3055,6 +3055,7 @@ Fields to extract:
           stripeCustomerId: user.clientStripeCustomerId ?? undefined,
           origin: input.origin,
           jobId: input.jobId,
+          interval: input.interval,
         });
         return { url };
       }),

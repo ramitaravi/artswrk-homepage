@@ -2,10 +2,9 @@
  * Post a Job — 3-step flow (redesigned)
  * Step 1: Natural language input
  * Step 2: AI-autofilled summary form (editable) → "Post Job Free"
- * Step 3: Job is live! + Connect/Boost/PRO pricing (pay to UNLOCK candidates)
+ * Step 3: Job is live! + Job Unlock / Artswrk Premium pricing (pay to UNLOCK candidates)
  *
- * Model: Free to post. $30 to connect with candidates (unlock applicants).
- * Optional +$15 boost for priority placement. Or $29/mo PRO for unlimited.
+ * Model: Free to post. $30 Job Unlock (one-time). Or Artswrk Premium $50/mo or $500/yr for unlimited.
  */
 
 import { useState, useRef, useEffect, useMemo } from "react";
@@ -1023,7 +1022,7 @@ function Step2({
 const TIERS = [
   {
     id: "connect",
-    label: "Connect",
+    label: "Job Unlock",
     price: 30,
     priceLabel: "$30",
     description: "Unlock all applicants for this job",
@@ -1034,9 +1033,12 @@ const TIERS = [
   },
   {
     id: "pro",
-    label: "PRO",
-    price: 29,
-    priceLabel: "$29/mo",
+    label: "Artswrk Premium",
+    price: 50,
+    priceMonthly: 50,
+    priceAnnual: 500,
+    priceLabel: "$50/mo",
+    priceLabelAnnual: "$500/yr",
     description: "Unlimited unlocks for all your jobs",
     features: ["Unlimited applicant unlocks", "Priority listing placement", "Cancel anytime"],
     icon: <Crown size={20} className="text-white" />,
@@ -1057,6 +1059,7 @@ function Step3({
 }) {
   const [, navigate] = useLocation();
   const [selectedTier, setSelectedTier] = useState<string>("connect");
+  const [premiumInterval, setPremiumInterval] = useState<"month" | "year">("month");
   const [isLoading, setIsLoading] = useState(false);
 
   // sub-step: "almost_ready" → "sponsor"
@@ -1074,7 +1077,19 @@ function Step3({
     },
   });
 
-  // boost.createCheckout is available via trpc.boost.createCheckout
+  const createSubscriptionCheckout = trpc.clientJobs.createSubscriptionCheckout.useMutation({
+    onSuccess: (data) => {
+      if (data.url) {
+        window.open(data.url, "_blank");
+        toast.success("Redirecting to Artswrk Premium checkout…");
+      }
+      setIsLoading(false);
+    },
+    onError: (err) => {
+      setIsLoading(false);
+      toast.error(`Checkout failed: ${err.message}`);
+    },
+  });
 
   function handleSponsor() {
     if (!jobId) {
@@ -1084,6 +1099,16 @@ function Step3({
     setIsLoading(true);
     const tier = TIERS.find((t) => t.id === selectedTier);
     if (!tier) return;
+
+    if (tier.id === "pro") {
+      // Route to Artswrk Premium subscription checkout
+      createSubscriptionCheckout.mutate({
+        jobId: jobId ?? undefined,
+        interval: premiumInterval,
+        origin: window.location.origin,
+      });
+      return;
+    }
 
     createAndCheckout.mutate({
       description: form.description,
@@ -1193,9 +1218,40 @@ function Step3({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-black text-[#111] text-base">{tier.label}</p>
-                  <p className="font-black text-[#F25722] text-lg">{tier.priceLabel}</p>
+                  <p className="font-black text-[#F25722] text-lg">
+                    {tier.id === "pro"
+                      ? premiumInterval === "year"
+                        ? "$500/yr"
+                        : "$50/mo"
+                      : tier.priceLabel}
+                  </p>
                 </div>
                 <p className="text-sm text-gray-500 mt-0.5">{tier.description}</p>
+                {/* Billing interval toggle — only for Artswrk Premium */}
+                {tier.id === "pro" && selectedTier === "pro" && (
+                  <div className="mt-3 flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1 w-fit" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => setPremiumInterval("month")}
+                      className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                        premiumInterval === "month"
+                          ? "bg-[#F25722] text-white shadow-sm"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      onClick={() => setPremiumInterval("year")}
+                      className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                        premiumInterval === "year"
+                          ? "bg-[#F25722] text-white shadow-sm"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Annual <span className="text-[10px] font-bold text-green-600 ml-0.5">save 2 months</span>
+                    </button>
+                  </div>
+                )}
                 <ul className="mt-2 space-y-1">
                   {tier.features.map((f) => (
                     <li key={f} className="flex items-center gap-1.5 text-xs text-gray-600">

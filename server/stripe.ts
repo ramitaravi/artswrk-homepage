@@ -417,18 +417,32 @@ export async function createClientJobUnlockCheckoutSession(
 }
 
 /**
- * Create a Stripe Checkout Session for a client monthly subscription ($50/mo).
+ * Create a Stripe Checkout Session for Artswrk Premium client subscription.
+ * Monthly: $50/mo  |  Annual: $500/yr (save 2 months)
  */
 export async function createClientSubscriptionCheckoutSession(
-  opts: CreateCheckoutOptions & { jobId?: number }
+  opts: CreateCheckoutOptions & { jobId?: number; interval?: "month" | "year" }
 ): Promise<{ url: string; sessionId: string }> {
   const stripe = getStripe();
+  const interval = opts.interval ?? "month";
+  const isAnnual = interval === "year";
   const returnJobPath = opts.jobId ? `/app/jobs/${opts.jobId}` : "/app/jobs";
+
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode: "subscription",
     line_items: [
       {
-        price: "price_1PdZbaA91H1fWNkKPGY6kyEl",
+        price_data: {
+          currency: "usd",
+          unit_amount: isAnnual ? 50000 : 5000, // $500/yr or $50/mo in cents
+          recurring: { interval },
+          product_data: {
+            name: "Artswrk Premium",
+            description: isAnnual
+              ? "Unlimited applicant unlocks for all your jobs — Annual plan (save 2 months)"
+              : "Unlimited applicant unlocks for all your jobs — Monthly plan",
+          },
+        },
         quantity: 1,
       },
     ],
@@ -440,6 +454,7 @@ export async function createClientSubscriptionCheckoutSession(
       user_id: opts.userId?.toString() ?? "",
       customer_email: opts.email ?? "",
       type: "client_subscription",
+      interval,
     },
   };
   if (opts.stripeCustomerId) {
