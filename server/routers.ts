@@ -3059,6 +3059,40 @@ Fields to extract:
         });
         return { url };
       }),
+    /** Competition Job Unlock checkout — $100 one-time per job (for Dance Competition / Event Company clients). */
+    createCompetitionJobUnlockCheckout: protectedProcedure
+      .input(z.object({ jobId: z.number(), jobTitle: z.string().optional(), origin: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const { url, sessionId } = await createEnterpriseJobUnlockCheckoutSession({
+          email: user.email ?? undefined,
+          userId: user.id,
+          jobId: input.jobId,
+          jobTitle: input.jobTitle,
+          origin: input.origin,
+          stripeCustomerId: user.clientStripeCustomerId ?? null,
+        });
+        return { url, sessionId };
+      }),
+
+    /** Competition Subscription checkout — $250/mo or $2500/yr (for Dance Competition / Event Company clients). */
+    createCompetitionSubscriptionCheckout: protectedProcedure
+      .input(z.object({ interval: z.enum(["month", "year"]), jobId: z.number().optional(), origin: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const returnJobPath = input.jobId ? `/app/jobs/${input.jobId}` : "/app/jobs";
+        const { url } = await createEnterpriseSubscriptionCheckoutSession({
+          email: user.email ?? undefined,
+          userId: user.id,
+          interval: input.interval,
+          origin: input.origin,
+          stripeCustomerId: user.clientStripeCustomerId ?? null,
+        });
+        return { url };
+      }),
+
     /** Verify a job unlock after Stripe redirect and record it in the DB. */
     verifyUnlock: protectedProcedure
       .input(z.object({ sessionId: z.string(), jobId: z.number() }))

@@ -200,7 +200,7 @@ function Step1({
         </h1>
         <p className="text-gray-500 text-base">
           Describe your job below — we'll turn it into a professional listing and send it to our vetted network of{" "}
-          <span className="font-semibold text-[#111]">5,000+ artists</span> looking for work.
+          <span className="font-semibold text-[#111]">6,000+ artists</span> looking for work.
         </p>
       </div>
 
@@ -260,7 +260,7 @@ function Step1({
       <div className="flex items-center justify-center gap-6 mt-6 text-xs text-gray-400 flex-wrap">
         <span className="flex items-center gap-1.5">
           <Users size={12} />
-          5,000+ artists
+          6,000+ artists
         </span>
         <span className="w-1 h-1 rounded-full bg-gray-300" />
         <span className="flex items-center gap-1.5">
@@ -1048,16 +1048,52 @@ const TIERS = [
   },
 ];
 
+// Competition-specific tiers ($100 unlock + $250/mo or $2500/yr subscription)
+const COMPETITION_TIERS = [
+  {
+    id: "connect",
+    label: "Job Unlock",
+    price: 100,
+    priceLabel: "$100",
+    description: "Unlock all applicants for this job",
+    features: ["View all applicants", "Message artists directly", "One-time fee"],
+    icon: <Unlock size={20} className="text-white" />,
+    gradient: "hirer-grad-bg",
+    plan: "one_time" as const,
+  },
+  {
+    id: "pro",
+    label: "Artswrk Premium",
+    price: 250,
+    priceMonthly: 250,
+    priceAnnual: 2500,
+    priceLabel: "$250/mo",
+    priceLabelAnnual: "$2,500/yr",
+    description: "Unlimited unlocks for all your jobs",
+    features: ["Unlimited applicant unlocks", "Priority listing placement", "Cancel anytime"],
+    icon: <Crown size={20} className="text-white" />,
+    gradient: "hirer-grad-bg",
+    plan: "subscription" as const,
+    badge: "Best Value",
+  },
+];
+
+const ENTERPRISE_HIRING_CATEGORIES = ["Dance Competition", "Event Company"];
+
 function Step3({
   form,
   jobId,
   onBack,
+  hiringCategory,
 }: {
   form: FormData;
   jobId: number | null;
   onBack: () => void;
+  hiringCategory?: string | null;
 }) {
   const [, navigate] = useLocation();
+  const isCompetition = ENTERPRISE_HIRING_CATEGORIES.includes(hiringCategory ?? "");
+  const activeTiers = isCompetition ? COMPETITION_TIERS : TIERS;
   const [selectedTier, setSelectedTier] = useState<string>("connect");
   const [premiumInterval, setPremiumInterval] = useState<"month" | "year">("month");
   const [isLoading, setIsLoading] = useState(false);
@@ -1091,14 +1127,61 @@ function Step3({
     },
   });
 
+  // Competition-specific checkout mutations
+  const createCompetitionJobUnlock = trpc.clientJobs.createCompetitionJobUnlockCheckout.useMutation({
+    onSuccess: (data) => {
+      if (data.url) {
+        window.open(data.url, "_blank");
+        toast.success("Redirecting to Job Unlock checkout…");
+      }
+      setIsLoading(false);
+    },
+    onError: (err) => {
+      setIsLoading(false);
+      toast.error(`Checkout failed: ${err.message}`);
+    },
+  });
+
+  const createCompetitionSubscription = trpc.clientJobs.createCompetitionSubscriptionCheckout.useMutation({
+    onSuccess: (data) => {
+      if (data.url) {
+        window.open(data.url, "_blank");
+        toast.success("Redirecting to Artswrk Premium checkout…");
+      }
+      setIsLoading(false);
+    },
+    onError: (err) => {
+      setIsLoading(false);
+      toast.error(`Checkout failed: ${err.message}`);
+    },
+  });
+
   function handleSponsor() {
     if (!jobId) {
       toast.error("Job ID missing — please try again.");
       return;
     }
     setIsLoading(true);
-    const tier = TIERS.find((t) => t.id === selectedTier);
+    const tier = activeTiers.find((t) => t.id === selectedTier);
     if (!tier) return;
+
+    if (isCompetition) {
+      // Competition flow: route to enterprise-priced checkout
+      if (tier.id === "pro") {
+        createCompetitionSubscription.mutate({
+          jobId: jobId ?? undefined,
+          interval: premiumInterval,
+          origin: window.location.origin,
+        });
+      } else {
+        createCompetitionJobUnlock.mutate({
+          jobId,
+          jobTitle: form.title || undefined,
+          origin: window.location.origin,
+        });
+      }
+      return;
+    }
 
     if (tier.id === "pro") {
       // Route to Artswrk Premium subscription checkout
@@ -1196,7 +1279,7 @@ function Step3({
       </div>
 
       <div className="space-y-3 mb-6">
-        {TIERS.map((tier) => (
+        {activeTiers.map((tier) => (
           <div
             key={tier.id}
             onClick={() => setSelectedTier(tier.id)}
@@ -1207,7 +1290,7 @@ function Step3({
             }`}
           >
             {tier.badge && (
-              <span className="absolute -top-2.5 right-4 px-2.5 py-0.5 rounded-full hirer-grad-bg text-white text-[10px] font-bold">
+              <span className="absolute top-3 right-4 px-2.5 py-0.5 rounded-full hirer-grad-bg text-white text-[10px] font-bold">
                 {tier.badge}
               </span>
             )}
@@ -1216,13 +1299,13 @@ function Step3({
                 {tier.icon}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2 pr-24">
                   <p className="font-black text-[#111] text-base">{tier.label}</p>
-                  <p className="font-black text-[#F25722] text-lg">
+                  <p className="font-black text-[#F25722] text-lg whitespace-nowrap">
                     {tier.id === "pro"
                       ? premiumInterval === "year"
-                        ? "$500/yr"
-                        : "$50/mo"
+                        ? (isCompetition ? "$2,500/yr" : "$500/yr")
+                        : (isCompetition ? "$250/mo" : "$50/mo")
                       : tier.priceLabel}
                   </p>
                 </div>
@@ -1371,6 +1454,7 @@ export default function PostJob() {
 
   if (isSuccess) return <SuccessPage />;
 
+  const { user } = useAuth();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [rawText, setRawText] = useState("");
   const [parsed, setParsed] = useState<ParsedJob | null>(null);
@@ -1413,6 +1497,7 @@ export default function PostJob() {
             form={form}
             jobId={jobId}
             onBack={() => setStep(2)}
+            hiringCategory={(user as any)?.hiringCategory ?? null}
           />
         )}
       </div>

@@ -121,7 +121,7 @@ export default function ArtistJoin() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
             <StepDots current={1} total={3} />
             <h1 className="text-2xl font-black text-[#111] mb-1">Create your artist account</h1>
-            <p className="text-gray-500 text-sm mb-7">Join 5,000+ artists already on Artswrk</p>
+            <p className="text-gray-500 text-sm mb-7">Join 6,000+ artists already on Artswrk</p>
 
             <form onSubmit={handleRegister} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">

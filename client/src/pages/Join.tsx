@@ -327,7 +327,7 @@ export default function Join() {
               {isArtist ? "Join now. Start earning on Artswrk 💰" : "Join now. Hire instantly on Artswrk ⭐"}
             </h1>
             <p className="text-gray-500 text-sm mb-7">
-              {isArtist ? "Join 5,000+ artists already on Artswrk" : "Join 5,000+ studios and artists on Artswrk"}
+              {isArtist ? "Join 6,000+ artists on Artswrk" : "Join 1,000+ studios on Artswrk"}
             </p>
 
             <form onSubmit={handleAccount} className="space-y-4">
@@ -375,9 +375,9 @@ export default function Join() {
                         <div key={n} className="h-1 flex-1 rounded-full transition-all duration-300"
                           style={{ background: pwScore >= n
                             ? pwScore <= 1 ? "#ef4444"
-                            : pwScore === 2 ? "#f97316"
-                            : pwScore === 3 ? "#eab308"
-                            : accentColor
+                            : pwScore === 2 ? "#eab308"
+                            : pwScore === 3 ? "#22c55e"
+                            : "#16a34a"
                             : "#e5e7eb"
                           }} />
                       ))}
@@ -392,8 +392,8 @@ export default function Join() {
                         { ok: pwRules.special, label: "Special character (e.g: !@#)" },
                       ].map(({ ok, label }) => (
                         <li key={label} className="flex items-center gap-2 text-xs transition-colors"
-                          style={{ color: ok ? accentColor : "#9ca3af" }}>
-                          <CheckCircle2 size={12} style={{ color: ok ? accentColor : "#d1d5db" }} />
+                          style={{ color: ok ? "#16a34a" : "#9ca3af" }}>
+                          <CheckCircle2 size={12} style={{ color: ok ? "#16a34a" : "#d1d5db" }} />
                           {label}
                         </li>
                       ))}
@@ -620,25 +620,25 @@ export default function Join() {
                   </div>
                 </div>
                 <ul className="space-y-1.5 text-xs text-gray-600">
-                  <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500" /> Visible to 5,000+ artists</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500" /> Visible to 6,000+ artists</li>
                   <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500" /> Avg. 3 applicants in 24 hrs</li>
                   <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500" /> No subscription required</li>
                 </ul>
               </div>
 
               <div className="border-2 border-[#FFBC5D] rounded-2xl p-5 relative overflow-hidden">
-                <div className="absolute top-3 right-3 bg-[#F25722] text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
-                  <Star size={9} /> Best Value
-                </div>
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <p className="font-bold text-[#111] text-sm">Subscribe &amp; Save</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Unlimited posts, cancel anytime</p>
-                  </div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="inline-flex items-center gap-1 bg-[#F25722] text-white text-[10px] font-bold px-2.5 py-1 rounded-full">
+                    <Star size={9} /> Best Value
+                  </span>
                   <div className="text-right">
                     <p className="font-black text-2xl text-[#111]">${isEnterprise(bizType) ? "250" : "50"}</p>
                     <p className="text-xs text-gray-400">per month</p>
                   </div>
+                </div>
+                <div className="mb-2">
+                  <p className="font-bold text-[#111] text-sm">Subscribe &amp; Save</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Unlimited posts, cancel anytime</p>
                 </div>
                 <ul className="space-y-1.5 text-xs text-gray-600">
                   <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500" /> Unlimited job posts</li>
@@ -654,8 +654,8 @@ export default function Join() {
                     <p className="font-bold text-[#111] text-sm">Talk to Sales</p>
                   </div>
                   <p className="text-xs text-gray-500 mb-3">Custom pricing for high-volume hiring and dedicated support.</p>
-                  <a href="mailto:hello@artswrk.com" className="text-xs font-semibold text-[#F25722] hover:opacity-70 transition-opacity underline underline-offset-2">
-                    Contact us → hello@artswrk.com
+                  <a href="mailto:contact@artswrk.com" className="text-xs font-semibold text-[#F25722] hover:opacity-70 transition-opacity underline underline-offset-2">
+                    Contact us → contact@artswrk.com
                   </a>
                 </div>
               )}
@@ -691,7 +691,7 @@ export default function Join() {
             </div>
             <div className="mt-6 flex items-center justify-center gap-5 text-xs text-gray-400">
               <span className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-green-400" /> Free to post</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-green-400" /> 5,000+ artists</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-green-400" /> 6,000+ artists</span>
               <span className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-green-400" /> Avg. 3 apps in 24hr</span>
             </div>
           </div>

@@ -723,3 +723,20 @@
 - [x] Home.tsx copy: studio count 1000+, button text, FAQ answers for fees/payments/taxes
 - [x] Empty gradient placeholder sections replaced with stats blocks on: DanceStudios, DanceCompetitions, MusicSchools, DanceJudges, DanceTeachers, MusicTeachers, Production
 - [x] FAQ answers (payments and taxes) updated on DanceTeachers, DanceJudges, MusicTeachers, Production to match canonical Home.tsx artist FAQ answers
+
+## QA Feedback Batch (May 28, 2026)
+
+- [x] Update "5,000+ artists" → "6,000+ artists" across all pages (ArtistJoin, ClientOnboarding, Join, PostJob, Home, niche landing pages)
+- [x] Update "700+ clients/studios" → "1,000+ clients" across all pages
+- [x] Join page: password strength bar and 4 criteria indicators changed from orange to green for both artists and clients
+- [x] Join page: artist copy "Join 5,000+ studios and artists" → "Join 6,000+ artists on Artswrk"
+- [x] Join page: client copy "Join 5,000+ studios and artists" → "Join 1,000+ studios on Artswrk"
+- [x] Fix Best Value badge overlap on pricing cards (studio and competition) — moved badge to top-right with proper spacing
+- [x] Talk to Sales email updated to contact@artswrk.com in ClientOnboarding
+- [x] Remove plan selection step from studio and competition onboarding flows (skip step 4, go directly to Done)
+- [x] Competition unlock flow: add competition-specific TIERS ($100 Job Unlock + $250/mo or $2,500/yr Artswrk Premium)
+- [x] Competition plan card selectability fixed — activeTiers used in render, all cards are clickable
+- [x] Competition unlock flow routes to correct Stripe checkout based on user hiringCategory
+- [x] PostJob.tsx passes hiringCategory from useAuth to Step3 to determine competition vs studio flow
+- [x] Google Places autocomplete: PlacesInput now calls ensureMapsLoaded() to inject Maps script via Manus proxy
+- [x] Best Value badge on PostJob plan cards repositioned to not overlap price text

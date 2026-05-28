@@ -25,6 +25,28 @@ import {
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 
+// ─── Google Maps script loader (uses Manus proxy) ──────────────────────────────
+const _FORGE_BASE_URL = (import.meta.env.VITE_FRONTEND_FORGE_API_URL as string) || "https://forge.butterfly-effect.dev";
+const _MAPS_PROXY_URL = `${_FORGE_BASE_URL}/v1/maps/proxy`;
+const _MAPS_API_KEY = import.meta.env.VITE_FRONTEND_FORGE_API_KEY as string;
+let _mapsScriptPromise: Promise<null> | null = null;
+
+function ensureMapsLoaded(): Promise<null> {
+  if (typeof window !== "undefined" && (window as any).google?.maps) return Promise.resolve(null);
+  if (_mapsScriptPromise) return _mapsScriptPromise;
+  _mapsScriptPromise = new Promise<null>((resolve, reject) => {
+    if ((window as any).google?.maps) { resolve(null); return; }
+    const script = document.createElement("script");
+    script.src = `${_MAPS_PROXY_URL}/maps/api/js?key=${_MAPS_API_KEY}&v=weekly&libraries=places`;
+    script.async = true;
+    script.crossOrigin = "anonymous";
+    script.onload = () => resolve(null);
+    script.onerror = () => { _mapsScriptPromise = null; reject(new Error("Failed to load Google Maps")); };
+    document.head.appendChild(script);
+  });
+  return _mapsScriptPromise;
+}
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 type OnboardingStep = 1 | 2 | 3 | 4 | 5;
 
@@ -63,7 +85,7 @@ const STEPS = [
   { n: 1, label: "Who are you?",     icon: User },
   { n: 2, label: "Business type",   icon: Building2 },
   { n: 3, label: "Your details",    icon: Briefcase },
-  { n: 4, label: "Choose a plan",   icon: CreditCard },
+  // Step 4 (plan selection) is intentionally skipped — plan is chosen after posting first job
   { n: 5, label: "All done!",       icon: Sparkles },
 ];
 
@@ -81,10 +103,10 @@ function PlacesInput({
   const [mapsLoaded, setMapsLoaded] = useState(false);
 
   useEffect(() => {
-    const check = () => { if (window.google?.maps?.places) { setMapsLoaded(true); return true; } return false; };
-    if (check()) return;
-    const iv = setInterval(() => { if (check()) clearInterval(iv); }, 300);
-    return () => clearInterval(iv);
+    // Trigger the actual script load via the Manus proxy
+    ensureMapsLoaded()
+      .then(() => setMapsLoaded(true))
+      .catch((err) => console.error("Maps load error:", err));
   }, []);
 
   useEffect(() => {
@@ -107,6 +129,9 @@ function PlacesInput({
       <input ref={inputRef} type="text" value={value} onChange={e => onChange(e.target.value)}
         placeholder={placeholder || "Search for your studio..."}
         className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-300 focus:outline-none focus:border-[#FFBC5D] transition-all" />
+      {!mapsLoaded && value.length > 0 && (
+        <p className="text-xs text-gray-400 mt-1 pl-1">Loading location search…</p>
+      )}
     </div>
   );
 }
@@ -239,8 +264,7 @@ export default function ClientOnboarding() {
     // 3=type selected, 4=details done, 5=pricing seen, 6+=complete
     const savedStep = status.onboardingStep ?? 0;
     if (savedStep >= 6) { navigate("/app"); return; }
-    if (savedStep >= 5) { setStep(5); return; }
-    if (savedStep >= 4) { setStep(4); return; }
+    if (savedStep >= 4) { setStep(5); return; } // skip plan step, go to done
     if (savedStep >= 3) { setStep(3); return; }
     if (savedStep >= 2) { setStep(2); return; }
     setStep(1);
@@ -271,8 +295,8 @@ export default function ClientOnboarding() {
   }
 
   async function handleArtistTypesContinue() {
-    await save({ onboardingStep: 3 });
-    setStep(4); // individuals skip details step
+    await save({ onboardingStep: 5 }); // skip details + plan steps for individuals
+    setStep(5);
   }
 
   // ── Step 3: Business details ──────────────────────────────────────────────
@@ -286,9 +310,9 @@ export default function ClientOnboarding() {
         location: form.location,
         website: form.website,
         phoneNumber: form.phoneNumber,
-        onboardingStep: 4,
+        onboardingStep: 5, // skip plan step
       });
-      setStep(4);
+      setStep(5);
     } catch (err: any) {
       setError(err.message || "Something went wrong. Please try again.");
     } finally {
@@ -611,25 +635,25 @@ export default function ClientOnboarding() {
                     </div>
                   </div>
                   <ul className="space-y-1.5 text-xs text-gray-600">
-                    <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500 shrink-0" /> Visible to 5,000+ artists</li>
+                    <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500 shrink-0" /> Visible to 6,000+ artists</li>
                     <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500 shrink-0" /> Avg. 3 applicants in 24 hrs</li>
                     <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500 shrink-0" /> No subscription required</li>
                   </ul>
                 </div>
 
                 <div className="border-2 border-[#FFBC5D] rounded-2xl p-5 relative overflow-hidden">
-                  <div className="absolute top-3 right-3 bg-[#F25722] text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
-                    <Star size={9} /> Best Value
-                  </div>
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <p className="font-bold text-[#111] text-sm">Subscribe & Save</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Unlimited posts, cancel anytime</p>
-                    </div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="inline-flex items-center gap-1 bg-[#F25722] text-white text-[10px] font-bold px-2.5 py-1 rounded-full">
+                      <Star size={9} /> Best Value
+                    </span>
                     <div className="text-right">
                       <p className="font-black text-2xl text-[#111]">${isEnterprise(form.hiringCategory) ? "250" : "50"}</p>
                       <p className="text-xs text-gray-400">per month</p>
                     </div>
+                  </div>
+                  <div className="mb-3">
+                    <p className="font-bold text-[#111] text-sm">Subscribe & Save</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Unlimited posts, cancel anytime</p>
                   </div>
                   <ul className="space-y-1.5 text-xs text-gray-600">
                     <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500 shrink-0" /> Unlimited job posts</li>
@@ -646,8 +670,8 @@ export default function ClientOnboarding() {
                       <p className="font-bold text-[#111] text-sm">Talk to Sales</p>
                     </div>
                     <p className="text-xs text-gray-500 mb-3">Custom pricing for high-volume hiring, white-label options, and dedicated support.</p>
-                    <a href="mailto:hello@artswrk.com" className="text-xs font-semibold text-[#F25722] hover:opacity-70 transition-opacity underline underline-offset-2">
-                      Contact us → hello@artswrk.com
+                    <a href="mailto:contact@artswrk.com" className="text-xs font-semibold text-[#F25722] hover:opacity-70 transition-opacity underline underline-offset-2">
+                      Contact us → contact@artswrk.com
                     </a>
                   </div>
                 )}
@@ -695,7 +719,7 @@ export default function ClientOnboarding() {
 
               <div className="mt-6 flex items-center justify-center gap-5 text-xs text-gray-400">
                 <span className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-green-400" /> Free to start</span>
-                <span className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-green-400" /> 5,000+ artists</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-green-400" /> 6,000+ artists</span>
                 <span className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-green-400" /> Avg. 3 apps in 24hr</span>
               </div>
             </div>
