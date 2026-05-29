@@ -1439,7 +1439,7 @@ function JobDetailView({
               No applicants yet.
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3" style={{paddingBottom: '15px', paddingLeft: '15px', paddingRight: '15px', paddingTop: '15px'}}>
               <p className="text-xs text-gray-400 font-medium">{applicants.length} applicant{applicants.length !== 1 ? "s" : ""}</p>
               {applicants.map((a: any) => {
                 const name = a.firstName
@@ -1471,7 +1471,7 @@ function JobDetailView({
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="text-sm font-bold text-[#111]">{name}</p>
                             {a.artswrkPro && (
-                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600">PRO</span>
+                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600" style={{backgroundColor: '#f9ecf3', color: '#ec008c', fontWeight: '700'}}>PRO</span>
                             )}
                           </div>
                           {a.location && (
