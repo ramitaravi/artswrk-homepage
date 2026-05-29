@@ -620,7 +620,7 @@ export const premiumJobInterestedArtists = mysqlTable("premium_job_interested_ar
   /** Bubble artist user ID */
   bubbleArtistId: varchar("bubbleArtistId", { length: 64 }),
   /** Bubble interestedartists record ID */
-  bubbleInterestedArtistId: varchar("bubbleInterestedArtistId", { length: 64 }),
+  bubbleInterestedArtistId: varchar("bubbleInterestedArtistId", { length: 64 }).unique(),
   /** Artist's application message */
   message: text("message"),
   /** Rate the artist quoted for this job */

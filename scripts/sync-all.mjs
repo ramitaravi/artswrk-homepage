@@ -525,6 +525,67 @@ async function syncConversations(conn, userMap, modifiedSince = null) {
   return { upserted, errors };
 }
 
+// ── Sync: Premium Job Interested Artists ────────────────────────────────────
+// Syncs the interestedartists records that have a premiumjob field into
+// premium_job_interested_artists using ON DUPLICATE KEY UPDATE on bubbleInterestedArtistId.
+async function syncPremiumInterestedArtists(conn, userMap, modifiedSince = null) {
+  // Fetch all interestedartists from Bubble, filter client-side for premium ones
+  const constraints = modifiedSince
+    ? [{ key: "Modified Date", constraint_type: "greater than", value: modifiedSince }]
+    : [];
+  const allRecords = await fetchAllPages("interestedartists", constraints);
+  // Filter to only records that have a premiumjob field
+  const records = allRecords.filter((r) => r.premiumjob);
+  console.log(`  Found ${records.length} premium interested artists (from ${allRecords.length} total)`);
+
+  // Build a map of bubblePremiumJobId → local premiumJobId
+  const [pjRows] = await conn.execute("SELECT id, bubbleId FROM premium_jobs WHERE bubbleId IS NOT NULL");
+  const premiumJobMap = new Map(pjRows.map((r) => [r.bubbleId, r.id]));
+
+  let upserted = 0, errors = 0;
+  for (const r of records) {
+    const premiumJobId = r.premiumjob ? (premiumJobMap.get(r.premiumjob) ?? null) : null;
+    const artistUserId = r.artist ? (userMap.get(r.artist) ?? null) : null;
+    // Trim whitespace from text fields
+    const message = typeof r.message === "string" ? r.message.trim() : (r.message ?? null);
+    const rate = typeof r.rate === "string" ? r.rate.trim() : (r.rate ?? null);
+    const resumeLink = typeof r.link === "string" ? r.link.trim() : (r.link ?? null);
+    const status = typeof r.status_interestedartists === "string" ? r.status_interestedartists.trim() : (r.status_interestedartists ?? null);
+    if (!premiumJobId) {
+      // Skip if we can't resolve the premium job — it may not be synced yet
+      continue;
+    }
+    try {
+      await conn.execute(
+        `INSERT INTO premium_job_interested_artists (
+          premiumJobId, bubblePremiumJobId,
+          artistUserId, bubbleArtistId,
+          bubbleInterestedArtistId,
+          message, rate, resumeLink, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          premiumJobId=VALUES(premiumJobId),
+          artistUserId=VALUES(artistUserId),
+          message=VALUES(message),
+          rate=VALUES(rate),
+          resumeLink=VALUES(resumeLink),
+          status=VALUES(status)`,
+        [
+          premiumJobId, r.premiumjob ?? null,
+          artistUserId, r.artist ?? null,
+          r._id,
+          message, rate, resumeLink, status,
+        ]
+      );
+      upserted++;
+    } catch (err) {
+      console.error(`  [premium_job_interested_artists] Error upserting ${r._id}: ${err.message}`);
+      errors++;
+    }
+  }
+  return { upserted, errors };
+}
+
 // ── Sync: Users (daily — new signups only) ────────────────────────────────────
 
 async function syncUsers(conn, modifiedSince = null) {
@@ -655,6 +716,9 @@ async function main() {
       const jobMap2 = new Map(jobRows2.map((r) => [r.bubbleId, r.id]));
       summary.interestedArtists = await syncInterestedArtists(conn, userMap, jobMap2, modifiedSince);
       console.log(`  → ${summary.interestedArtists.upserted} synced, ${summary.interestedArtists.errors} errors`);
+      console.log("\n--- Syncing Premium Job Interested Artists ---");
+      summary.premiumInterestedArtists = await syncPremiumInterestedArtists(conn, userMap, modifiedSince);
+      console.log(`  → ${summary.premiumInterestedArtists.upserted} synced, ${summary.premiumInterestedArtists.errors} errors`);
 
       console.log("\n--- Syncing Bookings ---");
       const [iaRows2] = await conn.execute("SELECT id, bubbleId FROM interested_artists WHERE bubbleId IS NOT NULL");

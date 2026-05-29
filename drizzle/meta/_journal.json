@@ -232,6 +232,13 @@
       "when": 1780016538377,
       "tag": "0032_opposite_ironclad",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "5",
+      "when": 1780018766606,
+      "tag": "0033_supreme_logan",
+      "breakpoints": true
     }
   ]
 }

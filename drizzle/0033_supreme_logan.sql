@@ -1,0 +1,1 @@
+ALTER TABLE `premium_job_interested_artists` ADD CONSTRAINT `premium_job_interested_artists_bubbleInterestedArtistId_unique` UNIQUE(`bubbleInterestedArtistId`);

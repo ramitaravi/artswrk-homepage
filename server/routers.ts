@@ -897,6 +897,27 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    /** Admin: manually unlock a premium job for an enterprise client (no Stripe charge) */
+    adminUnlockEnterpriseJob: protectedProcedure
+      .input(z.object({
+        clientUserId: z.number(),
+        jobId: z.number(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        // Check if already unlocked
+        const alreadyUnlocked = await isJobUnlocked(input.clientUserId, input.jobId);
+        if (alreadyUnlocked) return { success: true, alreadyUnlocked: true };
+        await recordEnterpriseJobUnlock({
+          clientUserId: input.clientUserId,
+          jobId: input.jobId,
+          stripeSessionId: `admin_unlock_${Date.now()}`,
+          stripePaymentIntentId: null,
+          amountCents: 0,
+        });
+        return { success: true, alreadyUnlocked: false };
+      }),
+
     /** All PRO jobs with search + filters */
     premiumJobs: protectedProcedure
       .input(z.object({

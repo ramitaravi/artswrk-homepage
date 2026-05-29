@@ -3423,6 +3423,24 @@ function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; 
   const setPlan = trpc.admin.setEnterprisePlan.useMutation({
     onSuccess: () => utils.admin.enterpriseClients.invalidate(),
   });
+  const adminUnlock = trpc.admin.adminUnlockEnterpriseJob.useMutation();
+  const [unlockingJobId, setUnlockingJobId] = useState<number | null>(null);
+  const [manuallyUnlockedJobIds, setManuallyUnlockedJobIds] = useState<Set<number>>(new Set());
+  async function handleAdminUnlock(e: React.MouseEvent, jobId: number) {
+    e.stopPropagation();
+    if (!confirm('Unlock this job for the client at no charge?')) return;
+    setUnlockingJobId(jobId);
+    try {
+      const result = await adminUnlock.mutateAsync({ clientUserId: client.id, jobId });
+      if (result.success) {
+        setManuallyUnlockedJobIds(prev => new Set([...prev, jobId]));
+      }
+    } catch (err: any) {
+      alert('Failed to unlock: ' + err.message);
+    } finally {
+      setUnlockingJobId(null);
+    }
+  }
 
   async function handlePlanChange(plan: EnterprisePlan, interval?: "month" | "year" | null) {
     setLocalPlan(plan);
@@ -3575,29 +3593,55 @@ function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; 
                 return (
                   <div key={job.id} className="border border-gray-100 rounded-xl overflow-hidden bg-gray-50">
                     {/* Job row — click to expand artists */}
-                    <button
-                      onClick={() => setExpandedJobId(isExpanded ? null : job.id)}
-                      className="w-full text-left p-4 hover:bg-white transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-[#111] text-sm truncate">{job.serviceType || 'Untitled Role'}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">{job.category}{job.location ? ` · ${job.location}` : ''}</p>
+                    <div className="flex items-stretch">
+                      <button
+                        onClick={() => setExpandedJobId(isExpanded ? null : job.id)}
+                        className="flex-1 text-left p-4 hover:bg-white transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-[#111] text-sm truncate">{job.serviceType || 'Untitled Role'}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">{job.category}{job.location ? ` · ${job.location}` : ''}</p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {job.budget && (
+                              <span className="text-xs font-semibold px-2 py-1 rounded-full bg-[#FFF0E6] text-[#F25722]">{job.budget}</span>
+                            )}
+                            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                              job.status === 'Active' ? 'bg-green-50 text-green-600' :
+                              job.status === 'Closed' ? 'bg-red-50 text-red-500' :
+                              'bg-gray-100 text-gray-500'
+                            }`}>{job.status || 'Unknown'}</span>
+                            <span className="text-xs text-gray-400">{job.interestedCount ?? 0} artists</span>
+                            <span className="text-gray-400 text-xs">{isExpanded ? '▲' : '▼'}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {job.budget && (
-                            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-[#FFF0E6] text-[#F25722]">{job.budget}</span>
+                      </button>
+                      {/* Admin Unlock button — only show for on-demand clients */}
+                      {localPlan === 'on_demand' && (
+                        <div className="flex items-center px-3 border-l border-gray-100">
+                          {manuallyUnlockedJobIds.has(job.id) ? (
+                            <span className="flex items-center gap-1 text-[10px] font-semibold text-green-600 bg-green-50 px-2.5 py-1.5 rounded-lg">
+                              <CheckCircle2 size={11} /> Unlocked
+                            </span>
+                          ) : (
+                            <button
+                              onClick={(e) => handleAdminUnlock(e, job.id)}
+                              disabled={unlockingJobId === job.id}
+                              className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-50 whitespace-nowrap"
+                              title="Unlock this job for the client at no charge"
+                            >
+                              {unlockingJobId === job.id ? (
+                                <div className="w-3 h-3 border-2 border-amber-300 border-t-amber-700 rounded-full animate-spin" />
+                              ) : (
+                                <Key size={11} />
+                              )}
+                              Unlock
+                            </button>
                           )}
-                          <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                            job.status === 'Active' ? 'bg-green-50 text-green-600' :
-                            job.status === 'Closed' ? 'bg-red-50 text-red-500' :
-                            'bg-gray-100 text-gray-500'
-                          }`}>{job.status || 'Unknown'}</span>
-                          <span className="text-xs text-gray-400">{job.interestedCount ?? 0} artists</span>
-                          <span className="text-gray-400 text-xs">{isExpanded ? '▲' : '▼'}</span>
                         </div>
-                      </div>
-                    </button>
+                      )}
+                    </div>
 
                     {/* Expanded: interested artists */}
                     {isExpanded && (

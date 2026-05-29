@@ -13,6 +13,7 @@ import { activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, getJ
 import { sendJobPostedEmail } from "../email";
 import { getMasterServiceTypeName } from "../db";
 import { handleBubbleWebhook } from "../bubbleWebhook";
+import { handleScheduledBubbleSync } from "../scheduledSync";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -259,6 +260,9 @@ async function startServer() {
   // ── Bubble webhook — receives real-time sync events from Bubble Backend Workflows ──
   // Must be registered BEFORE the global express.json() middleware
   app.post("/api/webhooks/bubble", express.json({ limit: "1mb" }), handleBubbleWebhook);
+
+  // ── Scheduled Bubble sync — triggered by Manus Heartbeat cron ─────────────
+  app.post("/api/scheduled/bubble-sync", express.json({ limit: "1mb" }), handleScheduledBubbleSync);
 
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
