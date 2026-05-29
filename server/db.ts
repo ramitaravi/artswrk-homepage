@@ -2203,6 +2203,7 @@ export async function getEnterpriseClients(opts: {
       enterpriseLogoUrl: users.enterpriseLogoUrl,
       enterpriseDescription: users.enterpriseDescription,
       enterprisePlan: users.enterprisePlan,
+      enterpriseSubInterval: users.enterpriseSubInterval,
       enterpriseStripeCustomerId: users.enterpriseStripeCustomerId,
       enterpriseStripeSubscriptionId: users.enterpriseStripeSubscriptionId,
       hiringCategory: users.hiringCategory,
@@ -2665,11 +2666,19 @@ export async function saveArtistBasicSubscription(userId: number, subscriptionId
 /** Set the enterprise plan type for a user (admin action) */
 export async function setEnterprisePlan(
   userId: number,
-  plan: "on_demand" | "subscriber" | null
+  plan: "on_demand" | "subscriber" | null,
+  interval?: "month" | "year" | null
 ): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(users).set({ enterprisePlan: plan as any }).where(eq(users.id, userId));
+  const updates: Record<string, any> = { enterprisePlan: plan };
+  // Clear interval when plan is not subscriber; set it when provided
+  if (plan !== "subscriber") {
+    updates.enterpriseSubInterval = null;
+  } else if (interval !== undefined) {
+    updates.enterpriseSubInterval = interval;
+  }
+  await db.update(users).set(updates).where(eq(users.id, userId));
 }
 
 /** Save enterprise Stripe customer ID */
@@ -2680,10 +2689,14 @@ export async function saveEnterpriseStripeCustomerId(userId: number, customerId:
 }
 
 /** Save enterprise subscription ID after successful checkout */
-export async function saveEnterpriseSubscription(userId: number, subscriptionId: string): Promise<void> {
+export async function saveEnterpriseSubscription(userId: number, subscriptionId: string, interval?: "month" | "year"): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(users).set({ enterpriseStripeSubscriptionId: subscriptionId }).where(eq(users.id, userId));
+  await db.update(users).set({
+    enterpriseStripeSubscriptionId: subscriptionId,
+    enterprisePlan: "subscriber",
+    ...(interval ? { enterpriseSubInterval: interval } : {}),
+  }).where(eq(users.id, userId));
 }
 
 /** Cancel enterprise subscription (clear subscription ID) */
@@ -2696,6 +2709,7 @@ export async function cancelEnterpriseSubscription(userId: number): Promise<void
 /** Get enterprise billing fields for a user */
 export async function getEnterpriseBillingInfo(userId: number): Promise<{
   enterprisePlan: "on_demand" | "subscriber" | null;
+  enterpriseSubInterval: "month" | "year" | null;
   enterpriseStripeCustomerId: string | null;
   enterpriseStripeSubscriptionId: string | null;
 } | null> {
@@ -2704,6 +2718,7 @@ export async function getEnterpriseBillingInfo(userId: number): Promise<{
   const rows = await db
     .select({
       enterprisePlan: users.enterprisePlan,
+      enterpriseSubInterval: users.enterpriseSubInterval,
       enterpriseStripeCustomerId: users.enterpriseStripeCustomerId,
       enterpriseStripeSubscriptionId: users.enterpriseStripeSubscriptionId,
     })
@@ -2713,6 +2728,7 @@ export async function getEnterpriseBillingInfo(userId: number): Promise<{
   if (!rows[0]) return null;
   return {
     enterprisePlan: rows[0].enterprisePlan ?? null,
+    enterpriseSubInterval: rows[0].enterpriseSubInterval ?? null,
     enterpriseStripeCustomerId: rows[0].enterpriseStripeCustomerId ?? null,
     enterpriseStripeSubscriptionId: rows[0].enterpriseStripeSubscriptionId ?? null,
   };

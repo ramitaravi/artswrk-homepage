@@ -112,6 +112,8 @@ export const users = mysqlTable("users", {
   enterpriseStripeCustomerId: varchar("enterpriseStripeCustomerId", { length: 64 }),
   /** Active Stripe subscription ID (subscriber plan only) */
   enterpriseStripeSubscriptionId: varchar("enterpriseStripeSubscriptionId", { length: 64 }),
+  /** Billing interval for subscriber plan — set when subscription is activated */
+  enterpriseSubInterval: mysqlEnum("enterpriseSubInterval", ["month", "year"]),
 
   // ── Onboarding ─────────────────────────────────────────────────────────────
   onboardingStep: int("onboardingStep").default(0),

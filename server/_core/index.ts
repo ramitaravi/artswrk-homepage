@@ -122,9 +122,10 @@ async function startServer() {
             if (session.customer) await saveArtistStripeCustomerId(userId, session.customer);
             console.log(`[Webhook] Activated artist Basic for user ${userId}`);
           } else if (eventType === "enterprise_subscription") {
-            await saveEnterpriseSubscription(userId, session.subscription);
+            const enterpriseInterval = (session.metadata?.interval as "month" | "year" | undefined) ?? undefined;
+            await saveEnterpriseSubscription(userId, session.subscription, enterpriseInterval);
             if (session.customer) await saveEnterpriseStripeCustomerId(userId, session.customer);
-            console.log(`[Webhook] Activated enterprise subscription for user ${userId}`);
+            console.log(`[Webhook] Activated enterprise subscription for user ${userId}, interval=${enterpriseInterval}`);
           } else {
             await saveClientSubscriptionId(userId, session.subscription);
           }

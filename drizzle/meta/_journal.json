@@ -225,6 +225,13 @@
       "when": 1777492858325,
       "tag": "0031_busy_maximus",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "5",
+      "when": 1780016538377,
+      "tag": "0032_opposite_ironclad",
+      "breakpoints": true
     }
   ]
 }

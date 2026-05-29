@@ -475,7 +475,9 @@ function PlanStatusCard() {
   const cancelAtEnd = billing.cancelAtPeriodEnd;
 
   const planLabel =
-    plan === "subscriber" ? "Enterprise Subscriber"
+    plan === "subscriber" && interval === "year" ? "Annual Subscription"
+    : plan === "subscriber" && interval === "month" ? "Monthly Subscription"
+    : plan === "subscriber" ? "Enterprise Subscriber"
     : plan === "on_demand" ? "On-Demand"
     : "Free";
 

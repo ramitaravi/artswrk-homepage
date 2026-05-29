@@ -3387,6 +3387,7 @@ type EnterpriseClient = {
   enterpriseLogoUrl: string | null;
   enterpriseDescription: string | null;
   enterprisePlan?: EnterprisePlan;
+  enterpriseSubInterval?: "month" | "year" | null;
   hiringCategory: string | null;
   website: string | null;
   instagram: string | null;
@@ -3405,6 +3406,7 @@ function EnterprisePlanBadge({ plan }: { plan: EnterprisePlan }) {
 function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; onClose: () => void }) {
   const [expandedJobId, setExpandedJobId] = useState<number | null>(null);
   const [localPlan, setLocalPlan] = useState<EnterprisePlan>(client.enterprisePlan ?? null);
+  const [localInterval, setLocalInterval] = useState<"month" | "year" | null>(client.enterpriseSubInterval ?? null);
   const utils = trpc.useUtils();
 
   const { data: jobsData, isLoading } = trpc.admin.premiumJobs.useQuery({
@@ -3422,9 +3424,14 @@ function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; 
     onSuccess: () => utils.admin.enterpriseClients.invalidate(),
   });
 
-  async function handlePlanChange(plan: EnterprisePlan) {
+  async function handlePlanChange(plan: EnterprisePlan, interval?: "month" | "year" | null) {
     setLocalPlan(plan);
-    await setPlan.mutateAsync({ userId: client.id, plan });
+    if (plan !== "subscriber") setLocalInterval(null);
+    await setPlan.mutateAsync({ userId: client.id, plan, interval: plan === "subscriber" ? (interval ?? localInterval) : null });
+  }
+  async function handleIntervalChange(interval: "month" | "year") {
+    setLocalInterval(interval);
+    await setPlan.mutateAsync({ userId: client.id, plan: "subscriber", interval });
   }
 
   const logo = client.enterpriseLogoUrl || client.profilePicture;
@@ -3509,9 +3516,29 @@ function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; 
             </p>
           )}
           {localPlan === "subscriber" && (
-            <p className="mt-2 text-xs text-purple-600 bg-purple-50 rounded-lg px-3 py-2">
-              This client has a <strong>subscription</strong> — $250/month or $2,500/year — with unlimited candidate access.
-            </p>
+            <div className="mt-2 bg-purple-50 rounded-lg px-3 py-2">
+              <p className="text-xs text-purple-600 mb-2">
+                This client has a <strong>subscription</strong> — unlimited candidate access.
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-purple-700 font-semibold">Billing interval:</span>
+                <button
+                  onClick={() => handleIntervalChange("month")}
+                  disabled={setPlan.isPending}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all ${localInterval === "month" ? "bg-purple-200 border-purple-400 text-purple-800" : "bg-white border-purple-200 text-purple-400 hover:bg-purple-100"}`}
+                >
+                  Monthly — $250/mo
+                </button>
+                <button
+                  onClick={() => handleIntervalChange("year")}
+                  disabled={setPlan.isPending}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all ${localInterval === "year" ? "bg-purple-200 border-purple-400 text-purple-800" : "bg-white border-purple-200 text-purple-400 hover:bg-purple-100"}`}
+                >
+                  Annual — $2,500/yr
+                </button>
+                {!localInterval && <span className="text-xs text-purple-400 italic">No interval set</span>}
+              </div>
+            </div>
           )}
         </div>
 

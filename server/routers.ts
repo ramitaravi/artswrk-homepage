@@ -889,10 +889,11 @@ export const appRouter = router({
       .input(z.object({
         userId: z.number(),
         plan: z.enum(["on_demand", "subscriber"]).nullable(),
+        interval: z.enum(["month", "year"]).nullable().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
-        await setEnterprisePlan(input.userId, input.plan);
+        await setEnterprisePlan(input.userId, input.plan, input.interval ?? undefined);
         return { success: true };
       }),
 
@@ -2381,7 +2382,10 @@ Fields to extract:
       .mutation(async ({ input, ctx }) => {
         const user = await getUserById(ctx.user.id);
         if (!user?.enterprise) throw new Error("Not an enterprise account");
-        if (user.enterprisePlan !== "subscriber") throw new Error("Subscription checkout is only for subscriber plan");
+        // Allow on-demand users to upgrade; only block if already actively subscribed
+        if (user.enterprisePlan === "subscriber" && user.enterpriseStripeSubscriptionId) {
+          throw new Error("Already subscribed — manage your subscription via the billing portal");
+        }
         const { url, sessionId } = await createEnterpriseSubscriptionCheckoutSession({
           email: user.email ?? undefined,
           userId: ctx.user.id,

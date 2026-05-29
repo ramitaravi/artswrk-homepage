@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `enterpriseSubInterval` enum('month','year');
