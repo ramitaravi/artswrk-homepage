@@ -278,10 +278,12 @@ export async function createEnterpriseJobUnlockCheckoutSession(
   const { STRIPE_PRODUCTS } = await import("./stripe-products");
   const product = STRIPE_PRODUCTS.ENTERPRISE_ON_DEMAND;
 
-  const sessionParams: Stripe.Checkout.SessionCreateParams = {
-    mode: "payment",
-    line_items: [
-      {
+  // Use static price ID if available (preferred — ties to existing Stripe product);
+  // fall back to price_data for local/test environments without the env var set.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lineItem: any = product.priceId
+    ? { price: product.priceId, quantity: 1 }
+    : {
         price_data: {
           currency: product.currency,
           unit_amount: product.amount,
@@ -291,8 +293,11 @@ export async function createEnterpriseJobUnlockCheckoutSession(
           },
         },
         quantity: 1,
-      },
-    ],
+      };
+
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
+    mode: "payment",
+    line_items: [lineItem],
     payment_intent_data: { setup_future_usage: "on_session" },
     success_url: `${opts.origin}/enterprise?unlock_job=${opts.jobId}&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${opts.origin}/enterprise`,

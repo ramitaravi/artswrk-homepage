@@ -80,14 +80,15 @@ export const STRIPE_PRODUCTS = {
   /**
    * Enterprise On-Demand — $100 per job to unlock candidate list.
    * Product: prod_TxJ7FkYDtKrFS1
-   * Uses price_data at checkout (no recurring price ID needed).
+   * Price ID: price_1SzOVLA91H1fWNkK5rX69GBU (set via ENTERPRISE_JOB_UNLOCK_PRICE_ID env var)
    */
   ENTERPRISE_ON_DEMAND: {
     productId: "prod_TxJ7FkYDtKrFS1",
     paymentLinkId: "plink_1SzOVjA91H1fWNkKiqwN8q1j",
+    priceId: process.env.ENTERPRISE_JOB_UNLOCK_PRICE_ID ?? "",
     name: "Artswrk Enterprise — View Candidates",
     description: "Unlock candidate list for one PRO job posting.",
-    amount: 10000, // $100 in cents
+    amount: 10000, // $100 in cents (fallback if priceId not set)
     currency: "usd",
     mode: "payment" as const,
   },
