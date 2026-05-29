@@ -6,6 +6,7 @@ import {
   mysqlTable,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/mysql-core";
 
@@ -662,7 +663,10 @@ export const clientCompanies = mysqlTable("client_companies", {
   /** Instructions for how artists should get to this studio */
   transportDetails: text("transportDetails"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => ({
+  /** Prevent duplicate company names per owner */
+  ownerNameUniq: uniqueIndex("client_companies_owner_name_uniq").on(t.ownerUserId, t.name),
+}));
 export type ClientCompany = typeof clientCompanies.$inferSelect;
 export type InsertClientCompany = typeof clientCompanies.$inferInsert;
 

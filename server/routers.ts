@@ -2283,7 +2283,20 @@ Fields to extract:
     /** Get client companies for this enterprise user */
     getClientCompanies: protectedProcedure
       .query(async ({ ctx }) => {
-        const companies = await getClientCompaniesByUserId(ctx.user.id);
+        const rawCompanies = await getClientCompaniesByUserId(ctx.user.id);
+        const user = await getUserById(ctx.user.id);
+        const proJobs = await getPremiumJobsByUserId(ctx.user.id);
+        // Enrich each company with openRoles count and normalized logoUrl
+        const companies = rawCompanies.map((c) => {
+          const openRoles = (proJobs as any[]).filter(
+            (j) => (j.company === c.name) && (j.status === 'Active' || !j.status)
+          ).length;
+          return {
+            ...c,
+            logoUrl: c.logo || user?.enterpriseLogoUrl || user?.profilePicture || null,
+            openRoles,
+          };
+        });
         return { companies };
       }),
 

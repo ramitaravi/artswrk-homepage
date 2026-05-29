@@ -53,6 +53,15 @@ function parseList(raw: string | null | undefined): string[] {
   try { return JSON.parse(raw) as string[]; } catch { return []; }
 }
 
+/** Format artist name as "First L." (first name + last initial with period) */
+function formatArtistName(firstName?: string | null, lastName?: string | null, fallback = "Artist"): string {
+  if (!firstName) return fallback;
+  if (lastName && lastName.length > 0) {
+    return `${firstName} ${lastName.charAt(0).toUpperCase()}.`;
+  }
+  return firstName;
+}
+
 function fmtDate(d: Date | string | null | undefined): string {
   if (!d) return "—";
   const dt = new Date(d);
@@ -337,31 +346,33 @@ function JobCard({
 }
 
 // ── Company Card (Companies Tab) ──────────────────────────────────────────────
-
-function CompanyCard({ company }: { company: any }) {
+function CompanyCard({ company, onClick }: { company: any; onClick?: () => void }) {
   const logoUrl = fixUrl(company.logoUrl);
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-      {/* Logo area */}
+    <div
+      className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all cursor-pointer overflow-hidden group"
+      onClick={onClick}
+    >
+      {/* Thumbnail area — circular profile picture */}
       <div className="h-40 bg-gray-50 flex items-center justify-center p-6">
         {logoUrl ? (
           <img
             src={logoUrl}
             alt={company.name}
-            className="max-h-full max-w-full object-contain"
+            className="w-24 h-24 rounded-full object-cover border-2 border-white shadow-md"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = "none";
             }}
           />
         ) : (
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-2xl">
+          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-2xl shadow-md">
             {initials(company.name)}
           </div>
         )}
       </div>
       {/* Info */}
       <div className="p-4 border-t border-gray-100">
-        <h3 className="font-bold text-[#111] text-sm mb-1">{company.name}</h3>
+        <h3 className="font-bold text-[#111] text-sm mb-1 group-hover:text-[#F25722] transition-colors">{company.name}</h3>
         {company.location && (
           <p className="text-xs text-gray-400 flex items-center gap-1 mb-2">
             <MapPin size={10} />
@@ -372,7 +383,7 @@ function CompanyCard({ company }: { company: any }) {
           <span className="text-xs font-semibold text-[#F25722]">
             {company.openRoles} open role{company.openRoles !== 1 ? "s" : ""}
           </span>
-          <span className="text-xs text-gray-400">View →</span>
+          <span className="text-xs text-gray-400 group-hover:text-[#F25722] transition-colors">View →</span>
         </div>
       </div>
     </div>
@@ -382,10 +393,7 @@ function CompanyCard({ company }: { company: any }) {
 // ── Artist Row (Artists Tab) ──────────────────────────────────────────────────
 
 function ArtistRow({ artist }: { artist: any }) {
-  const name =
-    artist.firstName
-      ? `${artist.firstName} ${artist.lastName || ""}`.trim()
-      : artist.name || "Artist";
+  const name = formatArtistName(artist.firstName, artist.lastName, artist.name || "Artist");
   return (
     <div className="flex items-center gap-4 py-3 border-b border-gray-50 last:border-0">
       <Avatar src={artist.profilePicture} name={name} size="md" />
@@ -991,7 +999,11 @@ function MasterView({
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {companies.map((company: any) => (
-                    <CompanyCard key={company.id} company={company} />
+                    <CompanyCard
+                      key={company.id}
+                      company={company}
+                      onClick={() => setTab("jobs")}
+                    />
                   ))}
                 </div>
               )}
@@ -1295,7 +1307,7 @@ function JobDetailView({
                       const lastName = p?.lastName || null;
                       const rawPic = p?.profilePicture || null;
                       const pic = rawPic ? (rawPic.startsWith("//") ? "https:" + rawPic : rawPic) : null;
-                      const displayName = firstName ? `${firstName}${lastName ? " " + lastName : ""}` : `Artist ${i + 1}`;
+                      const displayName = formatArtistName(firstName, lastName, `Artist ${i + 1}`);
                       return (
                         <div key={i} className="flex flex-col items-center gap-2 w-20">
                           <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 border-2 border-white shadow-md flex-shrink-0">
@@ -1443,7 +1455,7 @@ function JobDetailView({
               <p className="text-xs text-gray-400 font-medium">{applicants.length} applicant{applicants.length !== 1 ? "s" : ""}</p>
               {applicants.map((a: any) => {
                 const name = a.firstName
-                  ? `${a.firstName} ${a.lastName || ""}`.trim()
+                  ? formatArtistName(a.firstName, a.lastName)
                   : a.name || "Artist";
                 const profileUrl = a.slug ? `/book/${a.slug}` : null;
                 const disciplines = parseList(a.disciplines).slice(0, 3);

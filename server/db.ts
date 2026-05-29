@@ -3043,6 +3043,8 @@ export async function createClientCompany(data: {
 }): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  // Use raw SQL for upsert to prevent duplicates (unique index on ownerUserId+name)
+  // Use Drizzle's insert with onDuplicateKeyUpdate
   const result = await db.insert(clientCompanies).values({
     ownerUserId: data.ownerUserId,
     name: data.name,
@@ -3050,9 +3052,23 @@ export async function createClientCompany(data: {
     locationAddress: data.locationAddress ?? null,
     website: data.website ?? null,
     description: data.description ?? null,
+  }).onDuplicateKeyUpdate({
+    set: {
+      logo: data.logo ?? null,
+      locationAddress: data.locationAddress ?? null,
+      website: data.website ?? null,
+      description: data.description ?? null,
+    }
   });
   // @ts-ignore
-  return result[0].insertId as number;
+  const insertId = result[0].insertId as number;
+  if (insertId) return insertId;
+  // If duplicate was hit, fetch the existing row's id
+  const existing = await db.select({ id: clientCompanies.id })
+    .from(clientCompanies)
+    .where(eq(clientCompanies.ownerUserId, data.ownerUserId))
+    .limit(1);
+  return existing[0]?.id ?? 0;
 }
 
 // ─── Confirmation & Reimbursement Helpers ─────────────────────────────────────

@@ -239,6 +239,13 @@
       "when": 1780018766606,
       "tag": "0033_supreme_logan",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "5",
+      "when": 1780020250172,
+      "tag": "0034_peaceful_shotgun",
+      "breakpoints": true
     }
   ]
 }

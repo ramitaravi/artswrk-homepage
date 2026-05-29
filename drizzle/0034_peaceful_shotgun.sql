@@ -1,0 +1,1 @@
+ALTER TABLE `client_companies` ADD CONSTRAINT `client_companies_owner_name_uniq` UNIQUE(`ownerUserId`,`name`);
