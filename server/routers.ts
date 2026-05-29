@@ -2224,9 +2224,14 @@ Fields to extract:
         if (!isAdmin && isOnDemand) {
           const unlocked = await isJobUnlocked(ctx.user.id, input.jobId);
           if (!unlocked) {
-            // Return count only — frontend shows paywall
+            // Return count + partial preview (name + photo only) — frontend shows paywall
             const raw = await getPremiumJobInterestedArtists(input.jobId);
-            return { applicants: [], applicantCount: (raw as any[]).length, locked: true, plan: "on_demand" as const };
+            const preview = (raw as any[]).map((ia: any) => ({
+              firstName: ia.artistFirstName || null,
+              lastName: ia.artistLastName ? ia.artistLastName.charAt(0) + "." : null,
+              profilePicture: ia.artistProfilePicture || null,
+            }));
+            return { applicants: [], preview, applicantCount: (raw as any[]).length, locked: true, plan: "on_demand" as const };
           }
         }
 

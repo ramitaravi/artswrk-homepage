@@ -1126,6 +1126,7 @@ function JobDetailView({
   const [subscribing, setSubscribing] = useState(false);
 
   const applicants = applicantsData?.applicants || [];
+  const preview = (applicantsData as any)?.preview || [];
   const isLocked = applicantsData?.locked ?? false;
   const applicantCount = applicantsData?.applicantCount ?? applicants.length;
 
@@ -1265,33 +1266,65 @@ function JobDetailView({
               Loading applicants…
             </div>
           ) : isLocked ? (
-            /* On-demand paywall */
+            /* On-demand paywall — redesigned */
             <div className="p-6">
-              {/* Blurred candidate preview */}
+              {/* Green availability banner */}
               {applicantCount > 0 && (
-                <div className="relative mb-6 rounded-xl overflow-hidden border border-gray-100">
-                  <div className="blur-sm pointer-events-none select-none">
-                    {Array.from({ length: Math.min(applicantCount, 3) }).map((_, i) => (
-                      <div key={i} className="flex items-center gap-3 px-5 py-4 border-b border-gray-50 last:border-0">
-                        <div className="w-10 h-10 rounded-full bg-gray-200 flex-shrink-0" />
-                        <div className="flex-1 space-y-1.5">
-                          <div className="h-3 bg-gray-200 rounded w-32" />
-                          <div className="h-2.5 bg-gray-100 rounded w-48" />
-                        </div>
-                        <div className="h-8 w-20 bg-gray-100 rounded-lg" />
-                      </div>
-                    ))}
+                <div className="flex items-center gap-4 bg-gray-50 rounded-2xl p-5 mb-6 border border-gray-100">
+                  <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle2 size={22} className="text-green-500" />
                   </div>
-                  <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-[2px]">
-                    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-4 py-2 shadow-sm">
-                      <Lock size={14} className="text-[#F25722]" />
-                      <span className="text-xs font-bold text-[#111]">
-                        {applicantCount} candidate{applicantCount !== 1 ? "s" : ""} hidden
-                      </span>
-                    </div>
+                  <p className="text-base font-semibold text-[#111]">
+                    You have {applicantCount} artist{applicantCount !== 1 ? "s" : ""} available for your job!
+                  </p>
+                </div>
+              )}
+
+              {/* Artist preview grid */}
+              {applicantCount > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-bold text-[#111] mb-5 flex items-center gap-2">
+                    Select your membership to connect with {applicantCount} artist{applicantCount !== 1 ? "s" : ""}
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 mt-0.5 rotate-45">
+                      <line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/>
+                    </svg>
+                  </h3>
+                  <div className="flex flex-wrap gap-6">
+                    {(preview.length > 0 ? preview.slice(0, 8) : Array.from({ length: Math.min(applicantCount, 4) })).map((p: any, i: number) => {
+                      const firstName = p?.firstName || null;
+                      const lastName = p?.lastName || null;
+                      const rawPic = p?.profilePicture || null;
+                      const pic = rawPic ? (rawPic.startsWith("//") ? "https:" + rawPic : rawPic) : null;
+                      const displayName = firstName ? `${firstName}${lastName ? " " + lastName : ""}` : `Artist ${i + 1}`;
+                      return (
+                        <div key={i} className="flex flex-col items-center gap-2 w-20">
+                          <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 border-2 border-white shadow-md flex-shrink-0">
+                            {pic ? (
+                              <img src={pic} alt={displayName} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center text-gray-500 font-bold text-lg">
+                                {firstName ? firstName.charAt(0).toUpperCase() : "?"}
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-sm font-medium text-[#111] text-center leading-tight">{displayName}</span>
+                        </div>
+                      );
+                    })}
+                    {applicantCount > 8 && (
+                      <div className="flex flex-col items-center gap-2 w-20">
+                        <div className="w-20 h-20 rounded-full bg-gray-100 border-2 border-white shadow-md flex items-center justify-center">
+                          <span className="text-sm font-bold text-gray-500">+{applicantCount - 8}</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-400 text-center">more</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
+
+              {/* Divider */}
+              <div className="border-t border-gray-100 mb-6" />
 
               {/* Two options side by side */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1331,7 +1364,6 @@ function JobDetailView({
                   </button>
                   <p className="text-[11px] text-gray-400 text-center mt-2">Secure checkout via Stripe</p>
                 </div>
-
                 {/* Option 2: Subscribe */}
                 <div className="border-2 border-[#F25722] rounded-2xl p-5 flex flex-col relative">
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#F25722] text-white text-[10px] font-black px-3 py-1 rounded-full whitespace-nowrap">
@@ -1343,8 +1375,6 @@ function JobDetailView({
                     </div>
                     <span className="text-sm font-bold text-[#111]">Enterprise Plan</span>
                   </div>
-
-                  {/* Interval toggle */}
                   <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5 mb-3 w-fit">
                     <button
                       onClick={() => setSubInterval("month")}
@@ -1359,7 +1389,6 @@ function JobDetailView({
                       Annual <span className="text-[#F25722]">–17%</span>
                     </button>
                   </div>
-
                   <div className="mb-0.5">
                     <span className="text-sm text-gray-400 line-through mr-1">
                       {subInterval === "month" ? "$500" : "$417"}
