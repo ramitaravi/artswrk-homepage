@@ -13,6 +13,7 @@ import {
   MapPin,
   CreditCard,
   ChevronRight,
+  ChevronLeft,
   ExternalLink,
   MessageCircle,
   Star,
@@ -26,10 +27,16 @@ import {
   Settings,
   Zap,
   AlertCircle,
+  UserCheck,
+  Banknote,
+  Loader2,
+  ArrowLeft,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1108,8 +1115,283 @@ function EnterpriseMessagePanel({
   );
 }
 
-// ── Job Detail View ───────────────────────────────────────────────────────────
+// ── Confirm Artist Dialog ────────────────────────────────────────────────────
+function ConfirmArtistDialog({
+  applicant,
+  name,
+  onClose,
+  onConfirmed,
+}: {
+  applicant: any;
+  name: string;
+  onClose: () => void;
+  onConfirmed: () => void;
+}) {
+  const [paymentMethod, setPaymentMethod] = useState<"artswrk" | "direct" | null>(null);
+  const confirmMutation = trpc.clientJobs.confirmArtist.useMutation({
+    onSuccess: (res) => {
+      if (res.alreadyConfirmed) {
+        toast.info("Artist was already confirmed.");
+      } else {
+        toast.success("Artist confirmed! A confirmation email has been sent.");
+      }
+      onConfirmed();
+      onClose();
+    },
+    onError: (e) => toast.error(e.message || "Failed to confirm artist"),
+  });
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <UserCheck size={18} className="text-[#F25722]" />
+            Confirm {name}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-1">
+          <p className="text-sm text-gray-500">
+            How will you pay <strong>{name}</strong> for this job?
+          </p>
+          <div className="grid grid-cols-1 gap-3">
+            <button
+              onClick={() => setPaymentMethod("artswrk")}
+              className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${
+                paymentMethod === "artswrk" ? "border-[#F25722] bg-orange-50" : "border-gray-100 hover:border-gray-200"
+              }`}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                paymentMethod === "artswrk" ? "bg-[#F25722]" : "bg-gray-100"
+              }`}>
+                <CreditCard size={15} className={paymentMethod === "artswrk" ? "text-white" : "text-gray-500"} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-[#111]">Invoice via Artswrk</p>
+                <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                  Receive an invoice from Artswrk to pay the artist. 4% processing fee.
+                </p>
+              </div>
+              {paymentMethod === "artswrk" && <CheckCircle2 size={16} className="text-[#F25722] flex-shrink-0 mt-0.5" />}
+            </button>
+            <button
+              onClick={() => setPaymentMethod("direct")}
+              className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${
+                paymentMethod === "direct" ? "border-[#111] bg-gray-50" : "border-gray-100 hover:border-gray-200"
+              }`}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                paymentMethod === "direct" ? "bg-[#111]" : "bg-gray-100"
+              }`}>
+                <Banknote size={15} className={paymentMethod === "direct" ? "text-white" : "text-gray-500"} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-[#111]">Pay Artist Directly</p>
+                <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                  You will handle payment directly with the artist outside of Artswrk.
+                </p>
+              </div>
+              {paymentMethod === "direct" && <CheckCircle2 size={16} className="text-[#111] flex-shrink-0 mt-0.5" />}
+            </button>
+          </div>
+          <div className="flex gap-3 pt-1">
+            <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+            <Button
+              className="flex-1 bg-[#F25722] hover:opacity-90 text-white"
+              disabled={!paymentMethod || confirmMutation.isPending}
+              onClick={() => { if (paymentMethod) confirmMutation.mutate({ applicantId: applicant.id, paymentMethod }); }}
+            >
+              {confirmMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <UserCheck size={14} />}
+              Confirm Artist
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
+// ── Applicant Detail View ─────────────────────────────────────────────────────
+function ApplicantDetailView({
+  applicant,
+  allApplicants,
+  jobTitle,
+  onBack,
+  onNavigate,
+  onConfirmed,
+}: {
+  applicant: any;
+  allApplicants: any[];
+  jobTitle: string;
+  onBack: () => void;
+  onNavigate: (idx: number) => void;
+  onConfirmed: () => void;
+}) {
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [msgOpen, setMsgOpen] = useState(false);
+  const currentIdx = allApplicants.findIndex((a) => a.id === applicant.id);
+  const name = formatArtistName(applicant.firstName, applicant.lastName, applicant.name || "Artist");
+  const picUrl = fixUrl(applicant.profilePicture);
+  const profileUrl = applicant.slug ? `/book/${applicant.slug}` : null;
+  const disciplines = parseList(applicant.disciplines);
+  const rate = applicant.artistFlatRate
+    ? `Flat Rate: $${applicant.artistFlatRate}`
+    : applicant.artistHourlyRate
+    ? `$${applicant.artistHourlyRate}/hr`
+    : applicant.rate || null;
+
+  return (
+    <div className="flex flex-col gap-0">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm text-gray-400 mb-4 flex-wrap">
+        <button onClick={onBack} className="flex items-center gap-1 hover:text-[#F25722] transition-colors font-medium">
+          <ArrowLeft size={14} /> Applicants
+        </button>
+        <ChevronRight size={13} className="text-gray-300" />
+        <span className="text-[#111] font-semibold">{name}</span>
+        <span className="ml-auto flex items-center gap-2">
+          <button
+            disabled={currentIdx <= 0}
+            onClick={() => onNavigate(currentIdx - 1)}
+            className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center hover:border-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            <ChevronLeft size={15} />
+          </button>
+          <span className="text-xs text-gray-400">{currentIdx + 1} / {allApplicants.length}</span>
+          <button
+            disabled={currentIdx >= allApplicants.length - 1}
+            onClick={() => onNavigate(currentIdx + 1)}
+            className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center hover:border-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            <ChevronRight size={15} />
+          </button>
+        </span>
+      </div>
+
+      {/* Artist card */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        {/* Header row */}
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div className="flex items-center gap-4">
+            {picUrl ? (
+              <img src={picUrl} alt={name} className="w-16 h-16 rounded-full object-cover border-2 border-gray-100 flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-xl font-black flex-shrink-0">
+                {(name[0] || "?").toUpperCase()}
+              </div>
+            )}
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-black text-[#111]">{name}</h2>
+                {applicant.artswrkPro && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{backgroundColor: '#f9ecf3', color: '#ec008c'}}>PRO</span>
+                )}
+                {applicant.status && (
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${appStatusColor(applicant.status)}`}>{applicant.status}</span>
+                )}
+              </div>
+              {applicant.location && (
+                <p className="text-sm text-gray-400 flex items-center gap-1 mt-0.5">
+                  <MapPin size={12} /> {applicant.location}
+                </p>
+              )}
+            </div>
+          </div>
+          {rate && (
+            <span className="text-base font-black text-[#ec008c] flex-shrink-0">{rate}</span>
+          )}
+        </div>
+
+        {/* Disciplines */}
+        {disciplines.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {disciplines.map((d: string) => (
+              <span key={d} className="text-xs px-2.5 py-1 rounded-full bg-pink-50 text-pink-600 font-medium">{d}</span>
+            ))}
+          </div>
+        )}
+
+        {/* Cover letter */}
+        {applicant.message && (
+          <p className="text-sm text-gray-700 leading-relaxed mb-5">{applicant.message}</p>
+        )}
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={() => setShowConfirm(true)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors"
+          >
+            <UserCheck size={14} /> Confirm Artist
+          </button>
+          {profileUrl && (
+            <a
+              href={profileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-[#111] transition-colors"
+            >
+              Profile <ExternalLink size={12} />
+            </a>
+          )}
+          {applicant.resumeLink && (
+            <a
+              href={applicant.resumeLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sm font-semibold text-[#F25722] hover:opacity-80 transition-opacity"
+            >
+              Resume <ExternalLink size={12} />
+            </a>
+          )}
+          <button
+            onClick={() => setMsgOpen(!msgOpen)}
+            className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-[#111] transition-colors"
+          >
+            <MessageCircle size={14} /> Message
+          </button>
+        </div>
+
+        {/* Inline message */}
+        {msgOpen && (
+          <div className="mt-4">
+            <EnterpriseMessagePanel applicant={applicant} name={name} onClose={() => setMsgOpen(false)} />
+          </div>
+        )}
+      </div>
+
+      {/* Additional info */}
+      {(applicant.yearsExperience || applicant.instagram || applicant.website) && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mt-3 space-y-2">
+          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Additional Info</h4>
+          {applicant.yearsExperience && (
+            <p className="text-sm text-gray-700"><span className="font-semibold text-[#111]">Experience:</span> {applicant.yearsExperience} years</p>
+          )}
+          {applicant.instagram && (
+            <p className="text-sm text-gray-700"><span className="font-semibold text-[#111]">Instagram:</span>{" "}
+              <a href={`https://instagram.com/${applicant.instagram.replace("@", "")}`} target="_blank" rel="noopener noreferrer" className="text-[#F25722] hover:underline">@{applicant.instagram.replace("@", "")}</a>
+            </p>
+          )}
+          {applicant.website && (
+            <p className="text-sm text-gray-700"><span className="font-semibold text-[#111]">Website:</span>{" "}
+              <a href={applicant.website} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{applicant.website}</a>
+            </p>
+          )}
+        </div>
+      )}
+
+      {showConfirm && (
+        <ConfirmArtistDialog
+          applicant={applicant}
+          name={name}
+          onClose={() => setShowConfirm(false)}
+          onConfirmed={onConfirmed}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Job Detail View ───────────────────────────────────────────────────────────
 type DetailTab = "applicants" | "details";
 
 function JobDetailView({
@@ -1124,6 +1406,7 @@ function JobDetailView({
   const [tab, setTab] = useState<DetailTab>("applicants");
   const [checkingOut, setCheckingOut] = useState(false);
   const [msgOpen, setMsgOpen] = useState<number | null>(null);
+  const [selectedApplicantIdx, setSelectedApplicantIdx] = useState<number | null>(null);
   const utils = trpc.useUtils();
 
   const { data: applicantsData, isLoading } =
@@ -1271,7 +1554,17 @@ function JobDetailView({
       </div>
 
       {/* Applicants Tab */}
-      {tab === "applicants" && (
+      {tab === "applicants" && selectedApplicantIdx !== null && applicants[selectedApplicantIdx] && (
+        <ApplicantDetailView
+          applicant={applicants[selectedApplicantIdx]}
+          allApplicants={applicants}
+          jobTitle={jobTitle}
+          onBack={() => setSelectedApplicantIdx(null)}
+          onNavigate={(idx) => setSelectedApplicantIdx(idx)}
+          onConfirmed={() => { setSelectedApplicantIdx(null); utils.enterprise.getJobApplicants.invalidate({ jobId: job.id }); }}
+        />
+      )}
+      {tab === "applicants" && selectedApplicantIdx === null && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           {isLoading ? (
             <div className="text-center py-12 text-gray-400 text-sm">
@@ -1460,89 +1753,100 @@ function JobDetailView({
                 const profileUrl = a.slug ? `/book/${a.slug}` : null;
                 const disciplines = parseList(a.disciplines).slice(0, 3);
                 const picUrl = fixUrl(a.profilePicture);
+                const cardRate = a.artistFlatRate
+                  ? `Flat Rate: $${a.artistFlatRate}`
+                  : a.artistHourlyRate
+                  ? `$${a.artistHourlyRate}/hr`
+                  : a.rate || null;
+                const cardIdx = applicants.findIndex((ap: any) => ap.id === a.id);
                 return (
                   <div
                     key={a.id}
-                    className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:border-gray-200 hover:shadow-md transition-all"
+                    className="bg-white border-b border-gray-100 last:border-0 p-5 hover:bg-gray-50/50 transition-colors"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
+                    {/* Header row: avatar + name + rate */}
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0">
                         {picUrl ? (
                           <img
                             src={picUrl}
                             alt={name}
-                            className="w-10 h-10 rounded-full object-cover flex-shrink-0 border-2 border-gray-100"
+                            className="w-12 h-12 rounded-full object-cover border-2 border-gray-100"
                             onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-sm font-black flex-shrink-0">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black flex-shrink-0">
                             {(name[0] || "?").toUpperCase()}
                           </div>
                         )}
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-sm font-bold text-[#111]">{name}</p>
-                            {a.artswrkPro && (
-                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600" style={{backgroundColor: '#f9ecf3', color: '#ec008c', fontWeight: '700'}}>PRO</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-base font-black text-[#111]">{name}</p>
+                              {a.artswrkPro && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{backgroundColor: '#f9ecf3', color: '#ec008c'}}>PRO</span>
+                              )}
+                              {a.status && (
+                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${appStatusColor(a.status)}`}>{a.status}</span>
+                              )}
+                            </div>
+                            {a.location && (
+                              <p className="text-sm text-gray-400 flex items-center gap-1 mt-0.5">
+                                <MapPin size={11} /> {a.location}
+                              </p>
                             )}
                           </div>
-                          {a.location && (
-                            <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                              <MapPin size={9} /> {a.location}
-                            </p>
+                          {cardRate && (
+                            <span className="text-sm font-black text-[#ec008c] flex-shrink-0">{cardRate}</span>
                           )}
                         </div>
+                        {/* Cover letter preview */}
+                        {a.message && (
+                          <p className="text-sm text-gray-600 mt-2 leading-relaxed line-clamp-2">{a.message}</p>
+                        )}
+                        {/* Disciplines */}
+                        {disciplines.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {disciplines.map((d: string) => (
+                              <span key={d} className="text-[10px] px-2 py-0.5 rounded-full bg-pink-50 text-pink-600 font-medium">{d}</span>
+                            ))}
+                          </div>
+                        )}
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-4 mt-3 flex-wrap">
+                          <button
+                            onClick={() => setSelectedApplicantIdx(cardIdx)}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#111] text-white text-xs font-bold hover:bg-gray-800 transition-colors"
+                          >
+                            View Submission <ChevronRight size={12} />
+                          </button>
+                          {profileUrl && (
+                            <a
+                              href={profileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-sm font-semibold text-gray-500 hover:text-[#111] transition-colors"
+                            >
+                              Profile <ExternalLink size={11} />
+                            </a>
+                          )}
+                          <button
+                            onClick={() => setMsgOpen(msgOpen === a.id ? null : a.id)}
+                            className="flex items-center gap-1 text-sm font-semibold text-gray-400 hover:text-[#111] transition-colors"
+                          >
+                            <MessageCircle size={12} /> Message
+                          </button>
+                        </div>
+                        {/* Inline message panel */}
+                        {msgOpen === a.id && (
+                          <div className="mt-3">
+                            <EnterpriseMessagePanel applicant={a} name={name} onClose={() => setMsgOpen(null)} />
+                          </div>
+                        )}
                       </div>
-                      {a.status && (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${appStatusColor(a.status)}`}>
-                          {a.status}
-                        </span>
-                      )}
                     </div>
-                    {disciplines.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {disciplines.map((d: string) => (
-                          <span key={d} className="text-[10px] px-2 py-0.5 rounded-full bg-pink-50 text-pink-600 font-medium">{d}</span>
-                        ))}
-                      </div>
-                    )}
-                    {a.message && (
-                      <p className="text-xs text-gray-600 mt-2 leading-relaxed line-clamp-3">{a.message}</p>
-                    )}
-                    <div className="flex items-center gap-3 mt-3 flex-wrap text-xs text-gray-400">
-                      {a.rate && <span>{a.rate}</span>}
-                      <span className="ml-auto">{fmtDate(a.createdAt)}</span>
-                      {a.resumeLink && (
-                        <a
-                          href={a.resumeLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[#F25722] font-semibold hover:underline flex items-center gap-1"
-                        >
-                          <ExternalLink size={10} /> Resume
-                        </a>
-                      )}
-                      {profileUrl && (
-                        <a
-                          href={profileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-500 font-semibold hover:underline flex items-center gap-1"
-                        >
-                          <ExternalLink size={10} /> Profile
-                        </a>
-                      )}
-                      <button
-                        onClick={() => setMsgOpen(msgOpen === a.id ? null : a.id)}
-                        className="flex items-center gap-1 text-[#111] font-semibold hover:text-[#F25722] transition-colors"
-                      >
-                        <MessageCircle size={10} /> Message
-                      </button>
-                    </div>
-                    {/* Inline message panel */}
-                    {msgOpen === a.id && (
-                      <EnterpriseMessagePanel applicant={a} name={name} onClose={() => setMsgOpen(null)} />
-                    )}
                   </div>
                 );
               })}
