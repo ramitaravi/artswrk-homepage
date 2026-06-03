@@ -202,6 +202,8 @@ function DashboardTab({ user }: { user: any }) {
   const { data: proJobs, isLoading: proLoading } = trpc.artistDashboard.getProJobsFeed.useQuery({ limit: 10, offset: 0 });
   const { data: myApplications } = trpc.jobs.myApplications.useQuery({ limit: 100 });
   const appliedJobIds = new Set((myApplications as any[] ?? []).map((a: any) => a.jobId).filter(Boolean));
+  const { data: proApplications } = trpc.artistDashboard.getProApplications.useQuery();
+  const appliedProJobIds = new Set((proApplications as any[] ?? []).map((a: any) => a.premiumJobId).filter(Boolean));
 
   const affiliations = affiliationsData?.map(a => a.display) ?? [];
   const nearbyJobs = jobsFeed ?? [];
@@ -309,7 +311,7 @@ function DashboardTab({ user }: { user: any }) {
           ) : (
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
               {(proJobs?.length ? proJobs : PRO_JOBS).map((job: any) => {
-                const isApplied = !!(job.hasApplied || job.applied);
+                const isApplied = appliedProJobIds.has(job.id);
                 const title = job.serviceType || job.title || "Job";
                 const company = job.companyName || job.company || "";
                 const location = job.workFromAnywhere ? "Work From Anywhere" : (job.location && !job.location.includes("[object") ? job.location : "Work From Anywhere");
@@ -364,7 +366,7 @@ function DashboardTab({ user }: { user: any }) {
             ) : showProJobsAsPrimary ? (
               // PRO jobs as list fallback
               (proJobs?.length ? proJobs : []).map((job: any) => {
-                const isApplied = !!(job.hasApplied);
+                const isApplied = appliedProJobIds.has(job.id);
                 const title = job.serviceType || job.title || "Job";
                 const company = job.companyName || job.company || "";
                 const location = job.workFromAnywhere ? "Work From Anywhere" : (job.location && !job.location.includes("[object") ? job.location : "");
@@ -462,6 +464,7 @@ function JobsTab({ user }: { user: any }) {
   const { data: jobsFeed, isLoading: feedLoading } = trpc.artistDashboard.getJobsFeed.useQuery({ limit: 30, offset: 0 });
   const { data: proJobs, isLoading: proLoading } = trpc.artistDashboard.getProJobsFeed.useQuery({ limit: 30, offset: 0 });
   const { data: applications, isLoading: appsLoading } = trpc.artistDashboard.getProApplications.useQuery();
+  const appliedProJobIds = new Set((applications as any[] ?? []).map((a: any) => a.premiumJobId).filter(Boolean));
   const { data: regularApps } = trpc.jobs.myApplications.useQuery({ limit: 100 });
   const appliedRegularIds = new Set((regularApps as any[] ?? []).map((a: any) => a.jobId).filter(Boolean));
 
@@ -562,7 +565,7 @@ function JobsTab({ user }: { user: any }) {
           ) : (
             <div className="divide-y divide-gray-50">
               {proJobs.map((job: any) => {
-                const isApplied = !!(job.hasApplied);
+                const isApplied = appliedProJobIds.has(job.id);
                 return (
                   <div key={job.id} className="flex items-center justify-between p-4">
                     <div className="flex items-center gap-3 min-w-0">
@@ -1216,6 +1219,8 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
   const { data: planData, isLoading: planLoading } = trpc.artistSubscription.getCurrentPlan.useQuery();
   const { data: pricingData } = trpc.artistSubscription.getPricing.useQuery();
   const { data: proJobsData, isLoading: proJobsLoading } = trpc.artistDashboard.getProJobsFeed.useQuery({ limit: 50 });
+  const { data: proApplicationsData } = trpc.artistDashboard.getProApplications.useQuery();
+  const appliedProJobIds = new Set((proApplicationsData as any[] ?? []).map((a: any) => a.premiumJobId).filter(Boolean));
   const isPro = planData?.plan === "pro";
 
   // PRO upsell card for free and basic users
@@ -1317,7 +1322,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
           {(proJobsData as any[]).map((job: any) => {
-            const isApplied = !!(job.hasApplied);
+            const isApplied = appliedProJobIds.has(job.id);
             return (
               <div key={job.id} className="flex items-center justify-between p-4">
                 <div className="min-w-0">
