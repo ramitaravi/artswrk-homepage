@@ -200,6 +200,8 @@ function DashboardTab({ user }: { user: any }) {
     { enabled: true }
   );
   const { data: proJobs, isLoading: proLoading } = trpc.artistDashboard.getProJobsFeed.useQuery({ limit: 10, offset: 0 });
+  const { data: myApplications } = trpc.jobs.myApplications.useQuery({ limit: 100 });
+  const appliedJobIds = new Set((myApplications as any[] ?? []).map((a: any) => a.jobId).filter(Boolean));
 
   const affiliations = affiliationsData?.map(a => a.display) ?? [];
   const nearbyJobs = jobsFeed ?? [];
@@ -328,18 +330,16 @@ function DashboardTab({ user }: { user: any }) {
                         <MapPin size={9} /> {location}
                       </p>
                     </div>
-                    {isApplied ? (
-                      <span className="mt-3 flex items-center justify-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-3 py-2 rounded-lg">
-                        <CheckCircle2 size={11} /> Applied!
-                      </span>
-                    ) : (
-                      <a
-                        href={toProJobUrl({ id: job.id, company: job.companyName || job.company || null, serviceType: job.serviceType || null })}
-                        className="mt-3 w-full text-xs font-semibold text-white bg-[#111] px-3 py-2 rounded-lg hover:opacity-80 transition-opacity flex items-center justify-center gap-1"
-                      >
-                        Apply <ArrowRight size={11} />
-                      </a>
-                    )}
+                    <a
+                      href={toProJobUrl({ id: job.id, company: job.companyName || job.company || null, serviceType: job.serviceType || null })}
+                      className={`mt-3 w-full text-xs font-semibold px-3 py-2 rounded-lg flex items-center justify-center gap-1 transition-opacity ${
+                        isApplied
+                          ? "text-green-700 bg-green-50 border border-green-200 hover:bg-green-100"
+                          : "text-white bg-[#111] hover:opacity-80"
+                      }`}
+                    >
+                      {isApplied ? "View Application →" : <>Apply <ArrowRight size={11} /></>}
+                    </a>
                   </div>
                 );
               })}
@@ -380,18 +380,16 @@ function DashboardTab({ user }: { user: any }) {
                           <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{title}</h3>
                           <p className="text-xs text-gray-500 truncate">{company}</p>
                         </div>
-                        {isApplied ? (
-                          <span className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
-                            <CheckCircle2 size={10} /> Applied!
-                          </span>
-                        ) : (
-                          <a
-                            href={toProJobUrl({ id: job.id, company: job.companyName || job.company || null, serviceType: job.serviceType || null })}
-                            className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity"
-                          >
-                            Apply →
-                          </a>
-                        )}
+                        <a
+                          href={toProJobUrl({ id: job.id, company: job.companyName || job.company || null, serviceType: job.serviceType || null })}
+                          className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                            isApplied
+                              ? "text-green-700 bg-green-50 border border-green-200 hover:bg-green-100"
+                              : "text-white bg-[#111] hover:opacity-80"
+                          }`}
+                        >
+                          {isApplied ? "View Application →" : "Apply →"}
+                        </a>
                       </div>
                       {location && (
                         <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
@@ -413,6 +411,8 @@ function DashboardTab({ user }: { user: any }) {
               const ago = postedAgo(job.createdAt);
               const rate = formatRate(job);
               const dateLabel = job.dateType === "Ongoing" ? "Ongoing" : formatJobDate(job);
+              const jobDetailUrl = job.slug ? `/jobs/${job.slug}` : `/jobs/arts-job-${job.id}`;
+              const isApplied = appliedJobIds.has(job.id);
               return (
                 <div key={job.id} className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm transition-all duration-150">
                   <SquareAvatar name={studio} logo={job.clientLogo} />
@@ -423,10 +423,14 @@ function DashboardTab({ user }: { user: any }) {
                         <p className="text-xs text-gray-500 truncate">{studio}</p>
                       </div>
                       <a
-                        href={job.slug ? `/jobs/${job.slug}` : `/jobs/arts-job-${job.id}`}
-                        className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity"
+                        href={jobDetailUrl}
+                        className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                          isApplied
+                            ? "text-green-700 bg-green-50 border border-green-200 hover:bg-green-100"
+                            : "text-white bg-[#111] hover:opacity-80"
+                        }`}
                       >
-                        Apply →
+                        {isApplied ? "View Application →" : "Apply →"}
                       </a>
                     </div>
                     <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
@@ -458,6 +462,8 @@ function JobsTab({ user }: { user: any }) {
   const { data: jobsFeed, isLoading: feedLoading } = trpc.artistDashboard.getJobsFeed.useQuery({ limit: 30, offset: 0 });
   const { data: proJobs, isLoading: proLoading } = trpc.artistDashboard.getProJobsFeed.useQuery({ limit: 30, offset: 0 });
   const { data: applications, isLoading: appsLoading } = trpc.artistDashboard.getProApplications.useQuery();
+  const { data: regularApps } = trpc.jobs.myApplications.useQuery({ limit: 100 });
+  const appliedRegularIds = new Set((regularApps as any[] ?? []).map((a: any) => a.jobId).filter(Boolean));
 
   const subTabBtn = (tab: JobsSubTab, label: string) => (
     <button
@@ -501,28 +507,36 @@ function JobsTab({ user }: { user: any }) {
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
-              {jobsFeed.map((job: any) => (
-                <div key={job.id} className="flex items-start gap-3 p-4">
-                  <StudioAvatar name={job.studioName || job.creatorName || "Studio"} logo={job.logo} size="md" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#111]">{job.studioName || job.creatorName}</p>
-                    <p className="text-sm text-gray-700">{job.serviceType}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {job.location && !job.location.includes("[object") ? job.location : (job.workFromAnywhere ? "Work From Anywhere" : "Location TBD")}
-                      {job.postedAgo ? ` · Posted ${job.postedAgo}` : ""}
-                    </p>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                      {job.rate && <span className="flex items-center gap-1"><CreditCard size={10} /> {job.rate}</span>}
+              {jobsFeed.map((job: any) => {
+                const isApplied = appliedRegularIds.has(job.id);
+                const jobDetailUrl = job.slug ? `/jobs/${job.slug}` : `/jobs/arts-job-${job.id}`;
+                return (
+                  <div key={job.id} className="flex items-start gap-3 p-4">
+                    <StudioAvatar name={job.studioName || job.creatorName || "Studio"} logo={job.logo} size="md" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#111]">{job.studioName || job.creatorName}</p>
+                      <p className="text-sm text-gray-700">{job.serviceType}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {job.location && !job.location.includes("[object") ? job.location : (job.workFromAnywhere ? "Work From Anywhere" : "Location TBD")}
+                        {job.postedAgo ? ` · Posted ${job.postedAgo}` : ""}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                        {job.rate && <span className="flex items-center gap-1"><CreditCard size={10} /> {job.rate}</span>}
+                      </div>
                     </div>
+                    <a
+                      href={jobDetailUrl}
+                      className={`flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full transition-all ${
+                        isApplied
+                          ? "text-green-700 bg-green-50 border border-green-200 hover:bg-green-100"
+                          : "text-white bg-[#111] hover:opacity-80"
+                      }`}
+                    >
+                      {isApplied ? "View Application →" : "Apply"}
+                    </a>
                   </div>
-                  <a
-                    href={job.slug ? `/jobs/${job.slug}` : `/jobs/arts-job-${job.id}`}
-                    className="flex-shrink-0 text-xs font-semibold text-white bg-[#111] px-3 py-1.5 rounded-full hover:opacity-80 transition-opacity"
-                  >
-                    Apply
-                  </a>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -561,18 +575,16 @@ function JobsTab({ user }: { user: any }) {
                         </p>
                       </div>
                     </div>
-                    {isApplied ? (
-                      <span className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
-                        <CheckCircle2 size={11} /> Applied!
-                      </span>
-                    ) : (
-                      <a
-                        href={toProJobUrl({ id: job.id, company: job.companyName || null, serviceType: job.serviceType || null })}
-                        className="flex-shrink-0 text-xs font-semibold text-gray-700 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-50 transition-colors flex items-center gap-1"
-                      >
-                        Apply <ArrowRight size={11} />
-                      </a>
-                    )}
+                    <a
+                      href={toProJobUrl({ id: job.id, company: job.companyName || null, serviceType: job.serviceType || null })}
+                      className={`flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1 transition-all ${
+                        isApplied
+                          ? "text-green-700 bg-green-50 border border-green-200 hover:bg-green-100"
+                          : "text-gray-700 border border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      {isApplied ? "View Application →" : <>Apply <ArrowRight size={11} /></>}
+                    </a>
                   </div>
                 );
               })}
@@ -1304,23 +1316,30 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
-          {(proJobsData as any[]).map((job: any) => (
-            <div key={job.id} className="flex items-center justify-between p-4">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-[#111]">{job.serviceType || "Open Position"}</p>
-                <p className="text-xs text-gray-500">{job.company}</p>
-                <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                  <MapPin size={10} /> {job.workFromAnywhere ? "Work From Anywhere" : (job.location ?? "Location TBD")}
-                </p>
+          {(proJobsData as any[]).map((job: any) => {
+            const isApplied = !!(job.hasApplied);
+            return (
+              <div key={job.id} className="flex items-center justify-between p-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-[#111]">{job.serviceType || "Open Position"}</p>
+                  <p className="text-xs text-gray-500">{job.company}</p>
+                  <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                    <MapPin size={10} /> {job.workFromAnywhere ? "Work From Anywhere" : (job.location ?? "Location TBD")}
+                  </p>
+                </div>
+                <a
+                  href={toProJobUrl({ id: job.id, company: job.company, serviceType: job.serviceType })}
+                  className={`flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1 transition-all ${
+                    isApplied
+                      ? "text-green-700 bg-green-50 border border-green-200 hover:bg-green-100"
+                      : "text-gray-700 border border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  {isApplied ? "View Application →" : <>Apply <ArrowRight size={11} /></>}
+                </a>
               </div>
-              <a
-                href={toProJobUrl({ id: job.id, company: job.company, serviceType: job.serviceType })}
-                className="flex-shrink-0 text-xs font-semibold text-gray-700 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-50 transition-colors flex items-center gap-1"
-              >
-                Apply <ArrowRight size={11} />
-              </a>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
