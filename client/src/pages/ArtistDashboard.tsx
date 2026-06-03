@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { toProJobUrl } from "./ProJobDetail";
 
 // ─── Placeholder data (to be replaced with real API data) ─────────────────────
 
@@ -182,7 +183,6 @@ function DashboardTab({ user }: { user: any }) {
   const firstName = user?.firstName || user?.name?.split(" ")[0] || "there";
   const isPro = !!(user?.artswrkPro);
   const [tasksOpen, setTasksOpen] = useState(true);
-  const [appliedIds, setAppliedIds] = useState<Set<number>>(new Set());
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
@@ -200,12 +200,6 @@ function DashboardTab({ user }: { user: any }) {
     { enabled: true }
   );
   const { data: proJobs, isLoading: proLoading } = trpc.artistDashboard.getProJobsFeed.useQuery({ limit: 10, offset: 0 });
-
-  const applyMutation = trpc.artistDashboard.applyToProJob.useMutation({
-    onSuccess: (_data, variables) => {
-      setAppliedIds(prev => { const next = new Set(prev); next.add(variables.premiumJobId); return next; });
-    },
-  });
 
   const affiliations = affiliationsData?.map(a => a.display) ?? [];
   const nearbyJobs = jobsFeed ?? [];
@@ -313,7 +307,7 @@ function DashboardTab({ user }: { user: any }) {
           ) : (
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
               {(proJobs?.length ? proJobs : PRO_JOBS).map((job: any) => {
-                const isApplied = appliedIds.has(job.id) || job.hasApplied || job.applied;
+                const isApplied = !!(job.hasApplied || job.applied);
                 const title = job.serviceType || job.title || "Job";
                 const company = job.companyName || job.company || "";
                 const location = job.workFromAnywhere ? "Work From Anywhere" : (job.location && !job.location.includes("[object") ? job.location : "Work From Anywhere");
@@ -334,21 +328,15 @@ function DashboardTab({ user }: { user: any }) {
                         <MapPin size={9} /> {location}
                       </p>
                     </div>
-                    {isPro ? (
-                      isApplied ? (
-                        <span className="mt-3 flex items-center justify-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-3 py-2 rounded-lg">
-                          <CheckCircle2 size={11} /> Applied!
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => job.id && typeof job.id === "number" && applyMutation.mutate({ premiumJobId: job.id })}
-                          className="mt-3 w-full text-xs font-semibold text-white bg-[#111] px-3 py-2 rounded-lg hover:opacity-80 transition-opacity flex items-center justify-center gap-1"
-                        >
-                          Apply <ArrowRight size={11} />
-                        </button>
-                      )
+                    {isApplied ? (
+                      <span className="mt-3 flex items-center justify-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-3 py-2 rounded-lg">
+                        <CheckCircle2 size={11} /> Applied!
+                      </span>
                     ) : (
-                      <a href="/app/pro-jobs" className="mt-3 w-full text-xs font-semibold text-white bg-[#111] px-3 py-2 rounded-lg hover:opacity-80 transition-opacity flex items-center justify-center gap-1">
+                      <a
+                        href={toProJobUrl({ id: job.id, company: job.companyName || job.company || null, serviceType: job.serviceType || null })}
+                        className="mt-3 w-full text-xs font-semibold text-white bg-[#111] px-3 py-2 rounded-lg hover:opacity-80 transition-opacity flex items-center justify-center gap-1"
+                      >
                         Apply <ArrowRight size={11} />
                       </a>
                     )}
@@ -376,7 +364,7 @@ function DashboardTab({ user }: { user: any }) {
             ) : showProJobsAsPrimary ? (
               // PRO jobs as list fallback
               (proJobs?.length ? proJobs : []).map((job: any) => {
-                const isApplied = appliedIds.has(job.id) || job.hasApplied;
+                const isApplied = !!(job.hasApplied);
                 const title = job.serviceType || job.title || "Job";
                 const company = job.companyName || job.company || "";
                 const location = job.workFromAnywhere ? "Work From Anywhere" : (job.location && !job.location.includes("[object") ? job.location : "");
@@ -392,22 +380,16 @@ function DashboardTab({ user }: { user: any }) {
                           <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{title}</h3>
                           <p className="text-xs text-gray-500 truncate">{company}</p>
                         </div>
-                        {isPro ? (
-                          isApplied ? (
-                            <span className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
-                              <CheckCircle2 size={10} /> Applied!
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => applyMutation.mutate({ premiumJobId: job.id })}
-                              className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity"
-                            >
-                              Apply →
-                            </button>
-                          )
+                        {isApplied ? (
+                          <span className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
+                            <CheckCircle2 size={10} /> Applied!
+                          </span>
                         ) : (
-                          <a href="/app/settings" className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold text-white hirer-grad-bg hover:opacity-90 transition-opacity">
-                            Upgrade →
+                          <a
+                            href={toProJobUrl({ id: job.id, company: job.companyName || job.company || null, serviceType: job.serviceType || null })}
+                            className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity"
+                          >
+                            Apply →
                           </a>
                         )}
                       </div>
@@ -472,17 +454,10 @@ type JobsSubTab = "jobs-for-you" | "pro-jobs" | "applications";
 
 function JobsTab({ user }: { user: any }) {
   const [subTab, setSubTab] = useState<JobsSubTab>("jobs-for-you");
-  const [appliedIds, setAppliedIds] = useState<Set<number>>(new Set());
 
   const { data: jobsFeed, isLoading: feedLoading } = trpc.artistDashboard.getJobsFeed.useQuery({ limit: 30, offset: 0 });
   const { data: proJobs, isLoading: proLoading } = trpc.artistDashboard.getProJobsFeed.useQuery({ limit: 30, offset: 0 });
   const { data: applications, isLoading: appsLoading } = trpc.artistDashboard.getProApplications.useQuery();
-
-  const applyMutation = trpc.artistDashboard.applyToProJob.useMutation({
-    onSuccess: (data, variables) => {
-      setAppliedIds(prev => { const next = new Set(prev); next.add(variables.premiumJobId); return next; });
-    },
-  });
 
   const subTabBtn = (tab: JobsSubTab, label: string) => (
     <button
@@ -573,7 +548,7 @@ function JobsTab({ user }: { user: any }) {
           ) : (
             <div className="divide-y divide-gray-50">
               {proJobs.map((job: any) => {
-                const isApplied = appliedIds.has(job.id) || job.hasApplied;
+                const isApplied = !!(job.hasApplied);
                 return (
                   <div key={job.id} className="flex items-center justify-between p-4">
                     <div className="flex items-center gap-3 min-w-0">
@@ -591,13 +566,12 @@ function JobsTab({ user }: { user: any }) {
                         <CheckCircle2 size={11} /> Applied!
                       </span>
                     ) : (
-                      <button
-                        onClick={() => applyMutation.mutate({ premiumJobId: job.id })}
-                        disabled={applyMutation.isPending}
-                        className="flex-shrink-0 text-xs font-semibold text-gray-700 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50"
+                      <a
+                        href={toProJobUrl({ id: job.id, company: job.companyName || null, serviceType: job.serviceType || null })}
+                        className="flex-shrink-0 text-xs font-semibold text-gray-700 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-50 transition-colors flex items-center gap-1"
                       >
                         Apply <ArrowRight size={11} />
-                      </button>
+                      </a>
                     )}
                   </div>
                 );
@@ -1229,6 +1203,7 @@ function ProfileTab({ user }: { user: any }) {
 function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
   const { data: planData, isLoading: planLoading } = trpc.artistSubscription.getCurrentPlan.useQuery();
   const { data: pricingData } = trpc.artistSubscription.getPricing.useQuery();
+  const { data: proJobsData, isLoading: proJobsLoading } = trpc.artistDashboard.getProJobsFeed.useQuery({ limit: 50 });
   const isPro = planData?.plan === "pro";
 
   // PRO upsell card for free and basic users
@@ -1307,7 +1282,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
     );
   }
 
-  // PRO user view — full access
+  // PRO user view — full access with real data
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -1318,28 +1293,36 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
           <Star size={11} className="fill-amber-400" /> PRO Access
         </span>
       </div>
-      <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
-        {PRO_JOBS.map(job => (
-          <div key={job.id} className="flex items-center justify-between p-4">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-[#111]">{job.title}</p>
-              <p className="text-xs text-gray-500">{job.company}</p>
-              <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                <MapPin size={10} /> {job.location}
-              </p>
-            </div>
-            {job.applied ? (
-              <span className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
-                <CheckCircle2 size={11} /> Applied!
-              </span>
-            ) : (
-              <button className="flex-shrink-0 text-xs font-semibold text-gray-700 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-50 transition-colors flex items-center gap-1">
+      {proJobsLoading ? (
+        <div className="p-8 text-center bg-white rounded-2xl border border-gray-100">
+          <div className="w-6 h-6 border-2 border-gray-200 border-t-[#F25722] rounded-full animate-spin mx-auto" />
+        </div>
+      ) : !proJobsData?.length ? (
+        <div className="p-8 text-center bg-white rounded-2xl border border-gray-100">
+          <Star size={24} className="text-amber-300 mx-auto mb-2" />
+          <p className="text-sm text-gray-500">No PRO jobs right now — check back soon.</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
+          {(proJobsData as any[]).map((job: any) => (
+            <div key={job.id} className="flex items-center justify-between p-4">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[#111]">{job.serviceType || "Open Position"}</p>
+                <p className="text-xs text-gray-500">{job.company}</p>
+                <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                  <MapPin size={10} /> {job.workFromAnywhere ? "Work From Anywhere" : (job.location ?? "Location TBD")}
+                </p>
+              </div>
+              <a
+                href={toProJobUrl({ id: job.id, company: job.company, serviceType: job.serviceType })}
+                className="flex-shrink-0 text-xs font-semibold text-gray-700 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-50 transition-colors flex items-center gap-1"
+              >
                 Apply <ArrowRight size={11} />
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

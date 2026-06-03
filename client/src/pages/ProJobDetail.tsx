@@ -1,27 +1,34 @@
 /**
- * PRO Job Detail Page — /jobs/pro/:companySlug/:jobSlug
+ * PRO Job Detail Page — /pro/:jobSlug
  *
- * SEO-optimised detail page for enterprise / premium jobs.
- * URL pattern: /jobs/pro/elite-dance-academy/competition-choreographer-567
- * The numeric ID is extracted from the end of jobSlug.
- *
- * Includes:
- *   - JSON-LD JobPosting schema for Google Jobs indexing
- *   - Breadcrumb schema
- *   - Visual breadcrumbs
- *   - Full job details: budget, location, tags, description
- *   - Apply CTA — direct apply link or platform application
+ * Layout: single-column, Nova-style.
+ * - "Apply Now" + "Share" buttons above description
+ * - Apply form inline at bottom of content (scrolled to on click)
+ * - Sticky bottom bar always visible
  */
-import { useEffect, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import {
-  MapPin, Clock, DollarSign, Building2, ArrowLeft,
-  ChevronRight, Loader2, AlertCircle, Globe, ExternalLink, Star,
+  MapPin, Clock, ArrowLeft, Star, Loader2, AlertCircle, CheckCircle2,
+  FileText, Upload, DollarSign, Share2,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { slugify, extractIdFromSlug } from "./JobDetail";
 import Navbar from "@/components/Navbar";
+import InlineAuth from "@/components/InlineAuth";
+import { toast } from "sonner";
+
+// ─── URL helper ───────────────────────────────────────────────────────────────
+
+export function toProJobUrl(job: {
+  id: number;
+  company: string | null;
+  serviceType: string | null;
+}): string {
+  const titleSlug = slugify(job.serviceType ?? "open-position");
+  return `/pro/${titleSlug}-${job.id}`;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -42,86 +49,237 @@ function timeAgo(date: Date | string | null | undefined): string {
   return `${months} month${months === 1 ? "" : "s"} ago`;
 }
 
-export function toProJobUrl(job: {
-  id: number;
-  company: string | null;
-  serviceType: string | null;
-}): string {
-  const companySlug = slugify(job.company ?? "company");
-  const titleSlug = slugify(job.serviceType ?? "open-position");
-  return `/jobs/pro/${companySlug}/${titleSlug}-${job.id}`;
-}
+// ─── Resume card ──────────────────────────────────────────────────────────────
 
-// ─── JSON-LD ──────────────────────────────────────────────────────────────────
+type ResumeItem = { id: string; title: string; fileUrl: string; source: "library" | "profile" };
 
-function buildJobPostingSchema(job: any) {
-  return {
-    "@context": "https://schema.org",
-    "@type": "JobPosting",
-    title: job.serviceType ?? "Open Position",
-    description: job.description ?? job.serviceType ?? "Open Position at " + job.company,
-    datePosted: job.bubbleCreatedAt
-      ? new Date(job.bubbleCreatedAt).toISOString().split("T")[0]
-      : new Date(job.createdAt).toISOString().split("T")[0],
-    hiringOrganization: {
-      "@type": "Organization",
-      name: job.company ?? "Artswrk Enterprise Client",
-      ...(job.logo ? { logo: job.logo } : {}),
-    },
-    jobLocation: job.workFromAnywhere
-      ? { "@type": "Place", name: "Work From Anywhere / Remote" }
-      : job.location
-      ? { "@type": "Place", address: { "@type": "PostalAddress", name: job.location } }
-      : undefined,
-    jobBenefits: "Access to performing arts community via Artswrk",
-    ...(job.budget ? { baseSalary: { "@type": "MonetaryAmount", description: job.budget } } : {}),
-    employmentType: "CONTRACTOR",
-    directApply: !job.applyDirect,
-    url: typeof window !== "undefined" ? window.location.href : "",
-  };
-}
-
-function buildBreadcrumbSchema(items: { name: string; url: string }[]) {
-  return {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: items.map((item, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      name: item.name,
-      item: typeof window !== "undefined" ? `${window.location.origin}${item.url}` : item.url,
-    })),
-  };
-}
-
-// ─── Breadcrumb component ─────────────────────────────────────────────────────
-
-function Breadcrumbs({ crumbs }: { crumbs: { label: string; href?: string }[] }) {
+function ResumeCard({ resume, selected, onSelect }: { resume: ResumeItem; selected: boolean; onSelect: () => void }) {
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-gray-400 flex-wrap">
-      {crumbs.map((crumb, i) => (
-        <span key={i} className="flex items-center gap-1.5">
-          {i > 0 && <ChevronRight size={13} className="text-gray-300 flex-shrink-0" />}
-          {crumb.href ? (
-            <Link href={crumb.href} className="hover:text-[#F25722] transition-colors font-medium">
-              {crumb.label}
-            </Link>
-          ) : (
-            <span className="text-[#111] font-semibold">{crumb.label}</span>
-          )}
-        </span>
-      ))}
-    </nav>
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${
+        selected ? "border-[#111] bg-gray-50" : "border-gray-100 bg-white hover:border-gray-200"
+      }`}
+    >
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${selected ? "bg-[#111]" : "bg-gray-100"}`}>
+        <FileText size={14} className={selected ? "text-white" : "text-gray-400"} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-[#111] truncate">{resume.title}</p>
+        <p className="text-xs text-gray-400 mt-0.5">
+          {resume.fileUrl.split(".").pop()?.toUpperCase() || "File"} · {resume.source === "library" ? "Library" : "Profile"}
+        </p>
+      </div>
+      {selected && <CheckCircle2 size={16} className="text-[#111] flex-shrink-0" />}
+    </button>
+  );
+}
+
+// ─── Inline apply form ────────────────────────────────────────────────────────
+
+type ApplicationSummary = { resumeTitle?: string; resumeLink?: string; message?: string; rate?: string };
+
+function ProApplyForm({
+  jobId,
+  jobTitle,
+  company,
+  hasOpenBudget,
+  onApplied,
+}: {
+  jobId: number;
+  jobTitle: string;
+  company: string;
+  hasOpenBudget: boolean;
+  onApplied: (summary: ApplicationSummary) => void;
+}) {
+  const { isAuthenticated } = useAuth();
+  const utils = trpc.useUtils();
+  const { data: resumes = [], isLoading: resumesLoading } = trpc.jobs.myResumes.useQuery(
+    undefined,
+    { enabled: isAuthenticated }
+  );
+  const uploadResumeMutation = trpc.artists.uploadResume.useMutation();
+  const applyMutation = trpc.artistDashboard.applyToProJob.useMutation({
+    onSuccess: (_data, variables) => {
+      // Invalidate so Applications tab + dashboard both reflect the new record
+      utils.artistDashboard.getProApplications.invalidate();
+      utils.artistDashboard.checkProJobApplication.invalidate({ premiumJobId: jobId });
+      const selectedResume = allResumesRef.current.find((r) => r.id === selectedResumeIdRef.current);
+      onApplied({
+        resumeTitle: selectedResume?.title,
+        resumeLink: selectedResume?.fileUrl,
+        message: variables.message,
+        rate: variables.rate,
+      });
+    },
+    onError: () => toast.error("Something went wrong. Please try again."),
+  });
+
+  const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [rateInput, setRateInput] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [localResumes, setLocalResumes] = useState<ResumeItem[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Refs so onSuccess closure can read latest values without stale captures
+  const selectedResumeIdRef = useRef<string | null>(null);
+  const allResumesRef = useRef<ResumeItem[]>([]);
+
+  const allResumes = useMemo(() => {
+    const ids = new Set(localResumes.map((r) => r.id));
+    const merged = [...localResumes, ...(resumes as ResumeItem[]).filter((r) => !ids.has(r.id))];
+    allResumesRef.current = merged;
+    return merged;
+  }, [resumes, localResumes]);
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) { toast.error("Max 8 MB per resume."); return; }
+    setUploading(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const result = await uploadResumeMutation.mutateAsync({
+        fileName: file.name,
+        mimeType: file.type || "application/octet-stream",
+        base64,
+        title: file.name.replace(/\.[^/.]+$/, ""),
+      });
+      setLocalResumes((prev) => [result as ResumeItem, ...prev]);
+      setSelectedResumeId(result.id);
+      toast.success(`Uploaded: ${result.title}`);
+    } catch (err: any) {
+      toast.error(`Upload failed: ${err.message}`);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    selectedResumeIdRef.current = selectedResumeId;
+    const selectedResume = allResumes.find((r) => r.id === selectedResumeId);
+    applyMutation.mutate({
+      premiumJobId: jobId,
+      message: message.trim() || undefined,
+      resumeLink: selectedResume?.fileUrl || undefined,
+      rate: rateInput.trim() ? `$${rateInput.trim()}` : undefined,
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Resume picker */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-bold text-[#111]">Resume</p>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-[#111] transition-colors disabled:opacity-40"
+          >
+            {uploading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
+            {uploading ? "Uploading…" : "Upload new"}
+          </button>
+          <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" className="hidden" onChange={handleFileUpload} />
+        </div>
+
+        {resumesLoading ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 size={18} className="animate-spin text-gray-300" />
+          </div>
+        ) : allResumes.length === 0 ? (
+          <div className="border-2 border-dashed border-gray-100 rounded-xl p-5 text-center">
+            <FileText size={22} className="text-gray-200 mx-auto mb-1.5" />
+            <p className="text-sm text-gray-400 font-medium">No resumes yet</p>
+            <p className="text-xs text-gray-300 mt-0.5 mb-2">Upload a PDF, Word doc, or image</p>
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="text-xs font-semibold text-[#111] hover:underline">
+              + Upload resume
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-1.5 max-h-52 overflow-y-auto">
+            {allResumes.map((r) => (
+              <ResumeCard
+                key={r.id}
+                resume={r}
+                selected={selectedResumeId === r.id}
+                onSelect={() => setSelectedResumeId((prev) => (prev === r.id ? null : r.id))}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Message */}
+      <div>
+        <p className="text-sm font-bold text-[#111] mb-2">
+          Cover message <span className="text-gray-400 font-normal text-xs">(optional)</span>
+        </p>
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={4}
+          maxLength={2000}
+          placeholder={`Hi! I'm interested in the ${jobTitle} role…`}
+          className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl resize-none focus:outline-none focus:border-[#111] transition-colors"
+        />
+        <p className="text-xs text-gray-300 text-right mt-1">{message.length}/2000</p>
+      </div>
+
+      {/* Rate pitch */}
+      {hasOpenBudget && (
+        <div>
+          <p className="text-sm font-bold text-[#111] mb-2">
+            Your rate <span className="text-gray-400 font-normal text-xs">(optional)</span>
+          </p>
+          <div className="relative">
+            <DollarSign size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="number"
+              min={0}
+              placeholder="e.g. 150"
+              value={rateInput}
+              onChange={(e) => setRateInput(e.target.value)}
+              className="w-full pl-8 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#111] transition-colors"
+            />
+          </div>
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={applyMutation.isPending}
+        className="w-full py-3.5 rounded-xl text-sm font-bold text-white bg-[#111] hover:opacity-80 transition-opacity disabled:opacity-50"
+      >
+        {applyMutation.isPending ? (
+          <span className="flex items-center justify-center gap-2">
+            <Loader2 size={15} className="animate-spin" /> Submitting…
+          </span>
+        ) : (
+          "Submit Application →"
+        )}
+      </button>
+    </form>
   );
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ProJobDetail() {
-  const params = useParams<{ companySlug: string; jobSlug: string }>();
+  const params = useParams<{ jobSlug: string }>();
   const [, navigate] = useLocation();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
+  const isPro = !!(user as any)?.artswrkPro;
   const jobId = extractIdFromSlug(params.jobSlug ?? "");
 
   const { data: result, isLoading, error } = trpc.enterprise.getJobDetail.useQuery(
@@ -129,6 +287,41 @@ export default function ProJobDetail() {
     { enabled: jobId !== null }
   );
   const job = result?.job ?? null;
+
+  const utils = trpc.useUtils();
+
+  // Check DB on load so applied state survives page refresh
+  const { data: applicationCheck } = trpc.artistDashboard.checkProJobApplication.useQuery(
+    { premiumJobId: jobId! },
+    { enabled: jobId !== null && isAuthenticated && isPro }
+  );
+
+  const [applied, setApplied] = useState(false);
+  const [appliedSummary, setAppliedSummary] = useState<ApplicationSummary | null>(null);
+  const applyRef = useRef<HTMLDivElement>(null);
+
+  // Sync applied state + summary from server once loaded.
+  // Use functional update so an already-set in-session summary is never overwritten.
+  useEffect(() => {
+    if (!applicationCheck?.applied) return;
+    setApplied(true);
+    setAppliedSummary((prev) => {
+      if (prev) return prev; // don't overwrite in-session summary
+      const rl = (applicationCheck as any).resumeLink as string | null;
+      return {
+        resumeLink: rl ?? undefined,
+        resumeTitle: rl
+          ? decodeURIComponent(rl.split("/").pop()?.split("?")[0] ?? "Resume") || "Resume"
+          : undefined,
+        message: (applicationCheck as any).message as string ?? undefined,
+        rate: (applicationCheck as any).rate as string ?? undefined,
+      };
+    });
+  }, [applicationCheck]);
+
+  function scrollToApply() {
+    applyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   // Canonical redirect
   useEffect(() => {
@@ -139,29 +332,25 @@ export default function ProJobDetail() {
     }
   }, [job, navigate]);
 
-  const title = job?.serviceType ?? "Open Position";
-  const company = job?.company ?? "Artswrk Enterprise";
-  const location = job?.workFromAnywhere
-    ? "Work From Anywhere"
-    : (job as any)?.location ?? "Location not specified";
-
   // SEO
   useEffect(() => {
     if (!job) return;
-    document.title = `${title} at ${company} — ${location} | Artswrk PRO Jobs`;
-    let metaDesc = document.querySelector('meta[name="description"]') as HTMLMetaElement;
-    if (!metaDesc) {
-      metaDesc = document.createElement("meta");
-      metaDesc.setAttribute("name", "description");
-      document.head.appendChild(metaDesc);
+    const t = (job as any).serviceType ?? "Open Position";
+    const loc = (job as any).workFromAnywhere ? "Remote" : ((job as any).location ?? "");
+    document.title = `${t}${loc ? " · " + loc : ""} | Artswrk PRO`;
+  }, [job]);
+
+  async function handleShare() {
+    const url = window.location.href;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copied!");
+    } catch {
+      toast.error("Couldn't copy link.");
     }
-    metaDesc.setAttribute(
-      "content",
-      `${title} position at ${company} in ${location}. ${
-        (job as any).budget ? `Pay: ${(job as any).budget}.` : ""
-      } Apply on Artswrk PRO.`
-    );
-  }, [job, title, company, location]);
+  }
+
+  // ── Loading / error states ────────────────────────────────────────────────
 
   if (jobId === null) {
     return (
@@ -169,9 +358,7 @@ export default function ProJobDetail() {
         <div className="text-center">
           <AlertCircle size={40} className="text-gray-300 mx-auto mb-3" />
           <p className="font-semibold text-gray-500">Invalid job URL</p>
-          <Link href="/jobs" className="mt-4 inline-block text-sm text-[#F25722] font-semibold hover:underline">
-            ← Back to Jobs
-          </Link>
+          <Link href="/pro" className="mt-4 inline-block text-sm text-[#F25722] font-semibold hover:underline">← PRO Jobs</Link>
         </div>
       </div>
     );
@@ -191,290 +378,251 @@ export default function ProJobDetail() {
         <div className="text-center">
           <AlertCircle size={40} className="text-gray-300 mx-auto mb-3" />
           <p className="font-semibold text-gray-500">PRO job not found</p>
-          <Link href="/jobs" className="mt-4 inline-block text-sm text-[#F25722] font-semibold hover:underline">
-            ← Back to Jobs
-          </Link>
+          <Link href="/pro" className="mt-4 inline-block text-sm text-[#F25722] font-semibold hover:underline">← PRO Jobs</Link>
         </div>
       </div>
     );
   }
 
   const j = job as any;
-
-  const breadcrumbs = [
-    { label: "Jobs", href: "/jobs" },
-    { label: "PRO Jobs", href: "/jobs?tab=pro" },
-    { label: company, href: `/jobs/pro/${slugify(company)}` },
-    { label: title },
-  ];
-
-  const jsonLdJob = buildJobPostingSchema(j);
-  const jsonLdBreadcrumbs = buildBreadcrumbSchema(
-    breadcrumbs.map((b) => ({ name: b.label, url: b.href ?? "" }))
-  );
+  const title = j.serviceType ?? "Open Position";
+  const location = j.workFromAnywhere ? "Work From Anywhere" : (j.location ?? "Location TBD");
+  const company = j.company ?? "Artswrk Client";
+  const jobUrl = toProJobUrl(j);
+  const hasOpenBudget = !j.budget;
 
   return (
-    <div className="min-h-screen bg-gray-50" style={{ fontFamily: "Poppins, sans-serif" }}>
-      {/* JSON-LD */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdJob) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
-      />
-
-      {/* Shared auth-aware Navbar */}
+    <div className="min-h-screen bg-white" style={{ fontFamily: "Poppins, sans-serif" }}>
       <Navbar />
 
-      <div className="pt-14">
-        <div className="max-w-5xl mx-auto px-5 lg:px-10 py-8">
-          {/* Back + Breadcrumbs */}
-          <div className="mb-6">
-            <Link
-              href="/jobs"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-[#F25722] transition-colors mb-3"
+      {/* Page content — single column, pb-28 for sticky bar */}
+      <div className="pt-14 pb-28">
+        <div className="max-w-2xl mx-auto px-5 py-8">
+
+          {/* Back link */}
+          <Link
+            href="/pro"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-[#111] transition-colors mb-8"
+          >
+            <ArrowLeft size={14} /> Back to PRO Jobs
+          </Link>
+
+          {/* PRO badge */}
+          <div className="flex items-center gap-1.5 mb-3">
+            <Star size={12} className="text-yellow-500 fill-yellow-500" />
+            <span className="text-xs font-bold text-yellow-600 uppercase tracking-wide">PRO Job</span>
+          </div>
+
+          {/* Title */}
+          <h1 className="text-3xl font-black text-[#111] leading-tight mb-4">{title}</h1>
+
+          {/* Company row */}
+          <div className="flex items-center gap-3 mb-5">
+            {isAuthenticated ? (
+              <>
+                <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0">
+                  {j.logo ? (
+                    <img src={j.logo} alt={company} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-sm font-black text-gray-500">{company[0]?.toUpperCase()}</span>
+                  )}
+                </div>
+                <span className="text-sm font-semibold text-gray-600">{company}</span>
+              </>
+            ) : (
+              <>
+                <div className="w-9 h-9 rounded-full bg-gray-200 blur-sm flex-shrink-0" />
+                <span className="text-sm text-gray-400 select-none">
+                  Company hidden · <a href="/join" className="text-[#F25722] font-semibold hover:underline">Join to see</a>
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Meta chips */}
+          <div className="flex flex-wrap items-center gap-2 mb-6">
+            <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-full">
+              <MapPin size={11} /> {location}
+            </span>
+            {j.budget ? (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#F25722] bg-orange-50 border border-orange-100 px-3 py-1.5 rounded-full">
+                💳 {j.budget}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-full">
+                <DollarSign size={11} /> Open rate
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1.5 text-xs text-gray-400 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-full">
+              <Clock size={11} /> Posted {timeAgo(j.createdAt)}
+            </span>
+          </div>
+
+          {/* ── Action buttons / Applied summary chip ── */}
+          <div className="flex items-center gap-3 mb-8 flex-wrap">
+            {applied && appliedSummary ? (
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-50 border border-green-100">
+                <CheckCircle2 size={15} className="text-green-600 flex-shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-sm font-bold text-green-700">Applied</span>
+                  {appliedSummary.resumeTitle && (
+                    <span className="text-xs text-green-600 ml-2">· {appliedSummary.resumeTitle}</span>
+                  )}
+                  {appliedSummary.rate && (
+                    <span className="text-xs text-green-600 ml-2">· {appliedSummary.rate}</span>
+                  )}
+                </div>
+              </div>
+            ) : applied ? (
+              <span className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold text-green-700 bg-green-50 border border-green-100">
+                <CheckCircle2 size={15} /> Applied!
+              </span>
+            ) : (
+              <button
+                onClick={scrollToApply}
+                className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-[#111] hover:opacity-80 transition-opacity"
+              >
+                Apply Now
+              </button>
+            )}
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-[#111] transition-colors"
             >
-              <ArrowLeft size={14} />
-              Back to Jobs
-            </Link>
-            <Breadcrumbs crumbs={breadcrumbs} />
+              <Share2 size={14} /> Share job
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* ── Main column ── */}
-            <div className="lg:col-span-2 space-y-5">
-              {/* Hero card */}
-              <div className="bg-white rounded-2xl border border-yellow-200 p-6 shadow-sm">
-                <div className="flex items-start gap-4">
-                  {/* Company logo */}
-                  <div className="flex-shrink-0 w-16 h-16 rounded-2xl overflow-hidden bg-yellow-50 flex items-center justify-center shadow-sm border border-yellow-100">
-                    {j.logo ? (
-                      <img
-                        src={j.logo}
-                        alt={company}
-                        className="w-full h-full object-contain p-1"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).style.display = "none";
-                        }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-white text-xl font-black hirer-grad-bg">
-                        {company[0]?.toUpperCase()}
-                      </div>
-                    )}
-                  </div>
+          {/* Description */}
+          {j.description && (
+            <div className="border-t border-gray-100 pt-6">
+              <h2 className="text-sm font-black text-[#111] mb-3">About this role</h2>
+              <div className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
+                {j.description}
+              </div>
+            </div>
+          )}
 
-                  <div className="flex-1 min-w-0">
-                    {/* PRO badge */}
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <Star size={12} className="text-yellow-500 fill-yellow-500" />
-                      <span className="text-xs font-bold text-yellow-600 uppercase tracking-wide">
-                        PRO Job
-                      </span>
-                      {j.featured && (
-                        <span className="text-xs font-bold text-white bg-[#F25722] px-2 py-0.5 rounded-full ml-1">
-                          Featured
-                        </span>
-                      )}
-                    </div>
+          {/* ── Inline apply section ── */}
+          <div ref={applyRef} className="mt-10 pt-8 border-t border-gray-100 scroll-mt-20">
+            <h2 className="text-xl font-black text-[#111] mb-1">
+              {applied ? "Application submitted" : "Apply for this role"}
+            </h2>
+            <p className="text-sm text-gray-400 mb-6">
+              {applied
+                ? "The team will be in touch if you're a great fit."
+                : `Send your application to ${company} directly through Artswrk.`}
+            </p>
 
-                    <h1 className="text-2xl font-black text-[#111] leading-tight mb-1">
-                      {title}
-                    </h1>
-
-                    <div className="flex items-center gap-2 text-gray-500 text-sm font-medium">
-                      <Building2 size={13} className="flex-shrink-0" />
-                      <span>{company}</span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3 mt-3">
-                      <span className="flex items-center gap-1.5 text-xs text-gray-500">
-                        <MapPin size={12} />
-                        {location}
-                      </span>
-                      {j.budget && (
-                        <span className="flex items-center gap-1.5 text-xs text-[#F25722] font-semibold">
-                          <DollarSign size={12} />
-                          {j.budget}
-                        </span>
-                      )}
-                      <span className="flex items-center gap-1.5 text-xs text-gray-400">
-                        <Clock size={12} />
-                        Posted {timeAgo(j.createdAt)}
-                      </span>
-                    </div>
-                  </div>
+            {applied ? (
+              <div className="rounded-2xl border border-green-100 bg-green-50 p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={18} className="text-green-600 flex-shrink-0" />
+                  <p className="text-sm font-bold text-green-700">Application submitted!</p>
                 </div>
-
-                {/* Tags */}
-                {j.tag && (
-                  <div className="mt-4 pt-4 border-t border-yellow-50">
-                    <div className="flex flex-wrap gap-2">
-                      {j.tag
-                        .split(/[\s#,]+/)
-                        .filter(Boolean)
-                        .map((t: string, i: number) => (
-                          <span
-                            key={i}
-                            className="text-xs font-semibold text-yellow-700 bg-yellow-50 border border-yellow-100 px-3 py-1 rounded-full"
+                {(appliedSummary?.resumeLink || appliedSummary?.resumeTitle || appliedSummary?.message || appliedSummary?.rate) && (
+                  <div className="border-t border-green-100 pt-3 space-y-2.5">
+                    {/* Resume */}
+                    {(appliedSummary?.resumeLink || appliedSummary?.resumeTitle) && (
+                      <div className="flex items-center gap-2 text-xs text-green-700">
+                        <FileText size={12} className="flex-shrink-0 text-green-500" />
+                        <span className="font-semibold">Resume:</span>
+                        {appliedSummary?.resumeLink ? (
+                          <a
+                            href={appliedSummary.resumeLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="truncate underline underline-offset-2 hover:text-green-900 transition-colors"
                           >
-                            {t}
-                          </span>
-                        ))}
-                    </div>
+                            {appliedSummary.resumeTitle ?? "View resume →"}
+                          </a>
+                        ) : (
+                          <span className="truncate">{appliedSummary.resumeTitle}</span>
+                        )}
+                      </div>
+                    )}
+                    {/* Rate */}
+                    {appliedSummary?.rate && (
+                      <div className="flex items-center gap-2 text-xs text-green-700">
+                        <DollarSign size={12} className="flex-shrink-0 text-green-500" />
+                        <span className="font-semibold">Rate pitched:</span>
+                        <span>{appliedSummary.rate}</span>
+                      </div>
+                    )}
+                    {/* Message */}
+                    {appliedSummary?.message && (
+                      <div className="flex items-start gap-2 text-xs text-green-700">
+                        <span className="font-semibold flex-shrink-0 mt-0.5">Message:</span>
+                        <span className="line-clamp-3 text-green-700 leading-relaxed">{appliedSummary.message}</span>
+                      </div>
+                    )}
                   </div>
                 )}
+                <p className="text-xs text-green-600">The team will be in touch if you're a great fit. Track your application in your dashboard.</p>
               </div>
-
-              {/* Description */}
-              {j.description && (
-                <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-                  <h2 className="text-base font-black text-[#111] mb-4">About this role</h2>
-                  <div className="prose prose-sm max-w-none text-gray-600 leading-relaxed whitespace-pre-wrap">
-                    {j.description}
-                  </div>
+            ) : !isAuthenticated ? (
+              <InlineAuth nextUrl={jobUrl} heading="Join Artswrk to apply" />
+            ) : !isPro ? (
+              <div className="rounded-2xl border border-gray-100 p-6 bg-white shadow-sm text-center">
+                <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-3">
+                  <Star size={20} className="text-yellow-500 fill-yellow-500" />
                 </div>
-              )}
-
-              {/* Category */}
-              {j.category && (
-                <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-                  <h2 className="text-base font-black text-[#111] mb-3">Category</h2>
-                  <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-600 bg-gray-50 border border-gray-100 px-4 py-2 rounded-full">
-                    {j.category}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* ── Sidebar ── */}
-            <div className="space-y-4">
-              {/* Apply CTA */}
-              <div className="bg-white rounded-2xl border border-yellow-200 p-5 shadow-sm">
-                <div className="flex items-center gap-2 mb-1">
-                  <Star size={14} className="text-yellow-500 fill-yellow-500" />
-                  <h2 className="text-base font-black text-[#111]">Apply now</h2>
-                </div>
-                <p className="text-xs text-gray-400 mb-4">
-                  {j.applyDirect
-                    ? "This employer accepts direct applications."
-                    : "Apply through Artswrk to stand out."}
-                </p>
-
-                {j.applyDirect ? (
-                  <>
-                    {j.applyLink && (
-                      <a
-                        href={j.applyLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-1.5 w-full py-3 rounded-xl text-sm font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors"
-                      >
-                        Apply Directly <ExternalLink size={13} />
-                      </a>
-                    )}
-                    {j.applyEmail && (
-                      <a
-                        href={`mailto:${j.applyEmail}`}
-                        className="block w-full text-center py-2.5 rounded-xl text-sm font-semibold text-[#111] border border-gray-200 hover:bg-gray-50 transition-colors mt-2"
-                      >
-                        Email Application
-                      </a>
-                    )}
-                  </>
-                ) : user ? (
-                  <button className="block w-full text-center py-3 rounded-xl text-sm font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors">
-                    Apply via Artswrk →
-                  </button>
-                ) : (
-                  <>
-                    <Link
-                      href="/login"
-                      className="block w-full text-center py-3 rounded-xl text-sm font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors"
-                    >
-                      Login to Apply
-                    </Link>
-                    <Link
-                      href="/join"
-                      className="block w-full text-center py-2.5 rounded-xl text-sm font-semibold text-[#111] border border-gray-200 hover:bg-gray-50 transition-colors mt-2"
-                    >
-                      Create Free Account
-                    </Link>
-                  </>
-                )}
-              </div>
-
-              {/* Job Details */}
-              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                <h2 className="text-sm font-black text-[#111] mb-4">Job details</h2>
-                <div className="space-y-3">
-                  {j.budget && (
-                    <div className="flex items-start gap-3">
-                      <div className="w-7 h-7 rounded-lg bg-yellow-50 flex items-center justify-center flex-shrink-0">
-                        <DollarSign size={13} className="text-yellow-600" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-400">Budget</p>
-                        <p className="text-sm font-semibold text-[#111]">{j.budget}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-start gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
-                      <MapPin size={13} className="text-green-500" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Location</p>
-                      <p className="text-sm font-semibold text-[#111]">{location}</p>
-                      {j.workFromAnywhere && (
-                        <p className="text-xs text-green-500 mt-0.5 font-medium">Remote OK</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center flex-shrink-0">
-                      <Clock size={13} className="text-purple-500" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Employment type</p>
-                      <p className="text-sm font-semibold text-[#111]">Contract / Project</p>
-                    </div>
-                  </div>
-
-                  {j.status && (
-                    <div className="flex items-start gap-3">
-                      <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
-                        <Globe size={13} className="text-blue-500" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-400">Status</p>
-                        <p className="text-sm font-semibold text-[#111]">{j.status}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* About company */}
-              <div className="bg-[#111] rounded-2xl p-5">
-                <p className="text-white font-black text-sm mb-1">More PRO jobs</p>
-                <p className="text-white/60 text-xs mb-4">
-                  Browse exclusive roles from top studios and production companies.
-                </p>
-                <Link
-                  href="/jobs"
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors px-4 py-2 rounded-full"
+                <p className="text-base font-black text-[#111] mb-1">Artswrk PRO required</p>
+                <p className="text-sm text-gray-400 mb-5">Upgrade your account to apply to exclusive PRO jobs.</p>
+                <a
+                  href="/app/settings"
+                  className="inline-block px-6 py-3 rounded-xl text-sm font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors"
                 >
-                  View all PRO jobs <Star size={11} className="fill-current" />
-                </Link>
+                  Upgrade to PRO →
+                </a>
               </div>
-            </div>
+            ) : (
+              <ProApplyForm
+                jobId={j.id}
+                jobTitle={title}
+                company={company}
+                hasOpenBudget={hasOpenBudget}
+                onApplied={(summary) => { setApplied(true); setAppliedSummary(summary); }}
+              />
+            )}
           </div>
+
         </div>
+      </div>
+
+      {/* ── Sticky bottom bar ── */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-5 py-4 flex items-center justify-between gap-4 z-40 shadow-[0_-4px_24px_rgba(0,0,0,0.07)]">
+        <div className="min-w-0">
+          <p className="text-base font-black text-[#111] truncate">{j.budget ?? "Open rate"}</p>
+          <p className="text-xs text-gray-400 truncate">{location}</p>
+        </div>
+
+        {applied ? (
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-green-600 flex-shrink-0">
+            <CheckCircle2 size={16} /> Applied!
+          </span>
+        ) : !isAuthenticated ? (
+          <a
+            href={`/join?next=${encodeURIComponent(jobUrl)}`}
+            className="flex-shrink-0 px-6 py-3 rounded-2xl text-sm font-bold text-white bg-[#111] hover:opacity-80 transition-opacity"
+          >
+            Apply
+          </a>
+        ) : !isPro ? (
+          <a
+            href="/app/settings"
+            className="flex-shrink-0 px-6 py-3 rounded-2xl text-sm font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors"
+          >
+            Upgrade to PRO
+          </a>
+        ) : (
+          <button
+            onClick={scrollToApply}
+            className="flex-shrink-0 px-6 py-3 rounded-2xl text-sm font-bold text-white bg-[#111] hover:opacity-80 transition-opacity"
+          >
+            Apply
+          </button>
+        )}
       </div>
     </div>
   );

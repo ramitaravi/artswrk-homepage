@@ -107,7 +107,7 @@ function NavLink({ item }: { item: NavItem }) {
   );
 }
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({ children, fullHeight = false }: { children: React.ReactNode; fullHeight?: boolean }) {
   const { user, loading, logout } = useAuth();
   const [, navigate] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -366,7 +366,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         )}
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className={`flex-1 ${fullHeight ? "overflow-hidden flex flex-col" : "overflow-y-auto"}`}>
           {children}
         </main>
       </div>

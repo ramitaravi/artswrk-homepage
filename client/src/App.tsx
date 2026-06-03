@@ -105,14 +105,48 @@ function AppRoute({ clientComponent: ClientComponent = Overview }: { clientCompo
   );
 }
 
+/**
+ * Artists see the full Jobs feed embedded inside the dashboard sidebar.
+ * Clients see their own job postings (DashJobs).
+ */
+function ArtistJobsRoute() {
+  const { user, loading } = useAuth();
+  const isArtist = (user as any)?.userRole === "Artist";
+
+  if (loading) {
+    return (
+      <DashboardLayout fullHeight>
+        <div className="flex items-center justify-center h-full">
+          <div className="w-6 h-6 border-2 border-[#F25722] border-t-transparent rounded-full animate-spin" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!isArtist) {
+    return (
+      <DashboardLayout>
+        <DashJobs />
+      </DashboardLayout>
+    );
+  }
+
+  return (
+    <DashboardLayout fullHeight>
+      <Jobs inDashboard />
+    </DashboardLayout>
+  );
+}
+
 function Router() {
   return (
     <Switch>
       {/* Public routes */}
       <Route path="/" component={Home} />
-      <Route path="/jobs" component={Jobs} />
-      {/* Job detail pages — PRO route MUST come before generic slug routes */}
-      <Route path="/jobs/pro/:companySlug/:jobSlug" component={ProJobDetail} />
+      <Route path="/jobs">{() => <Jobs />}</Route>
+      <Route path="/pro">{() => <Jobs />}</Route>
+      {/* PRO job detail — must come before /pro list route */}
+      <Route path="/pro/:jobSlug" component={ProJobDetail} />
       {/* New simplified URL: /jobs/:jobSlug and /jobs/:jobSlug/apply */}
       <Route path="/jobs/:jobSlug/apply" component={ApplyPage} />
       <Route path="/jobs/:jobSlug" component={JobDetail} />
@@ -155,9 +189,9 @@ function Router() {
         {() => <AppRoute clientComponent={SimpleDashboard} />}
       </Route>
 
-      {/* Jobs: artists see job feed + applications, clients see their postings */}
+      {/* Jobs: artists see the full job feed inside the dashboard, clients see their postings */}
       <Route path="/app/jobs">
-        {() => <AppRoute clientComponent={DashJobs} />}
+        {() => <ArtistJobsRoute />}
       </Route>
 
       {/* Client job detail — shared with enterprise */}
@@ -222,7 +256,7 @@ function Router() {
         {() => <AppRoute />}
       </Route>
       <Route path="/app/pro-jobs">
-        {() => <AppRoute />}
+        {() => <ArtistJobsRoute />}
       </Route>
       <Route path="/app/settings">
         {() => <AppRoute />}

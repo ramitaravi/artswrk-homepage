@@ -238,8 +238,8 @@ export async function getPublicJobsEnriched(
   const db = await getDb();
   if (!db) return [];
 
-  // Build WHERE clauses — only Active jobs for public view
-  const whereClauses: string[] = ["j.requestStatus = 'Active'"];
+  // Build WHERE clauses — match dashboard: Active + Submissions Paused
+  const whereClauses: string[] = ["j.requestStatus IN ('Active', 'Submissions Paused')"];
 
   // Artist type keyword mapping — maps display names to keywords found in job descriptions
   const ARTIST_TYPE_KEYWORDS: Record<string, string[]> = {
@@ -2367,12 +2367,13 @@ export async function getArtistProJobsFeed(limit = 20, offset = 0): Promise<{
   workFromAnywhere: boolean | null;
   budget: string | null;
   location: string | null;
+  description: string | null;
   createdAt: Date | null;
 }[]> {
   const db = await getDb();
   if (!db) return [];
   const rows = await db.execute(
-    `SELECT id, serviceType, company, logo, workFromAnywhere, budget, location, createdAt
+    `SELECT id, serviceType, company, logo, workFromAnywhere, budget, location, description, createdAt
      FROM premium_jobs
      WHERE status = 'Active'
      ORDER BY createdAt DESC

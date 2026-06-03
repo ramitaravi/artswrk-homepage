@@ -2512,30 +2512,73 @@ Fields to extract:
       }),
     /** Apply to a PRO job as artist */
     applyToProJob: protectedProcedure
-      .input(z.object({ premiumJobId: z.number() }))
+      .input(z.object({
+        premiumJobId: z.number(),
+        message: z.string().max(2000).optional(),
+        resumeLink: z.string().optional(),
+        rate: z.string().max(100).optional(),
+      }))
       .mutation(async ({ input, ctx }) => {
-        // Insert into premium_job_interested_artists
         const { getDb } = await import('./db');
         const dbConn = await getDb();
         if (!dbConn) throw new Error('DB unavailable');
         const { premiumJobInterestedArtists } = await import('../drizzle/schema');
         const { eq, and } = await import('drizzle-orm');
-        // Check if already applied
-        const existing = await dbConn.select().from(premiumJobInterestedArtists)
+        const existing = await dbConn.select({ id: premiumJobInterestedArtists.id })
+          .from(premiumJobInterestedArtists)
           .where(and(
             eq(premiumJobInterestedArtists.artistUserId, ctx.user.id),
             eq(premiumJobInterestedArtists.premiumJobId, input.premiumJobId)
-          ));
-        if (existing.length > 0) return { success: true, alreadyApplied: true };
+          ))
+          .limit(1);
+        if (existing.length > 0) {
+          // Record already exists — update message/resume/rate in case they were missing
+          await dbConn.update(premiumJobInterestedArtists)
+            .set({
+              message: input.message || null,
+              resumeLink: input.resumeLink || null,
+              rate: input.rate || null,
+            })
+            .where(eq(premiumJobInterestedArtists.id, existing[0].id));
+          return { success: true, alreadyApplied: true };
+        }
         await dbConn.insert(premiumJobInterestedArtists).values({
           artistUserId: ctx.user.id,
           premiumJobId: input.premiumJobId,
           status: 'Pending',
+          message: input.message || null,
+          resumeLink: input.resumeLink || null,
+          rate: input.rate || null,
           createdAt: new Date(),
         });
         return { success: true, alreadyApplied: false };
       }),
 
+    /** Check if the logged-in artist has already applied to a specific PRO job */
+    checkProJobApplication: protectedProcedure
+      .input(z.object({ premiumJobId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const { getDb } = await import('./db');
+        const dbConn = await getDb();
+        if (!dbConn) return { applied: false, message: null, resumeLink: null, rate: null };
+        const { premiumJobInterestedArtists } = await import('../drizzle/schema');
+        const { eq, and } = await import('drizzle-orm');
+        const existing = await dbConn.select({
+          id: premiumJobInterestedArtists.id,
+          message: premiumJobInterestedArtists.message,
+          resumeLink: premiumJobInterestedArtists.resumeLink,
+          rate: premiumJobInterestedArtists.rate,
+        })
+          .from(premiumJobInterestedArtists)
+          .where(and(
+            eq(premiumJobInterestedArtists.artistUserId, ctx.user.id),
+            eq(premiumJobInterestedArtists.premiumJobId, input.premiumJobId)
+          ))
+          .limit(1);
+        if (existing.length === 0) return { applied: false, message: null, resumeLink: null, rate: null };
+        const rec = existing[0];
+        return { applied: true, message: rec.message ?? null, resumeLink: rec.resumeLink ?? null, rate: rec.rate ?? null };
+      }),
 
     /** Get all confirmed bookings for the logged-in artist. */
     myConfirmations: protectedProcedure
