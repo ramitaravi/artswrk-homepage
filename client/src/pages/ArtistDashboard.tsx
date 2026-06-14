@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import ArtistProfilePage from "./artist/ArtistProfilePage";
 import ArtistSettingsPlan from "./artist/ArtistSettingsPlan";
+import MessagesPage from "./dashboard/Messages";
 import {
   Briefcase,
   Calendar,
@@ -26,6 +27,7 @@ import {
   AlertCircle,
   ExternalLink,
   ArrowRight,
+  ArrowLeft,
   Sparkles,
   UserCheck,
   Banknote,
@@ -36,6 +38,7 @@ import {
   FileText,
   DollarSign,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { toProJobUrl } from "./ProJobDetail";
@@ -194,6 +197,9 @@ function DashboardTab({ user }: { user: any }) {
     }
   }, []);
 
+  const { data: msgStats } = trpc.messages.myStats.useQuery();
+  const unreadMessages = msgStats?.unreadMessages ?? 0;
+
   const { data: affiliationsData } = trpc.artistDashboard.getMyAffiliations.useQuery();
   const { data: jobsFeed, isLoading: feedLoading } = trpc.artistDashboard.getJobsFeed.useQuery(
     { limit: 20, offset: 0, lat: coords?.lat, lng: coords?.lng },
@@ -268,23 +274,31 @@ function DashboardTab({ user }: { user: any }) {
           >
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-[#111]">Your Tasks</span>
-              <span className="w-5 h-5 rounded-full bg-[#111] text-white text-[10px] font-semibold flex items-center justify-center">1</span>
+              {unreadMessages > 0 && (
+                <span className="w-5 h-5 rounded-full bg-[#F25722] text-white text-[10px] font-semibold flex items-center justify-center">{unreadMessages}</span>
+              )}
             </div>
             <ChevronRight size={16} className={`text-gray-400 transition-transform ${tasksOpen ? "rotate-90" : ""}`} />
           </button>
           {tasksOpen && (
             <div className="px-5 pb-4 space-y-2">
-              <div
-                className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
-                onClick={() => window.location.href = "/app/messages"}
-              >
-                <MessageSquare size={16} className="text-[#F25722] flex-shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-[#111]">New Messages (1 unread messages)</p>
-                  <p className="text-xs text-gray-500 mt-0.5">You have 1 new message</p>
+              {unreadMessages > 0 ? (
+                <div
+                  className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => window.location.href = "/app/messages"}
+                >
+                  <MessageSquare size={16} className="text-[#F25722] flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-[#111]">
+                      {unreadMessages === 1 ? "1 unread message" : `${unreadMessages} unread messages`}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">Tap to open your inbox</p>
+                  </div>
+                  <ChevronRight size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
                 </div>
-                <ChevronRight size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
-              </div>
+              ) : (
+                <p className="text-xs text-gray-400 py-1">No pending tasks — you're all caught up!</p>
+              )}
             </div>
           )}
         </div>
@@ -644,9 +658,399 @@ function JobsTab({ user }: { user: any }) {
 
 // ─── Bookings Tab ─────────────────────────────────────────────────────────────────
 
+type BookingFilter = "upcoming" | "completed" | "all";
+
+function bookingDate(b: any): Date | null {
+  return b.startDate ? new Date(b.startDate) : b.jobStartDate ? new Date(b.jobStartDate) : b.createdAt ? new Date(b.createdAt) : null;
+}
+
+function formatBookingDate(b: any): string {
+  const d = bookingDate(b);
+  if (!d) return "";
+  return d.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+}
+
+function isUpcoming(b: any): boolean {
+  const s = b.bookingStatus?.toLowerCase() ?? "";
+  if (s === "confirmed" || s === "pay now") return true;
+  const d = bookingDate(b);
+  if (!d) return false;
+  return d >= new Date(new Date().toDateString()); // today at midnight
+}
+
+// ── Booking row (list item) ───────────────────────────────────────────────────
+
+function BookingRow({ booking, onClick }: { booking: any; onClick: () => void }) {
+  const studio = booking.clientCompanyName ?? booking.clientFirstName ?? `Studio #${booking.clientUserId}`;
+  const rate = booking.artistRate ?? booking.clientRate;
+  const status = booking.bookingStatus ?? "Confirmed";
+  const statusColor =
+    status === "Completed" ? "text-green-600 bg-green-50"
+    : status === "Cancelled" ? "text-red-500 bg-red-50"
+    : status === "Pay Now" ? "text-[#F25722] bg-orange-50"
+    : "text-blue-600 bg-blue-50";
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4 hover:shadow-sm hover:border-gray-200 transition-all text-left"
+    >
+      {booking.clientPhoto ? (
+        <img src={booking.clientPhoto} alt={studio} className="w-14 h-14 rounded-xl object-contain bg-gray-50 p-1 flex-shrink-0 border border-gray-100" />
+      ) : (
+        <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-xl flex-shrink-0">
+          {(studio[0] || "?").toUpperCase()}
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-bold text-[#111] truncate">{studio}</p>
+        {rate != null && (
+          <p className="text-sm text-gray-700 font-semibold mt-0.5">+${typeof rate === "number" ? rate.toFixed(2) : rate}</p>
+        )}
+        <span className={`inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor}`}>{status}</span>
+      </div>
+      <ChevronRight size={18} className="text-gray-300 flex-shrink-0" />
+    </button>
+  );
+}
+
+// ── Booking Detail ────────────────────────────────────────────────────────────
+
+function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }) {
+  const utils = trpc.useUtils();
+  const [detailsOpen, setDetailsOpen] = useState(true);
+  const [paymentOpen, setPaymentOpen] = useState(true);
+  const [reimbNote, setReimbNote] = useState("");
+  const [reimbValue, setReimbValue] = useState("");
+  const [reimbFile, setReimbFile] = useState<File | null>(null);
+  const [invoiceNotes, setInvoiceNotes] = useState("");
+  const [artistRate, setArtistRate] = useState(booking.artistRate?.toString() ?? "");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const studio = booking.clientCompanyName ?? booking.clientFirstName ?? `Studio #${booking.clientUserId}`;
+  const jobTitle = (booking.jobDescription ?? "").split("\n")[0].slice(0, 80) || null;
+  // null paymentMethod = historical → treat as "artswrk"
+  const effectiveMethod: "artswrk" | "direct" = (booking.paymentMethod === "direct") ? "direct" : "artswrk";
+  const isAlreadyPaid = booking.paymentStatus?.toLowerCase() === "paid";
+  const isInvoiceSubmitted = !!booking.artswrkInvoiceSubmittedAt;
+  const isDirectConfirmed = !!booking.directPayConfirmedAt;
+  const rate = parseFloat(artistRate) || 0;
+
+  const setPaymentMethod = trpc.artistDashboard.setPaymentMethod.useMutation({
+    onSuccess: () => utils.artistDashboard.myConfirmations.invalidate(),
+  });
+
+  const confirmDirectPay = trpc.artistDashboard.confirmDirectPayment.useMutation({
+    onSuccess: () => utils.artistDashboard.myConfirmations.invalidate(),
+  });
+
+  const { data: reimbursements } = trpc.artistDashboard.getReimbursements.useQuery({ bookingId: booking.id });
+  const addReimbursement = trpc.artistDashboard.addReimbursement.useMutation({
+    onSuccess: () => {
+      utils.artistDashboard.myConfirmations.invalidate();
+      utils.artistDashboard.getReimbursements.invalidate({ bookingId: booking.id });
+      setReimbNote(""); setReimbValue(""); setReimbFile(null);
+    },
+  });
+  const uploadReceipt = trpc.artistDashboard.uploadReimbursementReceipt.useMutation();
+  const submitInvoice = trpc.artistDashboard.submitArtswrkInvoice.useMutation({
+    onSuccess: () => {
+      utils.artistDashboard.myConfirmations.invalidate();
+      toast.success("Invoice submitted to Artswrk!");
+    },
+    onError: (e: any) => toast.error(e.message || "Failed to submit invoice"),
+  });
+
+  const totalReimb = (reimbursements ?? []).reduce((s: number, r: any) => s + (r.value ?? 0), 0);
+  const processingFee = Math.round((rate + totalReimb) * 0.04);
+  const invoiceTotal = rate + totalReimb + processingFee;
+
+  async function handleAddReimbursement() {
+    if (!reimbValue || isNaN(parseFloat(reimbValue))) return;
+    let fileUrl: string | undefined;
+    if (reimbFile) {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve) => {
+        reader.onload = (e) => resolve((e.target?.result as string).split(",")[1]);
+        reader.readAsDataURL(reimbFile);
+      });
+      const res = await uploadReceipt.mutateAsync({ fileName: reimbFile.name, fileBase64: base64, mimeType: reimbFile.type });
+      fileUrl = res.url;
+    }
+    addReimbursement.mutate({ bookingId: booking.id, value: parseFloat(reimbValue), note: reimbNote || undefined, fileUrl });
+  }
+
+  const dateStr = formatBookingDate(booking);
+  const startTime = booking.startDate ? new Date(booking.startDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : null;
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-2">
+        <button onClick={onBack} className="p-2 -ml-2 rounded-xl hover:bg-gray-100 transition-colors text-gray-500 hover:text-[#111]">
+          <ArrowLeft size={20} />
+        </button>
+        <h2 className="flex-1 text-center text-lg font-bold text-[#111]">Your Booking</h2>
+        <div className="w-10" />
+      </div>
+
+      {/* Studio + message */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-3">
+        {booking.clientPhoto ? (
+          <img src={booking.clientPhoto} alt={studio} className="w-12 h-12 rounded-xl object-contain bg-gray-50 p-1 border border-gray-100 flex-shrink-0" />
+        ) : (
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-lg flex-shrink-0">
+            {(studio[0] || "?").toUpperCase()}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-[#111] truncate">{studio}</p>
+          {jobTitle && <p className="text-xs text-gray-500 truncate">{jobTitle}</p>}
+        </div>
+        <a
+          href="/app/messages"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#111] text-white text-xs font-semibold hover:bg-gray-800 transition-colors whitespace-nowrap flex-shrink-0"
+        >
+          <MessageSquare size={12} /> Message
+        </a>
+      </div>
+
+      {/* Booking Details */}
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <button
+          onClick={() => setDetailsOpen(v => !v)}
+          className="w-full px-5 py-4 flex items-center justify-between text-sm font-bold text-[#111] hover:bg-gray-50 transition-colors"
+        >
+          Booking Details
+          <ChevronRight size={16} className={`text-gray-400 transition-transform ${detailsOpen ? "rotate-90" : ""}`} />
+        </button>
+        {detailsOpen && (
+          <div className="px-5 pb-5 space-y-4 border-t border-gray-50">
+            <div className="grid grid-cols-1 gap-4 pt-4">
+              <div>
+                <p className="text-xs font-bold text-gray-500 mb-0.5">Client</p>
+                <p className="text-sm text-[#111]">{studio}</p>
+              </div>
+              {dateStr && (
+                <div>
+                  <p className="text-xs font-bold text-gray-500 mb-0.5">Date & Time</p>
+                  <p className="text-sm text-[#111]">{dateStr}{startTime ? ` · ${startTime}` : ""}</p>
+                </div>
+              )}
+              {booking.jobLocation && (
+                <div>
+                  <p className="text-xs font-bold text-gray-500 mb-0.5">Location</p>
+                  <p className="text-sm text-[#111]">{booking.jobLocation}</p>
+                </div>
+              )}
+              {booking.jobDescription && (
+                <div>
+                  <p className="text-xs font-bold text-gray-500 mb-0.5">Details</p>
+                  <p className="text-sm text-[#111] whitespace-pre-wrap">{booking.jobDescription}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Payment Details */}
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <button
+          onClick={() => setPaymentOpen(v => !v)}
+          className="w-full px-5 py-4 flex items-center justify-between text-sm font-bold text-[#111] hover:bg-gray-50 transition-colors"
+        >
+          <span>Payment Details</span>
+          <div className="flex items-center gap-2">
+            {(isInvoiceSubmitted || isDirectConfirmed) && (
+              <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Paid</span>
+            )}
+            <ChevronRight size={16} className={`text-gray-400 transition-transform ${paymentOpen ? "rotate-90" : ""}`} />
+          </div>
+        </button>
+
+        {paymentOpen && (
+          <div className="px-5 pb-5 border-t border-gray-50 space-y-5 pt-4">
+
+            {/* Already paid — just show confirmation, hide all forms */}
+            {isAlreadyPaid && (
+              <div className="flex items-center gap-2.5 py-2">
+                <CheckCircle2 size={18} className="text-green-500 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-bold text-green-700">Paid</p>
+                  <p className="text-xs text-gray-400">This booking has been marked as paid.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Payment method toggle — hidden when already paid */}
+            {!isAlreadyPaid && (
+              <div>
+                <p className="text-xs font-bold text-gray-500 mb-2">How was this paid?</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPaymentMethod.mutate({ bookingId: booking.id, method: "artswrk" })}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${effectiveMethod === "artswrk" ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}
+                  >
+                    Paid via Artswrk
+                  </button>
+                  <button
+                    onClick={() => setPaymentMethod.mutate({ bookingId: booking.id, method: "direct" })}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${effectiveMethod === "direct" ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}
+                  >
+                    Paid directly
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Reimbursements — always visible */}
+            {(reimbursements ?? []).length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-gray-500 mb-2">Reimbursements</p>
+                <div className="space-y-1.5">
+                  {(reimbursements ?? []).map((r: any) => (
+                    <div key={r.id} className="flex items-center justify-between text-xs bg-gray-50 rounded-lg px-3 py-2">
+                      <span className="text-gray-500">${r.value?.toFixed(2)}</span>
+                      <span className="text-gray-700 flex-1 px-3">{r.note || "Expense"}</span>
+                      {r.fileUrl && (
+                        <a href={r.fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-600 mr-2">
+                          <FileText size={12} />
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                  <div className="flex justify-between text-xs font-bold text-[#111] px-3 pt-1">
+                    <span>Reimbursements Total</span>
+                    <span>${totalReimb.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Add reimbursement — hidden when already paid */}
+            {!isAlreadyPaid && (
+              <div>
+                <p className="text-xs font-bold text-gray-500 mb-2">Add Reimbursement</p>
+                <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text" placeholder="Description (e.g. Gas, Parking)" value={reimbNote}
+                      onChange={(e) => setReimbNote(e.target.value)}
+                      className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#F25722]"
+                    />
+                    <input
+                      type="number" min="0" placeholder="$" value={reimbValue}
+                      onChange={(e) => setReimbValue(e.target.value)}
+                      className="w-20 px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#F25722]"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#F25722] transition-colors">
+                      <Upload size={11} /> {reimbFile ? reimbFile.name.slice(0, 18) : "Attach receipt"}
+                    </button>
+                    <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden"
+                      onChange={(e) => setReimbFile(e.target.files?.[0] ?? null)} />
+                    <button
+                      onClick={handleAddReimbursement}
+                      disabled={addReimbursement.isPending || uploadReceipt.isPending || !reimbValue}
+                      className="ml-auto flex items-center gap-1 text-xs font-bold text-white bg-[#F25722] px-3 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50"
+                    >
+                      {(addReimbursement.isPending || uploadReceipt.isPending) ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />} Add
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Rate summary — always visible when there's a non-zero rate or reimbursements */}
+            {(booking.artistRate > 0 || totalReimb > 0) && (
+              <div className="border-t border-gray-50 pt-4 space-y-1.5 text-sm">
+                {booking.artistRate > 0 && booking.hours != null && booking.hours > 0 && (
+                  <div className="flex justify-between text-gray-500 text-xs">
+                    <span>Hourly rate</span>
+                    <span>${booking.artistRate}/hr × {booking.hours} hrs</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-[#111] text-base pt-1">
+                  <span>Total Rate</span>
+                  <span>${(booking.artistRate + totalReimb).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Payment action forms — hidden when already paid */}
+            {!isAlreadyPaid && (<>
+              {/* Direct pay confirm */}
+              {effectiveMethod === "direct" && !isDirectConfirmed && (
+                <button
+                  onClick={() => confirmDirectPay.mutate({ bookingId: booking.id })}
+                  disabled={confirmDirectPay.isPending}
+                  className="w-full py-3 rounded-xl text-sm font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {confirmDirectPay.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                  Confirm I received payment
+                </button>
+              )}
+              {effectiveMethod === "direct" && isDirectConfirmed && (
+                <div className="flex items-center gap-2 text-sm text-green-600 font-semibold">
+                  <CheckCircle2 size={15} /> Confirmed received on {new Date(booking.directPayConfirmedAt).toLocaleDateString()}
+                </div>
+              )}
+
+              {/* Artswrk invoice */}
+              {effectiveMethod === "artswrk" && !isInvoiceSubmitted && (
+                <div className="space-y-3 border-t border-gray-50 pt-4">
+                  <p className="text-xs font-bold text-gray-500">Submit Invoice to Artswrk</p>
+                  <input
+                    type="number" min="0" placeholder="Your rate for this job ($)"
+                    value={artistRate} onChange={(e) => setArtistRate(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#F25722]"
+                  />
+                  {rate > 0 && (
+                    <div className="bg-orange-50 rounded-xl p-3 space-y-1.5 text-xs">
+                      <div className="flex justify-between text-gray-600"><span>Artist rate</span><span>${rate}</span></div>
+                      <div className="flex justify-between text-gray-600"><span>Reimbursements</span><span>${totalReimb}</span></div>
+                      <div className="flex justify-between text-gray-600"><span>4% processing fee</span><span>${processingFee}</span></div>
+                      <div className="flex justify-between font-bold text-[#111] border-t border-orange-100 pt-1.5">
+                        <span>Invoice total</span><span className="text-[#F25722]">${invoiceTotal}</span>
+                      </div>
+                    </div>
+                  )}
+                  <textarea value={invoiceNotes} onChange={(e) => setInvoiceNotes(e.target.value)} rows={2}
+                    placeholder="Additional notes (optional)"
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-[#F25722] resize-none"
+                  />
+                  <button
+                    onClick={() => submitInvoice.mutate({ bookingId: booking.id, artistRate: rate || undefined, notes: invoiceNotes || undefined, origin: window.location.origin })}
+                    disabled={submitInvoice.isPending || rate <= 0}
+                    className="w-full py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FFBC5D] to-[#F25722] hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {submitInvoice.isPending ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                    Submit Invoice to Artswrk
+                  </button>
+                </div>
+              )}
+              {effectiveMethod === "artswrk" && isInvoiceSubmitted && (
+                <div className="flex items-center gap-2 text-sm text-green-600 font-semibold">
+                  <CheckCircle2 size={15} /> Invoice submitted on {new Date(booking.artswrkInvoiceSubmittedAt).toLocaleDateString()}
+                </div>
+              )}
+            </>)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function BookingsTab() {
   const { data, isLoading } = trpc.artistDashboard.myConfirmations.useQuery();
   const confirmations = data ?? [];
+  const [filter, setFilter] = useState<BookingFilter>("all");
+  const [selected, setSelected] = useState<any | null>(null);
+
+  if (selected) return <BookingDetail booking={selected} onBack={() => setSelected(null)} />;
 
   if (isLoading) {
     return (
@@ -656,25 +1060,62 @@ function BookingsTab() {
     );
   }
 
+  const filtered = confirmations.filter((b: any) => {
+    if (filter === "upcoming") return isUpcoming(b);
+    if (filter === "completed") return !isUpcoming(b);
+    return true;
+  });
+
+  // Group by date string
+  const groups: { label: string; items: any[] }[] = [];
+  for (const b of filtered) {
+    const label = formatBookingDate(b) || "Unknown date";
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) last.items.push(b);
+    else groups.push({ label, items: [b] });
+  }
+
+  const tabs: { key: BookingFilter; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "upcoming", label: "Upcoming" },
+    { key: "completed", label: "Completed" },
+  ];
+
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-[#111]">Bookings</h2>
-      <p className="text-sm text-gray-400">
-        Jobs you have been confirmed for. Manage payment and reimbursements here.
-      </p>
-      {confirmations.length === 0 ? (
+      <h2 className="text-xl font-bold text-[#111]">Bookings</h2>
+
+      {/* Filter tabs */}
+      <div className="flex gap-2">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setFilter(t.key)}
+            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${filter === t.key ? "bg-[#111] text-white" : "text-gray-500 hover:text-[#111]"}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
           <Calendar size={36} className="mx-auto text-gray-300 mb-3" />
           <p className="text-sm font-semibold text-gray-700 mb-1">No bookings yet</p>
           <p className="text-sm text-gray-500 mb-4">When a studio confirms you for a job, it will appear here.</p>
-          <a href="/app/jobs" className="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity">
-            Browse jobs →
-          </a>
+          <a href="/app/jobs" className="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80">Browse jobs →</a>
         </div>
       ) : (
-        <div className="space-y-3">
-          {confirmations.map((b: any) => (
-            <ConfirmationCard key={b.id} booking={b} />
+        <div className="space-y-5">
+          {groups.map((g) => (
+            <div key={g.label}>
+              <p className="text-xs font-semibold text-gray-400 mb-2 px-1">{g.label}</p>
+              <div className="space-y-2">
+                {g.items.map((b: any) => (
+                  <BookingRow key={b.id} booking={b} onClick={() => setSelected(b)} />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -682,13 +1123,7 @@ function BookingsTab() {
   );
 }
 
-// ─── Confirmations Tab ─────────────────────────────────────────────────────────────────────────────────────
-
-/**
- * ConfirmationCard — shows a single confirmed booking for the artist.
- * - If paymentMethod === "artswrk": show reimbursement upload + invoice submission
- * - If paymentMethod === "direct": show "Confirm you got paid" button
- */
+// ─── Legacy ConfirmationCard (kept for reference, no longer rendered) ─────────
 function ConfirmationCard({ booking }: { booking: any }) {
   const utils = trpc.useUtils();
   const [expanded, setExpanded] = useState(false);
@@ -1087,91 +1522,7 @@ function PaymentsTab() {
   );
 }
 
-// ─── Messages Tab ─────────────────────────────────────────────────────────────────
 
-const SAMPLE_MESSAGES = [
-  { id: 1, from: "Elevation on Tour", avatar: "", preview: "Hi! We'd love to have you for our May event. Are you available?", time: "2h ago", unread: true },
-  { id: 2, from: "Journey Dance Competition", avatar: "", preview: "Thanks for applying! We'll be in touch soon.", time: "1d ago", unread: false },
-  { id: 3, from: "REVEL Dance", avatar: "", preview: "Your booking has been confirmed for March 15th.", time: "3d ago", unread: false },
-];
-
-function MessagesTab() {
-  const [selected, setSelected] = useState<number | null>(null);
-  const selectedMsg = SAMPLE_MESSAGES.find(m => m.id === selected);
-
-  return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-[#111]">Messages</h2>
-
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        {!selected ? (
-          // Inbox list
-          <div className="divide-y divide-gray-50">
-            {SAMPLE_MESSAGES.length === 0 ? (
-              <div className="p-8 text-center">
-                <MessageSquare size={36} className="mx-auto text-gray-300 mb-3" />
-                <p className="text-sm font-semibold text-gray-700 mb-1">No messages yet</p>
-                <p className="text-sm text-gray-500 mb-4">Apply to jobs to start conversations with hirers.</p>
-                <a href="/app/jobs" className="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity">
-                  Browse jobs →
-                </a>
-              </div>
-            ) : (
-              SAMPLE_MESSAGES.map(msg => (
-                <button
-                  key={msg.id}
-                  onClick={() => setSelected(msg.id)}
-                  className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors text-left"
-                >
-                  <StudioAvatar name={msg.from} logo={msg.avatar} size="md" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className={`text-sm truncate ${msg.unread ? "font-bold text-[#111]" : "font-semibold text-gray-700"}`}>{msg.from}</p>
-                      <p className="text-xs text-gray-400 flex-shrink-0 ml-2">{msg.time}</p>
-                    </div>
-                    <p className={`text-xs truncate mt-0.5 ${msg.unread ? "text-gray-700" : "text-gray-500"}`}>{msg.preview}</p>
-                  </div>
-                  {msg.unread && <div className="w-2 h-2 rounded-full bg-pink-500 flex-shrink-0" />}
-                </button>
-              ))
-            )}
-          </div>
-        ) : (
-          // Conversation view
-          <div className="flex flex-col h-[480px]">
-            <div className="flex items-center gap-3 p-4 border-b border-gray-100">
-              <button onClick={() => setSelected(null)} className="text-gray-500 hover:text-[#111] transition-colors">
-                <ChevronRight size={18} className="rotate-180" />
-              </button>
-              <StudioAvatar name={selectedMsg?.from || ""} logo={selectedMsg?.avatar} size="sm" />
-              <p className="text-sm font-semibold text-[#111]">{selectedMsg?.from}</p>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              <div className="flex justify-start">
-                <div className="max-w-xs bg-gray-100 rounded-2xl rounded-tl-sm px-4 py-2.5">
-                  <p className="text-sm text-gray-800">{selectedMsg?.preview}</p>
-                  <p className="text-xs text-gray-400 mt-1">{selectedMsg?.time}</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 border-t border-gray-100">
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="Type a message..."
-                  className="flex-1 text-sm px-4 py-2.5 rounded-full border border-gray-200 focus:outline-none focus:border-[#F25722] transition-colors"
-                />
-                <button className="w-9 h-9 rounded-full bg-[#111] text-white flex items-center justify-center hover:bg-gray-700 transition-colors flex-shrink-0">
-                  <ArrowRight size={14} />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ─── Profile Tab ─────────────────────────────────────────────────────────────────
 
@@ -1376,7 +1727,7 @@ export default function ArtistDashboard() {
     if (location.startsWith("/app/confirmations")) { window.location.replace("/app/bookings"); return null; }
     if (location.startsWith("/app/bookings")) return <BookingsTab />;
     if (location.startsWith("/app/payments")) return <PaymentsTab />;
-    if (location.startsWith("/app/messages")) return <MessagesTab />;
+    if (location.startsWith("/app/messages")) return null; // handled separately below
     if (location.startsWith("/app/profile")) return <ArtistProfilePage />;
     if (location.startsWith("/app/pro-jobs")) return <ProJobsTab onGoToSettings={() => { window.location.href = "/app/settings"; }} />;
     if (location.startsWith("/app/benefits")) return <ComingSoonTab icon={<Gift size={40} />} title="Benefits" />;
@@ -1384,6 +1735,10 @@ export default function ArtistDashboard() {
     if (location.startsWith("/app/settings")) return <ArtistSettingsPlan />;
     // Default: /app overview
     return <DashboardTab user={user} />;
+  }
+
+  if (location.startsWith("/app/messages")) {
+    return <MessagesPage />;
   }
 
   return (

@@ -971,10 +971,59 @@ export async function getConversationsByClientId(
       artistName: artistUser.name,
       artistProfilePicture: artistUser.profilePicture,
       artistSlug: artistUser.slug,
+      clientCompanyName: sql<string | null>`null`,
+      // Last message preview via correlated subquery
+      lastMessageContent: sql<string | null>`(SELECT content FROM messages WHERE conversationId = ${conversations.id} ORDER BY COALESCE(bubbleCreatedAt, createdAt) DESC LIMIT 1)`,
     })
     .from(conversations)
     .leftJoin(artistUser, eq(conversations.artistUserId, artistUser.id))
     .where(eq(conversations.clientUserId, clientUserId))
+    .orderBy(desc(conversations.lastMessageDate))
+    .limit(limit)
+    .offset(offset);
+}
+
+/**
+ * Get all conversations for an artist, joined with client info.
+ * Returns client data in artist* fields so the Messages UI works unchanged.
+ * Ordered by last message date descending.
+ */
+export async function getConversationsByArtistId(
+  artistUserId: number,
+  limit = 100,
+  offset = 0
+) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const clientUser = users;
+
+  return db
+    .select({
+      id: conversations.id,
+      bubbleId: conversations.bubbleId,
+      clientUserId: conversations.clientUserId,
+      bubbleClientId: conversations.bubbleClientId,
+      artistUserId: conversations.artistUserId,
+      bubbleArtistId: conversations.bubbleArtistId,
+      lastMessageDate: conversations.lastMessageDate,
+      unreadCount: conversations.unreadCount,
+      createdAt: conversations.createdAt,
+      bubbleCreatedAt: conversations.bubbleCreatedAt,
+      // Client info mapped to artist* keys so the shared UI components work
+      artistFirstName: clientUser.firstName,
+      artistLastName: clientUser.lastName,
+      artistName: sql<string | null>`COALESCE(${clientUser.clientCompanyName}, ${clientUser.name})`,
+      artistProfilePicture: clientUser.profilePicture,
+      artistSlug: sql<string | null>`null`,
+      // Extra field so the UI can show company name for clients
+      clientCompanyName: clientUser.clientCompanyName,
+      // Last message preview via correlated subquery
+      lastMessageContent: sql<string | null>`(SELECT content FROM messages WHERE conversationId = ${conversations.id} ORDER BY COALESCE(bubbleCreatedAt, createdAt) DESC LIMIT 1)`,
+    })
+    .from(conversations)
+    .leftJoin(clientUser, eq(conversations.clientUserId, clientUser.id))
+    .where(eq(conversations.artistUserId, artistUserId))
     .orderBy(desc(conversations.lastMessageDate))
     .limit(limit)
     .offset(offset);
@@ -1046,6 +1095,67 @@ export async function getMessageStatsByClientId(clientUserId: number) {
     totalMessages: Number(msgResult[0]?.totalMessages ?? 0),
     unreadMessages: Number(convoResult[0]?.unreadMessages ?? 0),
   };
+}
+
+/**
+ * Sum unread messages across all conversations where user is the artist.
+ */
+export async function getMessageStatsByArtistId(artistUserId: number) {
+  const db = await getDb();
+  if (!db) return { totalConversations: 0, totalMessages: 0, unreadMessages: 0 };
+
+  const convoResult = await db
+    .select({
+      totalConversations: sql<number>`COUNT(*)`,
+      unreadMessages: sql<number>`SUM(COALESCE(unreadCount, 0))`,
+    })
+    .from(conversations)
+    .where(eq(conversations.artistUserId, artistUserId));
+
+  const msgResult = await db
+    .select({ totalMessages: sql<number>`COUNT(*)` })
+    .from(messages)
+    .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+    .where(eq(conversations.artistUserId, artistUserId));
+
+  return {
+    totalConversations: Number(convoResult[0]?.totalConversations ?? 0),
+    totalMessages: Number(msgResult[0]?.totalMessages ?? 0),
+    unreadMessages: Number(convoResult[0]?.unreadMessages ?? 0),
+  };
+}
+
+/**
+ * Mark a conversation as read (set unreadCount = 0).
+ * Only succeeds if the requesting user is a participant.
+ */
+export async function markConversationAsRead(conversationId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return;
+
+  const { or } = await import("drizzle-orm");
+
+  // Verify user is a participant before clearing unread
+  const rows = await db
+    .select({ id: conversations.id })
+    .from(conversations)
+    .where(
+      and(
+        eq(conversations.id, conversationId),
+        or(
+          eq(conversations.clientUserId, userId),
+          eq(conversations.artistUserId, userId)
+        )
+      )
+    )
+    .limit(1);
+
+  if (rows.length === 0) return; // not a participant — ignore
+
+  await db
+    .update(conversations)
+    .set({ unreadCount: 0 })
+    .where(eq(conversations.id, conversationId));
 }
 
 // ── Wallet / Payment helpers ──────────────────────────────────────────────────
@@ -3166,6 +3276,7 @@ export async function getArtistConfirmedBookings(artistUserId: number) {
       paymentMethod: bookings.paymentMethod,
       artistRate: bookings.artistRate,
       clientRate: bookings.clientRate,
+      hours: bookings.hours,
       startDate: bookings.startDate,
       endDate: bookings.endDate,
       directPayConfirmedAt: bookings.directPayConfirmedAt,
@@ -3186,6 +3297,23 @@ export async function getArtistConfirmedBookings(artistUserId: number) {
     .where(and(eq(bookings.artistUserId, artistUserId), eq(bookings.deleted, false)))
     .orderBy(desc(bookings.createdAt));
   return rows;
+}
+
+/**
+ * Set or update the payment method for a booking (artist ownership required).
+ */
+export async function setBookingPaymentMethod(
+  bookingId: number,
+  artistUserId: number,
+  method: "artswrk" | "direct"
+) {
+  const db = await getDb();
+  if (!db) return false;
+  await db
+    .update(bookings)
+    .set({ paymentMethod: method })
+    .where(and(eq(bookings.id, bookingId), eq(bookings.artistUserId, artistUserId)));
+  return true;
 }
 
 /**
