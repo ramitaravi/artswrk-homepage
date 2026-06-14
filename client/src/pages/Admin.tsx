@@ -21,7 +21,7 @@ import { ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE } from "@shared/
 import { Link } from "wouter";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type AdminSection = "dashboard" | "artists" | "clients" | "jobs" | "pro-jobs" | "enterprise-clients" | "bookings" | "payments" | "subscriptions" | "settings";
+type AdminSection = "dashboard" | "artists" | "clients" | "jobs" | "pro-jobs" | "enterprise-clients" | "bookings" | "payments" | "subscriptions" | "emails" | "settings";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmt$(cents: number) {
@@ -51,6 +51,7 @@ const NAV_ITEMS: { id: AdminSection; label: string; icon: React.ReactNode }[] = 
   { id: "bookings", label: "Bookings", icon: <BookOpen size={16} /> },
   { id: "payments", label: "Payments", icon: <CreditCard size={16} /> },
   { id: "subscriptions", label: "Subscriptions", icon: <TrendingUp size={16} /> },
+  { id: "emails", label: "Emails", icon: <Mail size={16} /> },
   { id: "settings", label: "Settings", icon: <Settings size={16} /> },
 ];
 
@@ -4210,6 +4211,202 @@ function SettingsSection({ user }: { user: { email?: string | null } }) {
   );
 }
 
+// ─── Emails Section ───────────────────────────────────────────────────────────
+
+type EmailCategory = "artist" | "client" | "both";
+
+interface EmailEntry {
+  name: string;
+  trigger: string;
+  to: string;
+  cc?: string;
+  subject: string;
+  contentSummary: string;
+  category: EmailCategory;
+  implemented: boolean;
+}
+
+const EMAIL_CATALOG: EmailEntry[] = [
+  {
+    name: "Artist Welcome",
+    trigger: "Artist creates an account",
+    to: "Artist",
+    subject: "Welcome to Artswrk! 🎉",
+    contentSummary: "Welcomes the artist, explains how to get started: create profile, browse jobs, choose a plan. Links to dashboard.",
+    category: "artist",
+    implemented: true,
+  },
+  {
+    name: "Password Reset",
+    trigger: "User requests password reset",
+    to: "User (artist or client)",
+    subject: "Reset your Artswrk password",
+    contentSummary: "Contains a secure reset link valid for a limited time.",
+    category: "both",
+    implemented: true,
+  },
+  {
+    name: "Regular Job Posted",
+    trigger: "Client posts a regular job and it goes live",
+    to: "Client",
+    subject: "Your job is live on Artswrk! 🎉",
+    contentSummary: "Confirms job is live. Shows job card: service type, date, location, rate, description. Button to view the job posting.",
+    category: "client",
+    implemented: true,
+  },
+  {
+    name: "PRO / Enterprise Job Posted",
+    trigger: "Enterprise client posts a PRO job",
+    to: "Enterprise client",
+    cc: "support@artswrk.com",
+    subject: "Your job has been posted!",
+    contentSummary: "Branded confirmation. Shows job card: job title, company, location, description. Inline link to view the specific job at /enterprise/{jobId}.",
+    category: "client",
+    implemented: true,
+  },
+  {
+    name: "Regular Job — New Applicant Alert",
+    trigger: "Artist applies to a regular job",
+    to: "Client (job poster)",
+    subject: "Artist applied to your job (via SendGrid template)",
+    contentSummary: "Alerts client that an artist expressed interest. Uses SendGrid dynamic template. Links to client dashboard.",
+    category: "client",
+    implemented: true,
+  },
+  {
+    name: "Regular Job — Application Confirmation",
+    trigger: "Artist applies to a regular job",
+    to: "Artist",
+    subject: "Your application was received (via SendGrid template)",
+    contentSummary: "Confirms the artist's submission. Uses SendGrid dynamic template. Shows job details and links to artist dashboard.",
+    category: "artist",
+    implemented: true,
+  },
+  {
+    name: "PRO Job — Artist Applied Alert",
+    trigger: "Artist applies to a PRO job",
+    to: "Client (job poster)",
+    cc: "support@artswrk.com",
+    subject: "[FirstName] [L]. is available for your job!",
+    contentSummary: "Shows artist's cover message in a gray box. Shows job details (title, location, description) with a pink left border. 'View Submission →' black CTA button linking to /enterprise/{jobId}.",
+    category: "client",
+    implemented: true,
+  },
+  {
+    name: "PRO Job — Submission Confirmation",
+    trigger: "Artist applies to a PRO job",
+    to: "Artist",
+    cc: "support@artswrk.com",
+    subject: "Your submission has been received!",
+    contentSummary: "Confirms submission sent to client. Shows job details (service, location, description). Links to artist dashboard. Notes they'll be notified when client responds.",
+    category: "artist",
+    implemented: true,
+  },
+  {
+    name: "New Message",
+    trigger: "User sends a message to another user",
+    to: "Message recipient",
+    subject: "New message from [Sender] on Artswrk",
+    contentSummary: "Shows a preview of the message (up to 200 chars). 'Reply on Artswrk →' gradient CTA button.",
+    category: "both",
+    implemented: true,
+  },
+];
+
+const CATEGORY_LABELS: Record<EmailCategory, { label: string; color: string }> = {
+  artist: { label: "Artist", color: "bg-purple-100 text-purple-700" },
+  client: { label: "Client", color: "bg-blue-100 text-blue-700" },
+  both: { label: "Both", color: "bg-gray-100 text-gray-600" },
+};
+
+function EmailsSection() {
+  const [filter, setFilter] = useState<"all" | EmailCategory>("all");
+
+  const filtered = filter === "all" ? EMAIL_CATALOG : EMAIL_CATALOG.filter(e => e.category === filter || e.category === "both");
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-black text-[#111] mb-1">Transactional Emails</h1>
+        <p className="text-sm text-gray-400">All automated emails that go out from Artswrk — triggers, recipients, and content.</p>
+      </div>
+
+      {/* Filter pills */}
+      <div className="flex gap-2">
+        {(["all", "artist", "client", "both"] as const).map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors capitalize ${
+              filter === f ? "bg-[#111] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+            }`}
+          >
+            {f === "all" ? "All emails" : f === "both" ? "Both audiences" : `To ${f}`}
+          </button>
+        ))}
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: "Total templates", value: EMAIL_CATALOG.length },
+          { label: "Implemented", value: EMAIL_CATALOG.filter(e => e.implemented).length },
+          { label: "With CC", value: EMAIL_CATALOG.filter(e => e.cc).length },
+        ].map(stat => (
+          <div key={stat.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
+            <p className="text-2xl font-black text-[#111]">{stat.value}</p>
+            <p className="text-xs text-gray-400 mt-1">{stat.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Email cards */}
+      <div className="space-y-3">
+        {filtered.map(email => (
+          <div key={email.name} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-sm font-black text-[#111]">{email.name}</h2>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${CATEGORY_LABELS[email.category].color}`}>
+                  {CATEGORY_LABELS[email.category].label}
+                </span>
+                {email.implemented && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Live</span>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 text-xs">
+              <div className="flex gap-2">
+                <span className="font-semibold text-gray-400 w-16 flex-shrink-0">Trigger</span>
+                <span className="text-gray-700">{email.trigger}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="font-semibold text-gray-400 w-16 flex-shrink-0">To</span>
+                <span className="text-gray-700">{email.to}</span>
+              </div>
+              {email.cc && (
+                <div className="flex gap-2">
+                  <span className="font-semibold text-gray-400 w-16 flex-shrink-0">CC</span>
+                  <span className="text-gray-700">{email.cc}</span>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <span className="font-semibold text-gray-400 w-16 flex-shrink-0">Subject</span>
+                <span className="text-gray-700 font-mono bg-gray-50 px-2 py-0.5 rounded">{email.subject}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="font-semibold text-gray-400 w-16 flex-shrink-0">Content</span>
+                <span className="text-gray-600 leading-relaxed">{email.contentSummary}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Admin Page ──────────────────────────────────────────────────────────
 export default function Admin() {
   const { user, loading } = useAuth();
@@ -4266,6 +4463,7 @@ export default function Admin() {
           {section === "bookings" && <BookingsSection onViewPayment={goToPayment} initialDetailId={pendingBookingId} />}
           {section === "payments" && <PaymentsSection onViewBooking={goToBooking} initialDetailId={pendingPaymentId} />}
           {section === "subscriptions" && <SubscriptionsSection />}
+          {section === "emails" && <EmailsSection />}
           {section === "settings" && <SettingsSection user={user} />}
         </div>
       </main>

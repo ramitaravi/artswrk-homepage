@@ -1338,6 +1338,7 @@ export async function createNewUser(input: {
   firstName: string;
   lastName: string;
   passwordHash: string;
+  clientCompanyName?: string;
 }): Promise<{ id: number; openId: string }> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -1362,6 +1363,7 @@ export async function createNewUser(input: {
     userSignedUp: true,
     onboardingStep: 1,
     lastSignedIn: new Date(),
+    ...(input.clientCompanyName ? { clientCompanyName: input.clientCompanyName } : {}),
   });
   const newId = (result as any).insertId as number;
   return { id: newId, openId };
@@ -2281,7 +2283,7 @@ export async function createPremiumJob(data: {
     category: data.category ?? null,
     location: data.location ?? null,
     budget: data.budget ?? null,
-    workFromAnywhere: data.workFromAnywhere ?? false,
+    workFromAnywhere: data.workFromAnywhere === true,
     description: data.description ?? null,
     applyEmail: data.applyEmail ?? null,
     createdByUserId: data.createdByUserId,

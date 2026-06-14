@@ -5,7 +5,7 @@
  * Job detail view: breadcrumb → Applicants + Details tabs
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -288,11 +288,12 @@ function JobCard({
   const jobTitle = job.serviceType || job.title || "Job";
   // Guard against stringified [object Object] from Bubble import
   const rawLocation = job.location || job.clientLocation;
+  const wfa = !!job.workFromAnywhere;
   const location =
     rawLocation && !rawLocation.includes("[object") && rawLocation !== "[object Object]"
       ? rawLocation
-      : job.workFromAnywhere
-        ? "Work from Anywhere"
+      : wfa
+        ? "Open to Traveling Applicants"
         : null;
   const rate = job.rate || job.clientRate;
   const status = job.status || job.requestStatus;
@@ -544,18 +545,59 @@ function PlanStatusCard() {
 // ── Post Job Modal ───────────────────────────────────────────────────────────────────────────────────
 
 const JOB_CATEGORIES = [
-  "Dance Teacher",
-  "Choreographer",
-  "Competition Judge",
-  "Performer",
-  "Yoga / Pilates Instructor",
-  "Fitness Instructor",
-  "Photographer",
-  "Videographer",
-  "Music Teacher",
-  "Acting Coach",
-  "Other",
+  "Dance Competition",
+  "Dance Convention",
 ];
+
+// ── Minimal rich text editor (no library needed) ──────────────────────────────
+function RichTextEditor({ value, onChange }: { value: string; onChange: (html: string) => void }) {
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  // Sync external value only on first mount
+  useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const exec = useCallback((cmd: string, val?: string) => {
+    document.execCommand(cmd, false, val);
+    editorRef.current?.focus();
+    if (editorRef.current) onChange(editorRef.current.innerHTML);
+  }, [onChange]);
+
+  const handleInput = useCallback(() => {
+    if (editorRef.current) onChange(editorRef.current.innerHTML);
+  }, [onChange]);
+
+  const btnClass = "px-2.5 py-1 rounded text-xs font-bold text-gray-600 hover:bg-gray-100 transition-colors border border-transparent hover:border-gray-200";
+
+  return (
+    <div className="flex-1 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden focus-within:border-[#F25722] transition-all">
+      {/* Toolbar */}
+      <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-gray-200 bg-white flex-wrap">
+        <button type="button" className={btnClass} onClick={() => exec("bold")} title="Bold"><strong>B</strong></button>
+        <button type="button" className={`${btnClass} italic`} onClick={() => exec("italic")} title="Italic">I</button>
+        <button type="button" className={`${btnClass} underline`} onClick={() => exec("underline")} title="Underline">U</button>
+        <span className="w-px h-4 bg-gray-200 mx-1" />
+        <button type="button" className={btnClass} onClick={() => exec("insertUnorderedList")} title="Bullet list">• List</button>
+        <button type="button" className={btnClass} onClick={() => exec("insertOrderedList")} title="Numbered list">1. List</button>
+        <span className="w-px h-4 bg-gray-200 mx-1" />
+        <button type="button" className={btnClass} onClick={() => exec("removeFormat")} title="Clear formatting">Clear</button>
+      </div>
+      {/* Editable area */}
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={handleInput}
+        data-placeholder="Describe the role, requirements, and any other details..."
+        className="min-h-[120px] px-4 py-3 text-sm text-[#111] leading-relaxed outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400"
+      />
+    </div>
+  );
+}
 
 function PostJobModal({
   user,
@@ -577,6 +619,7 @@ function PostJobModal({
     category: "",
     location: "",
     budget: "",
+    askArtistRate: false,
     workFromAnywhere: false,
     description: "",
     applyEmail: user?.email || "",
@@ -617,7 +660,7 @@ function PostJobModal({
       logo: form.logo || undefined,
       category: form.category || undefined,
       location: form.location || undefined,
-      budget: form.budget || undefined,
+      budget: form.askArtistRate ? undefined : (form.budget || undefined),
       workFromAnywhere: form.workFromAnywhere,
       description: form.description || undefined,
       applyEmail: form.applyEmail || undefined,
@@ -731,19 +774,47 @@ function PostJobModal({
               </select>
             </div>
 
-            {/* Location */}
+            {/* Location + Work from anywhere (mutually exclusive) */}
             <div className="flex items-start gap-4 py-4 border-b border-gray-100">
               <label className="w-36 text-sm font-bold text-[#111] pt-2 flex-shrink-0">
                 Location
               </label>
-              <input
-                type="text"
-                placeholder="Start typing..."
-                value={form.location}
-                onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
-                disabled={form.workFromAnywhere}
-              />
+              <div className="flex-1 space-y-2">
+                {/* Toggle pills */}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, workFromAnywhere: false }))}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                      !form.workFromAnywhere
+                        ? "bg-[#111] text-white border-[#111]"
+                        : "bg-white text-gray-500 border-gray-200 hover:border-gray-400"
+                    }`}
+                  >
+                    Specific location
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, workFromAnywhere: true, location: "" }))}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                      form.workFromAnywhere
+                        ? "bg-[#111] text-white border-[#111]"
+                        : "bg-white text-gray-500 border-gray-200 hover:border-gray-400"
+                    }`}
+                  >
+                    Open to traveling applicants
+                  </button>
+                </div>
+                {!form.workFromAnywhere && (
+                  <input
+                    type="text"
+                    placeholder="City, State"
+                    value={form.location}
+                    onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                    className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
+                  />
+                )}
+              </div>
             </div>
 
             {/* Rate */}
@@ -751,33 +822,44 @@ function PostJobModal({
               <label className="w-36 text-sm font-bold text-[#111] pt-2 flex-shrink-0">
                 Rate
               </label>
-              <input
-                type="text"
-                placeholder="e.g. $50/hr or $500 flat"
-                value={form.budget}
-                onChange={(e) => setForm((f) => ({ ...f, budget: e.target.value }))}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
-              />
-            </div>
-
-            {/* Work from anywhere */}
-            <div className="flex items-center gap-4 py-4 border-b border-gray-100">
-              <label className="w-36 text-sm font-bold text-[#111] flex-shrink-0">
-                Work from anywhere?
-              </label>
-              <button
-                type="button"
-                onClick={() => setForm((f) => ({ ...f, workFromAnywhere: !f.workFromAnywhere }))}
-                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-                  form.workFromAnywhere ? "bg-green-500" : "bg-gray-300"
-                }`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                    form.workFromAnywhere ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
-              </button>
+              <div className="flex-1 space-y-2">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, askArtistRate: false }))}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                      !form.askArtistRate
+                        ? "bg-[#111] text-white border-[#111]"
+                        : "bg-white text-gray-500 border-gray-200 hover:border-gray-400"
+                    }`}
+                  >
+                    Set a rate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, askArtistRate: true, budget: "" }))}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                      form.askArtistRate
+                        ? "bg-[#111] text-white border-[#111]"
+                        : "bg-white text-gray-500 border-gray-200 hover:border-gray-400"
+                    }`}
+                  >
+                    Ask artist for their rate
+                  </button>
+                </div>
+                {!form.askArtistRate && (
+                  <input
+                    type="text"
+                    placeholder="e.g. $350/day, $500 flat, $50/hr"
+                    value={form.budget}
+                    onChange={(e) => setForm((f) => ({ ...f, budget: e.target.value }))}
+                    className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
+                  />
+                )}
+                {form.askArtistRate && (
+                  <p className="text-xs text-gray-400">Artists will be prompted to enter their rate when applying.</p>
+                )}
+              </div>
             </div>
 
             {/* Apply Email */}
@@ -799,12 +881,9 @@ function PostJobModal({
               <label className="w-36 text-sm font-bold text-[#111] pt-2 flex-shrink-0">
                 Description
               </label>
-              <textarea
-                placeholder="Describe the role, requirements, and any other details..."
+              <RichTextEditor
                 value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                rows={5}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all resize-none"
+                onChange={(html) => setForm((f) => ({ ...f, description: html }))}
               />
             </div>
 
@@ -1863,9 +1942,10 @@ function JobDetailView({
               <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
                 Description
               </h4>
-              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-                {job.description}
-              </p>
+              <div
+                className="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: job.description }}
+              />
             </div>
           )}
           {job.category && (
@@ -1882,7 +1962,7 @@ function JobDetailView({
             </h4>
             <p className="text-sm text-gray-700 flex items-center gap-1">
               <MapPin size={13} className="text-gray-400" />
-              {job.location && !job.location.includes("[object") ? job.location : job.workFromAnywhere ? "Work from Anywhere" : "TBD"}
+              {job.location && !job.location.includes("[object") ? job.location : !!job.workFromAnywhere ? "Open to Traveling Applicants" : "TBD"}
             </p>
           </div>
           {job.applyEmail && (
@@ -1898,12 +1978,20 @@ function JobDetailView({
               </a>
             </div>
           )}
-          {job.rate && (
+          {(job.budget || job.rate) && (
             <div>
               <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
                 Rate
               </h4>
-              <p className="text-sm text-gray-700">{job.rate}</p>
+              <p className="text-sm text-gray-700">{job.budget || job.rate}</p>
+            </div>
+          )}
+          {!job.budget && !job.rate && (
+            <div>
+              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                Rate
+              </h4>
+              <p className="text-sm text-gray-500 italic">Open — artists pitch their rate</p>
             </div>
           )}
         </div>

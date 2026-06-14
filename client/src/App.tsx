@@ -38,6 +38,7 @@ import About from "./pages/About";
 import InvoicePayment from "./pages/InvoicePayment";
 import DanceCompetitions from "./pages/DanceCompetitions";
 import DanceStudios from "./pages/DanceStudios";
+import AcrobaticArts from "./pages/AcrobaticArts";
 import MusicSchools from "./pages/MusicSchools";
 import DanceTeachers from "./pages/DanceTeachers";
 import DanceJudges from "./pages/DanceJudges";
@@ -172,6 +173,7 @@ function Router() {
       <Route path="/browse" component={BrowseArtists} />
       <Route path="/dance-competitions" component={DanceCompetitions} />
       <Route path="/dance-studios" component={DanceStudios} />
+      <Route path="/acrobatic-arts" component={AcrobaticArts} />
       <Route path="/music-schools" component={MusicSchools} />
       <Route path="/dance-teachers" component={DanceTeachers} />
       <Route path="/dance-judges" component={DanceJudges} />

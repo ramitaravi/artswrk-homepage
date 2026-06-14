@@ -196,7 +196,7 @@ export async function createBoostCheckoutSession(
  * Uses the existing Stripe product/price IDs.
  */
 export async function createArtistProCheckoutSession(
-  opts: CreateCheckoutOptions & { interval: "month" | "year" }
+  opts: CreateCheckoutOptions & { interval: "month" | "year"; returnPath?: string }
 ): Promise<{ url: string; sessionId: string }> {
   const stripe = getStripe();
   const { ARTIST_PRO } = await import("./stripe-products").then(m => ({ ARTIST_PRO: m.STRIPE_PRODUCTS.ARTIST_PRO }));
@@ -205,10 +205,13 @@ export async function createArtistProCheckoutSession(
     ? ARTIST_PRO.annual.priceId
     : ARTIST_PRO.monthly.priceId;
 
+  const successPath = opts.returnPath ?? "/app";
+  const separator = successPath.includes("?") ? "&" : "?";
+
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${opts.origin}/app?plan=pro&session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${opts.origin}${successPath}${separator}plan=pro&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${opts.origin}/app/settings?cancelled=1`,
     allow_promotion_codes: true,
     client_reference_id: opts.userId?.toString(),

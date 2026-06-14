@@ -119,6 +119,7 @@ function ProApplyForm({
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [rateInput, setRateInput] = useState("");
+  const [rateType, setRateType] = useState<"flat" | "hourly">("flat");
   const [uploading, setUploading] = useState(false);
   const [localResumes, setLocalResumes] = useState<ResumeItem[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -162,15 +163,23 @@ function ProApplyForm({
     }
   }
 
+  const canSubmit =
+    message.trim().length > 0 &&
+    (!hasOpenBudget || rateInput.trim().length > 0);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!canSubmit) return;
     selectedResumeIdRef.current = selectedResumeId;
     const selectedResume = allResumes.find((r) => r.id === selectedResumeId);
+    const formattedRate = rateInput.trim()
+      ? `$${rateInput.trim()}${rateType === "hourly" ? "/hr" : " flat"}`
+      : undefined;
     applyMutation.mutate({
       premiumJobId: jobId,
       message: message.trim() || undefined,
       resumeLink: selectedResume?.fileUrl || undefined,
-      rate: rateInput.trim() ? `$${rateInput.trim()}` : undefined,
+      rate: formattedRate,
     });
   }
 
@@ -221,9 +230,7 @@ function ProApplyForm({
 
       {/* Message */}
       <div>
-        <p className="text-sm font-bold text-[#111] mb-2">
-          Cover message <span className="text-gray-400 font-normal text-xs">(optional)</span>
-        </p>
+        <p className="text-sm font-bold text-[#111] mb-2">Cover message</p>
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
@@ -238,15 +245,30 @@ function ProApplyForm({
       {/* Rate pitch */}
       {hasOpenBudget && (
         <div>
-          <p className="text-sm font-bold text-[#111] mb-2">
-            Your rate <span className="text-gray-400 font-normal text-xs">(optional)</span>
-          </p>
+          <p className="text-sm font-bold text-[#111] mb-2">Your rate</p>
+          {/* Flat / Hourly toggle */}
+          <div className="flex gap-2 mb-2">
+            {(["flat", "hourly"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setRateType(t)}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                  rateType === t
+                    ? "bg-[#111] text-white"
+                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                }`}
+              >
+                {t === "flat" ? "Flat rate" : "Hourly rate"}
+              </button>
+            ))}
+          </div>
           <div className="relative">
             <DollarSign size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="number"
               min={0}
-              placeholder="e.g. 150"
+              placeholder={rateType === "hourly" ? "e.g. 50 /hr" : "e.g. 500 flat"}
               value={rateInput}
               onChange={(e) => setRateInput(e.target.value)}
               className="w-full pl-8 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#111] transition-colors"
@@ -257,7 +279,7 @@ function ProApplyForm({
 
       <button
         type="submit"
-        disabled={applyMutation.isPending}
+        disabled={applyMutation.isPending || !canSubmit}
         className="w-full py-3.5 rounded-xl text-sm font-bold text-white bg-[#111] hover:opacity-80 transition-opacity disabled:opacity-50"
       >
         {applyMutation.isPending ? (
@@ -299,6 +321,11 @@ export default function ProJobDetail() {
   const [applied, setApplied] = useState(false);
   const [appliedSummary, setAppliedSummary] = useState<ApplicationSummary | null>(null);
   const applyRef = useRef<HTMLDivElement>(null);
+
+  const proCheckoutMutation = trpc.artistSubscription.createProCheckout.useMutation({
+    onSuccess: (data: { url: string }) => { window.location.href = data.url; },
+    onError: (err) => { console.error("[PRO checkout]", err); toast.error("Checkout failed: " + err.message); },
+  });
 
   // Sync applied state + summary from server once loaded.
   // Use functional update so an already-set in-session summary is never overwritten.
@@ -418,7 +445,7 @@ export default function ProJobDetail() {
 
           {/* Company row */}
           <div className="flex items-center gap-3 mb-5">
-            {isAuthenticated ? (
+            {isAuthenticated && isPro ? (
               <>
                 <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0">
                   {j.logo ? (
@@ -428,6 +455,13 @@ export default function ProJobDetail() {
                   )}
                 </div>
                 <span className="text-sm font-semibold text-gray-600">{company}</span>
+              </>
+            ) : isAuthenticated ? (
+              <>
+                <div className="w-9 h-9 rounded-full bg-gray-200 blur-sm flex-shrink-0" />
+                <span className="text-sm text-gray-400 select-none">
+                  Company hidden · <button onClick={scrollToApply} className="text-[#F25722] font-semibold hover:underline">Unlock PRO to see</button>
+                </span>
               </>
             ) : (
               <>
@@ -561,20 +595,45 @@ export default function ProJobDetail() {
                 <p className="text-xs text-green-600">The team will be in touch if you're a great fit. Track your application in your dashboard.</p>
               </div>
             ) : !isAuthenticated ? (
-              <InlineAuth nextUrl={jobUrl} heading="Join Artswrk to apply" />
+              <InlineAuth
+                heading="Join Artswrk to apply"
+                onSuccess={() => window.location.reload()}
+                onNotFound={(email) => { window.location.href = `/join?next=${encodeURIComponent(jobUrl)}&email=${encodeURIComponent(email)}`; }}
+              />
             ) : !isPro ? (
-              <div className="rounded-2xl border border-gray-100 p-6 bg-white shadow-sm text-center">
-                <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-3">
-                  <Star size={20} className="text-yellow-500 fill-yellow-500" />
+              <div className="rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                {/* Blurred preview of apply form */}
+                <div className="relative p-6 select-none pointer-events-none">
+                  <div className="blur-sm opacity-40 space-y-4">
+                    <div className="h-4 bg-gray-200 rounded w-1/3" />
+                    <div className="h-24 bg-gray-100 rounded-xl" />
+                    <div className="h-4 bg-gray-200 rounded w-1/2" />
+                    <div className="h-10 bg-gray-100 rounded-xl" />
+                  </div>
+                  <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px]" />
                 </div>
-                <p className="text-base font-black text-[#111] mb-1">Artswrk PRO required</p>
-                <p className="text-sm text-gray-400 mb-5">Upgrade your account to apply to exclusive PRO jobs.</p>
-                <a
-                  href="/app/settings"
-                  className="inline-block px-6 py-3 rounded-xl text-sm font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors"
-                >
-                  Upgrade to PRO →
-                </a>
+                <div className="bg-[#111] p-5 text-center">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <Star size={16} className="text-yellow-400 fill-yellow-400" />
+                    <span className="text-white font-black text-sm">ArtswrkPRO</span>
+                  </div>
+                  <p className="text-white/70 text-xs mb-4">Subscribe to apply to exclusive high-paying PRO jobs</p>
+                  <button
+                    onClick={() => proCheckoutMutation.mutate({
+                      interval: "month",
+                      origin: window.location.origin,
+                      returnPath: jobUrl,
+                    })}
+                    disabled={proCheckoutMutation.isPending}
+                    className="w-full py-3 rounded-xl text-sm font-bold text-[#111] bg-white hover:bg-gray-100 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {proCheckoutMutation.isPending ? (
+                      <><Loader2 size={14} className="animate-spin" /> Redirecting…</>
+                    ) : (
+                      <>🔒 Unlock Artswrk PRO</>
+                    )}
+                  </button>
+                </div>
               </div>
             ) : (
               <ProApplyForm
@@ -609,12 +668,18 @@ export default function ProJobDetail() {
             Apply
           </a>
         ) : !isPro ? (
-          <a
-            href="/app/settings"
-            className="flex-shrink-0 px-6 py-3 rounded-2xl text-sm font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors"
+          <button
+            onClick={() => proCheckoutMutation.mutate({
+              interval: "month",
+              origin: window.location.origin,
+              returnPath: jobUrl,
+            })}
+            disabled={proCheckoutMutation.isPending}
+            className="flex-shrink-0 px-6 py-3 rounded-2xl text-sm font-bold text-white bg-[#111] hover:opacity-80 transition-opacity disabled:opacity-50 flex items-center gap-2"
           >
-            Upgrade to PRO
-          </a>
+            {proCheckoutMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : "🔒"}
+            Unlock PRO
+          </button>
         ) : (
           <button
             onClick={scrollToApply}

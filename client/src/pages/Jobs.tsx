@@ -407,6 +407,11 @@ function ProJobCard({
   isPro: boolean;
   applied?: boolean;
 }) {
+  const checkoutMutation = trpc.artistSubscription.createProCheckout.useMutation({
+    onSuccess: (data: { url: string }) => { window.location.href = data.url; },
+    onError: (err) => { console.error("[PRO checkout]", err); alert("Checkout failed: " + err.message); },
+  });
+
   // Logged-out: blurred logo, no company name, Apply goes to detail page
   if (!isAuthenticated) {
     return (
@@ -434,22 +439,14 @@ function ProJobCard({
     );
   }
 
-  // Logged-in but not PRO: show company, Apply → upgrade
+  // Logged-in but not PRO: blurred identity, direct checkout CTA
   if (!isPro) {
     return (
       <div className="flex items-center gap-4 p-4 border-b border-gray-100 last:border-b-0">
-        <div className="flex-shrink-0 w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
-          {job.logo ? (
-            <img src={job.logo} alt={job.company ?? ""} className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-sm font-black text-gray-500">
-              {(job.company ?? job.title)[0]?.toUpperCase() ?? "?"}
-            </span>
-          )}
-        </div>
+        {/* Company logo blurred — same treatment as logged-out */}
+        <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gray-300 blur-sm" />
         <div className="flex-1 min-w-0">
           <h3 className="font-bold text-[#111] text-sm leading-tight truncate">{job.title}</h3>
-          {job.company && <p className="text-xs text-gray-500 truncate">{job.company}</p>}
           <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
             <MapPin size={10} className="flex-shrink-0" /> {job.location}
           </p>
@@ -459,12 +456,18 @@ function ProJobCard({
             </span>
           )}
         </div>
-        <a
-          href="/app/settings"
-          className="flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold text-[#111] border border-[#111] hover:bg-gray-50 transition-colors"
+        <button
+          onClick={() => checkoutMutation.mutate({
+            interval: "month",
+            origin: window.location.origin,
+            returnPath: job.detailUrl,
+          })}
+          disabled={checkoutMutation.isPending}
+          className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#111] hover:opacity-80 transition-opacity disabled:opacity-50"
         >
-          Upgrade →
-        </a>
+          <Lock size={11} />
+          {checkoutMutation.isPending ? "…" : "Unlock PRO"}
+        </button>
       </div>
     );
   }

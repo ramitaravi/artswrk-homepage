@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { StudioJobWizard } from "@/components/StudioJobWizard";
 
 const HOW_IT_WORKS = [
   {
@@ -39,6 +40,23 @@ const FAQS = [
   { q: "Who are the Artswrk artists?", a: "Artswrk artists are vetted professional dance teachers, choreographers, judges, and performers across the country." },
 ];
 
+function StudioLeadForm() {
+  return (
+    <section className="py-16 px-5 lg:px-10 bg-gradient-to-br from-orange-50 to-amber-50">
+      <div className="max-w-xl mx-auto">
+        <div className="text-center mb-8">
+          <p className="text-sm font-semibold hirer-grad-text uppercase tracking-widest mb-3">Get Started Free</p>
+        </div>
+        <StudioJobWizard
+          heading="Post a Job in Minutes"
+          subheading="Describe what you need — our AI will build your listing and send it to 6,000+ artists."
+          businessType="Dance Studio"
+        />
+      </div>
+    </section>
+  );
+}
+
 function FaqItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
   return (
@@ -67,7 +85,7 @@ export default function DanceStudios() {
           </h1>
           <p className="text-gray-500 text-lg mb-8">Connect with dance teachers near you on Artswrk</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-6">
-            <a href="/jobs" className="inline-block bg-[#111] text-white text-sm font-bold px-7 py-3.5 rounded-full hover:bg-gray-800 transition-colors">
+            <a href="#get-started" className="inline-block bg-[#111] text-white text-sm font-bold px-7 py-3.5 rounded-full hover:bg-gray-800 transition-colors">
               Get Started →
             </a>
           </div>
@@ -89,6 +107,11 @@ export default function DanceStudios() {
           </div>
         </div>
       </section>
+
+      {/* ── Lead Capture Wizard ── */}
+      <div id="get-started">
+        <StudioLeadForm />
+      </div>
 
       {/* ── Hire Dance Teachers ── */}
       <section className="py-20 px-5 lg:px-10 max-w-7xl mx-auto">
@@ -177,7 +200,7 @@ export default function DanceStudios() {
         <div className="max-w-4xl mx-auto hirer-grad-bg rounded-3xl p-12 text-center">
           <h2 className="text-3xl md:text-4xl font-black text-white mb-4">Ready to hire your next dance teacher?</h2>
           <p className="text-white/80 mb-8">Join 500+ studios already hiring on Artswrk</p>
-          <a href="/jobs" className="inline-block bg-white text-[#F25722] text-sm font-bold px-8 py-4 rounded-full hover:bg-gray-50 transition-colors">
+          <a href="#get-started" className="inline-block bg-white text-[#F25722] text-sm font-bold px-8 py-4 rounded-full hover:bg-gray-50 transition-colors">
             Post a Job — It's Free
           </a>
         </div>

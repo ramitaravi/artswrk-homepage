@@ -10,6 +10,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import SharedNavbar from "@/components/Navbar";
+import BoostJobModal from "@/components/BoostJobModal";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Sparkles,
   MapPin,
@@ -318,18 +320,23 @@ function Step2({
     serviceType: parsed.serviceType || "",
   }));
 
-  // ── Auto-populate from last job on first load ──
+  // ── Auto-populate from last job on first load (only fills blanks, never overwrites AI-parsed values) ──
   const [lastJobApplied, setLastJobApplied] = useState(false);
   useEffect(() => {
     if (lastJobApplied || !lastJobQuery.data) return;
     const d = lastJobQuery.data;
-    setForm((f) => ({
-      ...f,
-      isHourly: d.isHourly ?? f.isHourly,
-      openRate: d.openRate ?? f.openRate,
-      clientHourlyRate: d.clientHourlyRate ? String(d.clientHourlyRate) : f.clientHourlyRate,
-      transportation: d.transportation ?? f.transportation,
-    }));
+    setForm((f) => {
+      const hasRate = f.openRate || !!f.clientHourlyRate || !!f.clientFlatRate;
+      return {
+        ...f,
+        // Only apply rate/type from last job when AI didn't parse a rate
+        isHourly: hasRate ? f.isHourly : (d.isHourly ?? f.isHourly),
+        openRate: hasRate ? f.openRate : (d.openRate ?? f.openRate),
+        clientHourlyRate: f.clientHourlyRate || (d.clientHourlyRate ? String(d.clientHourlyRate) : ""),
+        clientFlatRate: f.clientFlatRate || (d.clientFlatRate ? String(d.clientFlatRate) : ""),
+        transportation: d.transportation ?? f.transportation,
+      };
+    });
     setLastJobApplied(true);
   }, [lastJobQuery.data, lastJobApplied]);
 
@@ -401,11 +408,20 @@ function Step2({
     },
   });
 
+  // ── Validation ────────────────────────────────────────────────────────────
+  const isValid = {
+    title: !!form.title.trim(),
+    description: !!form.description.trim(),
+    location: !!form.locationAddress.trim(),
+    rate: form.openRate || !!form.clientHourlyRate.trim() || !!form.clientFlatRate.trim(),
+  };
+  const isFormValid = Object.values(isValid).every(Boolean);
+
+  function fieldSection(valid: boolean) {
+    return valid ? "" : "bg-red-50/50 border-l-[3px] border-l-red-300";
+  }
+
   function handlePostFree() {
-    if (!form.description.trim()) {
-      toast.error("Please add a job description.");
-      return;
-    }
     if (!isAuthenticated) {
       sessionStorage.setItem("postJobPending", JSON.stringify(form));
       window.location.href = getLoginUrl();
@@ -456,119 +472,93 @@ function Step2({
 
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-100">
         {/* Title */}
-        <div className="p-5">
+        <div className={`p-5 transition-colors ${fieldSection(isValid.title)}`}>
           <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
-            Job Title
+            Job Title {!isValid.title && <span className="text-red-400 normal-case font-normal ml-1">· required</span>}
           </label>
           <Input
             value={form.title}
             onChange={(e) => set("title", e.target.value)}
             placeholder="e.g. Hip Hop Sub Teacher"
-            className="border-gray-200 focus:border-[#F25722]"
+            className={`focus:border-[#F25722] ${!isValid.title ? "border-red-200" : "border-gray-200"}`}
           />
         </div>
 
-        {/* Studio / Company — logo-card dropdown for logged-in users */}
+        {/* Studio / Company — dropdown */}
         <div className="p-5">
           <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
             Posting On Behalf Of
           </label>
           {user ? (
             <div className="space-y-3">
-              {/* Company cards */}
               {companiesQuery.isLoading ? (
                 <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <Loader2 size={12} className="animate-spin" />
-                  Loading your companies...
+                  <Loader2 size={12} className="animate-spin" /> Loading...
                 </div>
               ) : (
-                <div className="flex flex-wrap gap-2">
-                  {/* Each company as a card */}
-                  {companies.map((company: import('../../../drizzle/schema').ClientCompany) => (
-                    <button
-                      key={company.id}
-                      type="button"
-                      onClick={() => {
-                        setForm((f) => ({
-                          ...f,
-                          studioName: company.name,
-                          selectedCompanyId: company.id,
-                          locationAddress: company.locationAddress || f.locationAddress,
-                          // Auto-populate transport from company settings
-                          transportation: company.transportReimbursed ?? f.transportation,
-                          transportationInstructions: company.transportDetails || f.transportationInstructions,
-                        }));
-                      }}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all text-left ${
-                        form.selectedCompanyId === company.id
-                          ? "border-[#F25722] bg-orange-50"
-                          : "border-gray-200 hover:border-gray-300 bg-white"
-                      }`}
-                    >
-                      {company.logo ? (
-                        <img
-                          src={company.logo}
-                          alt={company.name}
-                          className="w-7 h-7 rounded-lg object-cover flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-7 h-7 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
-                          <Building2 size={14} className="text-[#F25722]" />
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <p className={`text-xs font-semibold truncate max-w-[140px] ${
-                          form.selectedCompanyId === company.id ? "text-[#F25722]" : "text-[#111]"
-                        }`}>
-                          {company.name}
-                        </p>
-                        {company.locationAddress && (
-                          <p className="text-[10px] text-gray-400 truncate max-w-[140px]">
-                            {company.locationAddress}
-                          </p>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-
-                  {/* Post as individual */}
-                  <button
-                    type="button"
-                    onClick={() => {
+                <Select
+                  value={
+                    form.selectedCompanyId != null
+                      ? String(form.selectedCompanyId)
+                      : form.studioName === userFullName
+                      ? "__individual__"
+                      : "__none__"
+                  }
+                  onValueChange={(val) => {
+                    if (val === "__add__") {
+                      setShowAddCompany(true);
+                      return;
+                    }
+                    if (val === "__individual__") {
+                      setForm((f) => ({ ...f, studioName: userFullName, selectedCompanyId: null }));
+                      return;
+                    }
+                    const company = companies.find((c: any) => c.id === parseInt(val));
+                    if (company) {
                       setForm((f) => ({
                         ...f,
-                        studioName: userFullName,
-                        selectedCompanyId: null,
+                        studioName: company.name,
+                        selectedCompanyId: company.id,
+                        locationAddress: company.locationAddress || f.locationAddress,
+                        transportation: company.transportReimbursed ?? f.transportation,
+                        transportationInstructions: company.transportDetails || f.transportationInstructions,
                       }));
-                    }}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
-                      form.selectedCompanyId === null && form.studioName === userFullName
-                        ? "border-[#F25722] bg-orange-50"
-                        : "border-gray-200 hover:border-gray-300 bg-white"
-                    }`}
-                  >
-                    <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                      <Users size={14} className="text-gray-500" />
-                    </div>
-                    <p className={`text-xs font-semibold ${
-                      form.selectedCompanyId === null && form.studioName === userFullName
-                        ? "text-[#F25722]"
-                        : "text-[#111]"
-                    }`}>
-                      {userFullName} (Individual)
-                    </p>
-                  </button>
-
-                  {/* Add New Company */}
-                  <button
-                    type="button"
-                    onClick={() => setShowAddCompany(true)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-gray-300 hover:border-[#F25722] hover:text-[#F25722] transition-all text-gray-400"
-                  >
-                    <Plus size={14} />
-                    <span className="text-xs font-semibold">Add Company</span>
-                  </button>
-                </div>
+                    }
+                  }}
+                >
+                  <SelectTrigger className="border-gray-200 focus:border-[#F25722] w-full">
+                    <SelectValue placeholder="Select company or individual..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((company: any) => (
+                      <SelectItem key={company.id} value={String(company.id)}>
+                        <div className="flex items-center gap-2">
+                          {company.logo
+                            ? <img src={company.logo} alt={company.name} className="w-4 h-4 rounded object-cover flex-shrink-0" />
+                            : <Building2 size={13} className="text-gray-400 flex-shrink-0" />}
+                          <span className="font-semibold">{company.name}</span>
+                          {company.locationAddress && (
+                            <span className="text-gray-400 text-xs truncate">· {company.locationAddress}</span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                    {userFullName && (
+                      <SelectItem value="__individual__">
+                        <div className="flex items-center gap-2">
+                          <Users size={13} className="text-gray-400 flex-shrink-0" />
+                          <span>{userFullName} (Individual)</span>
+                        </div>
+                      </SelectItem>
+                    )}
+                    <SelectItem value="__add__" className="text-[#F25722] font-semibold">
+                      <div className="flex items-center gap-2">
+                        <Plus size={13} className="flex-shrink-0" />
+                        <span>Add New Company...</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               )}
 
               {/* Add Company inline form */}
@@ -576,97 +566,55 @@ function Step2({
                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold text-[#111]">New Company</p>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddCompany(false)}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
+                    <button type="button" onClick={() => setShowAddCompany(false)} className="text-gray-400 hover:text-gray-600">
                       <X size={14} />
                     </button>
                   </div>
-                  <Input
-                    value={newCompanyName}
-                    onChange={(e) => setNewCompanyName(e.target.value)}
-                    placeholder="Company / Studio name"
-                    className="border-gray-200 text-sm"
-                    autoFocus
-                  />
-                  <Input
-                    value={newCompanyLocation}
-                    onChange={(e) => setNewCompanyLocation(e.target.value)}
-                    placeholder="City, State (optional)"
-                    className="border-gray-200 text-sm"
-                  />
+                  <Input value={newCompanyName} onChange={(e) => setNewCompanyName(e.target.value)} placeholder="Company / Studio name" className="border-gray-200 text-sm" autoFocus />
+                  <Input value={newCompanyLocation} onChange={(e) => setNewCompanyLocation(e.target.value)} placeholder="City, State (optional)" className="border-gray-200 text-sm" />
                   <Button
                     size="sm"
                     onClick={() => {
-                      if (!newCompanyName.trim()) {
-                        toast.error("Company name is required");
-                        return;
-                      }
-                      addCompanyMutation.mutate({
-                        name: newCompanyName.trim(),
-                        locationAddress: newCompanyLocation.trim() || undefined,
-                      });
+                      if (!newCompanyName.trim()) { toast.error("Company name is required"); return; }
+                      addCompanyMutation.mutate({ name: newCompanyName.trim(), locationAddress: newCompanyLocation.trim() || undefined });
                     }}
                     disabled={addCompanyMutation.isPending}
                     className="hirer-grad-bg border-0 hover:opacity-90 text-xs"
                   >
-                    {addCompanyMutation.isPending ? (
-                      <Loader2 size={12} className="animate-spin mr-1" />
-                    ) : (
-                      <Plus size={12} className="mr-1" />
-                    )}
+                    {addCompanyMutation.isPending ? <Loader2 size={12} className="animate-spin mr-1" /> : <Plus size={12} className="mr-1" />}
                     Add Company
                   </Button>
                 </div>
               )}
-
-              {/* Custom name input if not matching any company or individual */}
-              {form.selectedCompanyId === null &&
-                form.studioName !== userFullName &&
-                !showAddCompany && (
-                  <Input
-                    value={form.studioName}
-                    onChange={(e) => set("studioName", e.target.value)}
-                    placeholder="Enter studio or company name"
-                    className="border-gray-200 focus:border-[#F25722]"
-                  />
-                )}
             </div>
           ) : (
-            <Input
-              value={form.studioName}
-              onChange={(e) => set("studioName", e.target.value)}
-              placeholder="Your studio or company name"
-              className="border-gray-200 focus:border-[#F25722]"
-            />
+            <Input value={form.studioName} onChange={(e) => set("studioName", e.target.value)} placeholder="Your studio or company name" className="border-gray-200 focus:border-[#F25722]" />
           )}
         </div>
 
         {/* Description */}
-        <div className="p-5">
+        <div className={`p-5 transition-colors ${fieldSection(isValid.description)}`}>
           <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
-            Job Description
+            Job Description {!isValid.description && <span className="text-red-400 normal-case font-normal ml-1">· required</span>}
           </label>
           <Textarea
             value={form.description}
             onChange={(e) => set("description", e.target.value)}
-            className="min-h-[100px] border-gray-200 focus:border-[#F25722] resize-none"
+            className={`min-h-[100px] focus:border-[#F25722] resize-none ${!isValid.description ? "border-red-200" : "border-gray-200"}`}
           />
         </div>
 
         {/* Location */}
-        <div className="p-5">
+        <div className={`p-5 transition-colors ${fieldSection(isValid.location)}`}>
           <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
             <MapPin size={11} className="inline mr-1" />
-            Location
+            Location {!isValid.location && <span className="text-red-400 normal-case font-normal ml-1">· required</span>}
           </label>
           <Input
             value={form.locationAddress}
             onChange={(e) => set("locationAddress", e.target.value)}
             placeholder="City, State or full address"
-            className="border-gray-200 focus:border-[#F25722]"
+            className={`focus:border-[#F25722] ${!isValid.location ? "border-red-200" : "border-gray-200"}`}
           />
           {/* Location conflict flag */}
           {locationConflict && selectedCompany?.locationAddress && (
@@ -829,10 +777,10 @@ function Step2({
         </div>
 
         {/* Rate */}
-        <div className="p-5">
+        <div className={`p-5 transition-colors ${fieldSection(isValid.rate)}`}>
           <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
             <DollarSign size={11} className="inline mr-1" />
-            Rate
+            Rate {!isValid.rate && <span className="text-red-400 normal-case font-normal ml-1">· required</span>}
           </label>
           <div className="flex gap-2 mb-3 flex-wrap">
             {[
@@ -998,8 +946,8 @@ function Step2({
         </Button>
         <Button
           onClick={handlePostFree}
-          disabled={createFreeJob.isPending}
-          className="flex-1 py-5 font-bold rounded-xl hirer-grad-bg border-0 hover:opacity-90 transition-opacity"
+          disabled={!isFormValid || createFreeJob.isPending}
+          className="flex-1 py-5 font-bold rounded-xl hirer-grad-bg border-0 hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {createFreeJob.isPending ? (
             <><Loader2 size={18} className="animate-spin mr-2" />Posting your job...</>
@@ -1009,9 +957,14 @@ function Step2({
         </Button>
       </div>
 
-      <p className="text-center text-xs text-gray-400 mt-3">
-        Free to post · No credit card required
-      </p>
+      {!isFormValid && (
+        <p className="text-center text-xs text-red-400 mt-2 font-medium">
+          Fill in the highlighted fields above to post
+        </p>
+      )}
+      {isFormValid && (
+        <p className="text-center text-xs text-gray-400 mt-3">Free to post · No credit card required</p>
+      )}
     </div>
   );
 }
@@ -1100,6 +1053,7 @@ function Step3({
 
   // sub-step: "almost_ready" → "sponsor"
   const [subStep, setSubStep] = useState<"almost_ready" | "sponsor">("almost_ready");
+  const [showBoost, setShowBoost] = useState(false);
 
   const createAndCheckout = trpc.postJob.createAndCheckout.useMutation({
     onSuccess: (data) => {
@@ -1209,24 +1163,34 @@ function Step3({
     });
   }
 
-  // ── Sub-step: Almost Ready ──────────────────────────────────────────────────
+  // ── Sub-step: Posted! ──────────────────────────────────────────────────────
   if (subStep === "almost_ready") {
     return (
       <div className="max-w-2xl mx-auto">
+        {jobId && (
+          <BoostJobModal
+            jobId={jobId}
+            jobTitle={form.title || undefined}
+            open={showBoost}
+            onClose={() => { setShowBoost(false); navigate("/app/jobs"); }}
+          />
+        )}
+
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-full hirer-grad-bg flex items-center justify-center mx-auto mb-4 shadow-lg">
             <CheckCircle2 size={28} className="text-white" />
           </div>
-          <h2 className="text-3xl font-black text-[#111] mb-2">Your job is live!</h2>
+          <h2 className="text-3xl font-black text-[#111] mb-2">Your job has been posted! 🎉</h2>
           <p className="text-gray-500 text-base max-w-md mx-auto">
-            Artists are already seeing your listing. Unlock applicants to start messaging them directly.
+            Artists are already seeing your listing. Boost it to the top for even more applicants.
           </p>
         </div>
 
+        {/* Live listing preview */}
         <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-100 p-5 mb-6">
           <p className="text-xs font-semibold text-[#F25722] uppercase tracking-wider mb-3 flex items-center gap-1.5">
             <Eye size={11} />
-            Your listing is now live
+            Live now
           </p>
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl hirer-grad-bg flex items-center justify-center text-white font-black text-sm flex-shrink-0">
@@ -1249,19 +1213,23 @@ function Step3({
         </div>
 
         <div className="flex gap-3">
-          <Button
-            variant="outline"
-            onClick={() => navigate("/app/jobs")}
-            className="flex-1 py-4"
-          >
+          <Button variant="outline" onClick={() => navigate("/app/jobs")} className="flex-1 py-4">
             View My Jobs
           </Button>
           <Button
             onClick={() => setSubStep("sponsor")}
+            variant="outline"
+            className="flex-1 py-4 border-[#F25722] text-[#F25722] hover:bg-orange-50"
+          >
+            <Unlock size={15} className="mr-1.5" />
+            Unlock Applicants
+          </Button>
+          <Button
+            onClick={() => setShowBoost(true)}
             className="flex-1 py-4 hirer-grad-bg border-0 hover:opacity-90 font-bold"
           >
-            Unlock Applicants
-            <ChevronRight size={16} className="ml-1" />
+            <Zap size={15} className="mr-1.5" />
+            Boost Job
           </Button>
         </div>
       </div>
@@ -1455,9 +1423,19 @@ export default function PostJob() {
   if (isSuccess) return <SuccessPage />;
 
   const { user } = useAuth();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [rawText, setRawText] = useState("");
-  const [parsed, setParsed] = useState<ParsedJob | null>(null);
+
+  // Read pre-parsed job data from the lead capture flow (DanceStudios → parse → here)
+  const [initialParsed] = useState<{ parsed: ParsedJob; rawText: string } | null>(() => {
+    const raw = sessionStorage.getItem("postJobParsed");
+    if (!raw) return null;
+    sessionStorage.removeItem("postJobParsed");
+    try { return JSON.parse(raw) as { parsed: ParsedJob; rawText: string }; }
+    catch { return null; }
+  });
+
+  const [step, setStep] = useState<1 | 2 | 3>(initialParsed ? 2 : 1);
+  const [rawText, setRawText] = useState(initialParsed?.rawText ?? "");
+  const [parsed, setParsed] = useState<ParsedJob | null>(initialParsed?.parsed ?? null);
   const [form, setForm] = useState<FormData | null>(null);
   const [jobId, setJobId] = useState<number | null>(null);
   const [, navigate] = useLocation();

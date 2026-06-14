@@ -211,7 +211,11 @@ export default function JobDetail() {
   // ── Sidebar / bottom CTA ─────────────────────────────────────────────────
 
   const ctaSection = !isAuthenticated ? (
-    <InlineAuth nextUrl={jobUrl} heading="Join Artswrk to apply" />
+    <InlineAuth
+      heading="Join Artswrk to apply"
+      onSuccess={() => window.location.reload()}
+      onNotFound={(email) => { window.location.href = `/join?next=${encodeURIComponent(jobUrl)}&email=${encodeURIComponent(email)}`; }}
+    />
   ) : !canApply ? (
     <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
       <p className="text-base font-black text-[#111] mb-1">Artswrk Basic</p>

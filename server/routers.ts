@@ -8,7 +8,7 @@ import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
 import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getMessagesByConversationId, getMessageStatsByClientId, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, markInvoicePaid } from "./db";
 import { invokeLLM } from "./_core/llm";
-import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail } from "./email";
+import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail } from "./email";
 import crypto from "crypto";
 import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistBasicCheckoutSession, createArtistPortalSession, createEnterpriseJobUnlockCheckoutSession, createEnterpriseSubscriptionCheckoutSession, createClientJobUnlockCheckoutSession, createClientSubscriptionCheckoutSession } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
@@ -1816,6 +1816,7 @@ Fields to extract:
           isHourly: last.isHourly ?? true,
           openRate: last.openRate ?? false,
           clientHourlyRate: last.clientHourlyRate ?? null,
+          clientFlatRate: (last as any).clientFlatRate ?? null,
           transportation: last.transportation ?? false,
           locationAddress: last.locationAddress ?? null,
         };
@@ -2322,7 +2323,7 @@ Fields to extract:
           category: input.category || null,
           location: input.location || null,
           budget: input.budget || null,
-          workFromAnywhere: input.workFromAnywhere,
+          workFromAnywhere: input.workFromAnywhere === true,
           description: input.description || null,
           applyEmail: input.applyEmail || null,
           createdByUserId: ctx.user.id,
@@ -2338,12 +2339,10 @@ Fields to extract:
             firstName: poster.firstName ?? poster.name?.split(" ")[0] ?? "there",
             company: input.company,
             serviceType: input.serviceType,
-            category: input.category || null,
             location: input.location || null,
-            budget: input.budget || null,
             description: input.description || null,
-            workFromAnywhere: input.workFromAnywhere,
-            jobLink: `${appUrl}/enterprise`,
+            workFromAnywhere: input.workFromAnywhere === true,
+            jobLink: `${appUrl}/enterprise/${jobId}`,
           }).catch((err) => console.error("[PRO job email]", err));
         }
 
@@ -2551,6 +2550,52 @@ Fields to extract:
           rate: input.rate || null,
           createdAt: new Date(),
         });
+
+        // Fire-and-forget emails — don't block the response
+        (async () => {
+          try {
+            const appUrl = process.env.VITE_APP_URL || "https://artswrk.com";
+            const job = await getPremiumJobById(input.premiumJobId);
+            if (!job) return;
+            const clientUser = job.createdByUserId ? await getUserById(job.createdByUserId) : null;
+            const artist = ctx.user as any;
+            const artistFirstName: string = artist.firstName || "Artist";
+            const artistLastInitial: string = (artist.lastName || "").charAt(0).toUpperCase();
+            const locationDisplay: string = job.workFromAnywhere
+              ? "Work From Anywhere"
+              : (job.location || "Location TBD");
+            const jobLink = `${appUrl}/enterprise/${job.id}`;
+            const dashboardLink = `${appUrl}/app`;
+
+            if (clientUser?.email) {
+              await sendProJobApplicantAlertEmail({
+                to: clientUser.email,
+                artistFirstName,
+                artistLastInitial,
+                message: input.message || null,
+                serviceType: job.serviceType || "Open Position",
+                location: locationDisplay,
+                description: job.description || null,
+                jobLink,
+              });
+            }
+
+            const artistEmail: string | undefined = (artist as any).email;
+            if (artistEmail) {
+              await sendProJobSubmissionConfirmationEmail({
+                to: artistEmail,
+                artistFirstName,
+                serviceType: job.serviceType || "Open Position",
+                location: locationDisplay,
+                description: job.description || null,
+                dashboardLink,
+              });
+            }
+          } catch (err) {
+            console.error("[applyToProJob] email error:", err);
+          }
+        })();
+
         return { success: true, alreadyApplied: false };
       }),
 
@@ -2848,6 +2893,39 @@ Fields to extract:
         return getUserByBubbleId(input.bubbleId);
       }),
 
+    studioOnboard: publicProcedure
+      .input(z.object({
+        fullName: z.string().min(1),
+        email: z.string().email(),
+        password: z.string().min(8),
+        companyName: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const email = input.email.toLowerCase().trim();
+        const existing = await getUserByEmail(email);
+        if (existing) {
+          return { status: "existing" as const };
+        }
+        const parts = input.fullName.trim().split(/\s+/);
+        const firstName = parts[0] ?? "";
+        const lastName = parts.slice(1).join(" ") || firstName;
+        const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
+        const newUser = await createNewUser({
+          email,
+          firstName,
+          lastName,
+          passwordHash,
+          clientCompanyName: input.companyName?.trim() || undefined,
+        });
+        const sessionToken = await sdk.createSessionToken(newUser.openId, {
+          name: `${firstName} ${lastName}`,
+          expiresInMs: ONE_YEAR_MS,
+        });
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        return { status: "created" as const };
+      }),
+
     list: protectedProcedure
       .input(z.object({ limit: z.number().min(1).max(100).default(50), offset: z.number().min(0).default(0) }))
       .query(async ({ input, ctx }) => {
@@ -3007,6 +3085,7 @@ Fields to extract:
       .input(z.object({
         interval: z.enum(["month", "year"]),
         origin: z.string().url(),
+        returnPath: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const info = await getArtistSubscriptionInfo(ctx.user.id);
@@ -3016,6 +3095,7 @@ Fields to extract:
           origin: input.origin,
           stripeCustomerId: info?.stripeCustomerId ?? null,
           interval: input.interval,
+          returnPath: input.returnPath,
         });
         return { url, sessionId };
       }),
