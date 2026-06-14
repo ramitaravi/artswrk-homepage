@@ -50,6 +50,8 @@ export const users = mysqlTable("users", {
 
   // ── Artist Fields ──────────────────────────────────────────────────────────
   stripeCustomerId: varchar("stripeCustomerId", { length: 64 }),
+  /** Stripe Connect account ID (e.g. acct_xxx) for artist payout dashboard */
+  stripeConnectAccountId: varchar("stripeConnectAccountId", { length: 64 }),
   /** Short bio / about text */
   bio: text("bio"),
   /** Pronouns (e.g. "She/her", "They/them") */

@@ -6,7 +6,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, markInvoicePaid } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail } from "./email";
 import crypto from "crypto";
@@ -2898,6 +2898,26 @@ Fields to extract:
         const key = `reimbursements/${user.id}/${suffix}-${input.fileName}`;
         const { url } = await storagePut(key, buffer, input.mimeType);
         return { url };
+      }),
+
+    /** Wallet: total earned, reimbursements, and transaction list from paid bookings. */
+    walletData: protectedProcedure
+      .query(async ({ ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        return getArtistWalletData(user.id);
+      }),
+
+    /** Generate a Stripe Express dashboard login link for the artist. */
+    stripeLoginLink: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const accountId = await getArtistStripeConnectAccount(user.id);
+        if (!accountId) throw new Error("No Stripe Connect account configured");
+        const stripe = new (await import("stripe")).default(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2023-10-16" as any });
+        const link = await stripe.accounts.createLoginLink(accountId);
+        return { url: link.url };
       }),
   }),
 

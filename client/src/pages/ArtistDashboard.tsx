@@ -1454,69 +1454,140 @@ function ConfirmationsTab() {
   );
 }
 
-// ─── Payments Tab ─────────────────────────────────────────────────────────────────────────────────────
-
-const SAMPLE_PAYMENTS = [
-  { id: 1, jobTitle: "Hip Hop Instructor", company: "Elevation on Tour", amount: "$160.00", date: "May 5, 2025", status: "paid" as const, method: "Direct Deposit" },
-  { id: 2, jobTitle: "Event Assistant", company: "Journey Dance Competition", amount: "$80.00", date: "Apr 22, 2025", status: "pending" as const, method: "Direct Deposit" },
-  { id: 3, jobTitle: "Dance Judge", company: "REVEL Dance", amount: "$150.00", date: "Mar 17, 2025", status: "paid" as const, method: "Direct Deposit" },
-];
+// ─── Payments / Wallet Tab ─────────────────────────────────────────────────────
 
 function PaymentsTab() {
-  const totalEarned = SAMPLE_PAYMENTS.filter(p => p.status === "paid").reduce((sum, p) => sum + parseFloat(p.amount.replace("$", "").replace(",", "")), 0);
-  const totalPending = SAMPLE_PAYMENTS.filter(p => p.status === "pending").reduce((sum, p) => sum + parseFloat(p.amount.replace("$", "").replace(",", "")), 0);
+  const { data: user } = trpc.auth.me.useQuery();
+  const { data: wallet, isLoading } = trpc.artistDashboard.walletData.useQuery();
+  const stripeLink = trpc.artistDashboard.stripeLoginLink.useMutation();
+  const { data: benefitsData } = trpc.benefits.list.useQuery({ audienceType: "Artist" });
+
+  const handleStripeClick = async () => {
+    try {
+      const { url } = await stripeLink.mutateAsync();
+      window.open(url, "_blank");
+    } catch {
+      // Fall back to generic Stripe dashboard if login link fails (Standard accounts)
+      window.open("https://dashboard.stripe.com/", "_blank");
+    }
+  };
+
+  const firstName = (user as any)?.firstName || (user as any)?.name?.split(" ")[0] || "Artist";
+  const lastName = (user as any)?.lastName || (user as any)?.name?.split(" ").slice(-1)[0] || "";
+  const initials = `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
+
+  const totalEarned = wallet?.totalEarned ?? 0;
+  const totalReimb = wallet?.totalReimbursements ?? 0;
+  const transactions = wallet?.transactions ?? [];
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-[#111]">Payments</h2>
+    <div className="space-y-5">
+      <h2 className="text-2xl font-bold text-[#111]">Wallet</h2>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-          <p className="text-xs text-gray-500 mb-1">Total Earned</p>
-          <p className="text-2xl font-semibold text-[#111]">${totalEarned.toFixed(2)}</p>
-          <p className="text-xs text-green-600 mt-1 font-semibold">↑ All time</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-          <p className="text-xs text-gray-500 mb-1">Pending</p>
-          <p className="text-2xl font-semibold text-[#111]">${totalPending.toFixed(2)}</p>
-          <p className="text-xs text-amber-600 mt-1 font-semibold">Awaiting payment</p>
-        </div>
-      </div>
-
-      {/* Payment history */}
-      <div className="bg-white rounded-2xl border border-gray-100">
-        <div className="px-5 py-4 border-b border-gray-50">
-          <h3 className="text-sm font-semibold text-[#111]">Payment History</h3>
-        </div>
-        <div className="divide-y divide-gray-50">
-          {SAMPLE_PAYMENTS.map(payment => (
-            <div key={payment.id} className="flex items-center justify-between p-4">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-[#111] truncate">{payment.jobTitle}</p>
-                <p className="text-xs text-gray-500">{payment.company}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{payment.date} · {payment.method}</p>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <p className="text-sm font-semibold text-[#111]">{payment.amount}</p>
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                  payment.status === "paid" ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
-                }`}>
-                  {payment.status === "paid" ? "Paid" : "Pending"}
-                </span>
+      <div className="flex flex-col lg:flex-row gap-5">
+        {/* Left column */}
+        <div className="flex flex-col gap-4 lg:w-64 flex-shrink-0">
+          {/* Earnings card */}
+          <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(135deg, #e94e77 0%, #c33c6d 60%, #a02058 100%)" }}>
+            <div className="flex justify-end mb-6">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-white/80">
+                <DollarSign size={13} /> USD
               </div>
             </div>
-          ))}
-        </div>
-      </div>
+            {isLoading ? (
+              <div className="h-8 w-32 bg-white/20 rounded-lg animate-pulse mb-2" />
+            ) : (
+              <p className="text-3xl font-bold tracking-tight">${totalEarned.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            )}
+            <p className="text-xs text-white/70 uppercase tracking-wider mt-1">Earned on Artswrk</p>
+            {totalReimb > 0 && (
+              <p className="text-xs text-white/80 mt-0.5">
+                <span className="font-bold">REIMBURSEMENTS</span> ${totalReimb.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            )}
+            <p className="text-xs text-white/60 mt-4 uppercase tracking-wider">
+              Paid to <span className="font-bold text-white">{firstName.toUpperCase()} {lastName[0] ? `${lastName[0].toUpperCase()}.` : ""}</span>
+            </p>
+          </div>
 
-      {/* Connect Stripe CTA */}
-      <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-5 text-white">
-        <h3 className="text-sm font-semibold mb-1">Set Up Direct Deposit</h3>
-        <p className="text-xs text-gray-400 mb-3">Connect your bank account to receive payments directly from hirers.</p>
-        <button className="text-xs font-semibold text-[#111] bg-white px-4 py-2 rounded-full hover:bg-gray-100 transition-colors">
-          Connect Bank Account
-        </button>
+          {/* View Stripe Dashboard */}
+          <button
+            onClick={handleStripeClick}
+            disabled={stripeLink.isPending}
+            className="w-full flex items-center gap-3 p-4 bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all text-left"
+          >
+            <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
+              <CreditCard size={18} className="text-[#F25722]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-[#111]">View Stripe Dashboard</p>
+              <p className="text-xs text-gray-400 mt-0.5">View Pending Payments, Payouts & More</p>
+            </div>
+            {stripeLink.isPending ? <Loader2 size={16} className="text-gray-400 animate-spin flex-shrink-0" /> : <ChevronRight size={16} className="text-gray-400 flex-shrink-0" />}
+          </button>
+
+          {/* Benefits Portal */}
+          {(benefitsData?.benefits?.length ?? 0) > 0 && (
+            <a
+              href="/app/benefits"
+              className="w-full flex items-center gap-3 p-4 bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all"
+            >
+              <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center flex-shrink-0">
+                <Sparkles size={18} className="text-purple-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-[#111]">Benefits Portal</p>
+                <p className="text-xs text-gray-400 mt-0.5">Put your earnings towards health insurance & sick pay</p>
+              </div>
+              <ChevronRight size={16} className="text-gray-400 flex-shrink-0" />
+            </a>
+          )}
+        </div>
+
+        {/* Right column — transactions */}
+        <div className="flex-1 bg-white rounded-2xl border border-gray-100">
+          <div className="px-5 py-4 border-b border-gray-50">
+            <h3 className="text-base font-bold text-[#111]">Recent Transactions</h3>
+          </div>
+          {isLoading ? (
+            <div className="divide-y divide-gray-50">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-5 py-4">
+                  <div className="w-9 h-9 rounded-xl bg-gray-100 animate-pulse flex-shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3 bg-gray-100 rounded animate-pulse w-40" />
+                    <div className="h-2.5 bg-gray-100 rounded animate-pulse w-24" />
+                  </div>
+                  <div className="h-3 bg-gray-100 rounded animate-pulse w-16" />
+                </div>
+              ))}
+            </div>
+          ) : transactions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <CreditCard size={32} className="text-gray-200 mb-3" />
+              <p className="text-sm text-gray-400">No paid bookings yet</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
+              {transactions.map((tx: any) => (
+                <div key={tx.id} className="flex items-center gap-3 px-5 py-4">
+                  <div className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
+                    <CreditCard size={15} className="text-[#F25722]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[#111] truncate">{tx.clientName}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {tx.date ? new Date(tx.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
+                    </p>
+                  </div>
+                  <p className="text-sm font-bold text-green-600 flex-shrink-0">
+                    +${(tx.amount ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

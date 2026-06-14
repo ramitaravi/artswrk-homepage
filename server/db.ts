@@ -3286,6 +3286,7 @@ export async function getArtistConfirmedBookings(artistUserId: number) {
       jobLocation: jobs.locationAddress,
       jobServiceType: jobs.masterServiceTypeId,
       jobStartDate: jobs.startDate,
+      totalArtistRate: bookings.totalArtistRate,
       clientName: users.name,
       clientFirstName: users.firstName,
       clientCompanyName: users.clientCompanyName,
@@ -3297,6 +3298,61 @@ export async function getArtistConfirmedBookings(artistUserId: number) {
     .where(and(eq(bookings.artistUserId, artistUserId), eq(bookings.deleted, false)))
     .orderBy(desc(bookings.createdAt));
   return rows;
+}
+
+/**
+ * Wallet stats + recent transactions for the artist's Wallet page.
+ */
+export async function getArtistWalletData(artistUserId: number) {
+  const db = await getDb();
+  if (!db) return { totalEarned: 0, totalReimbursements: 0, transactions: [] };
+
+  const paid = await db
+    .select({
+      id: bookings.id,
+      startDate: bookings.startDate,
+      createdAt: bookings.createdAt,
+      artistRate: bookings.artistRate,
+      totalArtistRate: bookings.totalArtistRate,
+      clientName: users.name,
+      clientCompanyName: users.clientCompanyName,
+    })
+    .from(bookings)
+    .leftJoin(users, eq(bookings.clientUserId, users.id))
+    .where(and(
+      eq(bookings.artistUserId, artistUserId),
+      eq(bookings.paymentStatus, "Paid"),
+      eq(bookings.deleted, false),
+    ))
+    .orderBy(desc(bookings.startDate));
+
+  const totalEarned = paid.reduce((s, b) => s + (b.totalArtistRate ?? b.artistRate ?? 0), 0);
+  const totalReimbursements = paid.reduce((s, b) => s + Math.max(0, (b.totalArtistRate ?? 0) - (b.artistRate ?? 0)), 0);
+
+  return {
+    totalEarned,
+    totalReimbursements,
+    transactions: paid.map(b => ({
+      id: b.id,
+      clientName: b.clientCompanyName || b.clientName || "Client",
+      date: b.startDate ?? b.createdAt,
+      amount: b.totalArtistRate ?? b.artistRate ?? 0,
+    })),
+  };
+}
+
+/**
+ * Returns the stripeConnectAccountId for an artist.
+ */
+export async function getArtistStripeConnectAccount(artistUserId: number): Promise<string | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select({ stripeConnectAccountId: users.stripeConnectAccountId })
+    .from(users)
+    .where(eq(users.id, artistUserId))
+    .limit(1);
+  return rows[0]?.stripeConnectAccountId ?? null;
 }
 
 /**
