@@ -77,6 +77,91 @@ export const artistProfileRouter = router({
     };
   }),
 
+  /** Get a public profile by slug (for /book/:slug public pages) */
+  getProfileBySlug: publicProcedure
+    .input(z.object({ slug: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      const [user] = await db.select().from(users).where(eq(users.slug, input.slug)).limit(1);
+      if (!user) throw new Error("Profile not found");
+      return {
+        id: user.id,
+        name: user.name || "",
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        pronouns: user.pronouns || "",
+        tagline: user.tagline || "",
+        bio: user.bio || "",
+        location: user.location || "",
+        profilePicture: user.profilePicture || "",
+        isPro: user.artswrkPro ?? false,
+        bookingCount: user.bookingCount ?? 0,
+        ratingScore: user.ratingScore ?? 0,
+        reviewCount: user.reviewCount ?? 0,
+        workTypes: parseJsonArray(user.workTypes),
+        artistDisciplines: parseJsonArray(user.artistDisciplines),
+        artistServices: parseJsonArray(user.artistServices),
+        masterArtistTypes: parseJsonArray(user.masterArtistTypes),
+        masterStyles: parseJsonArray(user.masterStyles),
+        mediaPhotos: parseJsonArray(user.mediaPhotos),
+        resumeFiles: parseResumeFiles(user.resumeFiles),
+        resumes: parseJsonArray(user.resumes),
+        videos: parseJsonArray(user.videos),
+        instagram: user.instagram || "",
+        tiktok: user.tiktok || "",
+        youtube: user.youtube || "",
+        website: user.website || "",
+        portfolio: user.portfolio || "",
+        joinedAt: user.createdAt,
+        bubbleCreatedAt: user.bubbleCreatedAt,
+        bubbleId: user.bubbleId || null,
+        slug: user.slug || null,
+      };
+    }),
+
+  /** Get reviews for any artist by userId (public) */
+  getPublicReviews: publicProcedure
+    .input(z.object({ userId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const reviews = await db
+        .select()
+        .from(artistReviews)
+        .where(eq(artistReviews.artistUserId, input.userId))
+        .orderBy(artistReviews.reviewDate);
+      return reviews.map(r => ({
+        id: r.id,
+        reviewerName: r.reviewerName || "",
+        reviewerStudio: r.reviewerStudio || "",
+        reviewerAvatar: r.reviewerAvatar || "",
+        rating: r.rating ?? 5,
+        body: r.body || "",
+        reviewDate: r.reviewDate,
+      }));
+    }),
+
+  /** Get service categories for any artist by userId (public) */
+  getPublicServiceCategories: publicProcedure
+    .input(z.object({ userId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const cats = await db
+        .select()
+        .from(artistServiceCategories)
+        .where(eq(artistServiceCategories.artistUserId, input.userId))
+        .orderBy(artistServiceCategories.sortOrder);
+      return cats.map(c => ({
+        id: c.id,
+        name: c.name,
+        imageUrl: c.imageUrl || "",
+        subServices: parseJsonArray(c.subServices),
+        sortOrder: c.sortOrder ?? 0,
+      }));
+    }),
+
   /** Get a public profile by user ID */
   getPublicProfile: publicProcedure
     .input(z.object({ userId: z.number() }))

@@ -228,7 +228,7 @@ function DiscoverTab({ onBrowse }: { onBrowse: (role?: string) => void }) {
                 return (
                   <div key={a.id}
                     className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow group cursor-pointer"
-                    onClick={() => navigate(`/app/artists/${a.id}`)}
+                    onClick={() => navigate(a.slug ? `/book/${a.slug}` : `/app/artists/${a.id}`)}
                   >
                     <div className="aspect-[4/5] relative overflow-hidden bg-gray-100">
                       {a.profilePicture ? (
@@ -403,7 +403,7 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
               return (
                 <div key={a.id}
                   className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-lg transition-all group cursor-pointer"
-                  onClick={() => navigate(`/app/artists/${a.id}`)}
+                  onClick={() => navigate(a.slug ? `/book/${a.slug}` : `/app/artists/${a.id}`)}
                 >
                   <div className="aspect-[3/4] relative overflow-hidden bg-gray-100">
                     {a.profilePicture ? (
@@ -452,7 +452,7 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
               return (
                 <div key={a.id}
                   className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer group"
-                  onClick={() => navigate(`/app/artists/${a.id}`)}
+                  onClick={() => navigate(a.slug ? `/book/${a.slug}` : `/app/artists/${a.id}`)}
                 >
                   <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100">
                     {a.profilePicture ? (
@@ -658,11 +658,15 @@ function MyArtistsTab() {
                   <div
                     className="grid grid-cols-12 gap-3 px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer items-center"
                     onClick={() => {
-                      const artistUserId = (a as any).artistUserId as number | null;
-                      if (artistUserId) {
-                        navigate(`/app/artists/${artistUserId}`);
+                      if (slug) {
+                        navigate(`/book/${slug}`);
                       } else {
-                        setExpanded(isExpanded ? null : a.id);
+                        const artistUserId = (a as any).artistUserId as number | null;
+                        if (artistUserId) {
+                          navigate(`/app/artists/${artistUserId}`);
+                        } else {
+                          setExpanded(isExpanded ? null : a.id);
+                        }
                       }
                     }}
                   >

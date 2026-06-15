@@ -762,9 +762,11 @@ function FeaturesSplit() {
                         </div>
                       </div>
                       <div className="flex text-yellow-400 text-xs mb-2">★★★★★</div>
-                      <button className="w-full text-xs font-semibold text-white py-1.5 rounded-lg hirer-grad-bg">
-                        View Profile →
-                      </button>
+                      <a href="/app/profile">
+                        <button className="w-full text-xs font-semibold text-white py-1.5 rounded-lg hirer-grad-bg">
+                          View Profile →
+                        </button>
+                      </a>
                     </>
                   ) : (
                     <>
