@@ -8,9 +8,10 @@ import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import {
   MapPin, Calendar, Share2, Star, Loader2,
-  Globe, Instagram, Youtube, ExternalLink, MessageCircle,
+  Globe, Instagram, Youtube, ExternalLink, MessageCircle, Pencil,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import Navbar from "@/components/Navbar";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -222,6 +223,7 @@ export default function ArtistProfile() {
   const { slug } = useParams<{ slug: string }>();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<Tab>("about");
+  const { user } = useAuth();
 
   const { data: profile, isLoading } = trpc.artistProfile.getProfileBySlug.useQuery(
     { slug: slug ?? "" },
@@ -267,6 +269,9 @@ export default function ArtistProfile() {
   }
 
   const p = profile as any;
+
+  // Owner detection: logged-in user's slug matches this profile's slug
+  const isOwner = !!(user && p.slug && (user as any).slug === p.slug);
 
   const workTypes: string[] = [
     ...(Array.isArray(p.masterArtistTypes) ? p.masterArtistTypes : []),
@@ -385,12 +390,20 @@ export default function ArtistProfile() {
                   </div>
                 )}
 
-                {/* Contact button */}
-                <a href="/app/messages">
-                  <button className="w-full py-3 rounded-xl bg-[#ec008c] text-white text-sm font-bold hover:bg-[#c40075] transition-colors flex items-center justify-center gap-2 mt-1">
-                    <MessageCircle size={15} /> Contact
-                  </button>
-                </a>
+                {/* Owner: go back to edit; Visitor: contact */}
+                {isOwner ? (
+                  <a href="/app/profile">
+                    <button className="w-full py-3 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 mt-1">
+                      <Pencil size={14} /> Edit Profile
+                    </button>
+                  </a>
+                ) : (
+                  <a href="/app/messages">
+                    <button className="w-full py-3 rounded-xl bg-[#ec008c] text-white text-sm font-bold hover:bg-[#c40075] transition-colors flex items-center justify-center gap-2 mt-1">
+                      <MessageCircle size={15} /> Contact
+                    </button>
+                  </a>
+                )}
 
                 {/* Share */}
                 <button

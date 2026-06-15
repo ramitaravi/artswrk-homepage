@@ -12,7 +12,7 @@
  */
 
 import { useState } from "react";
-import { MapPin, Calendar, Share2, Star, RefreshCw } from "lucide-react";
+import { MapPin, Calendar, Share2, Star, ExternalLink } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import EditProfileModal from "./EditProfileModal";
 
@@ -442,6 +442,16 @@ export default function ArtistProfilePage() {
               >
                 Edit Profile
               </button>
+
+              {/* View public profile */}
+              {p.slug && (
+                <a href={`/book/${p.slug}`} target="_blank" rel="noopener noreferrer">
+                  <button className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                    <ExternalLink size={14} />
+                    View Public Profile
+                  </button>
+                </a>
+              )}
 
               {/* Share */}
               <button
