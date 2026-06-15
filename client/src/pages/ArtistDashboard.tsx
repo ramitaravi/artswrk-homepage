@@ -235,8 +235,8 @@ function DashboardTab({ user }: { user: any }) {
             <div className="min-w-0">
               <h1 className="text-lg lg:text-xl font-semibold text-[#111]">Hey, {firstName} 🎉</h1>
               {user?.artswrkPro && (
-                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-pink-200 mt-1.5">
-                  <Star size={11} className="fill-amber-500 text-amber-500" /> Artswrk PRO Member
+                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-pink-50 text-[#ec008c] border border-pink-200 mt-1.5">
+                  <Star size={11} className="fill-[#ec008c] text-[#ec008c]" /> Artswrk PRO Member
                 </span>
               )}
             </div>
@@ -332,8 +332,8 @@ function DashboardTab({ user }: { user: any }) {
                 return (
                   <div key={job.id} className="flex-shrink-0 w-52 bg-white rounded-2xl border border-gray-100 p-4 flex flex-col justify-between relative">
                     {/* PRO badge */}
-                    <span className="absolute top-3 right-3 flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-pink-200 px-1.5 py-0.5 rounded-full">
-                      <Star size={9} className="fill-amber-500 text-amber-500" /> PRO
+                    <span className="absolute top-3 right-3 flex items-center gap-0.5 text-[10px] font-semibold text-[#ec008c] bg-pink-50 border border-pink-200 px-1.5 py-0.5 rounded-full">
+                      <Star size={9} className="fill-[#ec008c] text-[#ec008c]" /> PRO
                     </span>
                     <div>
                       {/* Blurred avatar for non-PRO */}
@@ -642,7 +642,7 @@ function JobsTab({ user }: { user: any }) {
                   <span className={`flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${
                     app.status === "Accepted" ? "bg-green-50 text-green-700" :
                     app.status === "Rejected" ? "bg-red-50 text-red-700" :
-                    "bg-amber-50 text-amber-700"
+                    "bg-pink-50 text-[#ec008c]"
                   }`}>
                     {app.status || "Pending"}
                   </span>
@@ -1652,15 +1652,15 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[#111] flex items-center gap-2">
-            PRO Jobs <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">⭐️</span>
+            PRO Jobs <span className="text-xs font-semibold bg-pink-50 text-[#ec008c] px-1.5 py-0.5 rounded">⭐️</span>
           </h2>
         </div>
 
         {/* Upsell card */}
         <div className="rounded-2xl border-2 border-pink-200 bg-gradient-to-br from-pink-50 to-fuchsia-50 p-6">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-              <Star size={22} className="text-amber-600 fill-amber-400" />
+            <div className="w-12 h-12 rounded-xl bg-pink-50 flex items-center justify-center flex-shrink-0">
+              <Star size={22} className="text-[#ec008c] fill-[#ec008c]" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-base font-semibold text-[#111]">Unlock PRO Jobs</p>
@@ -1670,7 +1670,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
               <ul className="mt-3 space-y-1.5">
                 {["Access enterprise & competition jobs", "Priority placement in search results", "Profile boost & featured badge", "Advanced application analytics"].map(f => (
                   <li key={f} className="flex items-center gap-2 text-sm text-gray-700">
-                    <CheckCircle2 size={13} className="text-amber-500 flex-shrink-0" />
+                    <CheckCircle2 size={13} className="text-[#ec008c] flex-shrink-0" />
                     {f}
                   </li>
                 ))}
@@ -1706,9 +1706,9 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
                 </div>
                 <button
                   onClick={onGoToSettings}
-                  className="flex-shrink-0 text-xs font-semibold text-amber-700 bg-amber-50 border border-pink-200 px-3 py-1.5 rounded-full hover:bg-amber-100 transition-colors flex items-center gap-1"
+                  className="flex-shrink-0 text-xs font-semibold text-[#ec008c] bg-amber-50 border border-pink-200 px-3 py-1.5 rounded-full hover:bg-pink-50 transition-colors flex items-center gap-1"
                 >
-                  <Star size={11} className="fill-amber-400" /> PRO Only
+                  <Star size={11} className="fill-[#ec008c]" /> PRO Only
                 </button>
               </div>
             ))}
@@ -1726,10 +1726,10 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-[#111] flex items-center gap-2">
-          PRO Jobs <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">⭐️</span>
+          PRO Jobs <span className="text-xs font-semibold bg-pink-50 text-[#ec008c] px-1.5 py-0.5 rounded">⭐️</span>
         </h2>
-        <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-pink-200 px-2.5 py-1 rounded-full flex items-center gap-1">
-          <Star size={11} className="fill-amber-400" /> PRO Access
+        <span className="text-xs font-semibold text-[#ec008c] bg-amber-50 border border-pink-200 px-2.5 py-1 rounded-full flex items-center gap-1">
+          <Star size={11} className="fill-[#ec008c]" /> PRO Access
         </span>
       </div>
       {proJobsLoading ? (
@@ -1738,7 +1738,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
         </div>
       ) : !proJobsData?.length ? (
         <div className="p-8 text-center bg-white rounded-2xl border border-gray-100">
-          <Star size={24} className="text-amber-300 mx-auto mb-2" />
+          <Star size={24} className="text-pink-300 mx-auto mb-2" />
           <p className="text-sm text-gray-500">No PRO jobs right now — check back soon.</p>
         </div>
       ) : (

@@ -93,9 +93,15 @@ function NavLink({ item, isArtist }: { item: NavItem; isArtist: boolean }) {
         <span className="flex-shrink-0">{item.icon}</span>
         <span className="text-sm font-medium flex-1 truncate">{item.label}</span>
         {item.premium && (
-          <span className="flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200">
-            <Crown size={9} /> PRO
-          </span>
+          isArtist ? (
+            <span className="flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-pink-50 text-[#ec008c] border border-pink-200">
+              <Star size={9} /> PRO
+            </span>
+          ) : (
+            <span className="flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200">
+              <Crown size={9} /> PRO
+            </span>
+          )
         )}
         {item.badge && !item.premium && (
           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${badgeColor} text-white min-w-[18px] text-center`}>
