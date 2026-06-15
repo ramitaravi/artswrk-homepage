@@ -296,7 +296,11 @@ export async function getPublicJobsEnriched(
        j.description, j.direct, j.bubbleCreatedAt,
        j.masterServiceTypeId
        ${distanceSelect},
-       u.clientCompanyName, u.name as clientName,
+       u.clientCompanyName,
+       COALESCE(
+         NULLIF(TRIM(CONCAT(COALESCE(u.firstName,''), ' ', COALESCE(u.lastName,''))), ''),
+         u.name
+       ) as clientName,
        COALESCE(u.enterpriseLogoUrl, u.profilePicture) as clientProfilePicture
      FROM jobs j
      LEFT JOIN users u ON j.clientUserId = u.id
@@ -340,7 +344,8 @@ export async function getJobDetailById(id: number): Promise<{
        j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate,
        j.locationAddress, j.locationLat, j.locationLng,
        j.description, j.direct, j.bubbleCreatedAt, j.clientUserId,
-       u.clientCompanyName, u.name as clientName,
+       u.clientCompanyName,
+       COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.firstName,''), ' ', COALESCE(u.lastName,''))), ''), u.name) as clientName,
        COALESCE(u.enterpriseLogoUrl, u.profilePicture) as clientProfilePicture
      FROM jobs j
      LEFT JOIN users u ON j.clientUserId = u.id
@@ -2443,7 +2448,8 @@ export async function getArtistJobsFeed(
   const rows = await db.execute(
      `SELECT j.id, j.slug, j.dateType, j.startDate, j.endDate, j.isHourly, j.openRate, j.artistHourlyRate, j.createdAt,
      j.locationAddress, j.locationLat, j.locationLng,
-     u.clientCompanyName, u.name as clientName,
+     u.clientCompanyName,
+     COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.firstName,''), ' ', COALESCE(u.lastName,''))), ''), u.name) as clientName,
      COALESCE(u.enterpriseLogoUrl, u.profilePicture) as clientLogo,
      mst.name as serviceType
      FROM jobs j
@@ -2535,7 +2541,8 @@ export async function getArtistBookings(artistUserId: number): Promise<{
   if (!db) return [];
   const rows = await db.execute(
     `SELECT b.id, b.bookingStatus, b.paymentStatus, b.clientRate, b.artistRate, b.startDate, b.endDate, b.locationAddress,
-     u.clientCompanyName, u.name as clientName
+     u.clientCompanyName,
+     COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.firstName,''), ' ', COALESCE(u.lastName,''))), ''), u.name) as clientName
      FROM bookings b
      LEFT JOIN users u ON b.clientUserId = u.id
      WHERE b.artistUserId = ${artistUserId}
