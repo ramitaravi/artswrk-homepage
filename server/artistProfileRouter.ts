@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, count } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
-import { users, artistReviews, artistServiceCategories } from "../drizzle/schema";
+import { users, artistReviews, artistServiceCategories, bookings } from "../drizzle/schema";
 
 // ─── Helper: parse JSON array safely ──────────────────────────────────────────
 function parseJsonArray(val: string | null | undefined): string[] {
@@ -34,13 +34,14 @@ export const artistProfileRouter = router({
     const db = await getDb();
     if (!db) throw new Error("Database unavailable");
 
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, ctx.user.id))
-      .limit(1);
+    const [[user], bookingCountResult] = await Promise.all([
+      db.select().from(users).where(eq(users.id, ctx.user.id)).limit(1),
+      db.select({ value: count() }).from(bookings).where(eq(bookings.artistUserId, ctx.user.id)),
+    ]);
 
     if (!user) throw new Error("User not found");
+
+    const liveBookingCount = bookingCountResult[0]?.value ?? 0;
 
     return {
       id: user.id,
@@ -53,7 +54,7 @@ export const artistProfileRouter = router({
       location: user.location || "",
       profilePicture: user.profilePicture || "",
       isPro: user.artswrkPro ?? false,
-      bookingCount: user.bookingCount ?? 0,
+      bookingCount: liveBookingCount || user.bookingCount || 0,
       ratingScore: user.ratingScore ?? 0,
       reviewCount: user.reviewCount ?? 0,
       workTypes: parseJsonArray(user.workTypes),

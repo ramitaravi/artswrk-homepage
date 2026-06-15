@@ -50,6 +50,9 @@ type ProfileData = {
   profilePicture: string;
   website: string;
   instagram: string;
+  tiktok: string;
+  youtube: string;
+  portfolio: string;
   mediaPhotos: string[];
   resumeFiles: ResumeFile[];
 };
@@ -91,6 +94,9 @@ export default function EditProfilePage({ onClose, initialTab = "about" }: EditP
       profilePicture: profile.profilePicture || "",
       website: profile.website || "",
       instagram: profile.instagram || "",
+      tiktok: (profile as any).tiktok || "",
+      youtube: (profile as any).youtube || "",
+      portfolio: (profile as any).portfolio || "",
       mediaPhotos: profile.mediaPhotos || [],
       resumeFiles: profile.resumeFiles || [],
     });
@@ -210,6 +216,9 @@ export default function EditProfilePage({ onClose, initialTab = "about" }: EditP
         profilePicture: about.profilePicture,
         website: about.website,
         instagram: about.instagram,
+        tiktok: about.tiktok,
+        youtube: about.youtube,
+        portfolio: about.portfolio,
         mediaPhotos: about.mediaPhotos,
         resumeFiles: about.resumeFiles,
       });
@@ -285,7 +294,7 @@ export default function EditProfilePage({ onClose, initialTab = "about" }: EditP
   ];
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <div className="bg-white flex flex-col rounded-2xl overflow-hidden">
       {/* Header */}
       <div className="px-6 pt-6 pb-2">
         <button onClick={onClose} className="flex items-center gap-2 text-gray-500 hover:text-gray-800 mb-4 transition-colors">
@@ -446,7 +455,17 @@ export default function EditProfilePage({ onClose, initialTab = "about" }: EditP
                     value={about.website}
                     onChange={e => setAbout(prev => prev ? { ...prev, website: e.target.value } : prev)}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-400 transition-colors"
-                    placeholder="https://www.ramitaravi.com"
+                    placeholder="https://www.yoursite.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Portfolio</label>
+                  <input
+                    type="url"
+                    value={about.portfolio}
+                    onChange={e => setAbout(prev => prev ? { ...prev, portfolio: e.target.value } : prev)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-400 transition-colors"
+                    placeholder="https://www.yourportfolio.com"
                   />
                 </div>
                 <div>
@@ -456,7 +475,27 @@ export default function EditProfilePage({ onClose, initialTab = "about" }: EditP
                     value={about.instagram}
                     onChange={e => setAbout(prev => prev ? { ...prev, instagram: e.target.value } : prev)}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-400 transition-colors"
-                    placeholder="https://www.instagram.com/ramita.ravi/"
+                    placeholder="@yourhandle"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">TikTok</label>
+                  <input
+                    type="text"
+                    value={about.tiktok}
+                    onChange={e => setAbout(prev => prev ? { ...prev, tiktok: e.target.value } : prev)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-400 transition-colors"
+                    placeholder="@yourhandle"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">YouTube</label>
+                  <input
+                    type="url"
+                    value={about.youtube}
+                    onChange={e => setAbout(prev => prev ? { ...prev, youtube: e.target.value } : prev)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-400 transition-colors"
+                    placeholder="https://youtube.com/@yourchannel"
                   />
                 </div>
               </div>
