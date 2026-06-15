@@ -77,17 +77,17 @@ const ARTIST_PREMIUM_NAV: NavItem[] = [
   { label: "Community", icon: <Users2 size={18} />, href: "/app/community", premium: true },
 ];
 
-function NavLink({ item }: { item: NavItem }) {
+function NavLink({ item, isArtist }: { item: NavItem; isArtist: boolean }) {
   const [location] = useLocation();
   const isActive = location === item.href || (item.href !== "/app" && location.startsWith(item.href));
+  const activeColor = isArtist ? "bg-pink-50 text-[#ec008c]" : "bg-orange-50 text-[#F25722]";
+  const badgeColor = isArtist ? "bg-[#ec008c]" : "bg-[#F25722]";
 
   return (
     <Link href={item.href}>
       <div
         className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors cursor-pointer ${
-          isActive
-            ? "bg-orange-50 text-[#F25722]"
-            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+          isActive ? activeColor : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
         }`}
       >
         <span className="flex-shrink-0">{item.icon}</span>
@@ -98,7 +98,7 @@ function NavLink({ item }: { item: NavItem }) {
           </span>
         )}
         {item.badge && !item.premium && (
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#F25722] text-white min-w-[18px] text-center">
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${badgeColor} text-white min-w-[18px] text-center`}>
             {item.badge}
           </span>
         )}
@@ -164,7 +164,7 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
-        <Loader2 className="animate-spin text-[#F25722]" size={32} />
+        <Loader2 className="animate-spin text-gray-400" size={32} />
       </div>
     );
   }
@@ -177,7 +177,7 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
       <div className="px-5 pt-6 pb-5">
         <Link href="/app">
           <span className="font-black text-xl tracking-tight">
-            <span className="hirer-grad-text">ARTS</span>
+            <span className={isArtist ? "artist-grad-text" : "hirer-grad-text"}>ARTS</span>
             <span className="bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">WRK</span>
           </span>
         </Link>
@@ -192,7 +192,7 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
             className="w-9 h-9 rounded-full object-cover flex-shrink-0"
           />
         ) : (
-          <div className="w-9 h-9 rounded-full hirer-grad-bg flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
+          <div className={`w-9 h-9 rounded-full ${isArtist ? "artist-grad-bg" : "hirer-grad-bg"} flex items-center justify-center text-white text-xs font-semibold flex-shrink-0`}>
             {avatarInitials}
           </div>
         )}
@@ -205,7 +205,7 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
             </span>
           )}
           {isArtist && (artswrkUser as any)?.artswrkPro && (
-            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-50 text-[#F25722] border border-orange-200 mt-0.5">
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-pink-50 text-[#ec008c] border border-pink-200 mt-0.5">
               <Star size={8} /> PRO
             </span>
           )}
@@ -215,7 +215,7 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
       {/* Core nav */}
       <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
         {coreNav.map((item) => (
-          <NavLink key={item.href} item={item} />
+          <NavLink key={item.href} item={item} isArtist={isArtist} />
         ))}
 
         {/* Premium section divider */}
@@ -226,7 +226,7 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
         </div>
 
         {premiumNav.map((item) => (
-          <NavLink key={item.href} item={item} />
+          <NavLink key={item.href} item={item} isArtist={isArtist} />
         ))}
       </nav>
 
@@ -317,10 +317,10 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
                 <img
                   src={avatarSrc}
                   alt={displayName}
-                  className="w-8 h-8 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-[#F25722] transition-all"
+                  className={`w-8 h-8 rounded-full object-cover cursor-pointer hover:ring-2 transition-all ${isArtist ? "hover:ring-[#ec008c]" : "hover:ring-[#F25722]"}`}
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full hirer-grad-bg flex items-center justify-center text-white text-xs font-semibold cursor-pointer hover:ring-2 hover:ring-[#F25722] transition-all">
+                <div className={`w-8 h-8 rounded-full ${isArtist ? "artist-grad-bg" : "hirer-grad-bg"} flex items-center justify-center text-white text-xs font-semibold cursor-pointer hover:ring-2 ${isArtist ? "hover:ring-[#ec008c]" : "hover:ring-[#F25722]"} transition-all`}>
                   {avatarInitials}
                 </div>
               )}

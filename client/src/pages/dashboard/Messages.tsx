@@ -76,7 +76,7 @@ function getInitials(firstName?: string | null, lastName?: string | null, name?:
 
 function getColor(id?: string | number | null) {
   const colors = [
-    "bg-orange-500", "bg-blue-500", "bg-purple-500", "bg-green-500",
+    "bg-pink-500", "bg-blue-500", "bg-purple-500", "bg-green-500",
     "bg-pink-500", "bg-indigo-500", "bg-teal-500", "bg-rose-500",
   ];
   const str = String(id ?? "");
@@ -197,7 +197,7 @@ function ConversationRow({ c, active, onClick }: {
       onClick={onClick}
       className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all group ${
         active
-          ? "bg-orange-50 border-r-2 border-[#F25722]"
+          ? "bg-pink-50 border-r-2 border-[#ec008c]"
           : "hover:bg-gray-50 border-r-2 border-transparent"
       }`}
     >
@@ -211,7 +211,7 @@ function ConversationRow({ c, active, onClick }: {
           size="md"
         />
         {hasUnread && (
-          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#F25722] text-white text-[9px] font-bold flex items-center justify-center shadow-sm">
+          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#ec008c] text-white text-[9px] font-bold flex items-center justify-center shadow-sm">
             {c.unreadCount}
           </span>
         )}
@@ -219,7 +219,7 @@ function ConversationRow({ c, active, onClick }: {
 
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between gap-2 mb-0.5">
-          <p className={`text-sm truncate ${hasUnread ? "font-bold text-[#111]" : active ? "font-semibold text-[#F25722]" : "font-semibold text-[#111]"}`}>
+          <p className={`text-sm truncate ${hasUnread ? "font-bold text-[#111]" : active ? "font-semibold text-[#ec008c]" : "font-semibold text-[#111]"}`}>
             {displayName}
           </p>
           <span className="text-[11px] text-gray-400 flex-shrink-0 whitespace-nowrap">{timeStr}</span>
@@ -233,7 +233,7 @@ function ConversationRow({ c, active, onClick }: {
         )}
       </div>
 
-      <ChevronRight size={14} className={`flex-shrink-0 transition-colors ${active ? "text-[#F25722]" : "text-gray-200 group-hover:text-gray-400"}`} />
+      <ChevronRight size={14} className={`flex-shrink-0 transition-colors ${active ? "text-[#ec008c]" : "text-gray-200 group-hover:text-gray-400"}`} />
     </button>
   );
 }
@@ -254,7 +254,7 @@ function ChatBubble({ msg, isFromMe }: { msg: Message; isFromMe: boolean }) {
     <div className={`flex ${isFromMe ? "justify-end" : "justify-start"}`}>
       <div className={`max-w-[72%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
         isFromMe
-          ? "bg-[#F25722] text-white rounded-br-sm"
+          ? "bg-[#ec008c] text-white rounded-br-sm"
           : "bg-white border border-gray-100 text-[#111] rounded-bl-sm shadow-sm"
       }`}>
         {!isFromMe && (
@@ -454,7 +454,7 @@ export default function Messages() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search conversations…"
-            className="w-full pl-8 pr-3 py-2 rounded-xl border border-gray-200 text-xs text-[#111] placeholder-gray-300 focus:outline-none focus:border-[#FFBC5D] transition-all bg-gray-50"
+            className="w-full pl-8 pr-3 py-2 rounded-xl border border-gray-200 text-xs text-[#111] placeholder-gray-300 focus:outline-none focus:border-[#ff7171] transition-all bg-gray-50"
           />
         </div>
       </div>
@@ -533,7 +533,7 @@ export default function Messages() {
             />
             <div className="flex-1 min-w-0">
               <p
-                className={`text-sm font-bold text-[#111] truncate ${!isArtist && activeConvo.artistUserId ? "cursor-pointer hover:text-[#F25722] transition-colors" : ""}`}
+                className={`text-sm font-bold text-[#111] truncate ${!isArtist && activeConvo.artistUserId ? "cursor-pointer hover:text-[#ec008c] transition-colors" : ""}`}
                 onClick={() => !isArtist && activeConvo.artistUserId && navigate(`/app/artists/${activeConvo.artistUserId}`)}
               >
                 {otherPartyName}
@@ -548,7 +548,7 @@ export default function Messages() {
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2.5">
             {msgsLoading ? (
               <div className="flex justify-center py-12">
-                <div className="w-5 h-5 border-2 border-[#F25722] border-t-transparent rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-[#ec008c] border-t-transparent rounded-full animate-spin" />
               </div>
             ) : allMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-gray-400 py-12">
@@ -563,11 +563,11 @@ export default function Messages() {
                       ref={unreadDividerRef}
                       className={`flex items-center gap-2 py-1 transition-opacity duration-1000 ${showUnreadDivider ? "opacity-100" : "opacity-0"}`}
                     >
-                      <div className="flex-1 h-px bg-[#F25722]/40" />
-                      <span className="text-[10px] font-semibold text-[#F25722] uppercase tracking-wider px-2 whitespace-nowrap">
+                      <div className="flex-1 h-px bg-[#ec008c]/40" />
+                      <span className="text-[10px] font-semibold text-[#ec008c] uppercase tracking-wider px-2 whitespace-nowrap">
                         {entryUnreadCount === 1 ? "1 new message" : `${entryUnreadCount} new messages`}
                       </span>
-                      <div className="flex-1 h-px bg-[#F25722]/40" />
+                      <div className="flex-1 h-px bg-[#ec008c]/40" />
                     </div>
                   )}
                   <ChatBubble msg={msg} isFromMe={isFromMe(msg)} />
@@ -579,7 +579,7 @@ export default function Messages() {
 
           {/* Compose */}
           <div className="bg-white border-t border-gray-100 p-3">
-            <div className="flex items-end gap-2 bg-gray-50 rounded-2xl border border-gray-200 focus-within:border-[#F25722] focus-within:bg-white transition-all px-3 py-2">
+            <div className="flex items-end gap-2 bg-gray-50 rounded-2xl border border-gray-200 focus-within:border-[#ec008c] focus-within:bg-white transition-all px-3 py-2">
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
@@ -592,7 +592,7 @@ export default function Messages() {
               <button
                 onClick={handleSend}
                 disabled={!draft.trim() || sendMessage.isPending}
-                className="flex-shrink-0 w-8 h-8 rounded-xl bg-[#F25722] text-white flex items-center justify-center hover:bg-[#d94e1d] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                className="flex-shrink-0 w-8 h-8 rounded-xl bg-[#ec008c] text-white flex items-center justify-center hover:bg-[#c40075] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 {sendMessage.isPending ? (
                   <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />

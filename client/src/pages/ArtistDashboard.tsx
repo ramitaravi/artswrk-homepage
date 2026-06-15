@@ -108,7 +108,7 @@ function StudioAvatar({ name, logo, size = "md" }: { name: string; logo?: string
   }
 
   return (
-    <div className={`${sizeClass} rounded-full flex-shrink-0 flex items-center justify-center font-semibold text-white hirer-grad-bg`}>
+    <div className={`${sizeClass} rounded-full flex-shrink-0 flex items-center justify-center font-semibold text-white artist-grad-bg`}>
       {initials}
     </div>
   );
@@ -228,14 +228,14 @@ function DashboardTab({ user }: { user: any }) {
             {user?.profilePicture ? (
               <img src={user.profilePicture.startsWith("//") ? `https:${user.profilePicture}` : user.profilePicture} alt={user.name} className="w-16 h-16 lg:w-20 lg:h-20 rounded-full object-cover ring-2 ring-gray-100 flex-shrink-0 lg:mb-3" />
             ) : (
-              <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-full hirer-grad-bg flex items-center justify-center text-white text-2xl font-semibold flex-shrink-0 lg:mb-3">
+              <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-full artist-grad-bg flex items-center justify-center text-white text-2xl font-semibold flex-shrink-0 lg:mb-3">
                 {(firstName[0] || "A").toUpperCase()}
               </div>
             )}
             <div className="min-w-0">
               <h1 className="text-lg lg:text-xl font-semibold text-[#111]">Hey, {firstName} 🎉</h1>
               {user?.artswrkPro && (
-                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 mt-1.5">
+                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-pink-200 mt-1.5">
                   <Star size={11} className="fill-amber-500 text-amber-500" /> Artswrk PRO Member
                 </span>
               )}
@@ -251,7 +251,7 @@ function DashboardTab({ user }: { user: any }) {
               ))}
             </div>
           ) : (
-            <a href="/app/profile" className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#F25722] transition-colors">
+            <a href="/app/profile" className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#ec008c] transition-colors">
               <span className="text-base leading-none">+</span> Add affiliations to your profile
             </a>
           )}
@@ -275,7 +275,7 @@ function DashboardTab({ user }: { user: any }) {
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-[#111]">Your Tasks</span>
               {unreadMessages > 0 && (
-                <span className="w-5 h-5 rounded-full bg-[#F25722] text-white text-[10px] font-semibold flex items-center justify-center">{unreadMessages}</span>
+                <span className="w-5 h-5 rounded-full bg-[#ec008c] text-white text-[10px] font-semibold flex items-center justify-center">{unreadMessages}</span>
               )}
             </div>
             <ChevronRight size={16} className={`text-gray-400 transition-transform ${tasksOpen ? "rotate-90" : ""}`} />
@@ -287,7 +287,7 @@ function DashboardTab({ user }: { user: any }) {
                   className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
                   onClick={() => window.location.href = "/app/messages"}
                 >
-                  <MessageSquare size={16} className="text-[#F25722] flex-shrink-0 mt-0.5" />
+                  <MessageSquare size={16} className="text-[#ec008c] flex-shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-[#111]">
                       {unreadMessages === 1 ? "1 unread message" : `${unreadMessages} unread messages`}
@@ -332,7 +332,7 @@ function DashboardTab({ user }: { user: any }) {
                 return (
                   <div key={job.id} className="flex-shrink-0 w-52 bg-white rounded-2xl border border-gray-100 p-4 flex flex-col justify-between relative">
                     {/* PRO badge */}
-                    <span className="absolute top-3 right-3 flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                    <span className="absolute top-3 right-3 flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-pink-200 px-1.5 py-0.5 rounded-full">
                       <Star size={9} className="fill-amber-500 text-amber-500" /> PRO
                     </span>
                     <div>
@@ -375,7 +375,7 @@ function DashboardTab({ user }: { user: any }) {
           <div className="space-y-2">
             {feedLoading || (showProJobsAsPrimary && proLoading) ? (
               <div className="p-8 text-center bg-white rounded-2xl border border-gray-100">
-                <div className="w-6 h-6 border-2 border-gray-200 border-t-[#F25722] rounded-full animate-spin mx-auto" />
+                <div className="w-6 h-6 border-2 border-gray-200 border-t-[#ec008c] rounded-full animate-spin mx-auto" />
               </div>
             ) : showProJobsAsPrimary ? (
               // PRO jobs as list fallback
@@ -413,7 +413,7 @@ function DashboardTab({ user }: { user: any }) {
                         </div>
                       )}
                       <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs">
-                        {dateLabel && <span className="flex items-center gap-1 text-[#F25722] font-medium"><Clock size={10} />{dateLabel}</span>}
+                        {dateLabel && <span className="flex items-center gap-1 text-[#ec008c] font-medium"><Clock size={10} />{dateLabel}</span>}
                         <span className="font-medium border rounded-full px-2 py-0.5 text-gray-600 border-gray-200 self-start">{rate || "Open rate"}</span>
                       </div>
                     </div>
@@ -454,7 +454,7 @@ function DashboardTab({ user }: { user: any }) {
                       {ago && <><span>·</span><span>Posted {ago}</span></>}
                     </div>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs">
-                      {dateLabel && <span className="flex items-center gap-1 text-[#F25722] font-medium"><Clock size={10} />{dateLabel}</span>}
+                      {dateLabel && <span className="flex items-center gap-1 text-[#ec008c] font-medium"><Clock size={10} />{dateLabel}</span>}
                       <span className="font-medium border rounded-full px-2 py-0.5 text-gray-600 border-gray-200 self-start">{rate || "Open rate"}</span>
                     </div>
                   </div>
@@ -512,7 +512,7 @@ function JobsTab({ user }: { user: any }) {
       {subTab === "jobs-for-you" && (
         <div className="bg-white rounded-2xl border border-gray-100">
           {feedLoading ? (
-            <div className="p-8 text-center"><div className="w-6 h-6 border-2 border-gray-200 border-t-[#F25722] rounded-full animate-spin mx-auto" /></div>
+            <div className="p-8 text-center"><div className="w-6 h-6 border-2 border-gray-200 border-t-[#ec008c] rounded-full animate-spin mx-auto" /></div>
           ) : !jobsFeed?.length ? (
             <div className="p-8 text-center">
               <Briefcase size={36} className="mx-auto text-gray-300 mb-3" />
@@ -563,7 +563,7 @@ function JobsTab({ user }: { user: any }) {
       {subTab === "pro-jobs" && (
         <div className="bg-white rounded-2xl border border-gray-100">
           {proLoading ? (
-            <div className="p-8 text-center"><div className="w-6 h-6 border-2 border-gray-200 border-t-[#F25722] rounded-full animate-spin mx-auto" /></div>
+            <div className="p-8 text-center"><div className="w-6 h-6 border-2 border-gray-200 border-t-[#ec008c] rounded-full animate-spin mx-auto" /></div>
           ) : !proJobs?.length ? (
             <div className="p-8 text-center">
               <Star size={36} className="mx-auto text-gray-300 mb-3" />
@@ -571,7 +571,7 @@ function JobsTab({ user }: { user: any }) {
               <p className="text-sm text-gray-500 mb-4">New PRO jobs are posted regularly. Check back soon!</p>
               <a
                 href="/app/settings"
-                className="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white hirer-grad-bg hover:opacity-80 transition-opacity"
+                className="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white artist-grad-bg hover:opacity-80 transition-opacity"
               >
                 Upgrade to PRO →
               </a>
@@ -614,7 +614,7 @@ function JobsTab({ user }: { user: any }) {
       {subTab === "applications" && (
         <div className="bg-white rounded-2xl border border-gray-100">
           {appsLoading ? (
-            <div className="p-8 text-center"><div className="w-6 h-6 border-2 border-gray-200 border-t-[#F25722] rounded-full animate-spin mx-auto" /></div>
+            <div className="p-8 text-center"><div className="w-6 h-6 border-2 border-gray-200 border-t-[#ec008c] rounded-full animate-spin mx-auto" /></div>
           ) : !applications?.length ? (
             <div className="p-8 text-center">
               <CheckCircle2 size={36} className="mx-auto text-gray-300 mb-3" />
@@ -687,7 +687,7 @@ function BookingRow({ booking, onClick }: { booking: any; onClick: () => void })
   const statusColor =
     status === "Completed" ? "text-green-600 bg-green-50"
     : status === "Cancelled" ? "text-red-500 bg-red-50"
-    : status === "Pay Now" ? "text-[#F25722] bg-orange-50"
+    : status === "Pay Now" ? "text-[#ec008c] bg-pink-50"
     : "text-blue-600 bg-blue-50";
 
   return (
@@ -698,7 +698,7 @@ function BookingRow({ booking, onClick }: { booking: any; onClick: () => void })
       {booking.clientPhoto ? (
         <img src={booking.clientPhoto} alt={studio} className="w-14 h-14 rounded-xl object-contain bg-gray-50 p-1 flex-shrink-0 border border-gray-100" />
       ) : (
-        <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-xl flex-shrink-0">
+        <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#ff7171] to-[#ec008c] flex items-center justify-center text-white font-black text-xl flex-shrink-0">
           {(studio[0] || "?").toUpperCase()}
         </div>
       )}
@@ -799,7 +799,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
         {booking.clientPhoto ? (
           <img src={booking.clientPhoto} alt={studio} className="w-12 h-12 rounded-xl object-contain bg-gray-50 p-1 border border-gray-100 flex-shrink-0" />
         ) : (
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-lg flex-shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#ff7171] to-[#ec008c] flex items-center justify-center text-white font-black text-lg flex-shrink-0">
             {(studio[0] || "?").toUpperCase()}
           </div>
         )}
@@ -937,16 +937,16 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                     <input
                       type="text" placeholder="Description (e.g. Gas, Parking)" value={reimbNote}
                       onChange={(e) => setReimbNote(e.target.value)}
-                      className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#F25722]"
+                      className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#ec008c]"
                     />
                     <input
                       type="number" min="0" placeholder="$" value={reimbValue}
                       onChange={(e) => setReimbValue(e.target.value)}
-                      className="w-20 px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#F25722]"
+                      className="w-20 px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#ec008c]"
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#F25722] transition-colors">
+                    <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#ec008c] transition-colors">
                       <Upload size={11} /> {reimbFile ? reimbFile.name.slice(0, 18) : "Attach receipt"}
                     </button>
                     <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden"
@@ -954,7 +954,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                     <button
                       onClick={handleAddReimbursement}
                       disabled={addReimbursement.isPending || uploadReceipt.isPending || !reimbValue}
-                      className="ml-auto flex items-center gap-1 text-xs font-bold text-white bg-[#F25722] px-3 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50"
+                      className="ml-auto flex items-center gap-1 text-xs font-bold text-white bg-[#ec008c] px-3 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50"
                     >
                       {(addReimbursement.isPending || uploadReceipt.isPending) ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />} Add
                     </button>
@@ -1005,26 +1005,26 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                   <input
                     type="number" min="0" placeholder="Your rate for this job ($)"
                     value={artistRate} onChange={(e) => setArtistRate(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#F25722]"
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#ec008c]"
                   />
                   {rate > 0 && (
-                    <div className="bg-orange-50 rounded-xl p-3 space-y-1.5 text-xs">
+                    <div className="bg-pink-50 rounded-xl p-3 space-y-1.5 text-xs">
                       <div className="flex justify-between text-gray-600"><span>Artist rate</span><span>${rate}</span></div>
                       <div className="flex justify-between text-gray-600"><span>Reimbursements</span><span>${totalReimb}</span></div>
                       <div className="flex justify-between text-gray-600"><span>4% processing fee</span><span>${processingFee}</span></div>
-                      <div className="flex justify-between font-bold text-[#111] border-t border-orange-100 pt-1.5">
-                        <span>Invoice total</span><span className="text-[#F25722]">${invoiceTotal}</span>
+                      <div className="flex justify-between font-bold text-[#111] border-t border-pink-100 pt-1.5">
+                        <span>Invoice total</span><span className="text-[#ec008c]">${invoiceTotal}</span>
                       </div>
                     </div>
                   )}
                   <textarea value={invoiceNotes} onChange={(e) => setInvoiceNotes(e.target.value)} rows={2}
                     placeholder="Additional notes (optional)"
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-[#F25722] resize-none"
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-[#ec008c] resize-none"
                   />
                   <button
                     onClick={() => submitInvoice.mutate({ bookingId: booking.id, artistRate: rate || undefined, notes: invoiceNotes || undefined, origin: window.location.origin })}
                     disabled={submitInvoice.isPending || rate <= 0}
-                    className="w-full py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FFBC5D] to-[#F25722] hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#ff7171] to-[#ec008c] hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {submitInvoice.isPending ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
                     Submit Invoice to Artswrk
@@ -1208,7 +1208,7 @@ function ConfirmationCard({ booking }: { booking: any }) {
       {/* Header */}
       <div className="p-4 flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-sm flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#ff7171] to-[#ec008c] flex items-center justify-center text-white font-black text-sm flex-shrink-0">
             {(studioName[0] || "?").toUpperCase()}
           </div>
           <div className="min-w-0">
@@ -1226,7 +1226,7 @@ function ConfirmationCard({ booking }: { booking: any }) {
             <UserCheck size={9} /> Confirmed
           </span>
           {isArtswrk && (
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722]">
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-pink-50 text-[#ec008c]">
               Invoice via Artswrk
             </span>
           )}
@@ -1272,7 +1272,7 @@ function ConfirmationCard({ booking }: { booking: any }) {
             <>
               <button
                 onClick={() => setExpanded(!expanded)}
-                className="w-full px-4 py-3 flex items-center justify-between text-sm font-semibold text-[#F25722] hover:bg-orange-50 transition-colors"
+                className="w-full px-4 py-3 flex items-center justify-between text-sm font-semibold text-[#ec008c] hover:bg-pink-50 transition-colors"
               >
                 <span className="flex items-center gap-2">
                   <FileText size={14} /> Submit Invoice to Artswrk
@@ -1291,7 +1291,7 @@ function ConfirmationCard({ booking }: { booking: any }) {
                       value={artistRate}
                       onChange={(e) => setArtistRate(e.target.value)}
                       placeholder="e.g. 150"
-                      className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-colors"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#ec008c] transition-colors"
                     />
                   </div>
 
@@ -1325,7 +1325,7 @@ function ConfirmationCard({ booking }: { booking: any }) {
                           placeholder="Description (e.g. Gas, Parking)"
                           value={reimbNote}
                           onChange={(e) => setReimbNote(e.target.value)}
-                          className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#F25722]"
+                          className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#ec008c]"
                         />
                         <input
                           type="number"
@@ -1333,13 +1333,13 @@ function ConfirmationCard({ booking }: { booking: any }) {
                           placeholder="$"
                           value={reimbValue}
                           onChange={(e) => setReimbValue(e.target.value)}
-                          className="w-20 px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#F25722]"
+                          className="w-20 px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#ec008c]"
                         />
                       </div>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => fileInputRef.current?.click()}
-                          className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#F25722] transition-colors"
+                          className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#ec008c] transition-colors"
                         >
                           <Upload size={12} /> {reimbFile ? reimbFile.name.slice(0, 20) : "Attach receipt"}
                         </button>
@@ -1353,7 +1353,7 @@ function ConfirmationCard({ booking }: { booking: any }) {
                         <button
                           onClick={handleAddReimbursement}
                           disabled={addReimbursement.isPending || uploadReceipt.isPending || !reimbValue}
-                          className="ml-auto flex items-center gap-1 text-xs font-bold text-white bg-[#F25722] px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                          className="ml-auto flex items-center gap-1 text-xs font-bold text-white bg-[#ec008c] px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
                         >
                           {(addReimbursement.isPending || uploadReceipt.isPending) ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
                           Add
@@ -1363,7 +1363,7 @@ function ConfirmationCard({ booking }: { booking: any }) {
                   </div>
 
                   {/* Invoice summary */}
-                  <div className="bg-orange-50 rounded-xl p-3 space-y-1.5 text-xs">
+                  <div className="bg-pink-50 rounded-xl p-3 space-y-1.5 text-xs">
                     <p className="font-semibold text-[#111] mb-2">Invoice Summary</p>
                     <div className="flex justify-between text-gray-600">
                       <span>Artist rate</span><span>${rate}</span>
@@ -1374,8 +1374,8 @@ function ConfirmationCard({ booking }: { booking: any }) {
                     <div className="flex justify-between text-gray-600">
                       <span>4% processing fee</span><span>${processingFee}</span>
                     </div>
-                    <div className="flex justify-between font-bold text-[#111] border-t border-orange-100 pt-1.5 mt-1.5">
-                      <span>Total to invoice client</span><span className="text-[#F25722]">${invoiceTotal}</span>
+                    <div className="flex justify-between font-bold text-[#111] border-t border-pink-100 pt-1.5 mt-1.5">
+                      <span>Total to invoice client</span><span className="text-[#ec008c]">${invoiceTotal}</span>
                     </div>
                   </div>
 
@@ -1387,7 +1387,7 @@ function ConfirmationCard({ booking }: { booking: any }) {
                       onChange={(e) => setInvoiceNotes(e.target.value)}
                       rows={2}
                       placeholder="Any notes for Artswrk..."
-                      className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#F25722] resize-none"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#ec008c] resize-none"
                     />
                   </div>
 
@@ -1399,7 +1399,7 @@ function ConfirmationCard({ booking }: { booking: any }) {
                       origin: window.location.origin,
                     })}
                     disabled={submitInvoice.isPending || rate <= 0}
-                    className="w-full py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FFBC5D] to-[#F25722] hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#ff7171] to-[#ec008c] hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {submitInvoice.isPending ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
                     Submit Invoice to Artswrk
@@ -1516,8 +1516,8 @@ function PaymentsTab() {
             disabled={stripeLink.isPending}
             className="w-full flex items-center gap-3 p-4 bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all text-left"
           >
-            <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
-              <CreditCard size={18} className="text-[#F25722]" />
+            <div className="w-10 h-10 rounded-xl bg-pink-50 flex items-center justify-center flex-shrink-0">
+              <CreditCard size={18} className="text-[#ec008c]" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-[#111]">View Stripe Dashboard</p>
@@ -1571,8 +1571,8 @@ function PaymentsTab() {
             <div className="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
               {transactions.map((tx: any) => (
                 <div key={tx.id} className="flex items-center gap-3 px-5 py-4">
-                  <div className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
-                    <CreditCard size={15} className="text-[#F25722]" />
+                  <div className="w-9 h-9 rounded-xl bg-pink-50 flex items-center justify-center flex-shrink-0">
+                    <CreditCard size={15} className="text-[#ec008c]" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[#111] truncate">{tx.clientName}</p>
@@ -1628,7 +1628,7 @@ function ProfileTab({ user }: { user: any }) {
           <p className="text-sm font-semibold text-[#111]">{user?.website || "Not set"}</p>
         </div>
       </div>
-      <button className="mt-4 w-full py-2.5 rounded-xl text-sm font-semibold text-white hirer-grad-bg hover:opacity-90 transition-opacity">
+      <button className="mt-4 w-full py-2.5 rounded-xl text-sm font-semibold text-white artist-grad-bg hover:opacity-90 transition-opacity">
         Edit Profile
       </button>
     </div>
@@ -1657,7 +1657,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
         </div>
 
         {/* Upsell card */}
-        <div className="rounded-2xl border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-6">
+        <div className="rounded-2xl border-2 border-pink-200 bg-gradient-to-br from-pink-50 to-fuchsia-50 p-6">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
               <Star size={22} className="text-amber-600 fill-amber-400" />
@@ -1678,7 +1678,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
               <div className="mt-5 flex items-center gap-3">
                 <button
                   onClick={onGoToSettings}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 hirer-grad-bg"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 artist-grad-bg"
                 >
                   <Sparkles size={15} />
                   {proMonthlyPrice ? `Upgrade to PRO — from ${proMonthlyPrice}/mo` : "Upgrade to PRO"}
@@ -1706,7 +1706,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
                 </div>
                 <button
                   onClick={onGoToSettings}
-                  className="flex-shrink-0 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full hover:bg-amber-100 transition-colors flex items-center gap-1"
+                  className="flex-shrink-0 text-xs font-semibold text-amber-700 bg-amber-50 border border-pink-200 px-3 py-1.5 rounded-full hover:bg-amber-100 transition-colors flex items-center gap-1"
                 >
                   <Star size={11} className="fill-amber-400" /> PRO Only
                 </button>
@@ -1728,13 +1728,13 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
         <h2 className="text-lg font-semibold text-[#111] flex items-center gap-2">
           PRO Jobs <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">⭐️</span>
         </h2>
-        <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full flex items-center gap-1">
+        <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-pink-200 px-2.5 py-1 rounded-full flex items-center gap-1">
           <Star size={11} className="fill-amber-400" /> PRO Access
         </span>
       </div>
       {proJobsLoading ? (
         <div className="p-8 text-center bg-white rounded-2xl border border-gray-100">
-          <div className="w-6 h-6 border-2 border-gray-200 border-t-[#F25722] rounded-full animate-spin mx-auto" />
+          <div className="w-6 h-6 border-2 border-gray-200 border-t-[#ec008c] rounded-full animate-spin mx-auto" />
         </div>
       ) : !proJobsData?.length ? (
         <div className="p-8 text-center bg-white rounded-2xl border border-gray-100">
