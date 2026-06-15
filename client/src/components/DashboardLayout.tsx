@@ -175,7 +175,7 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="px-5 pt-6 pb-5">
-        <Link href="/">
+        <Link href="/app">
           <span className="font-black text-xl tracking-tight">
             <span className="hirer-grad-text">ARTS</span>
             <span className="bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">WRK</span>

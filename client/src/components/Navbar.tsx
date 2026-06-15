@@ -73,8 +73,8 @@ export default function Navbar() {
       <nav className={`fixed left-0 right-0 z-50 bg-white border-b border-gray-100 ${isAuthenticated && user ? "top-7" : "top-0"}`}>
         <div className="mx-auto px-5 lg:px-10 max-w-7xl">
           <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <a href="/" className="flex items-center select-none">
+            {/* Logo — goes to /app when logged in */}
+            <a href={isAuthenticated ? "/app" : "/"} className="flex items-center select-none">
               <img src={LOGO_URL} alt="Artswrk" className="h-9 w-auto" />
             </a>
 
