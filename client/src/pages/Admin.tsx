@@ -15,7 +15,7 @@ import {
   DollarSign, Calendar, Star, UserCheck, Building2, Key,
   AlertCircle, CheckCircle2, Eye, EyeOff, LogOut, Filter,
   MapPin, Clock, ArrowUpRight, UserCog, ArrowLeft, Sparkles, Globe, ExternalLink, Megaphone,
-  Plus, Edit2, Mail, ChevronDown, ToggleLeft, ToggleRight, Instagram, Link as LinkIcon, Send,
+  Plus, Edit2, Mail, ChevronDown, ToggleLeft, ToggleRight, Instagram, Link as LinkIcon, Send, Copy, Loader2,
 } from "lucide-react";
 import { ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE } from "@shared/const";
 import { Link } from "wouter";
@@ -3729,11 +3729,181 @@ function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; 
   );
 }
 
+// ─── Create Enterprise Account Modal ─────────────────────────────────────────
+
+function CreateEnterpriseModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [form, setForm] = useState({
+    email: "",
+    companyName: "",
+    firstName: "",
+    lastName: "",
+    plan: "" as "" | "on_demand" | "subscriber",
+    hiringCategory: "",
+  });
+  const [result, setResult] = useState<{ email: string; setupUrl: string } | null>(null);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const create = trpc.admin.createEnterpriseAccount.useMutation({
+    onSuccess: (data) => {
+      setResult({ email: data.email, setupUrl: data.setupUrl });
+      onCreated();
+    },
+    onError: (e) => setError(e.message),
+  });
+
+  const fullSetupUrl = result ? `${window.location.origin}${result.setupUrl}` : "";
+
+  function handleCopy() {
+    navigator.clipboard.writeText(fullSetupUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    create.mutate({
+      email: form.email.trim(),
+      companyName: form.companyName.trim(),
+      firstName: form.firstName.trim() || undefined,
+      lastName: form.lastName.trim() || undefined,
+      plan: form.plan || undefined,
+      hiringCategory: form.hiringCategory.trim() || undefined,
+    });
+  }
+
+  const field = "w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#F25722] transition-colors bg-white";
+  const label = "block text-xs font-semibold text-gray-600 mb-1";
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-black text-[#111]">Create Enterprise Account</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Account is created without a password — the organisation receives a setup link.
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        {!result ? (
+          <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+            {/* Company name */}
+            <div>
+              <label className={label}>Company / Organisation name *</label>
+              <input required value={form.companyName} onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))} className={field} placeholder="e.g. Stars of Tomorrow Dance Competition" />
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className={label}>Contact email *</label>
+              <input required type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className={field} placeholder="director@competition.com" />
+            </div>
+
+            {/* Name */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={label}>First name</label>
+                <input value={form.firstName} onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))} className={field} placeholder="Jane" />
+              </div>
+              <div>
+                <label className={label}>Last name</label>
+                <input value={form.lastName} onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))} className={field} placeholder="Smith" />
+              </div>
+            </div>
+
+            {/* Plan + Category */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={label}>Plan</label>
+                <select value={form.plan} onChange={e => setForm(f => ({ ...f, plan: e.target.value as any }))} className={field}>
+                  <option value="">None (set later)</option>
+                  <option value="on_demand">On Demand</option>
+                  <option value="subscriber">Subscriber</option>
+                </select>
+              </div>
+              <div>
+                <label className={label}>Hiring category</label>
+                <input value={form.hiringCategory} onChange={e => setForm(f => ({ ...f, hiringCategory: e.target.value }))} className={field} placeholder="e.g. Dance Competition" />
+              </div>
+            </div>
+
+            {error && (
+              <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-100 text-sm text-red-600">{error}</div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 pt-1">
+              <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={create.isPending}
+                className="px-5 py-2.5 text-sm font-bold text-white bg-[#111] rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {create.isPending ? <><Loader2 size={14} className="animate-spin" /> Creating…</> : "Create account"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="px-6 py-6 space-y-5">
+            {/* Success */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">
+                <CheckCircle2 size={20} className="text-green-500" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-[#111]">Account created for {result.email}</p>
+                <p className="text-xs text-gray-500">Share the setup link below so they can set their password.</p>
+              </div>
+            </div>
+
+            {/* Setup link */}
+            <div>
+              <label className={label}>Setup link (send this to the client)</label>
+              <div className="flex items-center gap-2">
+                <input
+                  readOnly
+                  value={fullSetupUrl}
+                  className="flex-1 px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-600 select-all"
+                  onClick={e => (e.target as HTMLInputElement).select()}
+                />
+                <button
+                  onClick={handleCopy}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-1.5 flex-shrink-0 ${copied ? "bg-green-500 text-white" : "bg-[#111] text-white hover:bg-gray-800"}`}
+                >
+                  {copied ? <><CheckCircle2 size={14} /> Copied!</> : <><Copy size={14} /> Copy</>}
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">This link lets them set their password and access their enterprise dashboard.</p>
+            </div>
+
+            <div className="flex justify-end">
+              <button onClick={onClose} className="px-5 py-2.5 text-sm font-bold text-white bg-[#111] rounded-xl hover:bg-gray-800 transition-colors">
+                Done
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Enterprise Clients Section ───────────────────────────────────────────────
+
 function EnterpriseClientsSection() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [selectedClient, setSelectedClient] = useState<EnterpriseClient | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const LIMIT = 50;
 
   useEffect(() => {
@@ -3741,7 +3911,7 @@ function EnterpriseClientsSection() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { data, isLoading } = trpc.admin.enterpriseClients.useQuery({
+  const { data, isLoading, refetch } = trpc.admin.enterpriseClients.useQuery({
     limit: LIMIT,
     offset: (page - 1) * LIMIT,
     search: debouncedSearch || undefined,
@@ -3752,15 +3922,29 @@ function EnterpriseClientsSection() {
   return (
     <div className="space-y-5">
       {selectedClient && <EnterpriseClientModal client={selectedClient} onClose={() => setSelectedClient(null)} />}
+      {createOpen && (
+        <CreateEnterpriseModal
+          onClose={() => setCreateOpen(false)}
+          onCreated={() => refetch()}
+        />
+      )}
 
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-black text-[#111]">
           Enterprise Clients
           <span className="ml-2 text-sm font-normal text-gray-400">({data?.total?.toLocaleString() ?? "…"} total)</span>
         </h1>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100">
-          <Building2 size={13} className="text-blue-600" />
-          <span className="text-xs font-semibold text-blue-600">Enterprise / PRO Accounts</span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setCreateOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors"
+          >
+            <Plus size={15} /> Create Enterprise Account
+          </button>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100">
+            <Building2 size={13} className="text-blue-600" />
+            <span className="text-xs font-semibold text-blue-600">Enterprise / PRO Accounts</span>
+          </div>
         </div>
       </div>
 

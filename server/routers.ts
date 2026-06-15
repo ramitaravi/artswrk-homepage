@@ -514,6 +514,56 @@ export const appRouter = router({
         return getUserById(newId);
       }),
 
+    /**
+     * Create an enterprise account on behalf of an organisation.
+     * No password is set — the user must claim their account via /set-password.
+     */
+    createEnterpriseAccount: protectedProcedure
+      .input(z.object({
+        email: z.string().email(),
+        companyName: z.string().min(1),
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+        plan: z.enum(["on_demand", "subscriber"]).optional(),
+        hiringCategory: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") {
+          throw new Error("Forbidden: admin only");
+        }
+        const { getDb } = await import("./db");
+        const { users: usersTable } = await import("../drizzle/schema");
+        const db = await getDb();
+        if (!db) throw new Error("DB unavailable");
+
+        const email = input.email.toLowerCase().trim();
+        const existing = await getUserByEmail(email);
+        if (existing) throw new Error(`An account with email ${email} already exists.`);
+
+        const openId = `enterprise_${crypto.randomBytes(16).toString("hex")}`;
+        const firstName = input.firstName ?? "";
+        const lastName = input.lastName ?? "";
+
+        const result = await db.insert(usersTable).values({
+          openId,
+          email,
+          firstName: firstName || null,
+          lastName: lastName || null,
+          name: [firstName, lastName].filter(Boolean).join(" ") || input.companyName,
+          userRole: "Client" as const,
+          clientCompanyName: input.companyName,
+          enterprise: true,
+          enterprisePlan: input.plan ?? null,
+          hiringCategory: input.hiringCategory ?? null,
+          userSignedUp: true,
+          onboardingStep: 4,
+        } as any);
+
+        const newId = (result as any).insertId as number;
+        const setupUrl = `/login?email=${encodeURIComponent(email)}`;
+        return { id: newId, email, setupUrl };
+      }),
+
     /** All jobs posted by a specific client — admin only */
     clientJobs: protectedProcedure
       .input(z.object({ clientId: z.number() }))
