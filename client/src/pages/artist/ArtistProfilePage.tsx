@@ -353,12 +353,10 @@ export default function ArtistProfilePage() {
   // If edit mode is open, render the full-page edit view as an overlay
   if (editOpen) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center overflow-y-auto py-6 px-4">
-        <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl my-auto">
-          <EditProfileModal
-            onClose={() => { setEditOpen(false); refetch(); }}
-          />
-        </div>
+      <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
+        <EditProfileModal
+          onClose={() => { setEditOpen(false); refetch(); }}
+        />
       </div>
     );
   }
