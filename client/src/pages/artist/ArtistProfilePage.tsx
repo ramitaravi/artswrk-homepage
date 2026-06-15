@@ -14,6 +14,7 @@
 import { useState } from "react";
 import { MapPin, Calendar, Share2, Star, ExternalLink } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import EditProfileModal from "./EditProfileModal";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -255,6 +256,7 @@ type Tab = "about" | "services" | "reviews";
 export default function ArtistProfilePage() {
   const [activeTab, setActiveTab] = useState<Tab>("about");
   const [editOpen, setEditOpen] = useState(false);
+  const { user: authUser } = useAuth();
 
   const { data: profile, isLoading, refetch } = trpc.artistProfile.getMyProfile.useQuery();
 
@@ -444,8 +446,8 @@ export default function ArtistProfilePage() {
               </button>
 
               {/* View public profile */}
-              {p.slug && (
-                <a href={`/book/${p.slug}`} target="_blank" rel="noopener noreferrer">
+              {(p.slug || (authUser as any)?.slug) && (
+                <a href={`/book/${p.slug || (authUser as any)?.slug}`} target="_blank" rel="noopener noreferrer">
                   <button className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                     <ExternalLink size={14} />
                     View Public Profile

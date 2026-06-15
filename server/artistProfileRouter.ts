@@ -74,6 +74,7 @@ export const artistProfileRouter = router({
       joinedAt: user.createdAt,
       bubbleCreatedAt: user.bubbleCreatedAt,
       bubbleId: user.bubbleId || null,
+      slug: user.slug || null,
     };
   }),
 
