@@ -283,6 +283,9 @@ function Router() {
       <Route path="/book/:slug" component={PublicArtistProfile} />
 
       {/* Enterprise dashboard — job-level deep link must come before the base route */}
+      <Route path="/enterprise/messages">
+        {() => { window.location.replace("/app/messages"); return null; }}
+      </Route>
       <Route path="/enterprise/:jobId">
         {(params) => <Enterprise initialJobId={parseInt((params as any).jobId)} />}
       </Route>

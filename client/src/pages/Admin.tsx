@@ -3739,11 +3739,16 @@ function CreateEnterpriseModal({ onClose, onCreated }: { onClose: () => void; on
     lastName: "",
     plan: "" as "" | "on_demand" | "subscriber",
     hiringCategory: "",
+    businessOrIndividual: "Business" as "Business" | "Individual",
   });
+  const [logoUrl, setLogoUrl] = useState<string>("");
+  const [logoUploading, setLogoUploading] = useState(false);
   const [result, setResult] = useState<{ email: string; setupUrl: string } | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
+  const uploadFile = trpc.artistProfile.uploadFile.useMutation();
   const create = trpc.admin.createEnterpriseAccount.useMutation({
     onSuccess: (data) => {
       setResult({ email: data.email, setupUrl: data.setupUrl });
@@ -3760,6 +3765,26 @@ function CreateEnterpriseModal({ onClose, onCreated }: { onClose: () => void; on
     setTimeout(() => setCopied(false), 2000);
   }
 
+  async function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoUploading(true);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const { url } = await uploadFile.mutateAsync({ base64, mimeType: file.type, fileName: file.name, folder: "enterprise-logos" });
+      setLogoUrl(url);
+    } catch {
+      setError("Logo upload failed — try again.");
+    } finally {
+      setLogoUploading(false);
+    }
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -3769,7 +3794,9 @@ function CreateEnterpriseModal({ onClose, onCreated }: { onClose: () => void; on
       firstName: form.firstName.trim() || undefined,
       lastName: form.lastName.trim() || undefined,
       plan: form.plan || undefined,
-      hiringCategory: form.hiringCategory.trim() || undefined,
+      hiringCategory: form.hiringCategory || undefined,
+      businessOrIndividual: form.businessOrIndividual,
+      logoUrl: logoUrl || undefined,
     });
   }
 
@@ -3778,13 +3805,13 @@ function CreateEnterpriseModal({ onClose, onCreated }: { onClose: () => void; on
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
           <div>
             <h2 className="text-lg font-black text-[#111]">Create Enterprise Account</h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              Account is created without a password — the organisation receives a setup link.
+              Account is created without a password — the organization receives a setup link.
             </p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
@@ -3794,9 +3821,39 @@ function CreateEnterpriseModal({ onClose, onCreated }: { onClose: () => void; on
 
         {!result ? (
           <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+            {/* Logo upload */}
+            <div>
+              <label className={label}>Organization logo</label>
+              <div className="flex items-center gap-4">
+                <div
+                  onClick={() => logoInputRef.current?.click()}
+                  className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-[#F25722] transition-colors overflow-hidden flex-shrink-0 bg-gray-50"
+                >
+                  {logoUploading ? (
+                    <Loader2 size={20} className="animate-spin text-gray-400" />
+                  ) : logoUrl ? (
+                    <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                  ) : (
+                    <Building2 size={20} className="text-gray-300" />
+                  )}
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => logoInputRef.current?.click()}
+                    className="text-xs font-semibold text-[#F25722] hover:underline"
+                  >
+                    {logoUrl ? "Change logo" : "Upload logo"}
+                  </button>
+                  <p className="text-xs text-gray-400 mt-0.5">PNG, JPG up to 5MB</p>
+                </div>
+              </div>
+              <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
+            </div>
+
             {/* Company name */}
             <div>
-              <label className={label}>Company / Organisation name *</label>
+              <label className={label}>Company / Organization name *</label>
               <input required value={form.companyName} onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))} className={field} placeholder="e.g. Stars of Tomorrow Dance Competition" />
             </div>
 
@@ -3818,20 +3875,36 @@ function CreateEnterpriseModal({ onClose, onCreated }: { onClose: () => void; on
               </div>
             </div>
 
-            {/* Plan + Category */}
+            {/* Business type + Hiring category */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={label}>Plan</label>
-                <select value={form.plan} onChange={e => setForm(f => ({ ...f, plan: e.target.value as any }))} className={field}>
-                  <option value="">None (set later)</option>
-                  <option value="on_demand">On Demand</option>
-                  <option value="subscriber">Subscriber</option>
+                <label className={label}>Account type</label>
+                <select value={form.businessOrIndividual} onChange={e => setForm(f => ({ ...f, businessOrIndividual: e.target.value as any }))} className={field}>
+                  <option value="Business">Business</option>
+                  <option value="Individual">Individual</option>
                 </select>
               </div>
               <div>
                 <label className={label}>Hiring category</label>
-                <input value={form.hiringCategory} onChange={e => setForm(f => ({ ...f, hiringCategory: e.target.value }))} className={field} placeholder="e.g. Dance Competition" />
+                <select value={form.hiringCategory} onChange={e => setForm(f => ({ ...f, hiringCategory: e.target.value }))} className={field}>
+                  <option value="">None (set later)</option>
+                  <option value="Dance Competition">Dance Competition</option>
+                  <option value="Dance Studio">Dance Studio</option>
+                  <option value="Music School">Music School</option>
+                  <option value="Event Company">Event Company</option>
+                  <option value="Other">Other</option>
+                </select>
               </div>
+            </div>
+
+            {/* Plan */}
+            <div>
+              <label className={label}>Plan</label>
+              <select value={form.plan} onChange={e => setForm(f => ({ ...f, plan: e.target.value as any }))} className={field}>
+                <option value="">None (set later)</option>
+                <option value="on_demand">On Demand</option>
+                <option value="subscriber">Subscriber</option>
+              </select>
             </div>
 
             {error && (
@@ -3844,7 +3917,7 @@ function CreateEnterpriseModal({ onClose, onCreated }: { onClose: () => void; on
               </button>
               <button
                 type="submit"
-                disabled={create.isPending}
+                disabled={create.isPending || logoUploading}
                 className="px-5 py-2.5 text-sm font-bold text-white bg-[#111] rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {create.isPending ? <><Loader2 size={14} className="animate-spin" /> Creating…</> : "Create account"}
@@ -3860,7 +3933,7 @@ function CreateEnterpriseModal({ onClose, onCreated }: { onClose: () => void; on
               </div>
               <div>
                 <p className="text-sm font-bold text-[#111]">Account created for {result.email}</p>
-                <p className="text-xs text-gray-500">Share the setup link below so they can set their password.</p>
+                <p className="text-xs text-gray-500">Share the setup link so they can set their password and access the enterprise dashboard.</p>
               </div>
             </div>
 

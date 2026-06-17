@@ -442,65 +442,92 @@ export async function sendProJobPostedEmail(data: {
     ? "Open to Traveling Applicants"
     : data.location || "Location TBD";
 
-  const descriptionText = data.description
-    ? data.description.replace(/<[^>]*>/g, "").trim()
+  // Keep basic formatting tags, strip everything else, then truncate to ~350 chars
+  const sanitizedDescription = data.description
+    ? data.description
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+        .replace(/<(?!\/?(?:p|br|strong|b|em|i|ul|ol|li|h[1-6])(?:\s|\/|>))[^>]*>/gi, " ")
+        .replace(/\s{2,}/g, " ")
+        .trim()
+    : null;
+
+  // Text-only version for truncation check
+  const plainLength = sanitizedDescription
+    ? sanitizedDescription.replace(/<[^>]*>/g, "").length
+    : 0;
+
+  // If description is long, show a truncated plain-text excerpt with ellipsis
+  const descriptionHtml = sanitizedDescription
+    ? plainLength > 400
+      ? `<p style="font-size:13px;color:#555;line-height:1.7;margin:0">${sanitizedDescription.replace(/<[^>]*>/g, "").slice(0, 380).trimEnd()}…</p>`
+      : `<div style="font-size:13px;color:#555;line-height:1.7">${sanitizedDescription}</div>`
     : null;
 
   return sendSimpleEmail({
     to: data.to,
     cc: "support@artswrk.com",
-    subject: `Your job has been posted!`,
+    subject: `Your job has been posted — ${data.serviceType} at ${data.company}`,
     html: `
-      <div style="font-family:'Helvetica Neue',sans-serif;max-width:580px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f0f0f0">
+      <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:580px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f0f0f0">
 
         <!-- Header -->
         <div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:28px 36px">
-          <div style="display:inline-flex;align-items:center;gap:6px">
-            <span style="font-size:20px;font-weight:900;color:#fff;letter-spacing:-0.5px">ARTS</span>
-            <span style="font-size:20px;font-weight:900;background:#111;color:#fff;padding:2px 8px;border-radius:6px">WRK</span>
-          </div>
-          <p style="color:rgba(255,255,255,0.85);font-size:13px;margin:8px 0 0">Job Confirmation · ${data.company}</p>
+          <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/ArtswrkWhiteLogo_d14af74c.png"
+               alt="Artswrk" height="36" style="display:block;height:36px;width:auto;margin-bottom:8px" />
+          <p style="color:rgba(255,255,255,0.85);font-size:13px;margin:0;font-weight:500">Job Posted · ${data.company}</p>
         </div>
 
         <!-- Body -->
         <div style="padding:36px">
-          <p style="font-size:15px;color:#111;margin:0 0 20px">Hey ${data.firstName},</p>
-
-          <p style="font-size:15px;font-weight:700;color:#111;margin:0 0 16px">Your job has been posted! See details below:</p>
+          <p style="font-size:15px;color:#111;margin:0 0 6px">Hey ${data.firstName},</p>
+          <p style="font-size:15px;font-weight:700;color:#111;margin:0 0 24px">Your job has been posted! See details below:</p>
 
           <!-- Job card -->
           <div style="background:#f9f9f9;border-radius:12px;padding:20px 24px;margin-bottom:28px">
             <table style="width:100%;border-collapse:collapse">
               <tr>
-                <td style="padding:5px 16px 5px 0;font-size:13px;font-weight:700;color:#111;vertical-align:top;white-space:nowrap;text-decoration:underline">Job:</td>
-                <td style="padding:5px 0;font-size:14px;color:#111">${data.serviceType}</td>
+                <td style="padding:5px 16px 5px 0;font-size:13px;font-weight:700;color:#111;vertical-align:top;white-space:nowrap;width:110px">Job</td>
+                <td style="padding:5px 0;font-size:14px;color:#333;font-weight:600">${data.serviceType}</td>
               </tr>
               <tr>
-                <td style="padding:5px 16px 5px 0;font-size:13px;font-weight:700;color:#111;vertical-align:top;white-space:nowrap;text-decoration:underline">Company:</td>
-                <td style="padding:5px 0;font-size:14px;color:#111">${data.company}</td>
+                <td style="padding:5px 16px 5px 0;font-size:13px;font-weight:700;color:#111;vertical-align:top;white-space:nowrap">Company</td>
+                <td style="padding:5px 0;font-size:14px;color:#333">${data.company}</td>
               </tr>
               <tr>
-                <td style="padding:5px 16px 5px 0;font-size:13px;font-weight:700;color:#111;vertical-align:top;white-space:nowrap;text-decoration:underline">Location:</td>
-                <td style="padding:5px 0;font-size:14px;color:#111">${locationDisplay}</td>
+                <td style="padding:5px 16px 5px 0;font-size:13px;font-weight:700;color:#111;vertical-align:top;white-space:nowrap">Location</td>
+                <td style="padding:5px 0;font-size:14px;color:#333">${locationDisplay}</td>
               </tr>
-              ${descriptionText ? `
+              ${descriptionHtml ? `
               <tr>
-                <td style="padding:10px 16px 5px 0;font-size:13px;font-weight:700;color:#111;vertical-align:top;white-space:nowrap;text-decoration:underline">Description:</td>
-                <td style="padding:10px 0 5px;font-size:14px;color:#555;line-height:1.6">${descriptionText}</td>
+                <td colspan="2" style="padding:12px 0 0">
+                  <div style="border-top:1px solid #e8e8e8;padding-top:12px">
+                    <p style="font-size:13px;font-weight:700;color:#111;margin:0 0 6px">Description</p>
+                    ${descriptionHtml}
+                  </div>
+                </td>
               </tr>` : ""}
             </table>
           </div>
 
-          <p style="font-size:15px;color:#111;line-height:1.6;margin:0 0 24px">
-            Applicants will start applying to your job. To view your job and manage submissions, <a href="${data.jobLink}" style="color:#F25722;font-weight:700">click here</a>.
+          <!-- Big CTA button -->
+          <div style="text-align:center;margin-bottom:28px">
+            <a href="${data.jobLink}"
+               style="display:inline-block;background:linear-gradient(135deg,#FFBC5D,#F25722);color:#fff;font-size:15px;font-weight:800;text-decoration:none;padding:14px 36px;border-radius:100px;letter-spacing:-0.2px">
+              View Your Job →
+            </a>
+          </div>
+
+          <p style="font-size:14px;color:#666;line-height:1.6;margin:0 0 20px">
+            Artists are now able to apply. You can manage applicants and job details from your enterprise dashboard.
           </p>
 
-          <p style="font-size:15px;color:#111;line-height:1.6;margin:0 0 32px">
-            If you have any questions or concerns, don't hesitate to reach out to us at <a href="mailto:contact@artswrk.com" style="color:#F25722">contact@artswrk.com</a>.
+          <p style="font-size:14px;color:#666;line-height:1.6;margin:0 0 28px">
+            Questions? Email us at <a href="mailto:contact@artswrk.com" style="color:#F25722;text-decoration:none;font-weight:600">contact@artswrk.com</a>.
           </p>
 
-          <hr style="border:none;border-top:1px solid #f0f0f0;margin:0 0 24px" />
-          <p style="font-size:14px;color:#111;margin:0">Best,<br/>The Artswrk Team</p>
+          <hr style="border:none;border-top:1px solid #f0f0f0;margin:0 0 20px" />
+          <p style="font-size:13px;color:#999;margin:0">— The Artswrk Team</p>
         </div>
       </div>
     `,

@@ -526,6 +526,8 @@ export const appRouter = router({
         lastName: z.string().optional(),
         plan: z.enum(["on_demand", "subscriber"]).optional(),
         hiringCategory: z.string().optional(),
+        businessOrIndividual: z.enum(["Business", "Individual"]).optional(),
+        logoUrl: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") {
@@ -544,7 +546,7 @@ export const appRouter = router({
         const firstName = input.firstName ?? "";
         const lastName = input.lastName ?? "";
 
-        const result = await db.insert(usersTable).values({
+        await db.insert(usersTable).values({
           openId,
           email,
           firstName: firstName || null,
@@ -555,11 +557,25 @@ export const appRouter = router({
           enterprise: true,
           enterprisePlan: input.plan ?? null,
           hiringCategory: input.hiringCategory ?? null,
+          businessOrIndividual: input.businessOrIndividual ?? "Business",
+          profilePicture: input.logoUrl ?? null,
+          enterpriseLogoUrl: input.logoUrl ?? null,
           userSignedUp: true,
           onboardingStep: 4,
         } as any);
 
-        const newId = (result as any).insertId as number;
+        // Look up by email to get the real DB id — more reliable than parsing insertId
+        const newUser = await getUserByEmail(email);
+        const newId = newUser?.id;
+        if (!newId) throw new Error("User was created but could not be found — try again.");
+
+        // Create the client_companies row so the enterprise dashboard has a company immediately
+        await createClientCompany({
+          ownerUserId: newId,
+          name: input.companyName,
+          logo: input.logoUrl ?? null,
+        });
+
         const setupUrl = `/login?email=${encodeURIComponent(email)}`;
         return { id: newId, email, setupUrl };
       }),
@@ -2381,6 +2397,7 @@ Fields to extract:
         description: z.string().optional(),
         applyEmail: z.string().email().optional().or(z.literal('')),
         bubbleClientCompanyId: z.string().optional(),
+        appUrl: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const jobId = await createPremiumJob({
@@ -2397,10 +2414,18 @@ Fields to extract:
           bubbleClientCompanyId: input.bubbleClientCompanyId || null,
         });
 
+        // Upsert a client_companies row so the company appears in the Companies tab
+        await createClientCompany({
+          ownerUserId: ctx.user.id,
+          name: input.company,
+          logo: input.logo || null,
+        }).catch(() => {});  // non-fatal if already exists
+
         // Send PRO job confirmation email
         const poster = await getUserByOpenId(ctx.user.openId);
         if (poster?.email) {
-          const appUrl = process.env.VITE_APP_URL || "https://artswrk.com";
+          // Use client-supplied origin so the link works on any subdomain/preview env
+          const appUrl = input.appUrl || process.env.VITE_APP_URL || "https://artswrk.com";
           sendProJobPostedEmail({
             to: poster.email,
             firstName: poster.firstName ?? poster.name?.split(" ")[0] ?? "there",
@@ -2414,6 +2439,76 @@ Fields to extract:
         }
 
         return { success: true, jobId };
+      }),
+
+    /** Update a PRO job owned by the logged-in enterprise user */
+    updateOwnJob: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        serviceType: z.string().min(1).optional(),
+        company: z.string().optional(),
+        category: z.string().optional(),
+        location: z.string().optional(),
+        workFromAnywhere: z.boolean().optional(),
+        budget: z.string().optional(),
+        description: z.string().optional(),
+        applyEmail: z.string().email().optional().or(z.literal("")),
+        status: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const { getDb } = await import("./db");
+        const { premiumJobs: premiumJobsTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const db = await getDb();
+        if (!db) throw new Error("DB unavailable");
+
+        // Verify ownership before updating
+        const [existing] = await db
+          .select({ createdByUserId: premiumJobsTable.createdByUserId })
+          .from(premiumJobsTable)
+          .where(eq(premiumJobsTable.id, input.id))
+          .limit(1);
+        if (!existing) throw new Error("Job not found");
+        if (existing.createdByUserId !== ctx.user.id) throw new Error("Forbidden: not your job");
+
+        const { id, ...fields } = input;
+        const patch: Record<string, any> = {};
+        if (fields.serviceType !== undefined) patch.serviceType = fields.serviceType;
+        if (fields.company !== undefined) patch.company = fields.company;
+        if (fields.category !== undefined) patch.category = fields.category;
+        if (fields.location !== undefined) patch.location = fields.location || null;
+        if (fields.workFromAnywhere !== undefined) patch.workFromAnywhere = fields.workFromAnywhere;
+        if (fields.budget !== undefined) patch.budget = fields.budget || null;
+        if (fields.description !== undefined) patch.description = fields.description || null;
+        if (fields.applyEmail !== undefined) patch.applyEmail = fields.applyEmail || null;
+        if (fields.status !== undefined) patch.status = fields.status;
+
+        if (Object.keys(patch).length > 0) {
+          await db.update(premiumJobsTable).set(patch).where(eq(premiumJobsTable.id, id));
+        }
+        return { success: true };
+      }),
+
+    /** Archive a PRO job owned by the logged-in enterprise user */
+    archiveOwnJob: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const { getDb } = await import("./db");
+        const { premiumJobs: premiumJobsTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const db = await getDb();
+        if (!db) throw new Error("DB unavailable");
+
+        const [existing] = await db
+          .select({ createdByUserId: premiumJobsTable.createdByUserId })
+          .from(premiumJobsTable)
+          .where(eq(premiumJobsTable.id, input.id))
+          .limit(1);
+        if (!existing) throw new Error("Job not found");
+        if (existing.createdByUserId !== ctx.user.id) throw new Error("Forbidden: not your job");
+
+        await db.update(premiumJobsTable).set({ status: "Archived" }).where(eq(premiumJobsTable.id, input.id));
+        return { success: true };
       }),
 
     /** Get enterprise billing info for the logged-in client */
@@ -2501,6 +2596,32 @@ Fields to extract:
         return { url, sessionId };
       }),
 
+    /** Verify a completed Stripe job-unlock session and record the unlock in the DB */
+    verifyJobUnlock: protectedProcedure
+      .input(z.object({ sessionId: z.string(), jobId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        // Idempotent — skip if already recorded
+        const already = await isJobUnlocked(ctx.user.id, input.jobId);
+        if (already) return { success: true };
+        const stripe = getStripe();
+        const session = await stripe.checkout.sessions.retrieve(input.sessionId);
+        if (session.payment_status !== "paid" && session.status !== "complete") {
+          throw new Error("Payment not yet completed");
+        }
+        await recordEnterpriseJobUnlock({
+          clientUserId: ctx.user.id,
+          jobId: input.jobId,
+          stripeSessionId: input.sessionId,
+          stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : null,
+          amountCents: session.amount_total ?? 10000,
+        });
+        // Save Stripe customer ID for future use
+        if (session.customer && typeof session.customer === "string") {
+          await saveEnterpriseStripeCustomerId(ctx.user.id, session.customer);
+        }
+        return { success: true };
+      }),
+
     /** Open Stripe Customer Portal for enterprise subscription management */
     billingPortal: protectedProcedure
       .input(z.object({ returnUrl: z.string() }))
@@ -2515,6 +2636,97 @@ Fields to extract:
         return { url: session.url };
       }),
 
+    /** Confirm a PRO job applicant and create a booking record */
+    confirmApplicant: protectedProcedure
+      .input(z.object({
+        applicantId: z.number(),
+        paymentMethod: z.enum(["artswrk", "direct"]),
+        rateType: z.enum(["flat", "hourly"]).default("flat"),
+        artistRateCents: z.number().int().optional(),  // rate artist receives, in cents
+        hours: z.number().optional(),                  // if hourly
+        startDate: z.string().optional(),              // ISO date string
+        endDate: z.string().optional(),
+        locationAddress: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const { premiumJobInterestedArtists, premiumJobs } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const { getDb } = await import("./db");
+        const db = await getDb();
+        if (!db) throw new Error("DB unavailable");
+
+        // Fetch applicant from premium_interested_artists
+        const [applicantRow] = await db
+          .select()
+          .from(premiumJobInterestedArtists)
+          .where(eq(premiumJobInterestedArtists.id, input.applicantId))
+          .limit(1);
+        if (!applicantRow) throw new Error("Applicant not found");
+
+        // Fetch the premium job and verify ownership
+        const [jobRow] = await db
+          .select()
+          .from(premiumJobs)
+          .where(eq(premiumJobs.id, applicantRow.premiumJobId!))
+          .limit(1);
+        if (!jobRow) throw new Error("Job not found");
+        if (jobRow.createdByUserId !== ctx.user.id) throw new Error("Forbidden: not your job");
+
+        // artistRateCents → dollars for storage (booking table uses integer dollars)
+        const artistRateDollars = input.artistRateCents ? Math.round(input.artistRateCents / 100) : null;
+        const clientRateDollars = artistRateDollars !== null && input.paymentMethod === "artswrk"
+          ? Math.round(artistRateDollars * 1.05)
+          : artistRateDollars;
+
+        // Create the booking (reuse existing helper, passing premium IDs in the jobId / interestedArtistId slots)
+        const bookingId = await createBookingFromApplicant({
+          jobId: applicantRow.premiumJobId!,
+          interestedArtistId: input.applicantId,
+          clientUserId: ctx.user.id,
+          artistUserId: applicantRow.artistUserId!,
+          paymentMethod: input.paymentMethod,
+          artistRate: artistRateDollars,
+          clientRate: clientRateDollars,
+          startDate: input.startDate ? new Date(input.startDate) : null,
+          endDate: input.endDate ? new Date(input.endDate) : null,
+          locationAddress: input.locationAddress ?? jobRow.location ?? null,
+          description: [jobRow.description, input.notes].filter(Boolean).join("\n\n---\n\n") || null,
+        });
+
+        // Store hours on the booking if provided (hourly rate jobs)
+        if (input.hours && bookingId) {
+          const { bookings: bookingsTable } = await import("../drizzle/schema");
+          await db.update(bookingsTable).set({ hours: input.hours } as any).where(eq(bookingsTable.id, bookingId));
+        }
+
+        // Mark applicant status as Confirmed
+        await db.update(premiumJobInterestedArtists)
+          .set({ status: "Confirmed" } as any)
+          .where(eq(premiumJobInterestedArtists.id, input.applicantId));
+
+        // Send confirmation email to artist
+        try {
+          const artist = await getUserById(applicantRow.artistUserId!);
+          if (artist?.email) {
+            const enterprise = await getUserById(ctx.user.id);
+            const company = jobRow.company ?? enterprise?.clientCompanyName ?? enterprise?.name ?? "A company";
+            const payNote = input.paymentMethod === "artswrk"
+              ? "via Artswrk invoice (5% processing fee applies)"
+              : "directly by the company";
+            await sendSimpleEmail({
+              to: artist.email,
+              subject: `You've been confirmed for ${jobRow.serviceType ?? "a job"} at ${company}`,
+              html: `<div style="font-family:'Helvetica Neue',sans-serif;max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f0f0f0"><div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:28px 36px"><img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/ArtswrkWhiteLogo_d14af74c.png" alt="Artswrk" height="32" style="display:block;height:32px;width:auto"/></div><div style="padding:32px"><h2 style="font-size:20px;font-weight:900;color:#111;margin:0 0 6px">You've been confirmed! 🎉</h2><p style="font-size:15px;color:#555;margin:0 0 20px">Hi ${artist.firstName ?? "there"}, <strong>${company}</strong> has confirmed you for the role below.</p><div style="background:#f9f9f9;border-radius:12px;padding:16px 20px;margin-bottom:20px"><p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#111">Job: ${jobRow.serviceType ?? "Role"}</p>${input.agreedRate ? `<p style="margin:0 0 8px;font-size:13px;color:#555">Agreed rate: <strong>${input.agreedRate}</strong></p>` : ""}${input.notes ? `<p style="margin:0;font-size:13px;color:#555">Notes: ${input.notes}</p>` : ""}</div><p style="font-size:13px;color:#666;margin:0 0 20px">Payment will be handled ${payNote}.</p><a href="${process.env.VITE_APP_URL ?? "https://artswrk.com"}/app" style="display:inline-block;background:linear-gradient(135deg,#FFBC5D,#F25722);color:#fff;font-weight:800;font-size:14px;padding:12px 28px;border-radius:10px;text-decoration:none">View Dashboard →</a></div></div>`,
+            });
+          }
+        } catch (e) {
+          console.error("[enterprise.confirmApplicant] email send failed (non-fatal):", e);
+        }
+
+        return { success: true, bookingId };
+      }),
+
     /** Send a direct message to an artist from enterprise job detail view */
     messageArtist: protectedProcedure
       .input(z.object({ artistUserId: z.number(), message: z.string().min(1).max(2000) }))
@@ -2526,10 +2738,13 @@ Fields to extract:
         const artist = await getUserById(input.artistUserId);
         if (artist?.email) {
           try {
-            await sendSimpleEmail({
+            const senderName = (sender as any).clientCompanyName ?? sender.name ?? "Artswrk Client";
+            await sendNewMessageEmail({
               to: artist.email,
-              subject: `New message from ${(sender as any).clientCompanyName ?? sender.name ?? "Artswrk Client"}`,
-              html: `<p>Hi ${artist.firstName ?? "there"},</p><p>${(sender as any).clientCompanyName ?? sender.name ?? "A client"} has sent you a message on Artswrk:</p><blockquote style="border-left:3px solid #F25722;padding-left:12px;color:#555">${input.message}</blockquote><p><a href="https://artswrk.com/app/messages">Log in to reply</a></p><p>Best,<br/>The Artswrk Team</p>`,
+              recipientFirstName: artist.firstName ?? "there",
+              senderName,
+              messagePreview: input.message,
+              dashboardUrl: `${process.env.VITE_APP_URL ?? "https://artswrk.com"}/app/messages`,
             });
           } catch (e) {
             console.error("[enterprise.messageArtist] Email send failed (non-fatal):", e);
