@@ -9,6 +9,7 @@ export const ENV = {
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+  stripeConnectClientId: process.env.STRIPE_CONNECT_CLIENT_ID ?? "",
   sendgridApiKey: process.env.SENDGRID_API_KEY ?? "",
   brevoApiKey: process.env.BREVO_API_KEY ?? "",
 };

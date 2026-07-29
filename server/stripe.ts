@@ -5,6 +5,7 @@
  */
 
 import Stripe from "stripe";
+import { SignJWT, jwtVerify } from "jose";
 import { ENV } from "./_core/env";
 import { STRIPE_PRODUCTS } from "./stripe-products";
 
@@ -399,11 +400,19 @@ export async function createClientJobUnlockCheckoutSession(
     mode: "payment",
     line_items: [
       {
-        price: "price_1PdZbJA91H1fWNkKoDO2U5CV",
+        price_data: {
+          currency: "usd",
+          unit_amount: 3000, // $30
+          product_data: {
+            name: "Artswrk Job Unlock",
+            description: opts.jobTitle
+              ? `One-time unlock for: ${opts.jobTitle}`
+              : "Unlock all applicants for this job — no recurring charge",
+          },
+        },
         quantity: 1,
       },
     ],
-    payment_intent_data: { setup_future_usage: "on_session" },
     success_url: `${opts.origin}/app/jobs/${opts.jobId}?unlock_success=1&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${opts.origin}/app/jobs/${opts.jobId}`,
     allow_promotion_codes: true,
@@ -472,4 +481,54 @@ export async function createClientSubscriptionCheckoutSession(
   }
   const session = await stripe.checkout.sessions.create(sessionParams);
   return { url: session.url!, sessionId: session.id };
+}
+
+// ── Stripe Connect OAuth (artist payout onboarding) ─────────────────────────
+// The `state` param is a short-lived signed JWT carrying the artist's user ID
+// — no DB table or session lookup needed on the callback; the signature and
+// expiry are the only trust boundary. Stateless and CSRF-safe.
+
+function connectStateSecret(): Uint8Array {
+  if (!ENV.cookieSecret) throw new Error("JWT_SECRET is not configured");
+  return new TextEncoder().encode(ENV.cookieSecret);
+}
+
+export async function createStripeConnectAuthorizeUrl(userId: number, origin: string): Promise<string> {
+  if (!ENV.stripeConnectClientId) {
+    throw new Error("STRIPE_CONNECT_CLIENT_ID is not configured");
+  }
+  const state = await new SignJWT({ userId })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setExpirationTime("15m")
+    .sign(connectStateSecret());
+
+  const redirectUri = `${origin}/stripe-connect/callback`;
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: ENV.stripeConnectClientId,
+    scope: "read_write",
+    redirect_uri: redirectUri,
+    state,
+    "stripe_user[business_type]": "individual",
+  });
+  return `https://connect.stripe.com/oauth/authorize?${params.toString()}`;
+}
+
+/** Verifies + decodes the `state` param from a Connect OAuth callback. Throws if invalid/expired. */
+export async function verifyStripeConnectState(state: string): Promise<{ userId: number }> {
+  const { payload } = await jwtVerify(state, connectStateSecret(), { algorithms: ["HS256"] });
+  const userId = payload.userId;
+  if (typeof userId !== "number") throw new Error("Invalid state payload");
+  return { userId };
+}
+
+/** Exchanges an OAuth `code` for the artist's connected Stripe account ID. */
+export async function exchangeStripeConnectCode(code: string): Promise<string> {
+  const stripe = getStripe();
+  const response = await stripe.oauth.token({
+    grant_type: "authorization_code",
+    code,
+  } as any);
+  if (!(response as any).stripe_user_id) throw new Error("Stripe did not return a connected account ID");
+  return (response as any).stripe_user_id;
 }

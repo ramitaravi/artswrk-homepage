@@ -8,7 +8,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import ArtistProfilePage from "./artist/ArtistProfilePage";
-import ArtistSettingsPlan from "./artist/ArtistSettingsPlan";
+import ArtistSettings from "./artist/ArtistSettings";
 import MessagesPage from "./dashboard/Messages";
 import {
   Briefcase,
@@ -18,7 +18,6 @@ import {
   Star,
   Building2,
   Gift,
-  Users,
   Settings,
   MapPin,
   Clock,
@@ -200,7 +199,6 @@ function DashboardTab({ user }: { user: any }) {
   const { data: msgStats } = trpc.messages.myStats.useQuery();
   const unreadMessages = msgStats?.unreadMessages ?? 0;
 
-  const { data: affiliationsData } = trpc.artistDashboard.getMyAffiliations.useQuery();
   const { data: jobsFeed, isLoading: feedLoading } = trpc.artistDashboard.getJobsFeed.useQuery(
     { limit: 20, offset: 0, lat: coords?.lat, lng: coords?.lng },
     { enabled: true }
@@ -211,7 +209,6 @@ function DashboardTab({ user }: { user: any }) {
   const { data: proApplications } = trpc.artistDashboard.getProApplications.useQuery();
   const appliedProJobIds = new Set((proApplications as any[] ?? []).map((a: any) => a.premiumJobId).filter(Boolean));
 
-  const affiliations = affiliationsData?.map(a => a.display) ?? [];
   const nearbyJobs = jobsFeed ?? [];
   // If fewer than 2 nearby jobs, show PRO jobs in the main jobs section instead
   const showProJobsAsPrimary = !feedLoading && nearbyJobs.length < 2;
@@ -234,32 +231,24 @@ function DashboardTab({ user }: { user: any }) {
             )}
             <div className="min-w-0">
               <h1 className="text-lg lg:text-xl font-semibold text-[#111]">Hey, {firstName} 🎉</h1>
-              {user?.artswrkPro && (
+              {isPro ? (
                 <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-pink-50 text-[#ec008c] border border-pink-200 mt-1.5">
                   <Star size={11} className="fill-[#ec008c] text-[#ec008c]" /> Artswrk PRO Member
+                </span>
+              ) : user?.artswrkBasic ? (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200 mt-1.5">
+                  Basic Plan
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-50 text-gray-500 border border-gray-200 mt-1.5">
+                  Free Plan
                 </span>
               )}
             </div>
           </div>
 
-          <hr className="my-4 border-gray-100" />
-          <p className="text-xs font-semibold text-gray-500 mb-2">My Affiliations</p>
-          {affiliations.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {affiliations.map((aff: string) => (
-                <span key={aff} className="text-xs bg-gray-50 border border-gray-200 text-gray-700 px-2 py-0.5 rounded-full">{aff}</span>
-              ))}
-            </div>
-          ) : (
-            <a href="/app/profile" className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#ec008c] transition-colors">
-              <span className="text-base leading-none">+</span> Add affiliations to your profile
-            </a>
-          )}
-
           <a
-            href={user?.slug ? `/book/${user.slug}` : "/app/profile"}
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/app/profile"
             className="mt-4 w-full flex items-center justify-center gap-1.5 text-sm font-semibold text-white bg-[#111] px-4 py-2.5 rounded-xl hover:opacity-80 transition-opacity"
           >
             View Profile <ArrowRight size={14} />
@@ -1083,7 +1072,7 @@ function BookingsTab() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-[#111]">Bookings</h2>
+      <h1 className="text-xl font-bold text-[#111]">Bookings</h1>
 
       {/* Filter tabs */}
       <div className="flex gap-2">
@@ -1482,7 +1471,7 @@ function PaymentsTab() {
 
   return (
     <div className="space-y-5">
-      <h2 className="text-2xl font-bold text-[#111]">Wallet</h2>
+      <h1 className="text-xl font-bold text-[#111]">Payments</h1>
 
       <div className="flex flex-col lg:flex-row gap-5">
         {/* Left column */}
@@ -1651,9 +1640,9 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[#111] flex items-center gap-2">
+          <h1 className="text-xl font-bold text-[#111] flex items-center gap-2">
             PRO Jobs <span className="text-xs font-semibold bg-pink-50 text-[#ec008c] px-1.5 py-0.5 rounded">⭐️</span>
-          </h2>
+          </h1>
         </div>
 
         {/* Upsell card */}
@@ -1725,9 +1714,9 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[#111] flex items-center gap-2">
+        <h1 className="text-xl font-bold text-[#111] flex items-center gap-2">
           PRO Jobs <span className="text-xs font-semibold bg-pink-50 text-[#ec008c] px-1.5 py-0.5 rounded">⭐️</span>
-        </h2>
+        </h1>
         <span className="text-xs font-semibold text-[#ec008c] bg-amber-50 border border-pink-200 px-2.5 py-1 rounded-full flex items-center gap-1">
           <Star size={11} className="fill-[#ec008c]" /> PRO Access
         </span>
@@ -1802,8 +1791,8 @@ export default function ArtistDashboard() {
     if (location.startsWith("/app/profile")) return <ArtistProfilePage />;
     if (location.startsWith("/app/pro-jobs")) return <ProJobsTab onGoToSettings={() => { window.location.href = "/app/settings"; }} />;
     if (location.startsWith("/app/benefits")) return <ComingSoonTab icon={<Gift size={40} />} title="Benefits" />;
-    if (location.startsWith("/app/community")) return <ComingSoonTab icon={<Users size={40} />} title="Community" />;
-    if (location.startsWith("/app/settings")) return <ArtistSettingsPlan />;
+    if (location.startsWith("/app/community")) { window.location.replace("/app"); return null; }
+    if (location.startsWith("/app/settings")) return <ArtistSettings />;
     // Default: /app overview
     return <DashboardTab user={user} />;
   }

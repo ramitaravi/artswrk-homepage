@@ -16,6 +16,8 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import Navbar from "@/components/Navbar";
 import InlineAuth from "@/components/InlineAuth";
+import RichText from "@/components/RichText";
+import DashboardLayout from "@/components/DashboardLayout";
 
 // ─── Slug helpers (exported — used by other pages) ────────────────────────────
 
@@ -167,35 +169,43 @@ export default function JobDetail() {
     metaDesc.setAttribute("content", `${title} in ${cityDisplay}. ${rate !== "Rate negotiable" ? `Pay: ${rate}.` : ""} Apply on Artswrk.`);
   }, [job, title, cityDisplay, rate]);
 
+  // ── Page shell ─────────────────────────────────────────────────────────────
+  // Logged-in users get the same dashboard chrome (sidebar, gray canvas,
+  // centered width) as every other page; logged-out visitors get the
+  // standalone public page with its own Navbar.
+  const jobsBackHref = isAuthenticated ? "/app/jobs" : "/jobs";
+  const shell = (content: React.ReactNode) =>
+    isAuthenticated ? <DashboardLayout>{content}</DashboardLayout> : content;
+
   // ── Loading / error states ────────────────────────────────────────────────
 
   if (jobId === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
+    return shell(
+      <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
           <AlertCircle size={40} className="text-gray-300 mx-auto mb-3" />
           <p className="font-semibold text-gray-500">Invalid job URL</p>
-          <Link href="/jobs" className="mt-4 inline-block text-sm text-[#F25722] font-semibold hover:underline">← Back to Jobs</Link>
+          <Link href={jobsBackHref} className="mt-4 inline-block text-sm text-[#F25722] font-semibold hover:underline">← Back to Jobs</Link>
         </div>
       </div>
     );
   }
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
+    return shell(
+      <div className="min-h-[60vh] flex items-center justify-center">
         <Loader2 size={32} className="animate-spin text-gray-300" />
       </div>
     );
   }
 
   if (error || !job) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
+    return shell(
+      <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
           <AlertCircle size={40} className="text-gray-300 mx-auto mb-3" />
           <p className="font-semibold text-gray-500">Job not found</p>
-          <Link href="/jobs" className="mt-4 inline-block text-sm text-[#F25722] font-semibold hover:underline">← Back to Jobs</Link>
+          <Link href={jobsBackHref} className="mt-4 inline-block text-sm text-[#F25722] font-semibold hover:underline">← Back to Jobs</Link>
         </div>
       </div>
     );
@@ -246,15 +256,15 @@ export default function JobDetail() {
     </div>
   );
 
-  return (
-    <div className="min-h-screen bg-white" style={{ fontFamily: "Poppins, sans-serif" }}>
-      <Navbar />
+  return shell(
+    <div className={isAuthenticated ? "" : "min-h-screen bg-white"} style={{ fontFamily: "Poppins, sans-serif" }}>
+      {!isAuthenticated && <Navbar />}
 
-      <div className="pt-14 pb-28 lg:pb-10">
-        <div className="max-w-4xl mx-auto px-5 py-8">
+      <div className={isAuthenticated ? "pb-10" : "pt-14 pb-28 lg:pb-10"}>
+        <div className={isAuthenticated ? "max-w-5xl mx-auto px-4 md:px-6 py-6" : "max-w-4xl mx-auto px-5 py-8"}>
           {/* Back link */}
           <Link
-            href="/jobs"
+            href={jobsBackHref}
             className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-[#111] transition-colors mb-6"
           >
             <ArrowLeft size={14} /> Back to Jobs
@@ -314,9 +324,7 @@ export default function JobDetail() {
               {job.description && (
                 <div className="border-t border-gray-100 pt-5">
                   <h2 className="text-sm font-black text-[#111] mb-3">About this role</h2>
-                  <div className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
-                    {job.description}
-                  </div>
+                  <RichText html={job.description} className="text-gray-600" />
                 </div>
               )}
 
@@ -333,7 +341,7 @@ export default function JobDetail() {
                 <p className="text-white font-black text-sm mb-1">More jobs like this</p>
                 <p className="text-white/60 text-xs mb-4">Browse hundreds of open roles for performing artists.</p>
                 <Link
-                  href="/jobs"
+                  href={jobsBackHref}
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-white border border-white/30 hover:bg-white/10 transition-colors px-4 py-2 rounded-full"
                 >
                   Browse all jobs →
@@ -381,3 +389,4 @@ export default function JobDetail() {
     </div>
   );
 }
+

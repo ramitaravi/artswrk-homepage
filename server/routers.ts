@@ -6,7 +6,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllMasterServiceTypes, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail } from "./email";
 import crypto from "crypto";
@@ -18,6 +18,7 @@ import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import { z } from "zod";
 import { leadsRouter } from "./routers/leads";
+import { applyCheckoutSessionCompleted } from "./checkoutEffects";
 
 const SALT_ROUNDS = 12;
 
@@ -1631,6 +1632,7 @@ export const appRouter = router({
         offset: z.number().min(0).default(0),
         search: z.string().optional(),
         artistType: z.string().optional(),
+        affiliationId: z.number().optional(),
       }))
       .query(async ({ input }) => {
         return getArtistsList({
@@ -1638,8 +1640,27 @@ export const appRouter = router({
           offset: input.offset,
           search: input.search || undefined,
           artistType: input.artistType || undefined,
+          affiliationId: input.affiliationId || undefined,
         });
       }),
+
+    getAffiliations: publicProcedure.query(async () => {
+      return getAllAffiliations();
+    }),
+
+    getMasterServiceTypes: publicProcedure.query(async () => {
+      return getAllMasterServiceTypes();
+    }),
+
+    getArtistAffiliations: publicProcedure
+      .input(z.object({ userId: z.number() }))
+      .query(async ({ input }) => {
+        return getArtistAffiliations(input.userId);
+      }),
+
+    getFeatured: publicProcedure.query(async () => {
+      return getFeaturedArtists(24);
+    }),
 
     /**
      * Upload a resume file (base64) to S3 and save it to artist_resumes table.
@@ -1671,6 +1692,32 @@ export const appRouter = router({
         });
         const insertId = (result as any).insertId;
         return { id: `lib-${insertId}`, title, fileUrl: url, source: "library" as const };
+      }),
+  }),
+
+  // ── Generic Checkout Verification ─────────────────────────────────────────
+  // Synchronous fallback for every Stripe Checkout flow that doesn't already
+  // have its own verify procedure (artist Basic/PRO, enterprise subscription,
+  // enterprise job unlock, client subscription, client job unlock). The
+  // success page calls this immediately on return from Stripe so the user's
+  // plan/access updates right away instead of waiting on the webhook.
+  checkout: router({
+    verifySession: protectedProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        const stripe = getStripe();
+        const session = await stripe.checkout.sessions.retrieve(input.sessionId) as any;
+
+        if (session.metadata?.user_id && session.metadata.user_id !== String(ctx.user.id)) {
+          throw new Error("This checkout session does not belong to your account.");
+        }
+        if (session.payment_status !== "paid" && session.status !== "complete") {
+          throw new Error("Payment not completed");
+        }
+
+        await applyCheckoutSessionCompleted(session);
+
+        return { success: true, type: session.metadata?.type ?? null };
       }),
   }),
 
@@ -1742,6 +1789,7 @@ Fields to extract:
      */
     createFreeJob: protectedProcedure
       .input(z.object({
+        title: z.string().max(256).optional(),
         description: z.string().min(10),
         locationAddress: z.string().optional(),
         locationLat: z.string().optional(),
@@ -1764,6 +1812,7 @@ Fields to extract:
         const job = await createJob({
           clientUserId: user.id,
           clientEmail: user.email ?? undefined,
+          title: input.title,
           description: input.description,
           locationAddress: input.locationAddress,
           locationLat: input.locationLat,
@@ -2115,6 +2164,36 @@ Fields to extract:
         );
         await updateUserOnboarding(user.id, { profilePicture: url });
         return { url };
+      }),
+
+    /**
+     * Save profile fields (name, pronouns, phone, location) for any user.
+     */
+    saveProfile: protectedProcedure
+      .input(z.object({
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+        pronouns: z.string().optional(),
+        phoneNumber: z.string().optional(),
+        location: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const { getDb } = await import("./db");
+        const { users: usersTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const db = await getDb();
+        if (!db) throw new Error("DB unavailable");
+        const updateData: Record<string, unknown> = {};
+        if (input.firstName !== undefined) { updateData.firstName = input.firstName; updateData.name = [input.firstName, user.lastName].filter(Boolean).join(" "); }
+        if (input.lastName !== undefined) { updateData.lastName = input.lastName; updateData.name = [user.firstName, input.lastName].filter(Boolean).join(" "); }
+        if (input.firstName !== undefined && input.lastName !== undefined) updateData.name = [input.firstName, input.lastName].filter(Boolean).join(" ");
+        if (input.pronouns !== undefined) updateData.pronouns = input.pronouns;
+        if (input.phoneNumber !== undefined) updateData.phoneNumber = input.phoneNumber;
+        if (input.location !== undefined) updateData.location = input.location;
+        await db.update(usersTable).set(updateData as any).where(eq(usersTable.id, user.id));
+        return { success: true };
       }),
 
     /**
@@ -2717,7 +2796,7 @@ Fields to extract:
             await sendSimpleEmail({
               to: artist.email,
               subject: `You've been confirmed for ${jobRow.serviceType ?? "a job"} at ${company}`,
-              html: `<div style="font-family:'Helvetica Neue',sans-serif;max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f0f0f0"><div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:28px 36px"><img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/ArtswrkWhiteLogo_d14af74c.png" alt="Artswrk" height="32" style="display:block;height:32px;width:auto"/></div><div style="padding:32px"><h2 style="font-size:20px;font-weight:900;color:#111;margin:0 0 6px">You've been confirmed! 🎉</h2><p style="font-size:15px;color:#555;margin:0 0 20px">Hi ${artist.firstName ?? "there"}, <strong>${company}</strong> has confirmed you for the role below.</p><div style="background:#f9f9f9;border-radius:12px;padding:16px 20px;margin-bottom:20px"><p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#111">Job: ${jobRow.serviceType ?? "Role"}</p>${input.agreedRate ? `<p style="margin:0 0 8px;font-size:13px;color:#555">Agreed rate: <strong>${input.agreedRate}</strong></p>` : ""}${input.notes ? `<p style="margin:0;font-size:13px;color:#555">Notes: ${input.notes}</p>` : ""}</div><p style="font-size:13px;color:#666;margin:0 0 20px">Payment will be handled ${payNote}.</p><a href="${process.env.VITE_APP_URL ?? "https://artswrk.com"}/app" style="display:inline-block;background:linear-gradient(135deg,#FFBC5D,#F25722);color:#fff;font-weight:800;font-size:14px;padding:12px 28px;border-radius:10px;text-decoration:none">View Dashboard →</a></div></div>`,
+              html: `<div style="font-family:'Helvetica Neue',sans-serif;max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f0f0f0"><div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:28px 36px"><img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/ArtswrkWhiteLogo_d14af74c.png" alt="Artswrk" height="32" style="display:block;height:32px;width:auto"/></div><div style="padding:32px"><h2 style="font-size:20px;font-weight:900;color:#111;margin:0 0 6px">You've been confirmed! 🎉</h2><p style="font-size:15px;color:#555;margin:0 0 20px">Hi ${artist.firstName ?? "there"}, <strong>${company}</strong> has confirmed you for the role below.</p><div style="background:#f9f9f9;border-radius:12px;padding:16px 20px;margin-bottom:20px"><p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#111">Job: ${jobRow.serviceType ?? "Role"}</p>${(input as any).agreedRate ? `<p style="margin:0 0 8px;font-size:13px;color:#555">Agreed rate: <strong>${(input as any).agreedRate}</strong></p>` : ""}${input.notes ? `<p style="margin:0;font-size:13px;color:#555">Notes: ${input.notes}</p>` : ""}</div><p style="font-size:13px;color:#666;margin:0 0 20px">Payment will be handled ${payNote}.</p><a href="${process.env.VITE_APP_URL ?? "https://artswrk.com"}/app" style="display:inline-block;background:linear-gradient(135deg,#FFBC5D,#F25722);color:#fff;font-weight:800;font-size:14px;padding:12px 28px;border-radius:10px;text-decoration:none">View Dashboard →</a></div></div>`,
             });
           }
         } catch (e) {
@@ -3184,6 +3263,26 @@ Fields to extract:
         const link = await stripe.accounts.createLoginLink(accountId);
         return { url: link.url };
       }),
+
+    /** Whether the artist has a connected Stripe payout account. */
+    stripeConnectStatus: protectedProcedure
+      .query(async ({ ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const accountId = await getArtistStripeConnectAccount(user.id);
+        return { connected: !!accountId };
+      }),
+
+    /** Start the Stripe Connect OAuth flow so an artist can link their payout account. */
+    createStripeConnectUrl: protectedProcedure
+      .input(z.object({ origin: z.string().url() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const { createStripeConnectAuthorizeUrl } = await import("./stripe");
+        const url = await createStripeConnectAuthorizeUrl(user.id, input.origin);
+        return { url };
+      }),
   }),
 
   artswrkUsers: router({
@@ -3430,6 +3529,40 @@ Fields to extract:
       }),
   }),
 
+  // ── Account management ──────────────────────────────────────────────────────
+  account: router({
+    /**
+     * Account deletion isn't self-serve — this just emails the team with the
+     * user's reasons + message so a human follows up.
+     */
+    requestDeletion: protectedProcedure
+      .input(z.object({
+        reasons: z.array(z.string()).max(20).default([]),
+        message: z.string().max(2000).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+
+        const reasonsHtml = input.reasons.length
+          ? `<ul>${input.reasons.map((r) => `<li>${r}</li>`).join("")}</ul>`
+          : "<p>(no reasons selected)</p>";
+
+        await sendSimpleEmail({
+          to: "contact@artswrk.com",
+          subject: `Account deletion request — ${user.name ?? user.email}`,
+          html: `
+            <p><strong>User:</strong> ${user.name ?? "—"} (${user.email ?? "—"}), user ID ${user.id}</p>
+            <p><strong>Reasons:</strong></p>
+            ${reasonsHtml}
+            ${input.message ? `<p><strong>Message:</strong></p><p>${input.message.replace(/\n/g, "<br/>")}</p>` : ""}
+          `,
+        });
+
+        return { success: true };
+      }),
+  }),
+
   /** Client job detail, applicant review, and unlock flows */
   clientJobs: router({
     /** Get a single job with full details for the client dashboard. */
@@ -3443,7 +3576,8 @@ Fields to extract:
         if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
         const unlocked = !!(user as any).clientPremium || await isClientJobUnlocked(user.id, input.jobId);
         const bookings = await getAdminJobBookings(input.jobId);
-        return { ...job, unlocked, bookingCount: bookings.length };
+        const applicants = await getJobApplicantsWithDetails(input.jobId);
+        return { ...job, unlocked, bookingCount: bookings.length, applicantCount: applicants.length };
       }),
     /** Get applicants for a job. If locked, returns blurred preview only. */
     getApplicants: protectedProcedure
@@ -3455,7 +3589,10 @@ Fields to extract:
         if (!job) throw new Error("Job not found");
         if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
         const applicants = await getJobApplicantsWithDetails(input.jobId);
-        const unlocked = user.role === "admin" || !!(user as any).clientPremium || await isClientJobUnlocked(user.id, input.jobId);
+        // Paywall is based on the job owner's unlock status (not admin role bypass)
+        const ownerId = job.clientUserId;
+        const owner = await getUserById(ownerId);
+        const unlocked = !!(owner as any)?.clientPremium || await isClientJobUnlocked(ownerId, input.jobId);
         if (!unlocked) {
           return {
             locked: true,
@@ -3484,7 +3621,8 @@ Fields to extract:
         const job = await getAdminJobById(applicant.jobId);
         if (!job) throw new Error("Job not found");
         if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
-        const unlocked = user.role === "admin" || !!(user as any).clientPremium || await isClientJobUnlocked(user.id, applicant.jobId);
+        const detailOwner = await getUserById(job.clientUserId);
+        const unlocked = !!(detailOwner as any)?.clientPremium || await isClientJobUnlocked(job.clientUserId, applicant.jobId);
         if (!unlocked) throw new Error("Job must be unlocked to view applicant details");
         return applicant;
       }),
@@ -3628,6 +3766,13 @@ Fields to extract:
       .input(z.object({
         applicantId: z.number(),
         paymentMethod: z.enum(["artswrk", "direct"]),
+        rateType: z.enum(["flat", "hourly"]).default("flat"),
+        artistRateCents: z.number().int().optional(),
+        hours: z.number().optional(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        locationAddress: z.string().optional(),
+        notes: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
@@ -3641,25 +3786,36 @@ Fields to extract:
         if (!unlocked) throw new Error("Job must be unlocked to confirm artists");
         const existing = await getBookingByApplicantId(input.applicantId);
         if (existing) return { success: true, bookingId: existing.id, alreadyConfirmed: true };
+        const artistRateDollars = input.artistRateCents ? Math.round(input.artistRateCents / 100) : (applicant.artistHourlyRate ?? applicant.artistFlatRate ?? null);
+        const clientRateDollars = artistRateDollars !== null && input.paymentMethod === "artswrk"
+          ? Math.round((artistRateDollars as number) * 1.05)
+          : artistRateDollars;
         const bookingId = await createBookingFromApplicant({
           jobId: applicant.jobId,
           interestedArtistId: input.applicantId,
           clientUserId: user.id,
           artistUserId: applicant.artistId,
           paymentMethod: input.paymentMethod,
-          artistRate: applicant.artistHourlyRate ?? applicant.artistFlatRate ?? null,
-          clientRate: applicant.clientHourlyRate ?? applicant.clientFlatRate ?? null,
-          startDate: applicant.startDate ?? null,
-          endDate: applicant.endDate ?? null,
-          locationAddress: job.locationAddress ?? null,
-          description: job.description ?? null,
+          artistRate: artistRateDollars,
+          clientRate: clientRateDollars,
+          startDate: input.startDate ? new Date(input.startDate) : (applicant.startDate ?? null),
+          endDate: input.endDate ? new Date(input.endDate) : (applicant.endDate ?? null),
+          locationAddress: input.locationAddress ?? job.locationAddress ?? null,
+          description: [job.description, input.notes].filter(Boolean).join("\n\n---\n\n") || null,
         });
+        if (input.hours && bookingId) {
+          const { bookings: bookingsTable } = await import("../drizzle/schema");
+          const { eq } = await import("drizzle-orm");
+          const { getDb } = await import("./db");
+          const db2 = await getDb();
+          if (db2) await db2.update(bookingsTable).set({ hours: input.hours } as any).where(eq(bookingsTable.id, bookingId));
+        }
         try {
           if (applicant.artistEmail) {
             const studioName = (user as any).clientCompanyName ?? user.name ?? "A studio";
             const jobTitle = (job.description ?? "").split("\n")[0].slice(0, 60);
             const payMethodText = input.paymentMethod === "artswrk"
-              ? "Invoice via Artswrk (4% processing fee)"
+              ? "Pay via Artswrk (5% processing fee)"
               : "Direct payment from studio";
             await sendSimpleEmail({
               to: applicant.artistEmail,
@@ -3690,9 +3846,311 @@ Fields to extract:
     getByToken: publicProcedure
       .input(z.object({ token: z.string() }))
       .query(async ({ input }) => {
+        // Check regular booking first, then admin booking periods
         const booking = await getBookingByInvoiceToken(input.token);
-        if (!booking) throw new Error("Invoice not found");
-        return booking;
+        if (booking) return booking;
+        const period = await getBookingPeriodByInvoiceToken(input.token);
+        if (!period) throw new Error("Invoice not found");
+        return period;
+      }),
+  }),
+
+  /** Admin Bookings — created directly by admin, not tied to job/applicant */
+  adminBookings: router({
+    create: protectedProcedure
+      .input(z.object({
+        artistUserId: z.number().int(),
+        clientUserId: z.number().int(),
+        artistRateDollars: z.number().min(0),
+        clientRateDollars: z.number().min(0),
+        startDate: z.string(),
+        endDate: z.string(),
+        isRecurring: z.boolean().default(false),
+        recurringCadence: z.enum(["weekly", "biweekly", "monthly", "quarterly"]).optional(),
+        locationAddress: z.string().optional(),
+        description: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden");
+        const bookingId = await createAdminBooking({
+          ...input,
+          startDate: new Date(input.startDate),
+          endDate: new Date(input.endDate),
+        });
+
+        // Notify artist + client of new booking
+        const artist = await getUserById(input.artistUserId);
+        const client = await getUserById(input.clientUserId);
+        const { sendSimpleEmail } = await import("./email");
+        if (artist?.email) {
+          await sendSimpleEmail({
+            to: artist.email,
+            subject: "New Artswrk Booking",
+            html: `<p>Hi ${artist.firstName ?? "there"},</p><p>You have a new ${input.isRecurring ? "recurring" : "one-time"} booking${(client as any)?.clientCompanyName ? ` with ${(client as any).clientCompanyName}` : ""}.</p><p>Rate: $${input.artistRateDollars}/hr · Start: ${new Date(input.startDate).toLocaleDateString()}</p><p><a href="https://artswrk.com/app/bookings">View in your dashboard</a></p><p>Best,<br/>The Artswrk Team</p>`,
+          }).catch(() => {});
+        }
+        return { bookingId };
+      }),
+
+    list: protectedProcedure
+      .input(z.object({
+        search: z.string().optional(),
+        limit: z.number().min(1).max(200).default(50),
+        offset: z.number().min(0).default(0),
+      }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden");
+        return listAdminBookings(input);
+      }),
+
+    detail: protectedProcedure
+      .input(z.object({ bookingId: z.number().int() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden");
+        const detail = await getAdminBookingDetail(input.bookingId);
+        if (!detail) throw new Error("Booking not found");
+        return detail;
+      }),
+
+    triggerNotifications: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden");
+        const due = await getDuePeriods();
+        const { sendSimpleEmail: _sendPeriodNotif } = await import("./email");
+        let sent = 0;
+        for (const period of due) {
+          try {
+            const periodLabel = new Date(period.periodStart).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+            if (period.artistEmail) {
+              await _sendPeriodNotif({
+                to: period.artistEmail,
+                subject: `Time to submit your hours — ${periodLabel}`,
+                html: `<p>Hi ${period.artistFirstName ?? "there"},</p><p>It's time to log your hours and submit reimbursements for <strong>${periodLabel}</strong>.</p><p>Rate: $${period.artistRate}/hr${period.clientCompanyName ? ` · Client: ${period.clientCompanyName}` : ""}</p><p><a href="https://artswrk.com/app/bookings" style="background:#F25722;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Submit Hours →</a></p><p>Best,<br/>The Artswrk Team</p>`,
+              });
+            }
+            await markPeriodNotified(period.id);
+            sent++;
+          } catch (e) {
+            console.error(`[triggerNotifications] Period ${period.id} failed:`, e);
+          }
+        }
+        return { sent, total: due.length };
+      }),
+  }),
+
+  /** Booking Periods — artist-facing submission flow */
+  bookingPeriods: router({
+    /** Artist submits hours for a period → generates client invoice */
+    submit: protectedProcedure
+      .input(z.object({
+        periodId: z.number().int(),
+        actualHours: z.number().min(0),
+        artistNotes: z.string().optional(),
+        origin: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = ctx.user as any;
+        const period = await getBookingPeriodById(input.periodId);
+        if (!period) throw new Error("Period not found");
+
+        const booking = await getBookingById(period.bookingId);
+        if (!booking) throw new Error("Booking not found");
+        if (booking.artistUserId !== user.id) throw new Error("Not authorized");
+
+        const reimbList = await getReimbursementsByPeriodId(input.periodId);
+        const totalReimb = reimbList.reduce((s: number, r: any) => s + (r.value ?? 0), 0);
+        const artistRatePerHour = booking.artistRate ?? 0;
+        const clientRatePerHour = booking.clientRate ?? 0;
+
+        // No processing fee for admin bookings — client pays clientRate spread only
+        const artistTotal = artistRatePerHour * input.actualHours + totalReimb;
+        const clientTotal = clientRatePerHour * input.actualHours + totalReimb;
+        const totalCents = Math.round(clientTotal * 100);
+
+        const { randomBytes } = await import("crypto");
+        const invoicePaymentToken = randomBytes(24).toString("hex");
+
+        const origin = input.origin ?? "https://artswrk.com";
+        const paymentPageUrl = `${origin}/invoice/${invoicePaymentToken}`;
+
+        let stripeCheckoutUrl: string | undefined;
+        if (totalCents >= 50) {
+          try {
+            const stripe = getStripe();
+            const clientUser = booking.clientUserId ? await getUserById(booking.clientUserId) : null;
+            const artistName = user.name ?? user.firstName ?? "Artist";
+            const periodLabel = new Date(period.periodStart).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+            const session = await stripe.checkout.sessions.create({
+              mode: "payment",
+              line_items: [{
+                price_data: {
+                  currency: "usd",
+                  unit_amount: totalCents,
+                  product_data: {
+                    name: `Payment for ${artistName} — ${periodLabel}`,
+                    description: booking.description?.split("\n")[0].slice(0, 80) ?? `Admin Booking #${booking.id}`,
+                  },
+                },
+                quantity: 1,
+              }],
+              customer_email: clientUser?.email ?? undefined,
+              allow_promotion_codes: true,
+              metadata: {
+                booking_period_id: String(input.periodId),
+                invoice_payment_token: invoicePaymentToken,
+                artist_id: String(user.id),
+                client_id: String(booking.clientUserId ?? ""),
+                type: "admin_booking_period",
+              },
+              success_url: `${paymentPageUrl}?paid=1`,
+              cancel_url: paymentPageUrl,
+            });
+            stripeCheckoutUrl = session.url ?? undefined;
+          } catch (e) {
+            console.error("[bookingPeriods.submit] Stripe error:", e);
+          }
+        }
+
+        await submitBookingPeriod(input.periodId, {
+          actualHours: input.actualHours,
+          artistNotes: input.artistNotes,
+          invoicePaymentToken,
+          invoiceStripeCheckoutUrl: stripeCheckoutUrl,
+          invoiceTotalCents: totalCents,
+        });
+
+        // Email client with payment link
+        const clientUser = booking.clientUserId ? await getUserById(booking.clientUserId) : null;
+        if (clientUser?.email) {
+          const periodLabel = new Date(period.periodStart).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+          const artistName = (user.name ?? (`${user.firstName ?? ""} ${(user as any).lastName ?? ""}`.trim())) || "Your artist";
+          const { sendSimpleEmail: _sendClientInvoice } = await import("./email");
+          await _sendClientInvoice({
+            to: clientUser.email,
+            subject: `Invoice ready — ${artistName} (${periodLabel})`,
+            html: `<p>Hi ${(clientUser as any).clientCompanyName ?? clientUser.firstName ?? "there"},</p><p>${artistName} has submitted their hours for <strong>${periodLabel}</strong>.</p><p><strong>Total: $${(totalCents / 100).toFixed(2)}</strong>${totalReimb > 0 ? ` (incl. $${totalReimb.toFixed(2)} reimbursements)` : ""}</p><p><a href="${stripeCheckoutUrl ?? paymentPageUrl}" style="background:#F25722;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Pay Invoice →</a></p><p>Best,<br/>The Artswrk Team</p>`,
+          }).catch(() => {});
+        }
+
+        return { invoicePaymentToken, stripeCheckoutUrl };
+      }),
+
+    /** Get periods for a booking (artist or admin can call) */
+    getForBooking: protectedProcedure
+      .input(z.object({ bookingId: z.number().int() }))
+      .query(async ({ input, ctx }) => {
+        const user = ctx.user as any;
+        const booking = await getBookingById(input.bookingId);
+        if (!booking) throw new Error("Booking not found");
+        const isAdmin = user.openId === ENV.ownerOpenId || user.role === "admin";
+        const isParty = booking.artistUserId === user.id || booking.clientUserId === user.id;
+        if (!isAdmin && !isParty) throw new Error("Not authorized");
+        return getBookingPeriodById(input.bookingId);
+      }),
+
+    /** Artist or client gets their admin bookings */
+    myAdminBookings: protectedProcedure
+      .query(async ({ ctx }) => {
+        const user = ctx.user as any;
+        const isArtist = user.userRole === "Artist";
+        if (isArtist) return getArtistAdminBookings(user.id);
+        return getClientAdminBookings(user.id);
+      }),
+  }),
+
+  /** Saved artists (client favorites) */
+  savedArtists: router({
+    mySaved: protectedProcedure.query(async ({ ctx }) => {
+      const user = await getUserByOpenId(ctx.user.openId);
+      if (!user) return [];
+      return getSavedArtistsByClientId(user.id);
+    }),
+    toggle: protectedProcedure
+      .input(z.object({ artistUserId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        return toggleSavedArtist(user.id, input.artistUserId);
+      }),
+  }),
+
+  /** Company / Studio page — editable by client, viewable publicly */
+  companies: router({
+    /** Get the logged-in user's company data (for dashboard editor) */
+    get: protectedProcedure.query(async ({ ctx }) => {
+      const user = await getUserByOpenId(ctx.user.openId);
+      if (!user) throw new Error("User not found");
+      return getPublicCompanyPage(user.id);
+    }),
+
+    /** Save edits to the company record */
+    update: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1).max(256),
+        description: z.string().max(2000).optional().nullable(),
+        logo: z.string().max(1024).optional().nullable(),
+        website: z.string().max(512).optional().nullable(),
+        locationAddress: z.string().max(512).optional().nullable(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        await upsertClientCompany(user.id, input);
+        return { ok: true };
+      }),
+
+    /** List all companies owned by the logged-in user */
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const user = await getUserByOpenId(ctx.user.openId);
+      if (!user) throw new Error("User not found");
+      const companies = await getClientCompaniesByUserId(user.id);
+      return { companies };
+    }),
+
+    /** Upload a logo image for a specific company */
+    uploadLogo: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        base64: z.string(),
+        contentType: z.string().default("image/jpeg"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const buf = Buffer.from(input.base64, "base64");
+        const ext = input.contentType.split("/")[1] ?? "jpg";
+        const { url } = await storagePut(
+          `company-logos/${user.id}-${input.id}-${Date.now()}.${ext}`,
+          buf,
+          input.contentType
+        );
+        await updateClientCompanyById(input.id, user.id, { logo: url });
+        return { url };
+      }),
+
+    /** Update a specific company by id (must be owned by logged-in user) */
+    updateById: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().min(1).max(256),
+        description: z.string().max(2000).optional().nullable(),
+        logo: z.string().max(1024).optional().nullable(),
+        website: z.string().max(512).optional().nullable(),
+        locationAddress: z.string().max(512).optional().nullable(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const { id, ...data } = input;
+        await updateClientCompanyById(id, user.id, data);
+        return { ok: true };
+      }),
+
+    /** Public page data — accessible without auth */
+    getPublicPage: publicProcedure
+      .input(z.object({ userId: z.number() }))
+      .query(async ({ input }) => {
+        return getPublicCompanyPage(input.userId);
       }),
   }),
 

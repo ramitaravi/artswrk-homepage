@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, isNotNull, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, benefits, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, masterServiceTypes, messages, payments, premiumJobInterestedArtists, premiumJobs, reimbursements, users } from "../drizzle/schema";
+import { BookingPeriod, ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, affiliations, benefits, bookingPeriods, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, masterServiceTypes, messages, payments, premiumJobInterestedArtists, premiumJobs, reimbursements, savedArtists, userAffiliations, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -147,7 +147,7 @@ export async function getJobsByUserId(
     .select()
     .from(jobs)
     .where(and(...conditions))
-    .orderBy(desc(jobs.bubbleCreatedAt))
+    .orderBy(desc(jobs.id))
     .limit(limit)
     .offset(offset);
 }
@@ -294,7 +294,8 @@ export async function getPublicJobsEnriched(
        j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate,
        j.locationAddress, j.locationLat, j.locationLng,
        j.description, j.direct, j.bubbleCreatedAt,
-       j.masterServiceTypeId
+       j.masterServiceTypeId,
+       j.isBoosted, j.boostEndDate
        ${distanceSelect},
        u.clientCompanyName,
        COALESCE(
@@ -305,7 +306,7 @@ export async function getPublicJobsEnriched(
      FROM jobs j
      LEFT JOIN users u ON j.clientUserId = u.id
      WHERE ${whereSQL}
-     ORDER BY j.bubbleCreatedAt DESC
+     ORDER BY (j.isBoosted = 1 AND (j.boostEndDate IS NULL OR j.boostEndDate > NOW())) DESC, j.bubbleCreatedAt DESC
      LIMIT ${limit} OFFSET ${offset}`
   );
   return (rows[0] as unknown as any[]);
@@ -654,6 +655,8 @@ export async function getInterestedArtistsByClientId(
       artistProfilePicture: artistUser.profilePicture,
       artistSlug: artistUser.slug,
       artistAvailability: artistUser.optionAvailability,
+      artistBio: artistUser.bio,
+      artistLocation: artistUser.location,
     })
     .from(interestedArtists)
     .leftJoin(artistUser, eq(interestedArtists.artistUserId, artistUser.id))
@@ -776,6 +779,8 @@ export async function getBookingsByClientId(
       artistProfilePicture: artistUser.profilePicture,
       artistSlug: artistUser.slug,
       artistAvailability: artistUser.optionAvailability,
+      artistBio: artistUser.bio,
+      artistLocation: artistUser.location,
     })
     .from(bookings)
     .leftJoin(artistUser, eq(bookings.artistUserId, artistUser.id))
@@ -1359,6 +1364,7 @@ export async function getArtistHistoryForClient(artistUserId: number, clientUser
 export interface CreateJobInput {
   clientUserId?: number;
   clientEmail?: string;
+  title?: string;
   description?: string;
   locationAddress?: string;
   locationLat?: string;
@@ -1388,6 +1394,7 @@ export async function createJob(input: CreateJobInput) {
     .values({
       clientUserId: input.clientUserId,
       clientEmail: input.clientEmail,
+      title: input.title,
       description: input.description,
       locationAddress: input.locationAddress,
       locationLat: input.locationLat,
@@ -1563,16 +1570,29 @@ export async function getJobById(jobId: number) {
 /**
  * Browse all artists (userRole = 'Artist') with optional search and filter.
  */
+export async function getAllAffiliations() {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({ id: affiliations.id, display: affiliations.display, logoUrl: affiliations.logoUrl })
+    .from(affiliations)
+    .innerJoin(userAffiliations, eq(userAffiliations.affiliationId, affiliations.id))
+    .groupBy(affiliations.id)
+    .orderBy(affiliations.display);
+}
+
 export async function getArtistsList({
   limit = 50,
   offset = 0,
   search,
   artistType,
+  affiliationId,
 }: {
   limit?: number;
   offset?: number;
   search?: string;
   artistType?: string;
+  affiliationId?: number;
 }) {
   const db = await getDb();
   if (!db) return { artists: [], total: 0 };
@@ -1609,6 +1629,12 @@ export async function getArtistsList({
     );
   }
 
+  if (affiliationId) {
+    conditions.push(
+      sql`${users.id} IN (SELECT artistUserId FROM user_affiliations WHERE affiliationId = ${affiliationId})`
+    );
+  }
+
   const where = and(...conditions);
 
   const [countRow] = await db
@@ -1630,15 +1656,71 @@ export async function getArtistsList({
       artistServices: users.artistServices,
       artistDisciplines: users.artistDisciplines,
       artswrkPro: users.artswrkPro,
+      artswrkBasic: users.artswrkBasic,
       instagram: users.instagram,
     })
     .from(users)
     .where(where)
-    .orderBy(desc(users.artswrkPro), desc(users.createdAt))
+    .orderBy(
+      desc(users.artswrkPro),
+      desc(users.artswrkBasic),
+      sql`CASE WHEN ${users.profilePicture} IS NOT NULL AND ${users.profilePicture} != '' THEN 1 ELSE 0 END DESC`,
+      desc(users.createdAt)
+    )
     .limit(limit)
     .offset(offset);
 
   return { artists, total: Number(countRow?.count ?? 0) };
+}
+
+export async function getArtistAffiliations(userId: number) {
+  return getMyAffiliations(userId);
+}
+
+export async function getFeaturedArtists(limit = 24) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      name: users.name,
+      slug: users.slug,
+      profilePicture: users.profilePicture,
+      location: users.location,
+      masterArtistTypes: users.masterArtistTypes,
+      mediaPhotos: users.mediaPhotos,
+      artswrkPro: users.artswrkPro,
+      artswrkBasic: users.artswrkBasic,
+      bookingCount: sql<number>`(SELECT COUNT(*) FROM bookings b WHERE b.artistUserId = ${users.id} AND b.deleted = 0)`,
+    })
+    .from(users)
+    .where(
+      and(
+        eq(users.userRole, "Artist"),
+        isNotNull(users.profilePicture),
+        sql`${users.profilePicture} != ''`,
+        isNotNull(users.firstName),
+        sql`${users.firstName} != ''`,
+      )
+    )
+    .orderBy(
+      desc(users.artswrkPro),
+      desc(sql`(SELECT COUNT(*) FROM bookings b WHERE b.artistUserId = ${users.id} AND b.deleted = 0)`),
+      desc(users.artswrkBasic),
+      desc(users.createdAt),
+    )
+    .limit(limit);
+}
+
+export async function getAllMasterServiceTypes() {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({ id: masterServiceTypes.id, name: masterServiceTypes.name })
+    .from(masterServiceTypes)
+    .orderBy(masterServiceTypes.name);
 }
 
 // ── Admin Helpers ─────────────────────────────────────────────────────────────
@@ -1781,11 +1863,25 @@ export async function getAdminClients({
   if (!db) return { clients: [], total: 0 };
 
   const conditions = [eq(users.userRole, "Client")];
-  if (search) conditions.push(or(like(users.name, `%${search}%`), like(users.firstName, `%${search}%`), like(users.lastName, `%${search}%`))!);
-  if (companySearch) conditions.push(like(users.clientCompanyName, `%${companySearch}%`));
-  if (locationSearch) conditions.push(like(users.location, `%${locationSearch}%`));
+  if (search) conditions.push(or(
+    like(users.name, `%${search}%`),
+    like(users.firstName, `%${search}%`),
+    like(users.lastName, `%${search}%`),
+    like(users.email, `%${search}%`),
+  )!);
+  if (companySearch) conditions.push(or(
+    like(users.clientCompanyName, `%${companySearch}%`),
+    sql`EXISTS (SELECT 1 FROM client_companies cc WHERE cc.ownerUserId = ${users.id} AND cc.name LIKE ${`%${companySearch}%`})`,
+  )!);
+  if (locationSearch) conditions.push(or(
+    like(users.location, `%${locationSearch}%`),
+    sql`EXISTS (SELECT 1 FROM client_companies cc WHERE cc.ownerUserId = ${users.id} AND cc.locationAddress LIKE ${`%${locationSearch}%`})`,
+  )!);
   if (hiringCategory) conditions.push(like(users.hiringCategory, `%${hiringCategory}%`));
-  if (state) conditions.push(like(users.location, `%${state}%`));
+  if (state) conditions.push(or(
+    like(users.location, `%${state}%`),
+    sql`EXISTS (SELECT 1 FROM client_companies cc WHERE cc.ownerUserId = ${users.id} AND cc.locationAddress LIKE ${`%${state}%`})`,
+  )!);
   if (plan === "Premium") conditions.push(eq(users.clientPremium, true));
   if (businessType) conditions.push(eq(users.businessOrIndividual, businessType));
 
@@ -1801,8 +1897,8 @@ export async function getAdminClients({
       email: users.email,
       slug: users.slug,
       profilePicture: users.profilePicture,
-      location: users.location,
-      clientCompanyName: users.clientCompanyName,
+      location: sql<string | null>`COALESCE(${users.location}, (SELECT cc.locationAddress FROM client_companies cc WHERE cc.ownerUserId = ${users.id} ORDER BY cc.id ASC LIMIT 1))`,
+      clientCompanyName: sql<string | null>`COALESCE(${users.clientCompanyName}, (SELECT cc.name FROM client_companies cc WHERE cc.ownerUserId = ${users.id} ORDER BY cc.id ASC LIMIT 1))`,
       clientPremium: users.clientPremium,
       hiringCategory: users.hiringCategory,
       businessOrIndividual: users.businessOrIndividual,
@@ -2448,6 +2544,7 @@ export async function getArtistJobsFeed(
   const rows = await db.execute(
      `SELECT j.id, j.slug, j.dateType, j.startDate, j.endDate, j.isHourly, j.openRate, j.artistHourlyRate, j.createdAt,
      j.locationAddress, j.locationLat, j.locationLng,
+     j.isBoosted, j.boostEndDate,
      u.clientCompanyName,
      COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.firstName,''), ' ', COALESCE(u.lastName,''))), ''), u.name) as clientName,
      COALESCE(u.enterpriseLogoUrl, u.profilePicture) as clientLogo,
@@ -2457,7 +2554,7 @@ export async function getArtistJobsFeed(
      LEFT JOIN master_service_types mst ON mst.bubbleId = j.masterServiceTypeId
      WHERE j.requestStatus IN ('Active', 'Submissions Paused')
      ${radiusClause}
-     ORDER BY j.createdAt DESC
+     ORDER BY (j.isBoosted = 1 AND (j.boostEndDate IS NULL OR j.boostEndDate > NOW())) DESC, j.createdAt DESC
      LIMIT ${limit} OFFSET ${offset}`
   );
   return (rows[0] as unknown as any[]);
@@ -3349,17 +3446,31 @@ export async function getArtistWalletData(artistUserId: number) {
 }
 
 /**
- * Returns the stripeConnectAccountId for an artist.
+ * Returns the artist's connected Stripe Connect account ID (acct_...), used
+ * for payouts. This comes from `artistStripeAccountId` — the field the Bubble
+ * migration actually populates. `users.stripeConnectAccountId` is a separate,
+ * never-written column; reading it here was the bug behind "View Stripe
+ * Dashboard" always saying no account was configured.
  */
 export async function getArtistStripeConnectAccount(artistUserId: number): Promise<string | null> {
   const db = await getDb();
   if (!db) return null;
   const rows = await db
-    .select({ stripeConnectAccountId: users.stripeConnectAccountId })
+    .select({ artistStripeAccountId: users.artistStripeAccountId })
     .from(users)
     .where(eq(users.id, artistUserId))
     .limit(1);
-  return rows[0]?.stripeConnectAccountId ?? null;
+  return rows[0]?.artistStripeAccountId ?? null;
+}
+
+/** Saves the artist's connected Stripe account ID after completing Connect OAuth. */
+export async function saveArtistStripeConnectAccount(artistUserId: number, accountId: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(users)
+    .set({ artistStripeAccountId: accountId, artistStripeDateCreated: new Date() })
+    .where(eq(users.id, artistUserId));
 }
 
 /**
@@ -3524,4 +3635,529 @@ export async function getBookingByApplicantId(interestedArtistId: number) {
     .where(eq(bookings.interestedArtistId, interestedArtistId))
     .limit(1);
   return rows[0] ?? null;
+}
+
+// ─── Admin Bookings ───────────────────────────────────────────────────────────
+
+/** Generate billing period date ranges from a booking's start/end and cadence. */
+function computeAdminPeriods(
+  startDate: Date,
+  endDate: Date,
+  isRecurring: boolean,
+  cadence?: string | null,
+): Array<{ start: Date; end: Date; notifyAt: Date }> {
+  if (!isRecurring) {
+    // One-time booking → single period, notify 1 day after start
+    const notifyAt = new Date(startDate);
+    notifyAt.setDate(notifyAt.getDate() + 1);
+    return [{ start: startDate, end: endDate, notifyAt }];
+  }
+
+  const periods: Array<{ start: Date; end: Date; notifyAt: Date }> = [];
+  let cursor = new Date(startDate);
+  const end = new Date(endDate);
+
+  const advanceByPeriod = (d: Date): Date => {
+    const next = new Date(d);
+    switch (cadence) {
+      case "weekly":    next.setDate(next.getDate() + 7); break;
+      case "biweekly":  next.setDate(next.getDate() + 14); break;
+      case "quarterly": next.setMonth(next.getMonth() + 3); break;
+      default:          next.setMonth(next.getMonth() + 1); break; // monthly
+    }
+    return next;
+  };
+
+  while (cursor < end) {
+    const periodEnd = advanceByPeriod(cursor);
+    const actualEnd = periodEnd > end ? end : periodEnd;
+    // Notify artist on the last day of the period
+    const notifyAt = new Date(actualEnd);
+    notifyAt.setDate(notifyAt.getDate() - 1);
+    periods.push({ start: new Date(cursor), end: actualEnd, notifyAt });
+    cursor = periodEnd;
+    if (periods.length > 120) break; // safety cap
+  }
+  return periods;
+}
+
+/** Create an admin booking (no job/applicant required) and generate its billing periods. */
+export async function createAdminBooking(input: {
+  artistUserId: number;
+  clientUserId: number;
+  artistRateDollars: number;
+  clientRateDollars: number;
+  startDate: Date;
+  endDate: Date;
+  isRecurring: boolean;
+  recurringCadence?: string;
+  locationAddress?: string;
+  description?: string;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+
+  const [result] = await db.insert(bookings).values({
+    clientUserId: input.clientUserId,
+    artistUserId: input.artistUserId,
+    artistRate: input.artistRateDollars,
+    clientRate: input.clientRateDollars,
+    startDate: input.startDate,
+    endDate: input.endDate,
+    locationAddress: input.locationAddress ?? null,
+    description: input.description ?? null,
+    bookingStatus: "Confirmed",
+    paymentStatus: "Unpaid",
+    paymentMethod: "artswrk",
+    isAdminBooking: true,
+    isRecurring: input.isRecurring,
+    recurringCadence: input.recurringCadence ?? null,
+  } as any);
+
+  const bookingId = (result as any).insertId as number;
+
+  const periods = computeAdminPeriods(input.startDate, input.endDate, input.isRecurring, input.recurringCadence);
+  if (periods.length > 0) {
+    await db.insert(bookingPeriods).values(
+      periods.map((p, i) => ({
+        bookingId,
+        periodNumber: i + 1,
+        periodStart: p.start,
+        periodEnd: p.end,
+        notifyArtistAt: p.notifyAt,
+        status: "upcoming",
+      }))
+    );
+  }
+
+  return bookingId;
+}
+
+/** Get all admin bookings (admin list view) with artist + client names. */
+export async function listAdminBookings({
+  search,
+  limit = 50,
+  offset = 0,
+}: {
+  search?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const db = await getDb();
+  if (!db) return { bookings: [], total: 0 };
+
+  const artistUser = db.select().from(users).as("artistUser");
+  const clientUser = db.select().from(users).as("clientUser");
+
+  const where = and(
+    eq(bookings.isAdminBooking as any, true),
+    search
+      ? or(
+          like(sql`artistUser.firstName`, `%${search}%`),
+          like(sql`clientUser.clientCompanyName`, `%${search}%`),
+          like(bookings.description, `%${search}%`),
+        )
+      : undefined,
+  );
+
+  const rows = await db.execute(`
+    SELECT
+      b.id, b.bookingStatus, b.paymentStatus, b.artistRate, b.clientRate,
+      b.startDate, b.endDate, b.isRecurring, b.recurringCadence,
+      b.locationAddress, b.description, b.createdAt,
+      a.id AS artistId, a.firstName AS artistFirstName, a.lastName AS artistLastName,
+      a.name AS artistName, a.profilePicture AS artistProfilePicture, a.email AS artistEmail,
+      c.id AS clientId, c.firstName AS clientFirstName, c.lastName AS clientLastName,
+      c.name AS clientName, c.clientCompanyName, c.email AS clientEmail,
+      (SELECT COUNT(*) FROM booking_periods bp WHERE bp.bookingId = b.id) AS totalPeriods,
+      (SELECT COUNT(*) FROM booking_periods bp WHERE bp.bookingId = b.id AND bp.status = 'client_paid') AS paidPeriods,
+      (SELECT COUNT(*) FROM booking_periods bp WHERE bp.bookingId = b.id AND bp.status = 'open') AS openPeriods
+    FROM bookings b
+    LEFT JOIN users a ON b.artistUserId = a.id
+    LEFT JOIN users c ON b.clientUserId = c.id
+    WHERE b.isAdminBooking = 1
+    ORDER BY b.createdAt DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `);
+
+  const countResult = await db.execute(
+    `SELECT COUNT(*) AS total FROM bookings WHERE isAdminBooking = 1`
+  );
+
+  return {
+    bookings: (rows[0] as unknown as any[]),
+    total: Number((countResult[0] as unknown as any[])[0]?.total ?? 0),
+  };
+}
+
+/** Get a single admin booking with its periods (for admin detail view). */
+export async function getAdminBookingDetail(bookingId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const rows = await db.execute(`
+    SELECT
+      b.id, b.bookingStatus, b.paymentStatus, b.artistRate, b.clientRate,
+      b.startDate, b.endDate, b.isRecurring, b.recurringCadence,
+      b.locationAddress, b.description, b.createdAt,
+      a.id AS artistId, a.firstName AS artistFirstName, a.lastName AS artistLastName,
+      a.name AS artistName, a.profilePicture AS artistProfilePicture, a.email AS artistEmail,
+      c.id AS clientId, c.firstName AS clientFirstName, c.lastName AS clientLastName,
+      c.name AS clientName, c.clientCompanyName, c.email AS clientEmail
+    FROM bookings b
+    LEFT JOIN users a ON b.artistUserId = a.id
+    LEFT JOIN users c ON b.clientUserId = c.id
+    WHERE b.id = ${bookingId} AND b.isAdminBooking = 1
+    LIMIT 1
+  `);
+
+  const booking = (rows[0] as unknown as any[])[0];
+  if (!booking) return null;
+
+  const periods = await db
+    .select()
+    .from(bookingPeriods)
+    .where(eq(bookingPeriods.bookingId, bookingId))
+    .orderBy(asc(bookingPeriods.periodNumber));
+
+  return { ...booking, periods };
+}
+
+/** Get all periods for a booking. */
+export async function getBookingPeriodsForBooking(bookingId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(bookingPeriods)
+    .where(eq(bookingPeriods.bookingId, bookingId))
+    .orderBy(asc(bookingPeriods.periodNumber));
+}
+
+/** Get a single booking period by id. */
+export async function getBookingPeriodById(periodId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(bookingPeriods).where(eq(bookingPeriods.id, periodId)).limit(1);
+  return rows[0] ?? null;
+}
+
+/** Artist submits hours for a period and gets back an invoice token. */
+export async function submitBookingPeriod(
+  periodId: number,
+  data: { actualHours: number; artistNotes?: string; invoicePaymentToken: string; invoiceStripeCheckoutUrl?: string; invoiceTotalCents: number }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.update(bookingPeriods).set({
+    actualHours: data.actualHours,
+    artistNotes: data.artistNotes ?? null,
+    artistSubmittedAt: new Date(),
+    status: "artist_submitted",
+    invoicePaymentToken: data.invoicePaymentToken,
+    invoiceStripeCheckoutUrl: data.invoiceStripeCheckoutUrl ?? null,
+    invoiceTotalCents: data.invoiceTotalCents,
+  } as any).where(eq(bookingPeriods.id, periodId));
+}
+
+/** Mark a period's invoice as paid. */
+export async function markPeriodInvoicePaid(periodId: number, paymentIntentId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.update(bookingPeriods).set({
+    invoicePaidAt: new Date(),
+    invoiceStripePaymentIntentId: paymentIntentId,
+    status: "client_paid",
+  } as any).where(eq(bookingPeriods.id, periodId));
+}
+
+/** Look up a period by its invoice token (for the /invoice/:token payment page). */
+export async function getBookingPeriodByInvoiceToken(token: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.execute(`
+    SELECT
+      bp.*,
+      b.artistRate, b.clientRate, b.description AS jobDescription, b.locationAddress, b.startDate AS bookingStart,
+      a.firstName AS artistFirstName, a.lastName AS artistLastName, a.name AS artistName, a.email AS artistEmail,
+      c.firstName AS clientFirstName, c.lastName AS clientLastName, c.clientCompanyName, c.email AS clientEmail
+    FROM booking_periods bp
+    JOIN bookings b ON bp.bookingId = b.id
+    LEFT JOIN users a ON b.artistUserId = a.id
+    LEFT JOIN users c ON b.clientUserId = c.id
+    WHERE bp.invoicePaymentToken = '${token}'
+    LIMIT 1
+  `);
+  const row = (rows[0] as unknown as any[])[0];
+  if (!row) return null;
+  return { ...row, isPeriodInvoice: true };
+}
+
+/** Get all admin bookings for an artist (for artist's Bookings page). */
+export async function getArtistAdminBookings(artistUserId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(`
+    SELECT
+      b.id, b.bookingStatus, b.artistRate, b.clientRate, b.startDate, b.endDate,
+      b.isRecurring, b.recurringCadence, b.locationAddress, b.description,
+      c.clientCompanyName, c.firstName AS clientFirstName, c.lastName AS clientLastName, c.name AS clientName
+    FROM bookings b
+    LEFT JOIN users c ON b.clientUserId = c.id
+    WHERE b.artistUserId = ${artistUserId} AND b.isAdminBooking = 1
+    ORDER BY b.startDate DESC
+  `);
+  const bookingRows = (rows[0] as unknown as any[]);
+  if (bookingRows.length === 0) return [];
+
+  const ids = bookingRows.map((b: any) => b.id);
+  const periods = await db
+    .select()
+    .from(bookingPeriods)
+    .where(inArray(bookingPeriods.bookingId, ids))
+    .orderBy(asc(bookingPeriods.periodNumber));
+
+  return bookingRows.map((b: any) => ({
+    ...b,
+    periods: periods.filter((p) => p.bookingId === b.id),
+  }));
+}
+
+/** Get all admin bookings for a client (for client's Bookings page). */
+export async function getClientAdminBookings(clientUserId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(`
+    SELECT
+      b.id, b.bookingStatus, b.artistRate, b.clientRate, b.startDate, b.endDate,
+      b.isRecurring, b.recurringCadence, b.locationAddress, b.description,
+      a.firstName AS artistFirstName, a.lastName AS artistLastName, a.name AS artistName,
+      a.profilePicture AS artistProfilePicture, a.slug AS artistSlug
+    FROM bookings b
+    LEFT JOIN users a ON b.artistUserId = a.id
+    WHERE b.clientUserId = ${clientUserId} AND b.isAdminBooking = 1
+    ORDER BY b.startDate DESC
+  `);
+  const bookingRows = (rows[0] as unknown as any[]);
+  if (bookingRows.length === 0) return [];
+
+  const ids = bookingRows.map((b: any) => b.id);
+  const periods = await db
+    .select()
+    .from(bookingPeriods)
+    .where(inArray(bookingPeriods.bookingId, ids))
+    .orderBy(asc(bookingPeriods.periodNumber));
+
+  return bookingRows.map((b: any) => ({
+    ...b,
+    periods: periods.filter((p) => p.bookingId === b.id),
+  }));
+}
+
+/** Mark a period as notified and return the period. Called by the notification cron. */
+export async function markPeriodNotified(periodId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.update(bookingPeriods).set({
+    artistNotifiedAt: new Date(),
+    status: "open",
+  } as any).where(eq(bookingPeriods.id, periodId));
+}
+
+/** Return all periods due for notification (notifyArtistAt <= now, not yet notified). */
+export async function getDuePeriods() {
+  const db = await getDb();
+  if (!db) return [];
+  const now = new Date();
+  const rows = await db.execute(`
+    SELECT
+      bp.id, bp.bookingId, bp.periodNumber, bp.periodStart, bp.periodEnd, bp.notifyArtistAt,
+      b.artistRate, b.clientRate, b.description,
+      a.id AS artistUserId, a.email AS artistEmail, a.firstName AS artistFirstName,
+      c.clientCompanyName, c.firstName AS clientFirstName
+    FROM booking_periods bp
+    JOIN bookings b ON bp.bookingId = b.id
+    LEFT JOIN users a ON b.artistUserId = a.id
+    LEFT JOIN users c ON b.clientUserId = c.id
+    WHERE bp.status = 'upcoming'
+      AND bp.artistNotifiedAt IS NULL
+      AND bp.notifyArtistAt <= NOW()
+    ORDER BY bp.notifyArtistAt ASC
+    LIMIT 100
+  `);
+  return rows[0] as unknown as any[];
+}
+
+/** Get reimbursements for a booking period. */
+export async function getReimbursementsByPeriodId(periodId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(reimbursements)
+    .where(eq(reimbursements.bookingPeriodId as any, periodId));
+}
+
+// ── Saved Artists (Favorites) ─────────────────────────────────────────────────
+
+export async function getSavedArtistsByClientId(clientUserId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      savedId: savedArtists.id,
+      artistUserId: savedArtists.artistUserId,
+      savedAt: savedArtists.createdAt,
+      artistFirstName: users.firstName,
+      artistLastName: users.lastName,
+      artistName: users.name,
+      artistProfilePicture: users.profilePicture,
+      artistSlug: users.slug,
+      artistBio: users.bio,
+      artistLocation: users.location,
+    })
+    .from(savedArtists)
+    .leftJoin(users, eq(savedArtists.artistUserId, users.id))
+    .where(eq(savedArtists.clientUserId, clientUserId))
+    .orderBy(desc(savedArtists.createdAt));
+}
+
+export async function toggleSavedArtist(
+  clientUserId: number,
+  artistUserId: number
+): Promise<{ saved: boolean }> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+
+  const existing = await db
+    .select({ id: savedArtists.id })
+    .from(savedArtists)
+    .where(and(eq(savedArtists.clientUserId, clientUserId), eq(savedArtists.artistUserId, artistUserId)))
+    .limit(1);
+
+  if (existing.length > 0) {
+    await db.delete(savedArtists).where(
+      and(eq(savedArtists.clientUserId, clientUserId), eq(savedArtists.artistUserId, artistUserId))
+    );
+    return { saved: false };
+  } else {
+    await db.insert(savedArtists).values({ clientUserId, artistUserId });
+    return { saved: true };
+  }
+}
+
+// ── Company Page ──────────────────────────────────────────────────────────────
+
+export async function upsertClientCompany(ownerUserId: number, data: {
+  name?: string;
+  description?: string | null;
+  logo?: string | null;
+  website?: string | null;
+  locationAddress?: string | null;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const existing = await db
+    .select({ id: clientCompanies.id })
+    .from(clientCompanies)
+    .where(eq(clientCompanies.ownerUserId, ownerUserId))
+    .limit(1);
+  if (existing.length > 0) {
+    const updateData: Partial<typeof clientCompanies.$inferInsert> = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.logo !== undefined) updateData.logo = data.logo;
+    if (data.website !== undefined) updateData.website = data.website;
+    if (data.locationAddress !== undefined) updateData.locationAddress = data.locationAddress;
+    if (Object.keys(updateData).length > 0) {
+      await db.update(clientCompanies).set(updateData).where(eq(clientCompanies.ownerUserId, ownerUserId));
+    }
+  } else {
+    await db.insert(clientCompanies).values({
+      ownerUserId,
+      name: data.name ?? "My Studio",
+      description: data.description ?? null,
+      logo: data.logo ?? null,
+      website: data.website ?? null,
+      locationAddress: data.locationAddress ?? null,
+    });
+  }
+}
+
+export async function updateClientCompanyById(
+  id: number,
+  ownerUserId: number,
+  data: {
+    name?: string;
+    description?: string | null;
+    logo?: string | null;
+    website?: string | null;
+    locationAddress?: string | null;
+  }
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const updateData: Partial<typeof clientCompanies.$inferInsert> = {};
+  if (data.name !== undefined) updateData.name = data.name;
+  if (data.description !== undefined) updateData.description = data.description;
+  if (data.logo !== undefined) updateData.logo = data.logo;
+  if (data.website !== undefined) updateData.website = data.website;
+  if (data.locationAddress !== undefined) updateData.locationAddress = data.locationAddress;
+  if (Object.keys(updateData).length > 0) {
+    await db.update(clientCompanies)
+      .set(updateData)
+      .where(and(eq(clientCompanies.id, id), eq(clientCompanies.ownerUserId, ownerUserId)));
+  }
+}
+
+export async function getPublicCompanyPage(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const [owner] = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      clientCompanyName: users.clientCompanyName,
+      profilePicture: users.profilePicture,
+      slug: users.slug,
+      artswrkPro: users.artswrkPro,
+      artswrkBasic: users.artswrkBasic,
+      location: users.location,
+      instagram: users.instagram,
+      website: users.website,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!owner) return null;
+  const allCompanies = await db
+    .select()
+    .from(clientCompanies)
+    .where(eq(clientCompanies.ownerUserId, userId))
+    .orderBy(asc(clientCompanies.id));
+  const activeJobs = await db
+    .select({
+      id: jobs.id,
+      slug: jobs.slug,
+      title: jobs.title,
+      description: jobs.description,
+      locationAddress: jobs.locationAddress,
+      startDate: jobs.startDate,
+      requestStatus: jobs.requestStatus,
+      bubbleClientCompanyId: jobs.bubbleClientCompanyId,
+      isBoosted: jobs.isBoosted,
+      boostEndDate: jobs.boostEndDate,
+    })
+    .from(jobs)
+    .where(and(eq(jobs.clientUserId, userId), inArray(jobs.requestStatus, ["Active", "Confirmed"])))
+    .orderBy(desc(jobs.isBoosted), desc(jobs.id))
+    .limit(30);
+  return {
+    owner,
+    company: allCompanies[0] ?? null,
+    companies: allCompanies,
+    jobs: activeJobs,
+  };
 }
