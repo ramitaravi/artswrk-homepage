@@ -38,7 +38,7 @@ export default function Login() {
             href={`/join${next ? `?next=${encodeURIComponent(next)}` : ""}`}
             className="font-semibold text-[#F25722] hover:opacity-70 transition-opacity"
           >
-            Join free
+            Join Now
           </a>
         </p>
       </div>

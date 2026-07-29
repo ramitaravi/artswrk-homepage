@@ -245,7 +245,7 @@ export default function InlineAuth({
       {stage === "set-password" && userInfo && (
         <>
           <button type="button" onClick={goBack} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">
-            <ArrowLeft size={12} /> Different email
+            <ArrowLeft size={12} /> Use a different email
           </button>
           <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-sm font-black flex-shrink-0">
@@ -258,7 +258,7 @@ export default function InlineAuth({
           </div>
           <form onSubmit={handleSetPasswordSubmit} className="space-y-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Create password</label>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Create Password*</label>
               <div className="relative">
                 <input
                   ref={passwordRef}
@@ -276,7 +276,7 @@ export default function InlineAuth({
               </div>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Confirm password</label>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Confirm Password*</label>
               <div className="relative">
                 <input
                   type={showConfirm ? "text" : "password"}
