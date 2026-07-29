@@ -4,14 +4,13 @@
  * Map: real Google Maps with job pin markers
  * Data: real DB via tRPC (enriched jobs + PRO jobs + artist applications)
  */
-import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   Search, MapPin, Clock, ChevronDown, X, Star, Loader2,
   Briefcase, CheckCircle, AlertCircle, Lock, ArrowRight, Zap,
 } from "lucide-react";
 import { Link, useSearch, useLocation as useWouterLocation, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { MapView } from "@/components/Map";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toJobUrl } from "./JobDetail";
 import { toProJobUrl } from "./ProJobDetail";
@@ -40,6 +39,7 @@ interface DisplayJob {
   isDirect: boolean;
   clientProfilePicture: string | null;
   detailUrl: string;
+  isBoosted: boolean;
 }
 
 interface DisplayProJob {
@@ -305,92 +305,88 @@ const Navbar = SharedNavbar;
 
 function JobCard({
   job,
-  isSelected,
-  onClick,
   isAuthenticated = false,
   applied = false,
 }: {
   job: DisplayJob;
-  isSelected: boolean;
-  onClick: () => void;
   isAuthenticated?: boolean;
   applied?: boolean;
 }) {
   return (
-    <div
-      onClick={onClick}
-      className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all duration-150 ${
-        isSelected
-          ? "border-[#F25722] bg-orange-50 shadow-sm"
-          : "border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm"
-      }`}
-    >
-      {/* Company avatar */}
-      <div className="flex-shrink-0 w-11 h-11 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
-        {job.clientProfilePicture ? (
-          <img
-            src={job.clientProfilePicture}
-            alt={job.companyName ?? ""}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              const el = e.currentTarget;
-              el.style.display = "none";
-              const fb = el.nextElementSibling as HTMLElement;
-              if (fb) fb.style.display = "flex";
-            }}
-          />
-        ) : null}
-        <div
-          className="w-full h-full flex items-center justify-center text-white text-sm font-black artist-grad-bg"
-          style={{ display: job.clientProfilePicture ? "none" : "flex" }}
-        >
-          {(job.companyName ?? job.title)[0]?.toUpperCase() ?? "?"}
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <div className="min-w-0">
-            <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{job.title}</h3>
-            {/* Only show studio name to authenticated users */}
-            {isAuthenticated && job.companyName && (
-              <p className="text-xs text-gray-500 truncate">{job.companyName}</p>
-            )}
+    <Link href={job.detailUrl}>
+      <div className="flex items-start gap-4 p-5 rounded-2xl border border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm transition-all duration-150 cursor-pointer">
+        {/* Company avatar */}
+        <div className="flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
+          {job.clientProfilePicture ? (
+            <img
+              src={job.clientProfilePicture}
+              alt={job.companyName ?? ""}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                const el = e.currentTarget;
+                el.style.display = "none";
+                const fb = el.nextElementSibling as HTMLElement;
+                if (fb) fb.style.display = "flex";
+              }}
+            />
+          ) : null}
+          <div
+            className="w-full h-full flex items-center justify-center text-white text-base font-black artist-grad-bg"
+            style={{ display: job.clientProfilePicture ? "none" : "flex" }}
+          >
+            {(job.companyName ?? job.title)[0]?.toUpperCase() ?? "?"}
           </div>
-          <a
-            href={job.detailUrl}
-            className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-              applied
-                ? "text-green-700 bg-green-50 border border-green-200 hover:bg-green-100"
-                : "text-white bg-[#111] hover:bg-gray-800"
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {applied ? "View Application →" : "Apply →"}
-          </a>
         </div>
-        <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
-          <MapPin size={10} className="flex-shrink-0" />
-          <span className="truncate">{job.location}</span>
-          <span className="text-gray-200 mx-1">·</span>
-          <span className="flex-shrink-0">Posted {job.postedAgo}</span>
-        </div>
-        <div className="flex items-center gap-2 text-xs flex-wrap">
-          <span className="flex items-center gap-1 text-[#F25722] font-medium">
-            <Clock size={10} />
-            {job.datetime}
-          </span>
-          <span
-            className={`font-medium border rounded-full px-2 py-0.5 ${
-              job.rate ? "text-gray-600 border-gray-200" : "text-gray-400 border-gray-100"
-            }`}
-          >
-            {job.rate ?? "Open rate"}
-          </span>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          {job.isBoosted && (
+            <div className="flex items-center gap-1 mb-1.5">
+              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722]">
+                <Zap size={9} className="fill-[#F25722]" /> Priority Listing
+              </span>
+            </div>
+          )}
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <div className="min-w-0">
+              <h3 className="font-bold text-[#111] text-base leading-tight truncate">{job.title}</h3>
+              {/* Only show studio name to authenticated users */}
+              {isAuthenticated && job.companyName && (
+                <p className="text-sm text-gray-500 truncate mt-0.5">{job.companyName}</p>
+              )}
+            </div>
+            <span
+              className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold ${
+                applied
+                  ? "text-green-700 bg-green-50 border border-green-200"
+                  : "text-white bg-[#111]"
+              }`}
+            >
+              {applied ? "Applied" : "Apply →"}
+            </span>
+          </div>
+          <div className="flex items-center gap-1 text-xs text-gray-400 mt-2">
+            <MapPin size={10} className="flex-shrink-0" />
+            <span className="truncate">{job.location}</span>
+            <span className="text-gray-200 mx-1">·</span>
+            <span className="flex-shrink-0">Posted {job.postedAgo}</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs flex-wrap mt-2.5">
+            <span className="flex items-center gap-1 text-[#F25722] font-medium">
+              <Clock size={10} />
+              {job.datetime}
+            </span>
+            <span
+              className={`font-medium border rounded-full px-2 py-0.5 ${
+                job.rate ? "text-gray-600 border-gray-200" : "text-gray-400 border-gray-100"
+              }`}
+            >
+              {job.rate ?? "Open rate"}
+            </span>
+          </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -407,103 +403,68 @@ function ProJobCard({
   isPro: boolean;
   applied?: boolean;
 }) {
-  const checkoutMutation = trpc.artistSubscription.createProCheckout.useMutation({
-    onSuccess: (data: { url: string }) => { window.location.href = data.url; },
-    onError: (err) => { console.error("[PRO checkout]", err); alert("Checkout failed: " + err.message); },
-  });
+  // Every state is a single clickable card → the job detail page. The unlock/
+  // apply CTA is a visual pill only — actually unlocking PRO always happens
+  // on the detail page, never straight from the list.
+  const showCompany = isAuthenticated && isPro;
 
-  // Logged-out: blurred logo, no company name, Apply goes to detail page
-  if (!isAuthenticated) {
-    return (
-      <div className="flex items-center gap-4 p-4 border-b border-gray-100 last:border-b-0">
-        {/* Blurred avatar — company identity withheld */}
-        <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gray-300 blur-sm" />
-        <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-[#111] text-sm leading-tight truncate">{job.title}</h3>
-          <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-            <MapPin size={10} className="flex-shrink-0" /> {job.location}
-          </p>
-          {job.budget && (
-            <span className="inline-flex items-center gap-1 mt-1.5 text-xs font-semibold text-[#F25722] bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-full">
-              💳 {job.budget}
-            </span>
-          )}
-        </div>
-        <a
-          href={job.detailUrl}
-          className="flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-[#111] hover:opacity-80 transition-opacity"
-        >
-          Apply
-        </a>
-      </div>
-    );
-  }
-
-  // Logged-in but not PRO: blurred identity, direct checkout CTA
-  if (!isPro) {
-    return (
-      <div className="flex items-center gap-4 p-4 border-b border-gray-100 last:border-b-0">
-        {/* Company logo blurred — same treatment as logged-out */}
-        <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gray-300 blur-sm" />
-        <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-[#111] text-sm leading-tight truncate">{job.title}</h3>
-          <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-            <MapPin size={10} className="flex-shrink-0" /> {job.location}
-          </p>
-          {job.budget && (
-            <span className="inline-flex items-center gap-1 mt-1.5 text-xs font-semibold text-[#F25722] bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-full">
-              💳 {job.budget}
-            </span>
-          )}
-        </div>
-        <button
-          onClick={() => checkoutMutation.mutate({
-            interval: "month",
-            origin: window.location.origin,
-            returnPath: job.detailUrl,
-          })}
-          disabled={checkoutMutation.isPending}
-          className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#111] hover:opacity-80 transition-opacity disabled:opacity-50"
-        >
-          <Lock size={11} />
-          {checkoutMutation.isPending ? "…" : "Unlock PRO"}
-        </button>
-      </div>
-    );
-  }
-
-  // Logged-in PRO: full access → link to detail page
   return (
     <Link href={job.detailUrl}>
-      <div className="flex items-center gap-4 p-4 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors cursor-pointer">
-        <div className="flex-shrink-0 w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+      <div className="flex items-start gap-4 p-5 rounded-2xl border border-pink-100 bg-white hover:border-pink-200 hover:shadow-sm transition-all duration-150 cursor-pointer">
+        <div className="flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
           {job.logo ? (
-            <img src={job.logo} alt={job.company ?? ""} className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-sm font-black text-gray-500">
+            // Logo is always in the payload — just blurred (not hidden) until unlocked,
+            // so there's still a hint of the studio's brand/photo like on the old site.
+            <img
+              src={job.logo}
+              alt={showCompany ? (job.company ?? "") : ""}
+              className={`w-full h-full object-cover ${showCompany ? "" : "blur-md scale-125"}`}
+            />
+          ) : showCompany ? (
+            <span className="text-base font-black text-gray-500">
               {(job.company ?? job.title)[0]?.toUpperCase() ?? "?"}
             </span>
+          ) : (
+            <div className="w-full h-full bg-gray-300" />
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-[#111] text-sm leading-tight truncate">{job.title}</h3>
-          {job.company && <p className="text-xs text-gray-500 truncate">{job.company}</p>}
-          <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Star size={10} className="text-yellow-500 fill-yellow-500 flex-shrink-0" />
+            <span className="text-[10px] font-bold text-yellow-600 uppercase tracking-wide">PRO Job</span>
+          </div>
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <div className="min-w-0">
+              <h3 className="font-bold text-[#111] text-base leading-tight truncate">{job.title}</h3>
+              {showCompany && job.company && <p className="text-sm text-gray-500 truncate mt-0.5">{job.company}</p>}
+            </div>
+            {!isAuthenticated ? (
+              <span className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-[#111]">
+                Apply →
+              </span>
+            ) : !isPro ? (
+              <span className="flex-shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-[#111]">
+                <Lock size={11} /> Unlock PRO
+              </span>
+            ) : (
+              <span className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold ${
+                applied
+                  ? "text-green-700 bg-green-50 border border-green-200"
+                  : "text-white bg-[#111]"
+              }`}>
+                {applied ? "Applied" : "Apply →"}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 flex items-center gap-1 mt-2">
             <MapPin size={10} className="flex-shrink-0" /> {job.location}
           </p>
           {job.budget && (
-            <span className="inline-flex items-center gap-1 mt-1.5 text-xs font-semibold text-[#F25722] bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-full">
+            <span className="inline-flex items-center gap-1 mt-2.5 text-xs font-semibold text-[#F25722] bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-full">
               💳 {job.budget}
             </span>
           )}
         </div>
-        <span className={`flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold ${
-          applied
-            ? "text-green-700 bg-green-50 border border-green-200"
-            : "text-white bg-[#111]"
-        }`}>
-          {applied ? "View Application →" : "Apply"}
-        </span>
       </div>
     </Link>
   );
@@ -596,100 +557,6 @@ function ApplicationCard({ job, status }: { job: DisplayApplication; status: App
   );
 }
 
-// ─── Map Panel with real Google Maps ─────────────────────────────────────────
-
-function JobsMapPanel({
-  jobs,
-  selectedJob,
-  onSelectJob,
-}: {
-  jobs: DisplayJob[];
-  selectedJob: DisplayJob | null;
-  onSelectJob: (job: DisplayJob) => void;
-}) {
-  const mapRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
-  const prevJobsLenRef = useRef(0);
-
-  const jobsWithCoords = useMemo(
-    () => jobs.filter((j) => j.lat !== null && j.lng !== null),
-    [jobs]
-  );
-
-  const handleMapReady = useCallback(
-    (map: google.maps.Map) => {
-      mapRef.current = map;
-      markersRef.current.forEach((m) => (m.map = null));
-      markersRef.current = [];
-
-      if (jobsWithCoords.length === 0) return;
-
-      const bounds = new google.maps.LatLngBounds();
-
-      jobsWithCoords.forEach((job) => {
-        const pos = { lat: job.lat!, lng: job.lng! };
-        bounds.extend(pos);
-
-        // Custom red teardrop pin
-        const pin = document.createElement("div");
-        pin.style.cssText = `
-          width: 24px; height: 24px;
-          background: #F25722;
-          border: 2.5px solid white;
-          border-radius: 50% 50% 50% 0;
-          transform: rotate(-45deg);
-          box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-          cursor: pointer;
-          transition: transform 0.15s ease, background 0.15s ease;
-        `;
-
-        const marker = new google.maps.marker.AdvancedMarkerElement({
-          map,
-          position: pos,
-          title: job.title,
-          content: pin,
-        });
-
-        marker.addListener("click", () => {
-          onSelectJob(job);
-          map.panTo(pos);
-          map.setZoom(13);
-        });
-
-        markersRef.current.push(marker);
-      });
-
-      map.fitBounds(bounds, { top: 50, right: 50, bottom: 80, left: 50 });
-      prevJobsLenRef.current = jobsWithCoords.length;
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [jobsWithCoords.length]
-  );
-
-  // Pan to selected job when it changes
-  const prevSelectedIdRef = useRef<number | null>(null);
-  if (
-    selectedJob &&
-    selectedJob.lat !== null &&
-    selectedJob.lng !== null &&
-    mapRef.current &&
-    prevSelectedIdRef.current !== selectedJob.id
-  ) {
-    prevSelectedIdRef.current = selectedJob.id;
-    mapRef.current.panTo({ lat: selectedJob.lat!, lng: selectedJob.lng! });
-    mapRef.current.setZoom(13);
-  }
-
-  return (
-    <MapView
-      initialCenter={{ lat: 40.7128, lng: -74.006 }}
-      initialZoom={10}
-      onMapReady={handleMapReady}
-      className="w-full h-full"
-    />
-  );
-}
-
 // ─── Main Jobs Page ───────────────────────────────────────────────────────────
 
 type Tab = "near-me" | "pro" | "applications";
@@ -703,12 +570,23 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
     : (searchParams.get("tab") as Tab) ?? "near-me";
 
   const [tab, setTab] = useState<Tab>(initialTab);
+
+  // Keep the active tab in sync with the URL. This component doesn't remount
+  // when the sidebar nav switches between /app/jobs, /app/pro-jobs, etc. (same
+  // route tree, just a different matched Route), so without this the tab
+  // would stay stuck on whatever it was last set to.
+  useEffect(() => {
+    const nextTab: Tab =
+      path === "/pro" || path === "/app/pro-jobs" ? "pro"
+      : (searchParams.get("tab") as Tab) ?? "near-me";
+    setTab(nextTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, searchStr]);
+
   const [search, setSearch] = useState("");
   const [locationFilter, setLocationFilter] = useState<LocationFilter>({ query: searchParams.get("location") ?? "" });
   const [artistType, setArtistType] = useState("");
   const [serviceType, setServiceType] = useState("");
-  const [selectedJob, setSelectedJob] = useState<DisplayJob | null>(null);
-  const [mobileView, setMobileView] = useState<"list" | "map">("list");
   const locationInputRef = useRef<HTMLInputElement>(null);
   const placesAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
@@ -800,6 +678,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
       isDirect: j.direct ?? false,
       clientProfilePicture: j.clientProfilePicture ?? null,
       detailUrl: toJobUrl({ id: j.id, slug: j.slug, locationAddress: j.locationAddress, description: j.description }),
+      isBoosted: !!(j.isBoosted) && (!j.boostEndDate || new Date(j.boostEndDate) > new Date()),
     }));
   }, [rawJobs]);
 
@@ -852,13 +731,15 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
 
   // Client-side text search only; location/artistType/serviceType are server-side
   const filtered = useMemo(() => {
-    if (!search) return allJobs;
-    const q = search.toLowerCase();
-    return allJobs.filter((j) =>
-      j.title.toLowerCase().includes(q) ||
-      j.location.toLowerCase().includes(q) ||
-      (j.description ?? "").toLowerCase().includes(q)
-    );
+    const base = !search ? allJobs : (() => {
+      const q = search.toLowerCase();
+      return allJobs.filter((j) =>
+        j.title.toLowerCase().includes(q) ||
+        j.location.toLowerCase().includes(q) ||
+        (j.description ?? "").toLowerCase().includes(q)
+      );
+    })();
+    return [...base].sort((a, b) => (b.isBoosted ? 1 : 0) - (a.isBoosted ? 1 : 0));
   }, [allJobs, search]);
 
   const hasFilters = !!(search || locationFilter.query || artistType || serviceType);
@@ -870,7 +751,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
   ];
 
   return (
-    <div className={`${inDashboard ? "h-full" : "h-screen"} flex flex-col bg-white overflow-hidden`} style={{ fontFamily: "Poppins, sans-serif" }}>
+    <div className={`${inDashboard ? "h-full bg-gray-50" : "h-screen bg-white"} flex flex-col overflow-hidden`} style={{ fontFamily: "Poppins, sans-serif" }}>
       <SubscriptionPaywallModal
         isOpen={paywallOpen}
         onClose={() => setPaywallOpen(false)}
@@ -879,8 +760,8 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
       {!inDashboard && <Navbar />}
 
       {/* Page header + tabs */}
-      <div className={`${inDashboard ? "" : "pt-14"} flex-shrink-0 bg-white border-b border-gray-100`}>
-        <div className="px-5 lg:px-10 py-4 max-w-full">
+      <div className={`${inDashboard ? "" : "pt-14 bg-white border-b border-gray-100"} flex-shrink-0`}>
+        <div className="max-w-5xl mx-auto px-4 md:px-6 py-4">
           <div className="flex items-end justify-between mb-3">
             <div>
               <h1 className="text-xl font-black text-[#111]">
@@ -936,187 +817,115 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
 
       {/* ── Tab: Jobs Near Me ── */}
       {tab === "near-me" && (
-        <div className="flex flex-1 min-h-0 overflow-hidden">
-          {/* Left: filters + job list */}
-          <div className="w-full md:w-[420px] lg:w-[480px] flex flex-col border-r border-gray-100 flex-shrink-0">
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-5xl mx-auto px-4 md:px-6 py-6">
             {/* Filters */}
-            <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0 space-y-2">
-              {/* Row 1: Search + Location */}
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search Jobs..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] focus:bg-white transition-all"
-                  />
-                </div>
-                <div className="relative flex-1">
-                  <MapPin size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    ref={locationInputRef}
-                    type="text"
-                    placeholder="City, State..."
-                    value={locationFilter.query}
-                    onChange={(e) => setLocationFilter({ query: e.target.value })}
-                    className="w-full pl-8 pr-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] focus:bg-white transition-all"
-                  />
-                </div>
+            <div className="flex flex-col sm:flex-row gap-2 mb-5">
+              <div className="relative flex-1">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search Jobs..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] focus:bg-white transition-all"
+                />
               </div>
-              {/* Row 2: Artist Type + Service Type + Reset + Mobile Map Toggle */}
-              <div className="flex gap-2 items-center">
-                <div className="relative flex-1">
-                  <select
-                    value={artistType}
-                    onChange={(e) => { setArtistType(e.target.value); setServiceType(""); }}
-                    className="w-full appearance-none pl-3 pr-7 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] text-gray-600 cursor-pointer"
-                  >
-                    <option value="">Artist Type</option>
-                    {(filterOptions?.artistTypes ?? []).map((t) => (
-                      <option key={t.bubbleId} value={t.name}>{t.name}</option>
+              <div className="relative flex-1">
+                <MapPin size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  ref={locationInputRef}
+                  type="text"
+                  placeholder="City, State..."
+                  value={locationFilter.query}
+                  onChange={(e) => setLocationFilter({ query: e.target.value })}
+                  className="w-full pl-8 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] focus:bg-white transition-all"
+                />
+              </div>
+              <div className="relative sm:w-44 flex-shrink-0">
+                <select
+                  value={artistType}
+                  onChange={(e) => { setArtistType(e.target.value); setServiceType(""); }}
+                  className="w-full appearance-none pl-3 pr-7 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] text-gray-600 cursor-pointer"
+                >
+                  <option value="">Artist Type</option>
+                  {(filterOptions?.artistTypes ?? []).map((t) => (
+                    <option key={t.bubbleId} value={t.name}>{t.name}</option>
+                  ))}
+                </select>
+                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+              <div className="relative sm:w-44 flex-shrink-0">
+                <select
+                  value={serviceType}
+                  onChange={(e) => setServiceType(e.target.value)}
+                  className="w-full appearance-none pl-3 pr-7 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] text-gray-600 cursor-pointer"
+                >
+                  <option value="">Service Type</option>
+                  {(filterOptions?.serviceTypes ?? [])
+                    .filter((s) => !artistType || (filterOptions?.artistTypes ?? []).find((a) => a.name === artistType)?.bubbleId === s.artistTypeBubbleId || !s.artistTypeBubbleId)
+                    .map((s) => (
+                      <option key={s.bubbleId} value={s.name}>{s.name}</option>
                     ))}
-                  </select>
-                  <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
-                <div className="relative flex-1">
-                  <select
-                    value={serviceType}
-                    onChange={(e) => setServiceType(e.target.value)}
-                    className="w-full appearance-none pl-3 pr-7 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] text-gray-600 cursor-pointer"
-                  >
-                    <option value="">Service Type</option>
-                    {(filterOptions?.serviceTypes ?? [])
-                      .filter((s) => !artistType || (filterOptions?.artistTypes ?? []).find((a) => a.name === artistType)?.bubbleId === s.artistTypeBubbleId || !s.artistTypeBubbleId)
-                      .map((s) => (
-                        <option key={s.bubbleId} value={s.name}>{s.name}</option>
-                      ))}
-                  </select>
-                  <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
-                {hasFilters && (
-                  <button
-                    onClick={() => {
-                      setSearch("");
-                      setLocationFilter({ query: "" });
-                      setArtistType("");
-                      setServiceType("");
-                    }}
-                    className="flex items-center gap-1 text-xs font-semibold text-[#F25722] hover:text-[#d44a1a] transition-colors whitespace-nowrap"
-                  >
-                    <X size={12} /> Reset
-                  </button>
-                )}
-                {/* Mobile map/list toggle */}
-                <button
-                  className="md:hidden flex items-center gap-1 text-xs font-semibold text-gray-600 border border-gray-200 rounded-lg px-2.5 py-2 hover:bg-gray-50 transition-colors whitespace-nowrap flex-shrink-0"
-                  onClick={() => setMobileView(mobileView === "list" ? "map" : "list")}
-                >
-                  <MapPin size={12} /> {mobileView === "list" ? "Map" : "List"}
-                </button>
+                </select>
+                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
-            </div>
-
-            {/* Job list */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-              {/* Subscription banner for non-subscribers */}
-              {isAuthenticated && !canApplyToJobs && (
+              {hasFilters && (
                 <button
-                  onClick={() => setPaywallOpen(true)}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-[#FFF3EE] to-[#FFF8F5] border border-[#F25722]/20 hover:border-[#F25722]/40 transition-all text-left"
+                  onClick={() => {
+                    setSearch("");
+                    setLocationFilter({ query: "" });
+                    setArtistType("");
+                    setServiceType("");
+                  }}
+                  className="flex items-center justify-center gap-1 text-xs font-semibold text-[#F25722] hover:text-[#d44a1a] transition-colors whitespace-nowrap px-2"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-[#F25722] flex items-center justify-center flex-shrink-0">
-                    <Zap size={14} className="text-white fill-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-[#111]">Subscribe to apply to jobs</p>
-                    <p className="text-[11px] text-gray-500">Get Basic or PRO to unlock applications</p>
-                  </div>
-                  <ArrowRight size={14} className="text-[#F25722] flex-shrink-0" />
+                  <X size={12} /> Reset
                 </button>
               )}
+            </div>
 
-              {isLoading ? (
-                <div className="flex items-center justify-center py-16 text-gray-400">
-                  <Loader2 size={20} className="animate-spin mr-2" />
-                  <span className="text-sm">Loading jobs...</span>
+            {/* Subscription banner for non-subscribers */}
+            {isAuthenticated && !canApplyToJobs && (
+              <button
+                onClick={() => setPaywallOpen(true)}
+                className="w-full flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-[#FFF3EE] to-[#FFF8F5] border border-[#F25722]/20 hover:border-[#F25722]/40 transition-all text-left mb-4"
+              >
+                <div className="w-8 h-8 rounded-lg bg-[#F25722] flex items-center justify-center flex-shrink-0">
+                  <Zap size={14} className="text-white fill-white" />
                 </div>
-              ) : filtered.length === 0 ? (
-                <div className="text-center py-16">
-                  <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                    <Search size={20} className="text-gray-300" />
-                  </div>
-                  <p className="text-sm font-semibold text-gray-400">No jobs found</p>
-                  <p className="text-xs text-gray-300 mt-1">Try adjusting your filters</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-[#111]">Subscribe to apply to jobs</p>
+                  <p className="text-[11px] text-gray-500">Get Basic or PRO to unlock applications</p>
                 </div>
-              ) : (
-                filtered.map((job) => (
+                <ArrowRight size={14} className="text-[#F25722] flex-shrink-0" />
+              </button>
+            )}
+
+            {/* Job list */}
+            {isLoading ? (
+              <div className="flex items-center justify-center py-16 text-gray-400">
+                <Loader2 size={20} className="animate-spin mr-2" />
+                <span className="text-sm">Loading jobs...</span>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                  <Search size={20} className="text-gray-300" />
+                </div>
+                <p className="text-sm font-semibold text-gray-400">No jobs found</p>
+                <p className="text-xs text-gray-300 mt-1">Try adjusting your filters</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filtered.map((job) => (
                   <JobCard
                     key={job.id}
                     job={job}
-                    isSelected={selectedJob?.id === job.id}
-                    onClick={() =>
-                      setSelectedJob(selectedJob?.id === job.id ? null : job)
-                    }
                     isAuthenticated={isAuthenticated}
                     applied={appliedJobIds.has(job.id)}
                   />
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Right: Google Map — desktop always visible, mobile only when mobileView=map */}
-          <div className={`${mobileView === "map" ? "flex" : "hidden"} md:flex flex-1 relative`}>
-            {isLoading ? (
-              <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                <Loader2 size={24} className="animate-spin text-gray-300" />
-              </div>
-            ) : (
-              <JobsMapPanel
-                jobs={filtered}
-                selectedJob={selectedJob}
-                onSelectJob={(job) => setSelectedJob(job)}
-              />
-            )}
-
-            {/* Selected job floating card */}
-            {selectedJob && (
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 p-4 z-10">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-white text-sm font-black artist-grad-bg">
-                    {selectedJob.title[0]}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-[#111] text-sm truncate">
-                      {selectedJob.title}
-                    </h4>
-                    <p className="text-xs text-gray-400 truncate">{selectedJob.location}</p>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <span className="text-xs text-[#F25722] font-medium">
-                        {selectedJob.datetime}
-                      </span>
-                      {selectedJob.rate && (
-                        <span className="text-xs font-semibold text-[#111]">
-                          {selectedJob.rate}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setSelectedJob(null)}
-                    className="flex-shrink-0 text-gray-300 hover:text-gray-500 transition-colors"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-                <a
-                  href={selectedJob.detailUrl}
-                  className="mt-3 block w-full py-2 rounded-xl text-xs font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors text-center"
-                >
-                  Apply →
-                </a>
+                ))}
               </div>
             )}
           </div>
@@ -1126,7 +935,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
       {/* ── Tab: PRO Jobs ── */}
       {tab === "pro" && (
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-3xl mx-auto px-5 py-6">
+          <div className="max-w-5xl mx-auto px-4 md:px-6 py-6">
             {/* PRO upsell banner — only show if not already PRO */}
             {!canApplyToProJobs && (
               <div className="rounded-2xl bg-[#111] p-5 mb-6 flex items-center justify-between gap-4">
@@ -1156,7 +965,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
                 <span className="text-sm">Loading PRO jobs...</span>
               </div>
             ) : proJobs.length > 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+              <div className="space-y-3">
                 {proJobs.map((job) => (
                   <ProJobCard
                     key={job.id}
@@ -1183,7 +992,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
       {/* ── Tab: Applications ── */}
       {tab === "applications" && (
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-3xl mx-auto px-5 py-6">
+          <div className="max-w-5xl mx-auto px-4 md:px-6 py-6">
             {!isAuthenticated ? (
               /* Not logged in */
               <div className="mt-8 p-8 rounded-2xl bg-gray-50 border border-gray-100 text-center">

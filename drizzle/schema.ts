@@ -183,6 +183,7 @@ export const jobs = mysqlTable("jobs", {
 
   // ── Content ────────────────────────────────────────────────────────────────
   description: text("description"),
+  title: varchar("title", { length: 256 }),
   slug: varchar("slug", { length: 256 }),
 
   // ── Status ─────────────────────────────────────────────────────────────────
@@ -404,6 +405,12 @@ export const bookings = mysqlTable("bookings", {
   // ── Flags ──────────────────────────────────────────────────────────────────
   addedToSpreadsheet: boolean("addedToSpreadsheet").default(false),
   deleted: boolean("deleted").default(false),
+  /** Created directly by admin (not via job → applicant flow) */
+  isAdminBooking: boolean("isAdminBooking").default(false),
+  /** Whether this booking recurs on a fixed cadence */
+  isRecurring: boolean("isRecurring").default(false),
+  /** weekly | biweekly | monthly | quarterly — set when isRecurring = true */
+  recurringCadence: varchar("recurringCadence", { length: 32 }),
 
   // ── Timestamps ─────────────────────────────────────────────────────────────
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -975,6 +982,9 @@ export const reimbursements = mysqlTable("reimbursements", {
   /** Bubble artist user ID */
   bubbleArtistId: varchar("bubbleArtistId", { length: 64 }),
 
+  /** FK → booking_periods.id (for admin booking period reimbursements) */
+  bookingPeriodId: int("bookingPeriodId"),
+
   // ── Reimbursement Details ─────────────────────────────────────────────────
   /** Dollar value of the reimbursement */
   value: double("value"),
@@ -993,6 +1003,43 @@ export const reimbursements = mysqlTable("reimbursements", {
 });
 export type Reimbursement = typeof reimbursements.$inferSelect;
 export type InsertReimbursement = typeof reimbursements.$inferInsert;
+
+/**
+ * One billing period per recurring admin booking cycle.
+ * For one-time admin bookings this table has exactly one row per booking.
+ * The artist submits hours + reimbursements for each period;
+ * the system then generates a client invoice (same Stripe flow as regular bookings).
+ */
+export const bookingPeriods = mysqlTable("booking_periods", {
+  id: int("id").autoincrement().primaryKey(),
+  /** FK → bookings.id */
+  bookingId: int("bookingId").notNull(),
+  /** 1-based index within the booking's recurring schedule */
+  periodNumber: int("periodNumber").notNull(),
+  periodStart: timestamp("periodStart").notNull(),
+  periodEnd: timestamp("periodEnd").notNull(),
+  /** When to auto-email the artist to submit hours */
+  notifyArtistAt: timestamp("notifyArtistAt").notNull(),
+  /** Set when the notification email was sent */
+  artistNotifiedAt: timestamp("artistNotifiedAt"),
+  /** Set when the artist submits hours for this period */
+  artistSubmittedAt: timestamp("artistSubmittedAt"),
+  /** upcoming | open | artist_submitted | client_paid */
+  status: varchar("status", { length: 32 }).default("upcoming"),
+  /** Actual hours worked (artist fills this in at submission) */
+  actualHours: double("actualHours"),
+  artistNotes: text("artistNotes"),
+  // ── Per-period invoice (same pattern as bookings.invoicePaymentToken) ──────
+  invoicePaymentToken: varchar("invoicePaymentToken", { length: 64 }),
+  invoiceStripeCheckoutUrl: text("invoiceStripeCheckoutUrl"),
+  invoiceTotalCents: int("invoiceTotalCents"),
+  invoicePaidAt: timestamp("invoicePaidAt"),
+  invoiceStripePaymentIntentId: varchar("invoiceStripePaymentIntentId", { length: 128 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type BookingPeriod = typeof bookingPeriods.$inferSelect;
+export type InsertBookingPeriod = typeof bookingPeriods.$inferInsert;
 
 // ─── Ads ──────────────────────────────────────────────────────────────────────
 
@@ -1369,3 +1416,12 @@ export const leadsSyncLog = mysqlTable("leads_sync_log", {
   completedAt: timestamp("completedAt"),
 });
 export type LeadsSyncLog = typeof leadsSyncLog.$inferSelect;
+
+// ── Saved Artists (Client Favorites) ─────────────────────────────────────────
+export const savedArtists = mysqlTable("saved_artists", {
+  id: int("id").autoincrement().primaryKey(),
+  clientUserId: int("clientUserId").notNull(),
+  artistUserId: int("artistUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type SavedArtist = typeof savedArtists.$inferSelect;

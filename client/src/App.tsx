@@ -11,7 +11,6 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import DashboardLayout from "./components/DashboardLayout";
 import Overview from "./pages/dashboard/Overview";
-import SimpleDashboard from "./pages/dashboard/SimpleDashboard";
 import DashJobs from "./pages/dashboard/DashJobs";
 import Bookings from "./pages/dashboard/Bookings";
 import Payments from "./pages/dashboard/Payments";
@@ -48,7 +47,9 @@ import Terms from "./pages/Terms";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import CancellationPolicy from "./pages/CancellationPolicy";
 import ClientJobDetail from "./pages/dashboard/ClientJobDetail";
+import Settings from "./pages/dashboard/Settings";
 import PublicArtistProfile from "./pages/ArtistProfile";
+import PublicCompanyPage from "./pages/PublicCompanyPage";
 import LeadsOverview from "./pages/leads/LeadsOverview";
 import LeadsContacts from "./pages/leads/LeadsContacts";
 import LeadsLists from "./pages/leads/LeadsLists";
@@ -59,6 +60,7 @@ import LeadsFacebook from "./pages/leads/LeadsFacebook";
 import BrowseArtists from "./pages/BrowseArtists";
 import { useAuth } from "./_core/hooks/useAuth";
 import ImpersonationBanner from "./components/ImpersonationBanner";
+import CheckoutSessionVerifier from "./components/CheckoutSessionVerifier";
 
 // DashboardLayout handles auth protection internally (redirects to /login if not authenticated)
 function DashRoute({ component: Component }: { component: React.ComponentType }) {
@@ -139,13 +141,54 @@ function ArtistJobsRoute() {
   );
 }
 
+/**
+ * Community is a client-only feature for now — artists get redirected
+ * back to their dashboard instead of a "coming soon" placeholder.
+ */
+function CommunityRoute() {
+  const { user, loading } = useAuth();
+  const isArtist = (user as any)?.userRole === "Artist";
+
+  if (loading) return <DashboardLayout><div /></DashboardLayout>;
+
+  if (isArtist) {
+    window.location.replace("/app");
+    return null;
+  }
+
+  return (
+    <DashboardLayout>
+      <Community />
+    </DashboardLayout>
+  );
+}
+
+/**
+ * `/jobs` and `/pro` are public browsing routes with their own standalone
+ * navbar, meant for logged-out visitors. A logged-in user landing here
+ * (e.g. via an old link or bookmark) should get the real dashboard chrome —
+ * sidebar nav, not the marketing navbar — so send them to the /app equivalent.
+ */
+function PublicJobsRoute({ pro = false }: { pro?: boolean }) {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) return null;
+
+  if (isAuthenticated) {
+    window.location.replace(pro ? "/app/pro-jobs" : "/app/jobs");
+    return null;
+  }
+
+  return <Jobs />;
+}
+
 function Router() {
   return (
     <Switch>
       {/* Public routes */}
       <Route path="/" component={Home} />
-      <Route path="/jobs">{() => <Jobs />}</Route>
-      <Route path="/pro">{() => <Jobs />}</Route>
+      <Route path="/jobs">{() => <PublicJobsRoute />}</Route>
+      <Route path="/pro">{() => <PublicJobsRoute pro />}</Route>
       {/* PRO job detail — must come before /pro list route */}
       <Route path="/pro/:jobSlug" component={ProJobDetail} />
       {/* New simplified URL: /jobs/:jobSlug and /jobs/:jobSlug/apply */}
@@ -184,11 +227,6 @@ function Router() {
       {/* Home: artists see their overview, clients see hiring stats */}
       <Route path="/app">
         {() => <AppRoute clientComponent={Overview} />}
-      </Route>
-
-      {/* Simple dashboard — enterprise-style layout experiment */}
-      <Route path="/app/simple">
-        {() => <AppRoute clientComponent={SimpleDashboard} />}
       </Route>
 
       {/* Jobs: artists see the full job feed inside the dashboard, clients see their postings */}
@@ -247,7 +285,7 @@ function Router() {
         {() => <DashRoute component={SubLists} />}
       </Route>
       <Route path="/app/community">
-        {() => <DashRoute component={Community} />}
+        {() => <CommunityRoute />}
       </Route>
       <Route path="/app/benefits">
         {() => <DashRoute component={Benefits} />}
@@ -261,7 +299,7 @@ function Router() {
         {() => <ArtistJobsRoute />}
       </Route>
       <Route path="/app/settings">
-        {() => <AppRoute />}
+        {() => <AppRoute clientComponent={Settings} />}
       </Route>
 
       {/* Legacy redirects — old /dashboard/* paths → /app/* */}
@@ -281,6 +319,7 @@ function Router() {
 
       {/* Public artist profile page */}
       <Route path="/book/:slug" component={PublicArtistProfile} />
+      <Route path="/studio/:userId" component={PublicCompanyPage} />
 
       {/* Enterprise dashboard — job-level deep link must come before the base route */}
       <Route path="/enterprise/messages">
@@ -325,6 +364,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <ImpersonationBanner />
+          <CheckoutSessionVerifier />
           <Router />
         </TooltipProvider>
       </ThemeProvider>

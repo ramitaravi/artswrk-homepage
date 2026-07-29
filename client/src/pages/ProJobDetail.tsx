@@ -16,7 +16,9 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { slugify, extractIdFromSlug } from "./JobDetail";
 import Navbar from "@/components/Navbar";
+import DashboardLayout from "@/components/DashboardLayout";
 import InlineAuth from "@/components/InlineAuth";
+import RichText from "@/components/RichText";
 import { toast } from "sonner";
 
 // ─── URL helper ───────────────────────────────────────────────────────────────
@@ -377,35 +379,43 @@ export default function ProJobDetail() {
     }
   }
 
+  // ── Page shell ─────────────────────────────────────────────────────────────
+  // Logged-in users get the same dashboard chrome (sidebar, gray canvas,
+  // centered width) as every other page; logged-out visitors get the
+  // standalone public page with its own Navbar.
+  const proJobsBackHref = isAuthenticated ? "/app/pro-jobs" : "/pro";
+  const shell = (content: React.ReactNode) =>
+    isAuthenticated ? <DashboardLayout>{content}</DashboardLayout> : content;
+
   // ── Loading / error states ────────────────────────────────────────────────
 
   if (jobId === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
+    return shell(
+      <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
           <AlertCircle size={40} className="text-gray-300 mx-auto mb-3" />
           <p className="font-semibold text-gray-500">Invalid job URL</p>
-          <Link href="/pro" className="mt-4 inline-block text-sm text-[#F25722] font-semibold hover:underline">← PRO Jobs</Link>
+          <Link href={proJobsBackHref} className="mt-4 inline-block text-sm text-[#F25722] font-semibold hover:underline">← PRO Jobs</Link>
         </div>
       </div>
     );
   }
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
+    return shell(
+      <div className="min-h-[60vh] flex items-center justify-center">
         <Loader2 size={32} className="animate-spin text-gray-300" />
       </div>
     );
   }
 
   if (error || !job) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
+    return shell(
+      <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
           <AlertCircle size={40} className="text-gray-300 mx-auto mb-3" />
           <p className="font-semibold text-gray-500">PRO job not found</p>
-          <Link href="/pro" className="mt-4 inline-block text-sm text-[#F25722] font-semibold hover:underline">← PRO Jobs</Link>
+          <Link href={proJobsBackHref} className="mt-4 inline-block text-sm text-[#F25722] font-semibold hover:underline">← PRO Jobs</Link>
         </div>
       </div>
     );
@@ -417,18 +427,24 @@ export default function ProJobDetail() {
   const company = j.company ?? "Artswrk Client";
   const jobUrl = toProJobUrl(j);
   const hasOpenBudget = !j.budget;
+  // `category` is a legacy Bubble field — mostly holds a business type (e.g.
+  // "Dance Competition & Convention") but a handful of older rows have a
+  // location string in it instead. Only show it in place of "Company hidden"
+  // when it actually looks like a business type, not a place.
+  const looksLikeLocation = (s: string) => /,\s*[A-Z]{2}$/.test(s.trim()) || /^[A-Z]{2}$/.test(s.trim());
+  const businessType = j.category && !looksLikeLocation(j.category) ? j.category : null;
 
-  return (
-    <div className="min-h-screen bg-white" style={{ fontFamily: "Poppins, sans-serif" }}>
-      <Navbar />
+  return shell(
+    <div className={isAuthenticated ? "" : "min-h-screen bg-white"} style={{ fontFamily: "Poppins, sans-serif" }}>
+      {!isAuthenticated && <Navbar />}
 
-      {/* Page content — single column, pb-28 for sticky bar */}
-      <div className="pt-14 pb-28">
-        <div className="max-w-2xl mx-auto px-5 py-8">
+      {/* Page content — single column, pb-28 for sticky bar (mobile only when in dashboard) */}
+      <div className={isAuthenticated ? "pb-10" : "pt-14 pb-28"}>
+        <div className={isAuthenticated ? "max-w-5xl mx-auto px-4 md:px-6 py-6" : "max-w-2xl mx-auto px-5 py-8"}>
 
           {/* Back link */}
           <Link
-            href="/pro"
+            href={proJobsBackHref}
             className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-[#111] transition-colors mb-8"
           >
             <ArrowLeft size={14} /> Back to PRO Jobs
@@ -458,16 +474,20 @@ export default function ProJobDetail() {
               </>
             ) : isAuthenticated ? (
               <>
-                <div className="w-9 h-9 rounded-full bg-gray-200 blur-sm flex-shrink-0" />
+                <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+                  {j.logo && <img src={j.logo} alt="" className="w-full h-full object-cover blur-md scale-125" />}
+                </div>
                 <span className="text-sm text-gray-400 select-none">
-                  Company hidden · <button onClick={scrollToApply} className="text-[#F25722] font-semibold hover:underline">Unlock PRO to see</button>
+                  {businessType ?? "Company hidden"} · <button onClick={scrollToApply} className="text-[#F25722] font-semibold hover:underline">Unlock PRO to see</button>
                 </span>
               </>
             ) : (
               <>
-                <div className="w-9 h-9 rounded-full bg-gray-200 blur-sm flex-shrink-0" />
+                <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+                  {j.logo && <img src={j.logo} alt="" className="w-full h-full object-cover blur-md scale-125" />}
+                </div>
                 <span className="text-sm text-gray-400 select-none">
-                  Company hidden · <a href="/join" className="text-[#F25722] font-semibold hover:underline">Join to see</a>
+                  {businessType ?? "Company hidden"} · <a href="/join" className="text-[#F25722] font-semibold hover:underline">Join to see</a>
                 </span>
               </>
             )}
@@ -531,9 +551,7 @@ export default function ProJobDetail() {
           {j.description && (
             <div className="border-t border-gray-100 pt-6">
               <h2 className="text-sm font-black text-[#111] mb-3">About this role</h2>
-              <div className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
-                {j.description}
-              </div>
+              <RichText html={j.description} className="text-gray-600" />
             </div>
           )}
 
@@ -545,7 +563,9 @@ export default function ProJobDetail() {
             <p className="text-sm text-gray-400 mb-6">
               {applied
                 ? "The team will be in touch if you're a great fit."
-                : `Send your application to ${company} directly through Artswrk.`}
+                : isPro
+                ? `Send your application to ${company} directly through Artswrk.`
+                : `Unlock this ${businessType ?? "PRO"} role to send your application directly through Artswrk.`}
             </p>
 
             {applied ? (
@@ -601,23 +621,29 @@ export default function ProJobDetail() {
                 onNotFound={(email) => { window.location.href = `/join?next=${encodeURIComponent(jobUrl)}&email=${encodeURIComponent(email)}`; }}
               />
             ) : !isPro ? (
-              <div className="rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-                {/* Blurred preview of apply form */}
-                <div className="relative p-6 select-none pointer-events-none">
-                  <div className="blur-sm opacity-40 space-y-4">
-                    <div className="h-4 bg-gray-200 rounded w-1/3" />
-                    <div className="h-24 bg-gray-100 rounded-xl" />
-                    <div className="h-4 bg-gray-200 rounded w-1/2" />
-                    <div className="h-10 bg-gray-100 rounded-xl" />
+              <div className="rounded-xl border border-gray-100 overflow-hidden">
+                {/* Compact blurred preview of the real application form fields */}
+                <div className="relative px-5 py-4 select-none pointer-events-none">
+                  <div className="blur-[3px] opacity-50 flex items-center gap-3">
+                    <div className="flex-1">
+                      <p className="text-[11px] font-bold text-[#111] mb-1">Resume</p>
+                      <div className="h-9 bg-gray-100 border border-gray-200 rounded-lg" />
+                    </div>
+                    <div className="w-28 flex-shrink-0">
+                      <p className="text-[11px] font-bold text-[#111] mb-1">Your rate</p>
+                      <div className="h-9 bg-gray-100 border border-gray-200 rounded-lg" />
+                    </div>
                   </div>
-                  <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px]" />
+                  <div className="absolute inset-0 bg-white/45" />
                 </div>
-                <div className="bg-[#111] p-5 text-center">
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    <Star size={16} className="text-yellow-400 fill-yellow-400" />
-                    <span className="text-white font-black text-sm">ArtswrkPRO</span>
+                <div className="bg-[#111] px-5 py-4 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Star size={15} className="text-yellow-400 fill-yellow-400 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-white font-black text-sm leading-tight">ArtswrkPRO</p>
+                      <p className="text-white/60 text-[11px] leading-tight truncate">Unlock to apply to high-paying PRO jobs</p>
+                    </div>
                   </div>
-                  <p className="text-white/70 text-xs mb-4">Subscribe to apply to exclusive high-paying PRO jobs</p>
                   <button
                     onClick={() => proCheckoutMutation.mutate({
                       interval: "month",
@@ -625,12 +651,12 @@ export default function ProJobDetail() {
                       returnPath: jobUrl,
                     })}
                     disabled={proCheckoutMutation.isPending}
-                    className="w-full py-3 rounded-xl text-sm font-bold text-[#111] bg-white hover:bg-gray-100 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                    className="flex-shrink-0 px-4 py-2.5 rounded-lg text-sm font-bold text-[#111] bg-white hover:bg-gray-100 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
                   >
                     {proCheckoutMutation.isPending ? (
-                      <><Loader2 size={14} className="animate-spin" /> Redirecting…</>
+                      <Loader2 size={14} className="animate-spin" />
                     ) : (
-                      <>🔒 Unlock Artswrk PRO</>
+                      "🔒 Unlock"
                     )}
                   </button>
                 </div>
@@ -649,8 +675,9 @@ export default function ProJobDetail() {
         </div>
       </div>
 
-      {/* ── Sticky bottom bar ── */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-5 py-4 flex items-center justify-between gap-4 z-40 shadow-[0_-4px_24px_rgba(0,0,0,0.07)]">
+      {/* ── Sticky bottom bar (mobile-only when inside the dashboard —
+          otherwise it would sit under the sidebar on desktop) ── */}
+      <div className={`fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-5 py-4 flex items-center justify-between gap-4 z-40 shadow-[0_-4px_24px_rgba(0,0,0,0.07)] ${isAuthenticated ? "lg:hidden" : ""}`}>
         <div className="min-w-0">
           <p className="text-base font-black text-[#111] truncate">{j.budget ?? "Open rate"}</p>
           <p className="text-xs text-gray-400 truncate">{location}</p>

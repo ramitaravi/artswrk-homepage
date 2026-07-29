@@ -36,12 +36,21 @@ import {
   Building2,
   Truck,
   Pencil,
+  CalendarDays,
+  List,
+  BookOpen,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import BoostJobModal from "@/components/BoostJobModal";
+import RichText from "@/components/RichText";
+import Artists from "@/pages/dashboard/Artists";
+import Bookings from "@/pages/dashboard/Bookings";
+import CompanyPage from "@/pages/dashboard/CompanyPage";
+import SubLists from "@/pages/dashboard/SubLists";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -237,9 +246,33 @@ function Sidebar({
     },
     {
       icon: <Users size={18} />,
+      label: "My Artists",
+      onClick: () => onNavigate("artists"),
+      active: activeSection === "artists",
+    },
+    {
+      icon: <BookOpen size={18} />,
       label: "Browse Artists",
       onClick: () => navigate("/app/artists"),
       active: false,
+    },
+    {
+      icon: <CalendarDays size={18} />,
+      label: "Bookings",
+      onClick: () => onNavigate("bookings"),
+      active: activeSection === "bookings",
+    },
+    {
+      icon: <Building2 size={18} />,
+      label: "Company Page",
+      onClick: () => onNavigate("company"),
+      active: activeSection === "company",
+    },
+    {
+      icon: <List size={18} />,
+      label: "Sub Lists",
+      onClick: () => onNavigate("lists"),
+      active: activeSection === "lists",
     },
     {
       icon: <Settings size={18} />,
@@ -293,6 +326,7 @@ function JobCard({
   applicants: any[];
   onViewDetail: () => void;
 }) {
+  const [showBoost, setShowBoost] = useState(false);
   const rawLogo = job.logo || job.enterpriseLogoUrl;
   const logoUrl = fixUrl(rawLogo);
   const companyName = job.company || job.clientCompanyName || "Company";
@@ -310,64 +344,80 @@ function JobCard({
   const status = job.status || job.requestStatus;
 
   return (
-    <div
-      className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer group"
-      onClick={onViewDetail}
-    >
-      <div className="flex items-center gap-4 p-5">
-        {/* Company logo */}
-        <div className="w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 bg-gray-50 border border-gray-100 shadow-sm">
-          {logoUrl ? (
-            <img
-              src={logoUrl}
-              alt={companyName}
-              className="w-full h-full object-cover"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-base">
-              {initials(companyName)}
-            </div>
-          )}
-        </div>
-
-        {/* Job info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-3 mb-1">
-            <div className="min-w-0">
-              <h3 className="font-bold text-[#111] text-sm leading-snug truncate group-hover:text-[#F25722] transition-colors">
-                {jobTitle}
-              </h3>
-              <p className="text-xs text-gray-400 truncate">{companyName}</p>
-            </div>
-            <StatusBadge status={status} />
-          </div>
-          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-            {location && (
-              <span className="text-xs text-gray-400 flex items-center gap-1">
-                <MapPin size={10} className="flex-shrink-0" />{location}
-              </span>
-            )}
-            {rate && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722] text-xs font-semibold">
-                <CreditCard size={10} />{rate}
-              </span>
+    <>
+      {job.id && (
+        <BoostJobModal
+          jobId={job.id}
+          jobTitle={jobTitle}
+          open={showBoost}
+          onClose={() => setShowBoost(false)}
+        />
+      )}
+      <div
+        className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer group"
+        onClick={onViewDetail}
+      >
+        <div className="flex items-center gap-4 p-5">
+          {/* Company logo */}
+          <div className="w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 bg-gray-50 border border-gray-100 shadow-sm">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={companyName}
+                className="w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-base">
+                {initials(companyName)}
+              </div>
             )}
           </div>
-        </div>
 
-        {/* Right: applicants + chevron */}
-        <div className="flex items-center gap-3 flex-shrink-0">
-          {applicants.length > 0 && (
-            <div className="flex flex-col items-end gap-1">
-              <AvatarStack artists={applicants} />
-              <span className="text-[10px] text-gray-400">{applicants.length} applicant{applicants.length !== 1 ? "s" : ""}</span>
+          {/* Job info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-3 mb-1">
+              <div className="min-w-0">
+                <h3 className="font-bold text-[#111] text-sm leading-snug truncate group-hover:text-[#F25722] transition-colors">
+                  {jobTitle}
+                </h3>
+                <p className="text-xs text-gray-400 truncate">{companyName}</p>
+              </div>
+              <StatusBadge status={status} />
             </div>
-          )}
-          <ChevronRight size={16} className="text-gray-300 group-hover:text-[#F25722] transition-colors" />
+            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+              {location && (
+                <span className="text-xs text-gray-400 flex items-center gap-1">
+                  <MapPin size={10} className="flex-shrink-0" />{location}
+                </span>
+              )}
+              {rate && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722] text-xs font-semibold">
+                  <CreditCard size={10} />{rate}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Right: boost button + applicants + chevron */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {applicants.length > 0 && (
+              <div className="flex flex-col items-end gap-1">
+                <AvatarStack artists={applicants} />
+                <span className="text-[10px] text-gray-400">{applicants.length} applicant{applicants.length !== 1 ? "s" : ""}</span>
+              </div>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowBoost(true); }}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-orange-50 text-[#F25722] text-xs font-bold hover:bg-orange-100 transition-colors"
+            >
+              <Zap size={12} /> Boost
+            </button>
+            <ChevronRight size={16} className="text-gray-300 group-hover:text-[#F25722] transition-colors" />
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -1437,7 +1487,7 @@ function EnterpriseConfirmDialog({
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${paymentMethod === "artswrk" ? "bg-[#F25722]" : "bg-gray-100"}`}>
                   <CreditCard size={14} className={paymentMethod === "artswrk" ? "text-white" : "text-gray-500"} />
                 </div>
-                <p className="text-sm font-bold text-[#111]">Invoice via Artswrk</p>
+                <p className="text-sm font-bold text-[#111]">Pay via Artswrk</p>
                 <p className="text-xs text-gray-400 mt-0.5">Artswrk handles invoicing</p>
               </button>
               <button onClick={() => setPaymentMethod("direct")}
@@ -2215,7 +2265,7 @@ function JobDetailView({
           {job.description && (
             <div>
               <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Description</h4>
-              <div className="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: job.description }} />
+              <RichText html={job.description} className="text-gray-700" />
             </div>
           )}
           {job.category && (
@@ -2712,22 +2762,34 @@ export default function Enterprise({ initialJobId }: { initialJobId?: number } =
       />
 
       {/* Main content */}
-      <main className="flex-1 p-6 overflow-hidden">
+      <main className="flex-1 overflow-y-auto">
         {activeSection === "settings" ? (
           <EnterpriseBillingSettings onBack={() => setActiveSection("dashboard")} />
+        ) : activeSection === "artists" ? (
+          <Artists />
+        ) : activeSection === "bookings" ? (
+          <Bookings />
+        ) : activeSection === "company" ? (
+          <CompanyPage />
+        ) : activeSection === "lists" ? (
+          <SubLists />
         ) : selectedJob ? (
-          <JobDetailView
-            job={selectedJob}
-            user={enterpriseUser}
-            onBack={clearJob}
-            onJobUpdate={(updated) => setSelectedJob(updated)}
-          />
+          <div className="p-6">
+            <JobDetailView
+              job={selectedJob}
+              user={enterpriseUser}
+              onBack={clearJob}
+              onJobUpdate={(updated) => setSelectedJob(updated)}
+            />
+          </div>
         ) : (
-          <MasterView
-            user={enterpriseUser}
-            onSelectJob={selectJob}
-            initialJobId={initialJobId}
-          />
+          <div className="p-6">
+            <MasterView
+              user={enterpriseUser}
+              onSelectJob={selectJob}
+              initialJobId={initialJobId}
+            />
+          </div>
         )}
       </main>
     </div>

@@ -31,6 +31,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import Navbar from "@/components/Navbar";
+import DashboardLayout from "@/components/DashboardLayout";
 import {
   slugify,
   extractIdFromSlug,
@@ -353,15 +354,23 @@ export default function ApplyPage() {
     }
   }
 
+  // ── Page shell ─────────────────────────────────────────────────────────────
+  // Logged-in users get the same dashboard chrome (sidebar, gray canvas,
+  // centered width) as every other page; logged-out visitors get the
+  // standalone public page with its own Navbar.
+  const jobsBackHref = isAuthenticated ? "/app/jobs" : "/jobs";
+  const shell = (content: React.ReactNode) =>
+    isAuthenticated ? <DashboardLayout>{content}</DashboardLayout> : content;
+
   // ── Loading / error states ────────────────────────────────────────────────
 
   if (jobId === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    return shell(
+      <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
           <AlertCircle size={40} className="text-gray-300 mx-auto mb-3" />
           <p className="font-semibold text-gray-500">Invalid job URL</p>
-          <Link href="/jobs" className="mt-4 inline-block text-sm text-[#F25722] font-semibold hover:underline">
+          <Link href={jobsBackHref} className="mt-4 inline-block text-sm text-[#F25722] font-semibold hover:underline">
             ← Back to Jobs
           </Link>
         </div>
@@ -370,20 +379,20 @@ export default function ApplyPage() {
   }
 
   if (jobLoading || authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    return shell(
+      <div className="min-h-[60vh] flex items-center justify-center">
         <Loader2 size={32} className="animate-spin text-gray-300" />
       </div>
     );
   }
 
   if (!job) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    return shell(
+      <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
           <AlertCircle size={40} className="text-gray-300 mx-auto mb-3" />
           <p className="font-semibold text-gray-500">Job not found</p>
-          <Link href="/jobs" className="mt-4 inline-block text-sm text-[#F25722] font-semibold hover:underline">
+          <Link href={jobsBackHref} className="mt-4 inline-block text-sm text-[#F25722] font-semibold hover:underline">
             ← Back to Jobs
           </Link>
         </div>
@@ -425,8 +434,8 @@ export default function ApplyPage() {
   // ── Success state ─────────────────────────────────────────────────────────
 
   if (submitted) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4" style={{ fontFamily: "Poppins, sans-serif" }}>
+    return shell(
+      <div className="min-h-[60vh] flex items-center justify-center px-4">
         <div className="max-w-sm w-full bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
           <div className="w-16 h-16 rounded-full hirer-grad-bg flex items-center justify-center mx-auto mb-5 shadow-lg">
             <CheckCircle2 size={32} className="text-white" />
@@ -448,7 +457,7 @@ export default function ApplyPage() {
               View My Applications
             </Link>
             <Link
-              href="/jobs"
+              href={jobsBackHref}
               className="block w-full py-2.5 rounded-xl text-sm font-semibold text-[#111] border border-gray-200 hover:bg-gray-50 transition-colors"
             >
               Browse More Jobs
@@ -463,7 +472,7 @@ export default function ApplyPage() {
 
   const jobUrl = toJobUrl(job);
   const breadcrumbs = [
-    { label: "Jobs", href: "/jobs" },
+    { label: "Jobs", href: jobsBackHref },
     { label: cityDisplay, href: `/jobs?location=${encodeURIComponent(cityDisplay)}` },
     { label: title, href: jobUrl },
     { label: "Apply" },
@@ -476,8 +485,8 @@ export default function ApplyPage() {
 
   const isOpenRate = job.openRate;
 
-  return (
-    <div className="min-h-screen bg-gray-50" style={{ fontFamily: "Poppins, sans-serif" }}>
+  return shell(
+    <div className={isAuthenticated ? "" : "min-h-screen bg-gray-50"} style={{ fontFamily: "Poppins, sans-serif" }}>
       {/* JSON-LD */}
       <script
         type="application/ld+json"
@@ -489,10 +498,10 @@ export default function ApplyPage() {
       />
 
       {/* Shared auth-aware Navbar */}
-      <Navbar />
+      {!isAuthenticated && <Navbar />}
 
-      <div className="pt-14">
-        <div className="max-w-4xl mx-auto px-5 lg:px-10 py-8">
+      <div className={isAuthenticated ? "" : "pt-14"}>
+        <div className={isAuthenticated ? "max-w-5xl mx-auto px-4 md:px-6 py-6" : "max-w-4xl mx-auto px-5 lg:px-10 py-8"}>
           {/* Back + Breadcrumbs */}
           <div className="mb-6">
             <Link

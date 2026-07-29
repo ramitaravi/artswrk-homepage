@@ -10,7 +10,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import SharedNavbar from "@/components/Navbar";
-import BoostJobModal from "@/components/BoostJobModal";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -35,7 +34,6 @@ import {
   Star,
   ArrowRight,
   Users,
-  Eye,
   EyeOff,
   Lock,
   Unlock,
@@ -428,6 +426,7 @@ function Step2({
       return;
     }
     createFreeJob.mutate({
+      title: form.title || undefined,
       description: form.description,
       locationAddress: form.locationAddress || undefined,
       dateType: form.dateType as any,
@@ -1038,11 +1037,13 @@ function Step3({
   jobId,
   onBack,
   hiringCategory,
+  isPremium,
 }: {
   form: FormData;
   jobId: number | null;
   onBack: () => void;
   hiringCategory?: string | null;
+  isPremium?: boolean;
 }) {
   const [, navigate] = useLocation();
   const isCompetition = ENTERPRISE_HIRING_CATEGORIES.includes(hiringCategory ?? "");
@@ -1053,7 +1054,32 @@ function Step3({
 
   // sub-step: "almost_ready" → "sponsor"
   const [subStep, setSubStep] = useState<"almost_ready" | "sponsor">("almost_ready");
-  const [showBoost, setShowBoost] = useState(false);
+
+  // Inline boost controls (replaces BoostJobModal on Step 3)
+  const [boostBudget, setBoostBudget] = useState(20);
+  const [boostDuration, setBoostDuration] = useState(7);
+  const boostTotal = boostBudget * boostDuration;
+
+  // Performance estimates — scale linearly with spend
+  const estArtistsReached = Math.round(boostTotal * 38);
+  const estApplicants = Math.max(1, Math.round(boostTotal * 1.1));
+  const perfLabel = boostBudget >= 60 ? "Maximum" : boostBudget >= 35 ? "High" : boostBudget >= 15 ? "Good" : "Basic";
+  const perfColor = boostBudget >= 35 ? "#F25722" : "#FFBC5D";
+  // 8 signal bars — how many are lit based on budget (5→100)
+  const litBars = Math.max(1, Math.round((boostBudget / 100) * 8));
+  const BAR_HEIGHTS = [18, 28, 38, 48, 58, 70, 84, 100]; // % heights
+
+  const BOOST_DURATIONS = [
+    { value: 3, label: "3 days" },
+    { value: 7, label: "1 week" },
+    { value: 14, label: "2 weeks" },
+    { value: 30, label: "1 month" },
+  ];
+
+  const createBoostCheckout = trpc.boost.createCheckout.useMutation({
+    onSuccess: (data) => { window.location.href = data.checkoutUrl; },
+    onError: (err) => toast.error(err.message ?? "Failed to start boost checkout"),
+  });
 
   const createAndCheckout = trpc.postJob.createAndCheckout.useMutation({
     onSuccess: (data) => {
@@ -1163,74 +1189,190 @@ function Step3({
     });
   }
 
-  // ── Sub-step: Posted! ──────────────────────────────────────────────────────
+  // ── Sub-step: Posted + inline boost pitch ─────────────────────────────────
   if (subStep === "almost_ready") {
     return (
-      <div className="max-w-2xl mx-auto">
-        {jobId && (
-          <BoostJobModal
-            jobId={jobId}
-            jobTitle={form.title || undefined}
-            open={showBoost}
-            onClose={() => { setShowBoost(false); navigate("/app/jobs"); }}
-          />
+      <div className="max-w-xl mx-auto">
+
+        {/* ── Job live card ── */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl hirer-grad-bg flex items-center justify-center text-white font-black text-base flex-shrink-0 shadow-sm">
+            {(form.studioName || form.title || "J")[0].toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-black text-[#111] text-sm leading-snug">{form.title || "Your Job"}</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {form.studioName || "Your Studio"}{form.locationAddress ? ` · ${form.locationAddress}` : ""}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-xs font-bold text-green-600 bg-green-50 px-2.5 py-1 rounded-full flex items-center gap-1">
+              <CheckCircle2 size={11} /> Active
+            </span>
+          </div>
+        </div>
+
+        {/* ── Premium banner (premium users only) ── */}
+        {isPremium && (
+          <div className="rounded-2xl p-4 mb-6 hirer-grad-bg text-white flex items-start gap-3">
+            <Crown size={18} className="flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-black text-sm">You're on Artswrk Premium</p>
+              <p className="text-xs text-white/85 mt-0.5 leading-relaxed">
+                Message every artist who applies — and reach out to any of the 6,000+ artists on our platform with your membership.
+              </p>
+            </div>
+          </div>
         )}
 
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-full hirer-grad-bg flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <CheckCircle2 size={28} className="text-white" />
-          </div>
-          <h2 className="text-3xl font-black text-[#111] mb-2">Your job has been posted! 🎉</h2>
-          <p className="text-gray-500 text-base max-w-md mx-auto">
-            Artists are already seeing your listing. Boost it to the top for even more applicants.
-          </p>
-        </div>
-
-        {/* Live listing preview */}
-        <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-100 p-5 mb-6">
-          <p className="text-xs font-semibold text-[#F25722] uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <Eye size={11} />
-            Live now
-          </p>
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl hirer-grad-bg flex items-center justify-center text-white font-black text-sm flex-shrink-0">
-              {(form.studioName || form.title || "J")[0].toUpperCase()}
+        {/* ── Boost pitch ── */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          {/* Header */}
+          <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+            <div className="flex items-center gap-2 mb-1">
+              <Zap size={18} className="text-[#F25722]" />
+              <h2 className="text-xl font-black text-[#111]">Sponsor your listing</h2>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-black text-[#111] text-sm">{form.title || "Your Job"}</p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {form.studioName || "Your Studio"}
-                {form.locationAddress && ` · ${form.locationAddress}`}
-              </p>
-              <div className="flex gap-2 mt-2 flex-wrap">
-                <Badge variant="secondary" className="text-xs">{form.dateType}</Badge>
-                {form.transportation && (
-                  <Badge className="bg-blue-50 text-blue-600 border-0 text-xs">Travel covered</Badge>
-                )}
+            <p className="text-sm text-gray-500">
+              Your job is already live — boost it to the top of search results for even more applicants.
+            </p>
+          </div>
+
+          {/* Benefits */}
+          <div className="px-6 py-4 border-b border-gray-100 space-y-2.5">
+            {[
+              { icon: "📌", text: "Pinned to the top of search results" },
+              { icon: "📣", text: "Boosted across social media & email to our artist network" },
+              { icon: "⚡", text: "Get applications faster — sponsored posts see up to 3× more reach" },
+            ].map(({ icon, text }) => (
+              <div key={text} className="flex items-center gap-3">
+                <span className="text-base leading-none">{icon}</span>
+                <p className="text-sm text-gray-700">{text}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Budget + Duration controls */}
+          <div className="px-6 py-5 space-y-5">
+            {/* Daily budget */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-bold text-[#111]">Daily ad budget</span>
+                <span className="text-xs text-gray-400">Recommended: $15–30</span>
+              </div>
+              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden mb-3">
+                <span className="px-4 py-2.5 bg-gray-50 text-gray-500 font-semibold border-r border-gray-200 text-sm">$</span>
+                <span className="flex-1 px-4 py-2.5 text-base font-bold text-[#111]">{boostBudget}</span>
+                <span className="px-4 py-2.5 bg-gray-50 text-gray-400 text-xs border-l border-gray-200">per day</span>
+              </div>
+              <input
+                type="range"
+                min={5} max={100} step={5}
+                value={boostBudget}
+                onChange={(e) => setBoostBudget(Number(e.target.value))}
+                className="w-full accent-[#F25722]"
+              />
+              <div className="flex justify-between text-xs text-gray-400 mt-1">
+                <span>$5</span><span>$100</span>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => navigate("/app/jobs")} className="flex-1 py-4">
-            View My Jobs
-          </Button>
-          <Button
-            onClick={() => setSubStep("sponsor")}
-            variant="outline"
-            className="flex-1 py-4 border-[#F25722] text-[#F25722] hover:bg-orange-50"
-          >
-            <Unlock size={15} className="mr-1.5" />
-            Unlock Applicants
-          </Button>
-          <Button
-            onClick={() => setShowBoost(true)}
-            className="flex-1 py-4 hirer-grad-bg border-0 hover:opacity-90 font-bold"
-          >
-            <Zap size={15} className="mr-1.5" />
-            Boost Job
-          </Button>
+            {/* Performance preview */}
+            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-[#111] uppercase tracking-wide">Ad Performance</span>
+                <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ color: perfColor, background: boostBudget >= 35 ? "#FFF0EB" : "#FFFBEB" }}>
+                  {perfLabel}
+                </span>
+              </div>
+
+              {/* Signal-strength bars */}
+              <div className="flex items-end gap-1.5 h-10 mb-4">
+                {BAR_HEIGHTS.map((h, i) => {
+                  const filled = i < litBars;
+                  const intensity = i / (BAR_HEIGHTS.length - 1);
+                  const fillColor = filled
+                    ? `hsl(${20 - intensity * 10}deg, ${85 + intensity * 15}%, ${62 - intensity * 22}%)`
+                    : "#E5E7EB";
+                  return (
+                    <div
+                      key={i}
+                      className="flex-1 rounded-sm transition-all duration-200"
+                      style={{ height: `${h}%`, background: fillColor }}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Stats row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[11px] text-gray-400 mb-0.5">Est. artists reached</p>
+                  <p className="text-sm font-black text-[#111]">{estArtistsReached.toLocaleString()}+</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-400 mb-0.5">Est. applicants</p>
+                  <p className="text-sm font-black text-[#111]">{estApplicants}+</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Duration */}
+            <div>
+              <span className="text-sm font-bold text-[#111] block mb-2">Ad duration</span>
+              <Select
+                value={boostDuration.toString()}
+                onValueChange={(v) => setBoostDuration(parseInt(v))}
+              >
+                <SelectTrigger className="w-full rounded-xl border-gray-200">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BOOST_DURATIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value.toString()}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-400 mt-1.5">You can pause or close your boost at any time.</p>
+            </div>
+
+            {/* Total */}
+            <div className="flex items-center justify-between py-3 border-t border-gray-100">
+              <span className="text-sm text-gray-500">Total ({BOOST_DURATIONS.find(d => d.value === boostDuration)?.label ?? ""})</span>
+              <span className="text-2xl font-black text-[#111]">${boostTotal.toFixed(2)}</span>
+            </div>
+          </div>
+
+          {/* CTAs */}
+          <div className="px-6 pb-6 space-y-3">
+            <Button
+              onClick={() => {
+                if (!jobId) { toast.error("Job ID missing — please try again."); return; }
+                createBoostCheckout.mutate({
+                  jobId,
+                  dailyBudget: boostBudget,
+                  durationDays: boostDuration,
+                  origin: window.location.origin,
+                });
+              }}
+              disabled={!jobId || createBoostCheckout.isPending}
+              className="w-full py-4 hirer-grad-bg border-0 hover:opacity-90 font-bold text-base rounded-xl"
+            >
+              {createBoostCheckout.isPending ? (
+                <><Loader2 size={16} className="mr-2 animate-spin" /> Redirecting…</>
+              ) : (
+                <><Zap size={16} className="mr-2" /> Boost My Job — ${boostTotal.toFixed(2)}</>
+              )}
+            </Button>
+            <button
+              onClick={() => navigate("/app/jobs")}
+              className="w-full text-sm text-gray-400 hover:text-gray-600 transition-colors py-1"
+            >
+              No thanks, view my jobs →
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -1358,38 +1500,53 @@ function SuccessPage() {
   const isPro = params.get("plan") === "pro";
   const isBoosted = params.get("boosted") === "1";
 
-  const verify = trpc.postJob.verifyCheckout.useMutation({});
+  const verifyJob = trpc.postJob.verifyCheckout.useMutation({});
+  const verifyBoost = trpc.boost.verifyCheckout.useMutation({});
 
   useEffect(() => {
-    if (sessionId) {
-      verify.mutate({ sessionId });
+    if (!sessionId) return;
+    if (isBoosted) {
+      verifyBoost.mutate({ sessionId });
+    } else {
+      verifyJob.mutate({ sessionId });
     }
   }, [sessionId]);
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-5">
       <div className="max-w-md text-center">
-        <div className="w-20 h-20 rounded-full hirer-grad-bg flex items-center justify-center mx-auto mb-6 shadow-lg">
-          <Unlock size={36} className="text-white" />
-        </div>
-        <h1 className="text-3xl font-black text-[#111] mb-3">
-          Candidates unlocked! 🎉
-        </h1>
-        <p className="text-gray-500 mb-2">
-          You can now view and message all applicants for this job from your{" "}
-          <span className="font-bold text-[#111]">dashboard</span>.
-        </p>
-        {isPro && (
-          <p className="text-sm text-[#F25722] font-semibold mb-2">
-            Welcome to Artswrk PRO! Unlimited unlocks are now active.
-          </p>
+        {isBoosted ? (
+          <>
+            <div className="w-20 h-20 rounded-full bg-orange-50 border-2 border-orange-200 flex items-center justify-center mx-auto mb-6 shadow-sm">
+              <span className="text-4xl">⚡</span>
+            </div>
+            <h1 className="text-3xl font-black text-[#111] mb-3">
+              Your job is now boosted! 🚀
+            </h1>
+            <p className="text-gray-500 mb-2">
+              Your listing has been moved to the <span className="font-bold text-[#111]">top of the job board</span> and marked as Priority Listing for artists.
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="w-20 h-20 rounded-full hirer-grad-bg flex items-center justify-center mx-auto mb-6 shadow-lg">
+              <Unlock size={36} className="text-white" />
+            </div>
+            <h1 className="text-3xl font-black text-[#111] mb-3">
+              Candidates unlocked! 🎉
+            </h1>
+            <p className="text-gray-500 mb-2">
+              You can now view and message all applicants for this job from your{" "}
+              <span className="font-bold text-[#111]">dashboard</span>.
+            </p>
+            {isPro && (
+              <p className="text-sm text-[#F25722] font-semibold mb-2">
+                Welcome to Artswrk PRO! Unlimited unlocks are now active.
+              </p>
+            )}
+          </>
         )}
-        {isBoosted && (
-          <p className="text-sm text-purple-600 font-semibold mb-2">
-            ⚡ Your job is now boosted for maximum visibility!
-          </p>
-        )}
-        {verify.isPending && (
+        {(verifyJob.isPending || verifyBoost.isPending) && (
           <p className="text-xs text-gray-400 flex items-center justify-center gap-1.5 mb-4">
             <Loader2 size={12} className="animate-spin" />
             Activating your access...
@@ -1476,6 +1633,7 @@ export default function PostJob() {
             jobId={jobId}
             onBack={() => setStep(2)}
             hiringCategory={(user as any)?.hiringCategory ?? null}
+            isPremium={!!(user as any)?.artswrkPro || !!(user as any)?.artswrkBasic}
           />
         )}
       </div>

@@ -58,6 +58,7 @@ function AboutTab({ profile }: { profile: any }) {
   // Server already returns these as parsed arrays — no need to re-parse
   const mediaPhotos: string[] = Array.isArray(profile.mediaPhotos) ? profile.mediaPhotos : [];
   const resumeFiles: { url: string; name: string }[] = Array.isArray(profile.resumeFiles) ? profile.resumeFiles : [];
+  const { data: affiliations = [] } = trpc.artists.getArtistAffiliations.useQuery({ userId: profile.id });
 
   return (
     <div className="space-y-8">
@@ -111,6 +112,34 @@ function AboutTab({ profile }: { profile: any }) {
           <p className="text-sm text-gray-600 leading-relaxed">{profile.bio}</p>
         </div>
       )}
+
+      {/* Affiliations */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-800 mb-3">Affiliations</h3>
+        {(affiliations as any[]).length > 0 ? (
+          <div className="flex flex-wrap gap-3">
+            {(affiliations as any[]).map((aff: any, i: number) => (
+              <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white">
+                {aff.logoUrl ? (
+                  <img
+                    src={aff.logoUrl.startsWith("//") ? `https:${aff.logoUrl}` : aff.logoUrl}
+                    alt={aff.display}
+                    className="w-5 h-5 rounded-sm object-contain flex-shrink-0"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                  />
+                ) : (
+                  <div className="w-5 h-5 rounded-sm bg-gray-200 flex items-center justify-center text-[8px] font-black text-gray-500 flex-shrink-0">
+                    {(aff.display ?? "?")[0]?.toUpperCase()}
+                  </div>
+                )}
+                <span className="text-sm font-medium text-gray-700">{aff.display}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400">No affiliations added yet.</p>
+        )}
+      </div>
     </div>
   );
 }

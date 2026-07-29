@@ -12,7 +12,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import {
   LayoutDashboard, Users, Briefcase, BookOpen, CreditCard, Settings,
   Search, Shield, ChevronLeft, ChevronRight, Menu, X, TrendingUp,
-  DollarSign, Calendar, Star, UserCheck, Building2, Key,
+  DollarSign, Calendar, CalendarDays, Star, UserCheck, Building2, Key,
   AlertCircle, CheckCircle2, Eye, EyeOff, LogOut, Filter,
   MapPin, Clock, ArrowUpRight, UserCog, ArrowLeft, Sparkles, Globe, ExternalLink, Megaphone,
   Plus, Edit2, Mail, ChevronDown, ToggleLeft, ToggleRight, Instagram, Link as LinkIcon, Send, Copy, Loader2,
@@ -21,7 +21,7 @@ import { ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE } from "@shared/
 import { Link } from "wouter";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type AdminSection = "dashboard" | "artists" | "clients" | "jobs" | "pro-jobs" | "enterprise-clients" | "bookings" | "payments" | "subscriptions" | "emails" | "settings";
+type AdminSection = "dashboard" | "artists" | "clients" | "jobs" | "pro-jobs" | "enterprise-clients" | "bookings" | "admin-bookings" | "payments" | "subscriptions" | "emails" | "settings";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmt$(cents: number) {
@@ -49,6 +49,7 @@ const NAV_ITEMS: { id: AdminSection; label: string; icon: React.ReactNode }[] = 
   { id: "pro-jobs", label: "PRO Jobs", icon: <Sparkles size={16} /> },
   { id: "enterprise-clients", label: "Enterprise Clients", icon: <Building2 size={16} /> },
   { id: "bookings", label: "Bookings", icon: <BookOpen size={16} /> },
+  { id: "admin-bookings", label: "Admin Bookings", icon: <CalendarDays size={16} /> },
   { id: "payments", label: "Payments", icon: <CreditCard size={16} /> },
   { id: "subscriptions", label: "Subscriptions", icon: <TrendingUp size={16} /> },
   { id: "emails", label: "Emails", icon: <Mail size={16} /> },
@@ -4664,6 +4665,427 @@ function EmailsSection() {
   );
 }
 
+// ─── Admin Bookings Section ───────────────────────────────────────────────────
+function AdminBookingsSection() {
+  type View = { mode: "list" } | { mode: "create" } | { mode: "detail"; id: number };
+  const [view, setView] = useState<View>({ mode: "list" });
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer.current);
+  }, [search]);
+
+  const { data, isLoading, refetch } = trpc.adminBookings.list.useQuery(
+    { search: debouncedSearch || undefined, limit: 50, offset: 0 },
+    { enabled: view.mode === "list" }
+  );
+  const utils = trpc.useUtils();
+
+  const notifyMutation = trpc.adminBookings.triggerNotifications.useMutation({
+    onSuccess: (r) => {
+      alert(`Sent ${r.sent} notification${r.sent !== 1 ? "s" : ""} (${r.total} due).`);
+      utils.adminBookings.list.invalidate();
+    },
+  });
+
+  if (view.mode === "create") {
+    return <AdminBookingCreateForm onBack={() => setView({ mode: "list" })} onCreated={(id) => setView({ mode: "detail", id })} />;
+  }
+
+  if (view.mode === "detail") {
+    return <AdminRecurringBookingDetail bookingId={view.id} onBack={() => { setView({ mode: "list" }); refetch(); }} />;
+  }
+
+  const bookings = (data as any)?.bookings ?? [];
+  const total = (data as any)?.total ?? 0;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-black text-[#111]">Admin Bookings ({total.toLocaleString()})</h1>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => notifyMutation.mutate()}
+            disabled={notifyMutation.isPending}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <Send size={13} /> {notifyMutation.isPending ? "Notifying…" : "Send Notifications"}
+          </button>
+          <button
+            onClick={() => setView({ mode: "create" })}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity"
+          >
+            <Plus size={15} /> Create Booking
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+        <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
+          <Search size={13} className="text-gray-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by artist, client, description…" className="bg-transparent text-xs text-[#111] placeholder-gray-400 focus:outline-none w-full" />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-100 bg-gray-50">
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Artist</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Client</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Rates</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Schedule</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Periods</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-xs">Loading…</td></tr>
+            ) : bookings.length === 0 ? (
+              <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-xs">No admin bookings yet</td></tr>
+            ) : bookings.map((b: any) => (
+              <tr key={b.id} onClick={() => setView({ mode: "detail", id: b.id })} className="border-b border-gray-50 hover:bg-orange-50/40 transition-colors cursor-pointer">
+                <td className="px-5 py-3">
+                  <p className="font-semibold text-xs text-[#111]">{b.artistFirstName ? `${b.artistFirstName} ${b.artistLastName ?? ""}`.trim() : b.artistName ?? "—"}</p>
+                  <p className="text-[10px] text-gray-400">{b.artistEmail}</p>
+                </td>
+                <td className="px-4 py-3">
+                  <p className="font-semibold text-xs text-[#111]">{b.clientCompanyName || (b.clientFirstName ? `${b.clientFirstName} ${b.clientLastName ?? ""}`.trim() : "—")}</p>
+                  <p className="text-[10px] text-gray-400">{b.clientEmail}</p>
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-700">
+                  <p>${b.clientRate}/hr <span className="text-gray-400">(client)</span></p>
+                  <p>${b.artistRate}/hr <span className="text-gray-400">(artist)</span></p>
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-600">
+                  <p>{fmtDate(b.startDate)} → {fmtDate(b.endDate)}</p>
+                  {b.isRecurring && <span className="text-[10px] font-semibold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-full capitalize">{b.recurringCadence}</span>}
+                </td>
+                <td className="px-4 py-3 text-xs">
+                  <span className="font-semibold text-[#111]">{b.paidPeriods ?? 0}</span>
+                  <span className="text-gray-400">/{b.totalPeriods ?? 0} paid</span>
+                  {(b.openPeriods ?? 0) > 0 && <span className="ml-1 text-amber-600 font-semibold">{b.openPeriods} pending</span>}
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(b.createdAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function AdminBookingCreateForm({ onBack, onCreated }: { onBack: () => void; onCreated: (id: number) => void }) {
+  const [artistSearch, setArtistSearch] = useState("");
+  const [clientSearch, setClientSearch] = useState("");
+  const [selectedArtist, setSelectedArtist] = useState<any>(null);
+  const [selectedClient, setSelectedClient] = useState<any>(null);
+  const [artistRate, setArtistRate] = useState("");
+  const [clientRate, setClientRate] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [cadence, setCadence] = useState<"weekly" | "biweekly" | "monthly" | "quarterly">("monthly");
+  const [location, setLocation] = useState("");
+  const [description, setDescription] = useState("");
+
+  const [debouncedArtist, setDebouncedArtist] = useState("");
+  const [debouncedClient, setDebouncedClient] = useState("");
+  const artistTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const clientTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => { clearTimeout(artistTimer.current); artistTimer.current = setTimeout(() => setDebouncedArtist(artistSearch), 350); return () => clearTimeout(artistTimer.current); }, [artistSearch]);
+  useEffect(() => { clearTimeout(clientTimer.current); clientTimer.current = setTimeout(() => setDebouncedClient(clientSearch), 350); return () => clearTimeout(clientTimer.current); }, [clientSearch]);
+
+  const { data: artistResults } = trpc.admin.artists.useQuery({ search: debouncedArtist, limit: 8, offset: 0 }, { enabled: debouncedArtist.length > 1 && !selectedArtist });
+  const { data: clientResults } = trpc.admin.clients.useQuery({ search: debouncedClient, limit: 8, offset: 0 }, { enabled: debouncedClient.length > 1 && !selectedClient });
+
+  const createMutation = trpc.adminBookings.create.useMutation({
+    onSuccess: (r) => onCreated(r.bookingId),
+    onError: (e) => alert("Error: " + e.message),
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedArtist || !selectedClient) return alert("Select an artist and client.");
+    if (!startDate || !endDate) return alert("Set start and end dates.");
+    if (new Date(endDate) <= new Date(startDate)) return alert("End date must be after start date.");
+    createMutation.mutate({
+      artistUserId: selectedArtist.id,
+      clientUserId: selectedClient.id,
+      artistRateDollars: Number(artistRate),
+      clientRateDollars: Number(clientRate),
+      startDate,
+      endDate,
+      isRecurring,
+      recurringCadence: isRecurring ? cadence : undefined,
+      locationAddress: location || undefined,
+      description: description || undefined,
+    });
+  }
+
+  const inputCls = "w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#F25722]";
+  const labelCls = "block text-xs font-semibold text-gray-600 mb-1";
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-2 text-sm">
+        <button onClick={onBack} className="text-gray-400 hover:text-[#F25722] font-medium transition-colors flex items-center gap-1">
+          <ChevronLeft size={14} /> Admin Bookings
+        </button>
+        <span className="text-gray-300">/</span>
+        <span className="text-[#111] font-semibold">Create Admin Booking</span>
+      </div>
+
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 max-w-2xl">
+        <h2 className="text-lg font-black text-[#111]">New Admin Booking</h2>
+
+        {/* Artist picker */}
+        <div>
+          <label className={labelCls}>Artist *</label>
+          {selectedArtist ? (
+            <div className="flex items-center gap-3 p-3 rounded-xl border border-green-200 bg-green-50">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-[#111]">{selectedArtist.firstName} {selectedArtist.lastName ?? ""}</p>
+                <p className="text-xs text-gray-500">{selectedArtist.email}</p>
+              </div>
+              <button type="button" onClick={() => { setSelectedArtist(null); setArtistSearch(""); }} className="text-xs text-red-500 hover:text-red-700">Change</button>
+            </div>
+          ) : (
+            <div className="relative">
+              <input value={artistSearch} onChange={e => setArtistSearch(e.target.value)} placeholder="Search artist by name or email…" className={inputCls} />
+              {(artistResults as any)?.artists?.length > 0 && (
+                <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                  {(artistResults as any).artists.map((a: any) => (
+                    <button key={a.id} type="button" onClick={() => { setSelectedArtist(a); setArtistSearch(""); }} className="w-full text-left px-4 py-2.5 hover:bg-orange-50 transition-colors">
+                      <p className="text-sm font-semibold text-[#111]">{a.firstName} {a.lastName ?? ""}</p>
+                      <p className="text-xs text-gray-400">{a.email}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Client picker */}
+        <div>
+          <label className={labelCls}>Client *</label>
+          {selectedClient ? (
+            <div className="flex items-center gap-3 p-3 rounded-xl border border-green-200 bg-green-50">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-[#111]">{selectedClient.clientCompanyName || displayName(selectedClient)}</p>
+                <p className="text-xs text-gray-500">{selectedClient.email}</p>
+              </div>
+              <button type="button" onClick={() => { setSelectedClient(null); setClientSearch(""); }} className="text-xs text-red-500 hover:text-red-700">Change</button>
+            </div>
+          ) : (
+            <div className="relative">
+              <input value={clientSearch} onChange={e => setClientSearch(e.target.value)} placeholder="Search client by name, company, or email…" className={inputCls} />
+              {(clientResults as any)?.clients?.length > 0 && (
+                <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                  {(clientResults as any).clients.map((c: any) => (
+                    <button key={c.id} type="button" onClick={() => { setSelectedClient(c); setClientSearch(""); }} className="w-full text-left px-4 py-2.5 hover:bg-orange-50 transition-colors">
+                      <p className="text-sm font-semibold text-[#111]">{c.clientCompanyName || displayName(c)}</p>
+                      <p className="text-xs text-gray-400">{c.email}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Rates */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>Client Rate ($/hr) *</label>
+            <input type="number" min="0" step="0.01" value={clientRate} onChange={e => setClientRate(e.target.value)} placeholder="e.g. 85" className={inputCls} required />
+          </div>
+          <div>
+            <label className={labelCls}>Artist Rate ($/hr) *</label>
+            <input type="number" min="0" step="0.01" value={artistRate} onChange={e => setArtistRate(e.target.value)} placeholder="e.g. 70" className={inputCls} required />
+            {clientRate && artistRate && Number(clientRate) > Number(artistRate) && (
+              <p className="text-[10px] text-green-600 mt-1 font-semibold">Artswrk margin: ${(Number(clientRate) - Number(artistRate)).toFixed(2)}/hr</p>
+            )}
+          </div>
+        </div>
+
+        {/* Dates */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>Start Date *</label>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={inputCls} required />
+          </div>
+          <div>
+            <label className={labelCls}>End Date *</label>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={inputCls} required />
+          </div>
+        </div>
+
+        {/* Recurring toggle */}
+        <div className="flex items-start gap-4 p-4 rounded-xl bg-gray-50 border border-gray-100">
+          <div className="flex-1">
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setIsRecurring(r => !r)} className="flex-shrink-0">
+                {isRecurring ? <ToggleRight size={26} className="text-[#F25722]" /> : <ToggleLeft size={26} className="text-gray-300" />}
+              </button>
+              <div>
+                <p className="text-sm font-semibold text-[#111]">Recurring Booking</p>
+                <p className="text-xs text-gray-500">Artist submits hours each billing period</p>
+              </div>
+            </div>
+            {isRecurring && (
+              <div className="mt-3 ml-9">
+                <label className={labelCls}>Billing Cadence</label>
+                <select value={cadence} onChange={e => setCadence(e.target.value as any)} className={inputCls}>
+                  <option value="weekly">Weekly</option>
+                  <option value="biweekly">Bi-weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Period preview */}
+        {isRecurring && startDate && endDate && new Date(endDate) > new Date(startDate) && (
+          <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
+            <p className="text-xs font-semibold text-blue-700 mb-1">Billing Period Preview</p>
+            <p className="text-xs text-blue-600">
+              {cadence === "weekly" && `≈${Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (7 * 86400000))} weekly periods`}
+              {cadence === "biweekly" && `≈${Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (14 * 86400000))} bi-weekly periods`}
+              {cadence === "monthly" && `≈${Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (30 * 86400000))} monthly periods`}
+              {cadence === "quarterly" && `≈${Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (90 * 86400000))} quarterly periods`}
+              {" "}— artist will be notified at the end of each period to submit hours.
+            </p>
+          </div>
+        )}
+
+        <div>
+          <label className={labelCls}>Location (optional)</label>
+          <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Studio address or city" className={inputCls} />
+        </div>
+
+        <div>
+          <label className={labelCls}>Description / Notes (optional)</label>
+          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="Scope of work, service type, etc." className={`${inputCls} resize-none`} />
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <button type="button" onClick={onBack} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+          <button type="submit" disabled={createMutation.isPending} className="flex-1 px-5 py-2.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity disabled:opacity-60">
+            {createMutation.isPending ? "Creating…" : "Create Admin Booking"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function AdminRecurringBookingDetail({ bookingId, onBack }: { bookingId: number; onBack: () => void }) {
+  const { data, isLoading } = trpc.adminBookings.detail.useQuery({ bookingId });
+  const booking = data as any;
+
+  if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-6 h-6 border-2 border-[#F25722] border-t-transparent rounded-full animate-spin" /></div>;
+  if (!booking) return <div className="py-20 text-center text-gray-400 text-sm">Booking not found.</div>;
+
+  const periods: any[] = booking.periods ?? [];
+  const statusColor = (s: string) => ({
+    upcoming: "bg-gray-100 text-gray-500",
+    open: "bg-amber-50 text-amber-600",
+    artist_submitted: "bg-blue-50 text-blue-600",
+    client_paid: "bg-green-50 text-green-600",
+  }[s] ?? "bg-gray-100 text-gray-500");
+
+  const statusLabel = (s: string) => ({
+    upcoming: "Upcoming",
+    open: "Open — Awaiting Artist",
+    artist_submitted: "Submitted — Awaiting Payment",
+    client_paid: "Paid",
+  }[s] ?? s);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-2 text-sm">
+        <button onClick={onBack} className="text-gray-400 hover:text-[#F25722] font-medium transition-colors flex items-center gap-1">
+          <ChevronLeft size={14} /> Admin Bookings
+        </button>
+        <span className="text-gray-300">/</span>
+        <span className="text-[#111] font-semibold">Booking #{booking.id}</span>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Booking info */}
+        <div className="lg:col-span-1 space-y-4">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+            <h2 className="text-sm font-black text-[#111] uppercase tracking-wider">Booking Details</h2>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between"><span className="text-gray-500">Status</span><span className="font-semibold capitalize">{booking.bookingStatus}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Client Rate</span><span className="font-semibold">${booking.clientRate}/hr</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Artist Rate</span><span className="font-semibold">${booking.artistRate}/hr</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Margin</span><span className="font-semibold text-green-600">${(booking.clientRate - booking.artistRate).toFixed(2)}/hr</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Start</span><span>{fmtDate(booking.startDate)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">End</span><span>{fmtDate(booking.endDate)}</span></div>
+              {booking.isRecurring && <div className="flex justify-between"><span className="text-gray-500">Cadence</span><span className="capitalize font-semibold text-purple-600">{booking.recurringCadence}</span></div>}
+              {booking.locationAddress && <div className="flex justify-between"><span className="text-gray-500">Location</span><span className="text-right max-w-[60%]">{booking.locationAddress}</span></div>}
+              {booking.description && <div><span className="text-gray-500 block mb-1">Notes</span><span className="text-gray-700">{booking.description}</span></div>}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+            <h2 className="text-sm font-black text-[#111] uppercase tracking-wider">People</h2>
+            <div>
+              <p className="text-[10px] text-gray-400 font-semibold uppercase mb-1">Artist</p>
+              <p className="text-sm font-semibold text-[#111]">{booking.artistFirstName} {booking.artistLastName ?? ""}</p>
+              <p className="text-xs text-gray-500">{booking.artistEmail}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-gray-400 font-semibold uppercase mb-1">Client</p>
+              <p className="text-sm font-semibold text-[#111]">{booking.clientCompanyName || `${booking.clientFirstName ?? ""} ${booking.clientLastName ?? ""}`.trim()}</p>
+              <p className="text-xs text-gray-500">{booking.clientEmail}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Periods */}
+        <div className="lg:col-span-2 space-y-3">
+          <h2 className="text-sm font-black text-[#111] uppercase tracking-wider">Billing Periods ({periods.length})</h2>
+          {periods.length === 0 && <p className="text-sm text-gray-400 py-6 text-center">No periods generated.</p>}
+          {periods.map((p: any, i: number) => (
+            <div key={p.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-gray-400">Period {i + 1}</span>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusColor(p.status)}`}>{statusLabel(p.status)}</span>
+                  </div>
+                  <p className="text-sm font-semibold text-[#111]">{fmtDate(p.periodStart)} → {fmtDate(p.periodEnd)}</p>
+                  <p className="text-xs text-gray-500">Artist notified: {p.notifyArtistAt ? fmtDate(p.notifyArtistAt) : "—"}</p>
+                </div>
+                <div className="text-right text-xs">
+                  {p.actualHours != null && <p className="font-semibold text-[#111]">{p.actualHours}h logged</p>}
+                  {p.invoiceTotalCents != null && <p className="text-gray-600">{fmt$(p.invoiceTotalCents)}</p>}
+                  {p.invoicePaidAt && <p className="text-green-600 font-semibold">Paid {fmtDate(p.invoicePaidAt)}</p>}
+                  {p.invoiceStripeCheckoutUrl && p.status === "artist_submitted" && (
+                    <a href={p.invoiceStripeCheckoutUrl} target="_blank" rel="noopener noreferrer" className="text-[#F25722] font-semibold hover:underline">Pay →</a>
+                  )}
+                </div>
+              </div>
+              {p.artistNotes && <p className="mt-2 text-xs text-gray-500 italic border-t border-gray-50 pt-2">{p.artistNotes}</p>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Admin Page ──────────────────────────────────────────────────────────
 export default function Admin() {
   const { user, loading } = useAuth();
@@ -4718,6 +5140,7 @@ export default function Admin() {
           {section === "pro-jobs" && <ProJobsSection />}
           {section === "enterprise-clients" && <EnterpriseClientsSection />}
           {section === "bookings" && <BookingsSection onViewPayment={goToPayment} initialDetailId={pendingBookingId} />}
+          {section === "admin-bookings" && <AdminBookingsSection />}
           {section === "payments" && <PaymentsSection onViewBooking={goToBooking} initialDetailId={pendingPaymentId} />}
           {section === "subscriptions" && <SubscriptionsSection />}
           {section === "emails" && <EmailsSection />}

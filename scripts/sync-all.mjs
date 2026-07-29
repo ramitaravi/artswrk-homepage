@@ -609,8 +609,11 @@ async function syncUsers(conn, modifiedSince = null) {
           openId, bubbleId, email, firstName, lastName, name,
           profilePicture, userRole, slug, location,
           artswrkPro, artswrkBasic, loginMethod,
+          stripeCustomerId, artistStripeAccountId, artistStripeReturnCode,
+          artistStripeProductId, artistStripeDateCreated,
+          clientStripeCustomerId, clientStripeCardId,
           bubbleCreatedAt, bubbleModifiedAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           email=COALESCE(VALUES(email), email),
           firstName=COALESCE(VALUES(firstName), firstName),
@@ -622,6 +625,13 @@ async function syncUsers(conn, modifiedSince = null) {
           location=COALESCE(VALUES(location), location),
           artswrkPro=VALUES(artswrkPro),
           artswrkBasic=VALUES(artswrkBasic),
+          stripeCustomerId=COALESCE(VALUES(stripeCustomerId), stripeCustomerId),
+          artistStripeAccountId=COALESCE(VALUES(artistStripeAccountId), artistStripeAccountId),
+          artistStripeReturnCode=COALESCE(VALUES(artistStripeReturnCode), artistStripeReturnCode),
+          artistStripeProductId=COALESCE(VALUES(artistStripeProductId), artistStripeProductId),
+          artistStripeDateCreated=COALESCE(VALUES(artistStripeDateCreated), artistStripeDateCreated),
+          clientStripeCustomerId=COALESCE(VALUES(clientStripeCustomerId), clientStripeCustomerId),
+          clientStripeCardId=COALESCE(VALUES(clientStripeCardId), clientStripeCardId),
           bubbleModifiedAt=VALUES(bubbleModifiedAt)`,
         [
           `bubble_${r._id}`, r._id,
@@ -634,6 +644,13 @@ async function syncUsers(conn, modifiedSince = null) {
           r["Artswrk PRO?"] ? 1 : 0,
           r["Artswrk Basic?"] ? 1 : 0,
           "bubble",
+          r["StripeCustomerID"] ?? null,
+          r["Artist Stripe Account ID"] ?? null,
+          r["Artist Stripe Return Code"] ?? null,
+          r["Stripe product ID"] ?? null,
+          safeDate(r["Artist Stripe Date Created"]),
+          r["Client Stripe Customer ID"] ?? null,
+          r["Client Stripe Card ID"] ?? null,
           safeDate(r["Created Date"]), safeDate(r["Modified Date"]),
         ]
       );

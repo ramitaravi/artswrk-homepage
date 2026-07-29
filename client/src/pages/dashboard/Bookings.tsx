@@ -3,14 +3,15 @@
  * Real data from the bookings table, linked to jobs + interested artists.
  */
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import {
   Calendar, Clock, MapPin, DollarSign, CheckCircle, AlertCircle,
   ChevronDown, ChevronUp, CreditCard, User, Briefcase, ExternalLink,
-  TrendingUp, Loader2
+  TrendingUp, Loader2, RefreshCw, Send, ArrowRight, Building2
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 // Flexible type for both raw Booking schema rows and enriched query results
 type AnyBooking = {
   id: number;
@@ -288,17 +289,218 @@ function BookingRow({ booking }: { booking: AnyBooking }) {
   );
 }
 
+// ── Admin Booking Period Submit Form ──────────────────────────────────────────
+
+function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
+  period: any;
+  booking: any;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [hours, setHours] = useState(period.actualHours?.toString() ?? "");
+  const [notes, setNotes] = useState(period.artistNotes ?? "");
+
+  const submit = trpc.bookingPeriods.submit.useMutation({
+    onSuccess: () => { onSuccess(); onClose(); },
+    onError: (e) => alert("Error: " + e.message),
+  });
+
+  const periodLabel = new Date(period.periodStart).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const artistRate = booking.artistRate ?? 0;
+  const clientRate = booking.clientRate ?? 0;
+  const estimatedArtist = hours ? (Number(hours) * artistRate).toFixed(2) : null;
+  const estimatedClient = hours ? (Number(hours) * clientRate).toFixed(2) : null;
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+        <div>
+          <h2 className="text-lg font-black text-[#111]">Submit Hours</h2>
+          <p className="text-sm text-gray-500">{periodLabel} · {formatDate(period.periodStart)} – {formatDate(period.periodEnd)}</p>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Hours Worked *</label>
+          <input
+            type="number" min="0" step="0.25"
+            value={hours} onChange={e => setHours(e.target.value)}
+            placeholder="e.g. 8.5"
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#F25722]"
+          />
+        </div>
+
+        {estimatedArtist && (
+          <div className="bg-gray-50 rounded-xl p-3 text-xs space-y-1">
+            <div className="flex justify-between"><span className="text-gray-500">Your earnings</span><span className="font-semibold text-[#111]">${estimatedArtist}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Client invoice</span><span className="font-semibold text-[#111]">${estimatedClient}</span></div>
+            <p className="text-[10px] text-gray-400 pt-1">Based on ${artistRate}/hr artist · ${clientRate}/hr client rate. Reimbursements add to the invoice.</p>
+          </div>
+        )}
+
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Notes (optional)</label>
+          <textarea
+            value={notes} onChange={e => setNotes(e.target.value)}
+            rows={2} placeholder="Any notes for the client…"
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] resize-none"
+          />
+        </div>
+
+        <div className="p-3 bg-blue-50 rounded-xl text-xs text-blue-700">
+          Submitting will generate a payment invoice and email the client a payment link.
+        </div>
+
+        <div className="flex gap-3">
+          <button onClick={onClose} className="px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+          <button
+            onClick={() => submit.mutate({ periodId: period.id, actualHours: Number(hours), artistNotes: notes || undefined, origin: window.location.origin })}
+            disabled={!hours || submit.isPending}
+            className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            {submit.isPending ? <><Loader2 size={14} className="animate-spin" /> Submitting…</> : <><Send size={14} /> Submit & Invoice Client</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Admin Booking Card ────────────────────────────────────────────────────────
+
+function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: any; isArtist: boolean; onPeriodsUpdated: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const [submitPeriod, setSubmitPeriod] = useState<any>(null);
+
+  const periods: any[] = booking.periods ?? [];
+  const openPeriods = periods.filter((p: any) => p.status === "open");
+  const submittedPeriods = periods.filter((p: any) => p.status === "artist_submitted");
+  const paidPeriods = periods.filter((p: any) => p.status === "client_paid");
+
+  const clientName = booking.clientCompanyName || (booking.clientFirstName ? `${booking.clientFirstName} ${booking.clientLastName ?? ""}`.trim() : null);
+  const artistName = booking.artistFirstName ? `${booking.artistFirstName} ${booking.artistLastName ?? ""}`.trim() : booking.artistName;
+
+  const statusColor = (s: string) => ({
+    upcoming: "text-gray-400 bg-gray-50",
+    open: "text-amber-600 bg-amber-50",
+    artist_submitted: "text-blue-600 bg-blue-50",
+    client_paid: "text-green-600 bg-green-50",
+  }[s] ?? "text-gray-400 bg-gray-50");
+
+  const statusLabel = (s: string) => ({
+    upcoming: "Upcoming",
+    open: "Awaiting submission",
+    artist_submitted: "Invoice sent",
+    client_paid: "Paid",
+  }[s] ?? s);
+
+  return (
+    <>
+      {submitPeriod && (
+        <PeriodSubmitModal
+          period={submitPeriod}
+          booking={booking}
+          onClose={() => setSubmitPeriod(null)}
+          onSuccess={onPeriodsUpdated}
+        />
+      )}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+        <div className="p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white flex-shrink-0">
+                <CalendarDays size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 uppercase tracking-wider">Admin Booking</span>
+                  {booking.isRecurring && <span className="text-[10px] font-semibold text-gray-500 capitalize">{booking.recurringCadence}</span>}
+                </div>
+                <p className="text-sm font-bold text-[#111]">
+                  {isArtist ? (clientName ?? "Client") : (artistName ?? "Artist")}
+                </p>
+                {booking.description && <p className="text-xs text-gray-500 line-clamp-1">{booking.description}</p>}
+                <div className="flex items-center gap-3 mt-1 flex-wrap">
+                  <span className="flex items-center gap-1 text-xs text-gray-500"><Calendar size={11} /> {formatDate(booking.startDate)} – {formatDate(booking.endDate)}</span>
+                  {booking.locationAddress && <span className="flex items-center gap-1 text-xs text-gray-500 truncate max-w-[160px]"><MapPin size={11} /> {booking.locationAddress}</span>}
+                </div>
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0 flex flex-col items-end gap-2">
+              <p className="text-sm font-black text-[#111]">${isArtist ? booking.artistRate : booking.clientRate}/hr</p>
+              <p className="text-[10px] text-gray-400">{paidPeriods.length}/{periods.length} paid</p>
+              {isArtist && openPeriods.length > 0 && (
+                <button
+                  onClick={() => setSubmitPeriod(openPeriods[0])}
+                  className="flex items-center gap-1 text-xs font-bold text-white hirer-grad-bg px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  <Send size={11} /> Submit Hours
+                </button>
+              )}
+              {!isArtist && submittedPeriods.length > 0 && submittedPeriods[0].invoiceStripeCheckoutUrl && (
+                <a
+                  href={submittedPeriods[0].invoiceStripeCheckoutUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs font-bold text-white hirer-grad-bg px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  <CreditCard size={11} /> Pay Invoice
+                </a>
+              )}
+              <button onClick={() => setExpanded(e => !e)} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                {expanded ? "Less" : `${periods.length} period${periods.length !== 1 ? "s" : ""}`}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {expanded && (
+          <div className="border-t border-gray-100 bg-gray-50 px-5 py-4 space-y-2">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Billing Periods</p>
+            {periods.map((p: any, i: number) => (
+              <div key={p.id} className="flex items-center justify-between bg-white rounded-xl px-4 py-2.5 border border-gray-100">
+                <div>
+                  <p className="text-xs font-semibold text-[#111]">Period {i + 1} · {formatDate(p.periodStart)} – {formatDate(p.periodEnd)}</p>
+                  {p.actualHours != null && <p className="text-[10px] text-gray-500">{p.actualHours}h logged</p>}
+                </div>
+                <div className="flex items-center gap-2">
+                  {p.invoiceTotalCents != null && <span className="text-xs font-semibold text-gray-700">${(p.invoiceTotalCents / 100).toFixed(2)}</span>}
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusColor(p.status)}`}>{statusLabel(p.status)}</span>
+                  {isArtist && p.status === "open" && (
+                    <button onClick={() => setSubmitPeriod(p)} className="text-[10px] font-bold text-[#F25722] hover:underline">Submit →</button>
+                  )}
+                  {!isArtist && p.status === "artist_submitted" && p.invoiceStripeCheckoutUrl && (
+                    <a href={p.invoiceStripeCheckoutUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-[#F25722] hover:underline">Pay →</a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// Need CalendarDays icon
+function CalendarDays({ size, className }: { size: number; className?: string }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="8" y2="18"/><line x1="12" y1="18" x2="12" y2="18"/></svg>;
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 type FilterTab = "all" | "Confirmed" | "Completed" | "Cancelled";
 
 export default function Bookings() {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const { user } = useAuth();
+  const isArtist = (user as any)?.userRole === "Artist";
 
   const { data: stats, isLoading: statsLoading } = trpc.bookings.myStats.useQuery();
   const { data: bookings, isLoading: bookingsLoading } = trpc.bookings.myBookings.useQuery({
     limit: 200,
   });
+  const { data: adminBookings, isLoading: adminLoading, refetch: refetchAdmin } = trpc.bookingPeriods.myAdminBookings.useQuery();
 
   const isLoading = statsLoading || bookingsLoading;
 
@@ -315,7 +517,7 @@ export default function Bookings() {
   ];
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto">
       <div className="mb-7">
         <h1 className="text-2xl font-black text-[#111]">Bookings</h1>
         <p className="text-gray-500 text-sm mt-1">
@@ -384,6 +586,18 @@ export default function Bookings() {
           </button>
         ))}
       </div>
+
+      {/* Admin Bookings */}
+      {!adminLoading && (adminBookings as any[])?.length > 0 && (
+        <div className="mb-7">
+          <h2 className="text-base font-black text-[#111] mb-3">Admin Bookings</h2>
+          <div className="space-y-3">
+            {(adminBookings as any[]).map((b: any) => (
+              <AdminBookingCard key={b.id} booking={b} isArtist={isArtist} onPeriodsUpdated={() => refetchAdmin()} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Booking list */}
       {isLoading ? (

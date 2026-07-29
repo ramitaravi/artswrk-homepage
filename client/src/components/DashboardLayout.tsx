@@ -23,6 +23,8 @@ import {
   Bell,
   Crown,
   ChevronRight,
+  ChevronDown,
+  ExternalLink,
   Loader2,
   Star,
   User,
@@ -46,16 +48,12 @@ interface NavItem {
 // Client (hirer) nav
 const CLIENT_CORE_NAV: NavItem[] = [
   { label: "Dashboard", icon: <LayoutDashboard size={18} />, href: "/app" },
-  { label: "Dashboard Simple", icon: <LayoutGrid size={18} />, href: "/app/simple" },
-  { label: "My Jobs", icon: <Briefcase size={18} />, href: "/app/jobs" },
-  { label: "Bookings", icon: <Calendar size={18} />, href: "/app/bookings" },
-  { label: "Payments", icon: <CreditCard size={18} />, href: "/app/payments" },
   { label: "Artists", icon: <Users size={18} />, href: "/app/artists" },
+  { label: "Payments", icon: <CreditCard size={18} />, href: "/app/payments" },
   { label: "Messages", icon: <MessageSquare size={18} />, href: "/app/messages" },
 ];
 
 const CLIENT_PREMIUM_NAV: NavItem[] = [
-  { label: "Company Page", icon: <Building2 size={18} />, href: "/app/company", premium: true },
   { label: "Sub Lists", icon: <List size={18} />, href: "/app/lists", premium: true },
   { label: "Community", icon: <Users2 size={18} />, href: "/app/community", premium: true },
   { label: "Benefits", icon: <Gift size={18} />, href: "/app/benefits", premium: true },
@@ -74,8 +72,73 @@ const ARTIST_CORE_NAV: NavItem[] = [
 const ARTIST_PREMIUM_NAV: NavItem[] = [
   { label: "PRO Jobs", icon: <Star size={18} />, href: "/app/pro-jobs", premium: true },
   { label: "Benefits", icon: <Gift size={18} />, href: "/app/benefits", premium: true },
-  { label: "Community", icon: <Users2 size={18} />, href: "/app/community", premium: true },
 ];
+
+interface CollapsibleChild {
+  label: string;
+  href: string;
+  external?: boolean;
+  icon?: React.ReactNode;
+}
+
+interface CollapsibleNavItemProps {
+  label: string;
+  icon: React.ReactNode;
+  children: CollapsibleChild[];
+  isArtist: boolean;
+  defaultOpen?: boolean;
+}
+
+function CollapsibleNavItem({ label, icon, children, isArtist, defaultOpen = false }: CollapsibleNavItemProps) {
+  const [location] = useLocation();
+  const [open, setOpen] = useState(defaultOpen || children.some((c) => !c.external && location.startsWith(c.href)));
+  const isChildActive = children.some((c) => !c.external && (location === c.href || location.startsWith(c.href)));
+  const activeColor = isArtist ? "text-[#ec008c]" : "text-[#F25722]";
+  const subActiveColor = isArtist ? "bg-pink-50 text-[#ec008c]" : "bg-orange-50 text-[#F25722]";
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+          isChildActive ? activeColor : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+        }`}
+      >
+        <span className="flex-shrink-0">{icon}</span>
+        <span className="text-sm font-medium flex-1 text-left truncate">{label}</span>
+        {open ? <ChevronDown size={14} className="flex-shrink-0 text-gray-400" /> : <ChevronRight size={14} className="flex-shrink-0 text-gray-400" />}
+      </button>
+      {open && (
+        <div className="ml-4 pl-3 border-l border-gray-100 mt-0.5 space-y-0.5">
+          {children.map((child) => {
+            const isActive = !child.external && (location === child.href || location.startsWith(child.href));
+            if (child.external) {
+              return (
+                <a key={child.href} href={child.href} target="_blank" rel="noopener noreferrer">
+                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium cursor-pointer transition-colors text-gray-500 hover:bg-orange-50 hover:text-[#F25722]">
+                    {child.icon && <span className="flex-shrink-0">{child.icon}</span>}
+                    {child.label}
+                    <ExternalLink size={10} className="ml-auto flex-shrink-0 opacity-50" />
+                  </div>
+                </a>
+              );
+            }
+            return (
+              <Link key={child.href} href={child.href}>
+                <div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium cursor-pointer transition-colors ${
+                  isActive ? subActiveColor : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                }`}>
+                  {child.icon && <span className="flex-shrink-0">{child.icon}</span>}
+                  {child.label}
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function NavLink({ item, isArtist }: { item: NavItem; isArtist: boolean }) {
   const [location] = useLocation();
@@ -156,6 +219,11 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
   const isArtist = artswrkUser?.userRole === "Artist";
   const coreNav = isArtist ? ARTIST_CORE_NAV : CLIENT_CORE_NAV;
   const premiumNav = isArtist ? ARTIST_PREMIUM_NAV : CLIENT_PREMIUM_NAV;
+  // Sidebar card subtitle: artists see their plan (more useful than their own
+  // first name repeated); clients keep seeing their studio/company name.
+  const sidebarSubtitle = isArtist
+    ? ((artswrkUser as any)?.artswrkPro ? "PRO Plan" : (artswrkUser as any)?.artswrkBasic ? "Basic Plan" : "Free Plan")
+    : displayStudio;
 
   const avatarInitials = displayName
     .split(" ")
@@ -204,7 +272,7 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
         )}
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-[#111] truncate">{displayName}</p>
-          <p className="text-xs text-gray-400 truncate">{displayStudio}</p>
+          <p className="text-xs text-gray-400 truncate">{sidebarSubtitle}</p>
           {isPremium && (
             <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200 mt-0.5">
               <Crown size={8} /> PREMIUM
@@ -220,7 +288,35 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
 
       {/* Core nav */}
       <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
-        {coreNav.map((item) => (
+        {/* Dashboard always first */}
+        <NavLink key="/app" item={{ label: "Dashboard", icon: <LayoutDashboard size={18} />, href: "/app" }} isArtist={isArtist} />
+
+        {/* Clients get a collapsible "My Jobs" group */}
+        {!isArtist && (
+          <>
+            <CollapsibleNavItem
+              label="My Jobs"
+              icon={<Briefcase size={18} />}
+              isArtist={false}
+              defaultOpen={true}
+              children={[
+                { label: "My Jobs", href: "/app/jobs" },
+                ...(artswrkUser?.id ? [{
+                  label: "My Hiring Page",
+                  href: `${window.location.origin}/studio/${artswrkUser.id}`,
+                  external: true,
+                  icon: <ExternalLink size={11} />,
+                }] : []),
+              ]}
+            />
+            <NavLink key="/app/bookings" item={{ label: "Bookings", icon: <Calendar size={18} />, href: "/app/bookings" }} isArtist={false} />
+          </>
+        )}
+
+        {/* Remaining nav items (skip Dashboard since we already rendered it above).
+            Artists get Bookings from ARTIST_CORE_NAV in its correct position —
+            it's only rendered manually above for clients (inside the My Jobs group). */}
+        {coreNav.filter((item) => item.href !== "/app").map((item) => (
           <NavLink key={item.href} item={item} isArtist={isArtist} />
         ))}
 
