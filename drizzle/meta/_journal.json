@@ -246,6 +246,13 @@
       "when": 1780020250172,
       "tag": "0034_peaceful_shotgun",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "5",
+      "when": 1781702236862,
+      "tag": "0035_first_william_stryker",
+      "breakpoints": true
     }
   ]
 }

@@ -38,7 +38,7 @@ export default function Community() {
   const [liked, setLiked] = useState<Set<number>>(new Set());
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-4 md:p-6 max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-7">
         <div>
           <div className="flex items-center gap-2 mb-1">
