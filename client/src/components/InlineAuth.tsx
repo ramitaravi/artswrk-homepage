@@ -253,7 +253,7 @@ export default function InlineAuth({
             </div>
             <div className="min-w-0">
               <p className="text-sm font-bold text-[#111] truncate">Hey {displayName}!</p>
-              <p className="text-xs text-gray-500">Create a password to sign in for the first time</p>
+              <p className="text-xs text-gray-500">Welcome back to Artswrk ⭐️ Our site went through a refresh. Create a new password to log into the new & improved Artswrk!</p>
             </div>
           </div>
           <form onSubmit={handleSetPasswordSubmit} className="space-y-3">
