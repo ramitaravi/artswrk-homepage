@@ -47,6 +47,7 @@
 - [x] Seed Nick's Bubble user record (nick+ferrari@artswrk.com → Phyllis F / Ferrari Dance Center NYC)
 - [x] Add getUserByEmail, getUserByBubbleId, getAllUsers query helpers
 - [x] Add artswrkUsers tRPC router (getByEmail, getByBubbleId, list)
+- [x] Export the full database as a portable table-level CSV backup package with schema reference
 
 ## Upcoming
 - [x] Wire demo login to real database (login as nick+ferrari@artswrk.com)
