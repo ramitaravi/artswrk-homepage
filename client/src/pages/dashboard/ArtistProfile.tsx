@@ -90,8 +90,12 @@ function AboutTab({ profile, userId }: { profile: any; userId: number }) {
   const resumeFiles: { url: string; name: string }[] = Array.isArray(profile.resumeFiles) ? profile.resumeFiles : [];
   const disciplines = arr(profile.artistDisciplines);
   const services = arr(profile.artistServices);
-  const masterTypes = arr(profile.masterArtistTypes);
-  const allTags = Array.from(new Set([...masterTypes, ...disciplines, ...services])).filter(Boolean);
+  // profile.masterArtistTypes holds raw Bubble internal IDs, not display
+  // names — deliberately excluded. profile.workTypes is the pre-resolved,
+  // human-readable equivalent already synced for display (same fix as the
+  // parent component's own workTypes usage below).
+  const workTypes = arr(profile.workTypes);
+  const allTags = Array.from(new Set([...workTypes, ...disciplines, ...services])).filter(Boolean);
 
   const { data: categories = [] } = trpc.artistProfile.getPublicServiceCategories.useQuery({ userId });
   const { data: affiliations = [] } = trpc.artists.getArtistAffiliations.useQuery({ userId });

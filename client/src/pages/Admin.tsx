@@ -767,7 +767,7 @@ function AdminArtistDetail({ artistId, onBack, onEdit }: { artistId: number; onB
   if (!artist) return <div className="text-center py-24 text-gray-400 text-sm">Artist not found</div>;
 
   const name = displayName(artist);
-  const types = parseArr(artist.masterArtistTypes);
+  const types = parseArr(artist.workTypes);
   const services = parseArr(artist.artistServices);
   const styles = parseArr(artist.masterStyles);
 
@@ -1115,7 +1115,7 @@ function ArtistsSection() {
               ) : data?.artists.length === 0 ? (
                 <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-xs">No artists found</td></tr>
               ) : data?.artists.map(a => {
-                const types = (() => { try { return JSON.parse(a.masterArtistTypes || "[]"); } catch { return []; } })();
+                const types = (() => { try { return JSON.parse(a.workTypes || "[]"); } catch { return []; } })();
                 return (
                   <tr
                     key={a.id}

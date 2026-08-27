@@ -1721,8 +1721,13 @@ export async function getArtistsList({
   }
 
   if (artistType) {
+    // workTypes is the clean, human-readable field the filter pills are now
+    // generated from (getArtistTypeCounts) — masterArtistTypes stores raw
+    // Bubble internal IDs and rarely matches a typed filter term. Kept as a
+    // fallback alongside artistServices/artistDisciplines for older records.
     conditions.push(
       or(
+        like(users.workTypes, `%${artistType}%`),
         like(users.masterArtistTypes, `%${artistType}%`),
         like(users.artistServices, `%${artistType}%`),
         like(users.artistDisciplines, `%${artistType}%`),
@@ -1754,6 +1759,7 @@ export async function getArtistsList({
       location: users.location,
       bio: users.bio,
       masterArtistTypes: users.masterArtistTypes,
+      workTypes: users.workTypes,
       artistServices: users.artistServices,
       artistDisciplines: users.artistDisciplines,
       artswrkPro: users.artswrkPro,
@@ -1791,6 +1797,7 @@ export async function getFeaturedArtists(limit = 24) {
       profilePicture: users.profilePicture,
       location: users.location,
       masterArtistTypes: users.masterArtistTypes,
+      workTypes: users.workTypes,
       mediaPhotos: users.mediaPhotos,
       artswrkPro: users.artswrkPro,
       artswrkBasic: users.artswrkBasic,
@@ -1836,14 +1843,14 @@ export async function getArtistTypeCounts() {
   if (!db) return [];
 
   const rows = await db
-    .select({ masterArtistTypes: users.masterArtistTypes })
+    .select({ workTypes: users.workTypes })
     .from(users)
     .where(
       and(
         eq(users.userRole, "Artist"),
-        isNotNull(users.masterArtistTypes),
-        sql`${users.masterArtistTypes} != ''`,
-        sql`${users.masterArtistTypes} != '[]'`,
+        isNotNull(users.workTypes),
+        sql`${users.workTypes} != ''`,
+        sql`${users.workTypes} != '[]'`,
       )
     );
 
@@ -1851,7 +1858,7 @@ export async function getArtistTypeCounts() {
   for (const row of rows) {
     let types: string[] = [];
     try {
-      types = JSON.parse(row.masterArtistTypes ?? "[]");
+      types = JSON.parse(row.workTypes ?? "[]");
     } catch {
       continue;
     }
@@ -1998,6 +2005,7 @@ export async function getAdminArtists({
       profilePicture: users.profilePicture,
       location: users.location,
       masterArtistTypes: users.masterArtistTypes,
+      workTypes: users.workTypes,
       artistServices: users.artistServices,
       artswrkPro: users.artswrkPro,
       artswrkBasic: users.artswrkBasic,

@@ -247,7 +247,7 @@ const SERVICE_TYPES = [
 function ArtistCard({ artist, blurred }: { artist: any; blurred?: boolean }) {
   const displayName = getDisplayName(artist.firstName, artist.lastName, artist.name);
   const primaryType = (() => {
-    try { return JSON.parse(artist.masterArtistTypes ?? "[]")[0] ?? ""; } catch { return ""; }
+    try { return JSON.parse(artist.workTypes ?? "[]")[0] ?? ""; } catch { return ""; }
   })();
   const initials = getInitials(artist.firstName, artist.lastName, artist.name);
   const color = getArtistColor(artist.firstName ?? artist.name);

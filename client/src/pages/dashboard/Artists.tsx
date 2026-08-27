@@ -332,7 +332,7 @@ function FeaturedStrip() {
           })();
           const photo = fixUrl(firstPhoto) || fixUrl(a.profilePicture);
           const primaryType = (() => {
-            try { return JSON.parse(a.masterArtistTypes ?? "[]")[0] ?? ""; } catch { return ""; }
+            try { return JSON.parse(a.workTypes ?? "[]")[0] ?? ""; } catch { return ""; }
           })();
           return (
             <div
@@ -535,7 +535,7 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
             {artists.map((a) => {
               const displayName = getDisplayName(a.firstName, a.lastName, a.name);
               const primaryType = (() => {
-                try { return JSON.parse(a.masterArtistTypes ?? "[]")[0] ?? ""; } catch { return ""; }
+                try { return JSON.parse(a.workTypes ?? "[]")[0] ?? ""; } catch { return ""; }
               })();
               return (
                 <div key={a.id}
@@ -584,7 +584,7 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
             {artists.map((a) => {
               const displayName = getDisplayName(a.firstName, a.lastName, a.name);
               const primaryType = (() => {
-                try { return JSON.parse(a.masterArtistTypes ?? "[]")[0] ?? ""; } catch { return ""; }
+                try { return JSON.parse(a.workTypes ?? "[]")[0] ?? ""; } catch { return ""; }
               })();
               return (
                 <div key={a.id}
