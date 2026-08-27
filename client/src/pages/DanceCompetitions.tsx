@@ -1,18 +1,7 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import Navbar from "@/components/Navbar";
-
-// Competition logos (using the artist strip images already in the app + Bubble CDN logos)
-const COMPETITION_LOGOS = [
-  { name: "N70", url: "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/artist-strip-1-aY8po4fr7wkR7kHuYcLRjW.webp", isImage: false },
-  { name: "Jump", url: "", isImage: false },
-  { name: "DreamMaker", url: "", isImage: false },
-  { name: "Believe", url: "", isImage: false },
-  { name: "Nexstar", url: "", isImage: false },
-  { name: "Revel Talent Co", url: "", isImage: false },
-  { name: "Starpower", url: "", isImage: false },
-  { name: "Hollywood Vibe", url: "", isImage: false },
-];
+import { COMPETITION_LOGOS, type CompetitionLogo } from "@/data/competitionLogos";
 
 // How it works screenshots (from the existing artist strip CDN images)
 const HOW_IT_WORKS = [
@@ -85,6 +74,59 @@ function FaqItem({ q, a }: { q: string; a: string }) {
   );
 }
 
+function CompetitionLogoCard({ logo, duplicate = false }: { logo: CompetitionLogo; duplicate?: boolean }) {
+  const widthClass = logo.sizing === "wide"
+    ? "w-[220px] md:w-[268px]"
+    : logo.sizing === "compact"
+      ? "w-[160px] md:w-[188px]"
+      : "w-[190px] md:w-[224px]";
+
+  return (
+    <div
+      className={`${widthClass} flex h-[92px] shrink-0 items-center justify-center rounded-2xl border px-4 py-3 shadow-[0_10px_35px_rgba(15,23,42,0.06)] md:h-[108px] md:px-5 md:py-4 ${
+        logo.surface === "dark"
+          ? "border-white/10 bg-[#08090c]"
+          : "border-gray-200/80 bg-white"
+      }`}
+      aria-hidden={duplicate || undefined}
+    >
+      <img
+        src={logo.src}
+        alt={duplicate ? "" : logo.name}
+        loading="lazy"
+        decoding="async"
+        className="h-full w-full object-contain"
+      />
+    </div>
+  );
+}
+
+function CompetitionLogoMarquee() {
+  return (
+    <div className="relative overflow-hidden" aria-label="Dance competitions hiring on Artswrk">
+      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-[#f8fafc] to-transparent sm:w-24" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-[#f8fafc] to-transparent sm:w-24" />
+      <div className="competition-logo-marquee flex w-max">
+        {[false, true].map((duplicate) => (
+          <div
+            key={duplicate ? "duplicate" : "primary"}
+            className="flex shrink-0 items-center gap-4 pr-4 md:gap-6 md:pr-6"
+            aria-hidden={duplicate || undefined}
+          >
+            {COMPETITION_LOGOS.map((logo) => (
+              <CompetitionLogoCard
+                key={`${duplicate ? "duplicate" : "primary"}-${logo.name}`}
+                logo={logo}
+                duplicate={duplicate}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function DanceCompetitions() {
   const [activeStaff, setActiveStaff] = useState(0);
 
@@ -113,28 +155,11 @@ export default function DanceCompetitions() {
       </section>
 
       {/* ── Logo Ticker ─────────────────────────────────────────────────── */}
-      <section className="py-8 border-y border-gray-100 overflow-hidden bg-gray-50">
-        <p className="text-center text-xs font-semibold text-gray-400 uppercase tracking-widest mb-6">
+      <section className="overflow-hidden border-y border-gray-100 bg-[#f8fafc] py-8 md:py-10">
+        <p className="mb-6 text-center text-xs font-semibold uppercase tracking-[0.2em] text-gray-400 md:mb-8">
           Join Competitions Nationwide Hiring on Artswrk
         </p>
-        <div className="relative overflow-hidden">
-          <div
-            className="flex gap-16 items-center"
-            style={{
-              animation: "ticker 30s linear infinite",
-              width: "max-content",
-            }}
-          >
-            {[...COMPETITION_LOGOS, ...COMPETITION_LOGOS].map((logo, i) => (
-              <div
-                key={i}
-                className="text-xl font-black text-gray-400 tracking-tight whitespace-nowrap flex-shrink-0"
-              >
-                {logo.name}
-              </div>
-            ))}
-          </div>
-        </div>
+        <CompetitionLogoMarquee />
       </section>
 
       {/* ── Hire Competition Staff ──────────────────────────────────────── */}
@@ -275,9 +300,25 @@ export default function DanceCompetitions() {
       </section>
 
       <style>{`
-        @keyframes ticker {
+        @keyframes competition-logo-marquee {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
+        }
+
+        .competition-logo-marquee {
+          animation: competition-logo-marquee 42s linear infinite;
+          will-change: transform;
+        }
+
+        .competition-logo-marquee:hover {
+          animation-play-state: paused;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .competition-logo-marquee {
+            animation: none;
+            transform: translateX(0);
+          }
         }
       `}</style>
     </div>

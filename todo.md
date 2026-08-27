@@ -753,3 +753,10 @@
 - [ ] Verify frequent and daily background sync jobs, execution history, alerting, and failure recovery
 - [ ] Add automated reconciliation and launch-readiness tests for counts, duplicates, orphan records, identities, and subscriber access
 - [ ] Run a final pre-launch dry run and document cutover, rollback, monitoring, and post-launch validation steps
+
+## Homepage Competition Logo Marquee
+- [x] Replace the moving homepage banner with the ten supplied competition logos
+- [x] Normalize logo presentation for wide, square, light, and dark source artwork
+- [x] Preserve seamless looping behavior and responsive desktop/mobile layout
+- [x] Add or update automated tests for the marquee logo data and rendering
+- [x] Visually verify the homepage marquee and save a checkpoint

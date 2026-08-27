@@ -12,6 +12,7 @@ import { ENV } from "./env";
 import { applyCheckoutSessionCompleted } from "../checkoutEffects";
 import { handleBubbleWebhook } from "../bubbleWebhook";
 import { handleScheduledBubbleSync } from "../scheduledSync";
+import { registerStorageProxy } from "./storageProxy";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -155,6 +156,8 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  registerStorageProxy(app);
 
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
