@@ -52,7 +52,7 @@ export default function JobListCard({
       : "border-gray-100 hover:border-gray-200";
 
   return (
-    <Link href={href}>
+    <Link href={href} className="block">
       <div
         className={`flex items-start gap-4 p-5 rounded-2xl border ${borderClass} bg-white hover:shadow-sm transition-all duration-150 cursor-pointer`}
       >
@@ -104,7 +104,7 @@ export default function JobListCard({
           {(dateLabel || rate) && (
             <div className="flex items-center gap-2 text-xs flex-wrap mt-2.5">
               {dateLabel && (
-                <span className="flex items-center gap-1 text-[#F25722] font-medium">
+                <span className="flex items-center gap-1 font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#fdeaf5", color: "#ec008c" }}>
                   <Clock size={10} />
                   {dateLabel}
                 </span>
