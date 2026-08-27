@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ArrowRight } from "lucide-react";
+import { useLocation } from "wouter";
 import Navbar from "@/components/Navbar";
 import { COMPETITION_LOGOS, type CompetitionLogo } from "@/data/competitionLogos";
 
@@ -129,28 +130,86 @@ function CompetitionLogoMarquee() {
 
 export default function DanceCompetitions() {
   const [activeStaff, setActiveStaff] = useState(0);
+  const [, navigate] = useLocation();
+  const [competitionName, setCompetitionName] = useState("");
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+
+  function handleGetStarted(e: React.FormEvent) {
+    e.preventDefault();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    const params = new URLSearchParams({
+      role: "client",
+      next: "/post-job",
+      email: email.trim(),
+    });
+    if (competitionName.trim()) params.set("company", competitionName.trim());
+    navigate(`/join?${params.toString()}`);
+  }
 
   return (
     <div className="bg-white min-h-screen font-[Poppins,sans-serif]">
       <Navbar />
-      {/* ── Hero ─────────────────────────────────────────────────────────────────── */}
-      <section className="pt-28 pb-20 px-5 lg:px-10 text-center">
-        <div className="max-w-3xl mx-auto">
-          <p className="text-sm font-semibold hirer-grad-text uppercase tracking-widest mb-4">
-            For Dance Competitions
-          </p>
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#111] leading-tight mb-5">
-            The #1 Platform<br />to Hire Dance<br />Competition Staff
-          </h1>
-          <p className="text-gray-500 text-lg mb-8">
-            Find judges, emcees, and event staff on Artswrk
-          </p>
-          <a
-            href="/jobs"
-            className="inline-block bg-[#111] text-white text-sm font-bold px-7 py-3.5 rounded-full hover:bg-gray-800 transition-colors"
-          >
-            Get Started →
-          </a>
+      {/* ── Hero — split screen: pitch + quick-start job post ──────────────────── */}
+      <section className="pt-28 pb-20 px-5 lg:px-10">
+        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-14 items-center">
+          {/* Left: pitch */}
+          <div>
+            <p className="text-sm font-semibold hirer-grad-text uppercase tracking-widest mb-4">
+              For Dance Competitions
+            </p>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#111] leading-tight mb-5">
+              The #1 Platform<br />to Hire Dance<br />Competition Staff
+            </h1>
+            <p className="text-gray-500 text-lg mb-2 max-w-md">
+              Find judges, emcees, and event staff on Artswrk.
+            </p>
+            <p className="text-gray-400 text-sm max-w-md">
+              Post your first job in under a minute — no account needed to get started.
+            </p>
+          </div>
+
+          {/* Right: quick-start job post */}
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-7 md:p-8">
+            <p className="text-xs font-bold uppercase tracking-widest text-[#F25722] mb-1.5">Get Started</p>
+            <h2 className="text-xl font-black text-[#111] mb-6">Post your job in minutes</h2>
+            <form onSubmit={handleGetStarted} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                  Competition Name
+                </label>
+                <input
+                  type="text"
+                  value={competitionName}
+                  onChange={(e) => setCompetitionName(e.target.value)}
+                  placeholder="e.g. Starpower Dance Competition"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                  placeholder="you@competition.com"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-colors"
+                />
+                {error && <p className="mt-1.5 text-xs text-red-500">{error}</p>}
+              </div>
+              <button
+                type="submit"
+                className="w-full hirer-grad-bg text-white text-sm font-bold py-3.5 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
+              >
+                Get Started <ArrowRight size={15} />
+              </button>
+            </form>
+          </div>
         </div>
       </section>
 

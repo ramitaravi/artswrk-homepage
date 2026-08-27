@@ -124,10 +124,16 @@ export default function Join() {
   const params        = new URLSearchParams(searchStr);
   const next          = params.get("next") ?? "";
   const prefillEmail  = params.get("email") ?? "";
+  const prefillCompany = params.get("company") ?? "";
+  const prefillRole: Role =
+    params.get("role") === "client" || params.get("role") === "artist"
+      ? (params.get("role") as Role)
+      : null;
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [stage,       setStage]       = useState<Stage>("role");
-  const [role,        setRole]        = useState<Role>(null);
+  // A ?role= param (from a landing page CTA) skips the role picker entirely.
+  const [stage,       setStage]       = useState<Stage>(prefillRole ? "account" : "role");
+  const [role,        setRole]        = useState<Role>(prefillRole);
   const [error,       setError]       = useState("");
   const [busy,        setBusy]        = useState(false);
   const [showPw,      setShowPw]      = useState(false);
@@ -144,7 +150,7 @@ export default function Join() {
 
   // client
   const [bizType,     setBizType]     = useState("");
-  const [companyName, setCompanyName] = useState("");
+  const [companyName, setCompanyName] = useState(prefillCompany);
   const [location,    setLocation]    = useState("");
   const [website,     setWebsite]     = useState("");
   const [phone,       setPhone]       = useState("");
