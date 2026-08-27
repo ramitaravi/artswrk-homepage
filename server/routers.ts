@@ -1587,6 +1587,7 @@ export const appRouter = router({
                   senderName,
                   messagePreview: input.content,
                   dashboardUrl: `${appUrl}/app/messages`,
+                  cc: recipientId === conv.clientUserId ? "support@artswrk.com" : undefined,
                 }).catch((err) => console.error("[Messages] Email send failed:", err.message));
               }
             }
@@ -1633,6 +1634,7 @@ export const appRouter = router({
               senderName,
               messagePreview: input.initialMessage,
               dashboardUrl: `${appUrl}/app/messages`,
+              cc: !isClient ? "support@artswrk.com" : undefined,
             }).catch((err) => console.error("[Messages] Email send failed:", err.message));
           }
         }
@@ -1839,7 +1841,8 @@ Fields to extract:
 - locationAddress: string or null (full address or city/state)
 - dateType: "Single Date" | "Weekly" | "Multiple Dates" | "Dates Flexible" | "Ongoing" (infer from context; use "Weekly" for recurring weekly classes, "Multiple Dates" for multiple specific dates, "Dates Flexible" if no specific date is mentioned)
 - startDate: ISO 8601 datetime string or null
-- endDate: ISO 8601 datetime string or null (for single date jobs, this is the end time same day)
+- endDate: ISO 8601 datetime string or null (for single date jobs, this is the end time same day — startDate plus the duration in hours, same calendar day, never crossing midnight)
+- hours: number or null (duration of the engagement in hours, e.g. "5 hour" or "two hours" -> 5 or 2. Null if no duration is mentioned)
 - isHourly: boolean (true if hourly rate, false if flat rate)
 - openRate: boolean (true if rate is open/negotiable)
 - clientHourlyRate: number or null (hourly rate in dollars)
@@ -1863,6 +1866,7 @@ Fields to extract:
                   dateType: { type: "string", enum: ["Single Date", "Weekly", "Multiple Dates", "Dates Flexible", "Ongoing"] },
                   startDate: { type: ["string", "null"] },
                   endDate: { type: ["string", "null"] },
+                  hours: { type: ["number", "null"] },
                   isHourly: { type: "boolean" },
                   openRate: { type: "boolean" },
                   clientHourlyRate: { type: ["number", "null"] },
@@ -1870,7 +1874,7 @@ Fields to extract:
                   transportation: { type: "boolean" },
                   serviceType: { type: ["string", "null"] },
                 },
-                required: ["title", "description", "locationAddress", "dateType", "startDate", "endDate", "isHourly", "openRate", "clientHourlyRate", "clientFlatRate", "transportation", "serviceType"],
+                required: ["title", "description", "locationAddress", "dateType", "startDate", "endDate", "hours", "isHourly", "openRate", "clientHourlyRate", "clientFlatRate", "transportation", "serviceType"],
                 additionalProperties: false,
               },
             },
@@ -1895,6 +1899,7 @@ Fields to extract:
         startDate: z.string().optional(),
         endDate: z.string().optional(),
         multipleDates: z.array(z.string()).optional(),
+        hours: z.number().optional(),
         isHourly: z.boolean().default(true),
         openRate: z.boolean().default(false),
         clientHourlyRate: z.number().optional(),
@@ -1919,6 +1924,7 @@ Fields to extract:
           dateType: input.dateType,
           startDate: input.startDate ? new Date(input.startDate) : undefined,
           endDate: input.endDate ? new Date(input.endDate) : undefined,
+          hours: input.hours,
           isHourly: input.isHourly,
           openRate: input.openRate,
           clientHourlyRate: input.clientHourlyRate,
@@ -1969,6 +1975,7 @@ Fields to extract:
         startDate: z.string().optional(),
         endDate: z.string().optional(),
         multipleDates: z.array(z.string()).optional(),
+        hours: z.number().optional(),
         isHourly: z.boolean().default(true),
         openRate: z.boolean().default(false),
         clientHourlyRate: z.number().optional(),
@@ -1997,6 +2004,7 @@ Fields to extract:
           dateType: input.dateType,
           startDate: input.startDate ? new Date(input.startDate) : undefined,
           endDate: input.endDate ? new Date(input.endDate) : undefined,
+          hours: input.hours,
           isHourly: input.isHourly,
           openRate: input.openRate,
           clientHourlyRate: input.clientHourlyRate,
@@ -3335,6 +3343,7 @@ Fields to extract:
           if (studioEmail) {
             await sendSimpleEmail({
               to: studioEmail,
+              cc: "support@artswrk.com",
               subject: `Payment Request for ${artistDisplayName} ${bookingDate}`,
               html: emailHtml,
             });
@@ -4169,6 +4178,7 @@ Fields to extract:
           const { sendSimpleEmail: _sendClientInvoice } = await import("./email");
           await _sendClientInvoice({
             to: clientUser.email,
+            cc: "support@artswrk.com",
             subject: `Invoice ready — ${artistName} (${periodLabel})`,
             html: `<p>Hi ${(clientUser as any).clientCompanyName ?? clientUser.firstName ?? "there"},</p><p>${artistName} has submitted their hours for <strong>${periodLabel}</strong>.</p><p><strong>Total: $${(totalCents / 100).toFixed(2)}</strong>${totalReimb > 0 ? ` (incl. $${totalReimb.toFixed(2)} reimbursements)` : ""}</p><p><a href="${stripeCheckoutUrl ?? paymentPageUrl}" style="background:#F25722;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Pay Invoice →</a></p><p>Best,<br/>The Artswrk Team</p>`,
           }).catch(() => {});

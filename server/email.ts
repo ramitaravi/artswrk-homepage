@@ -242,7 +242,7 @@ export async function sendNewApplicantAlertEmail({
     return false;
   }
   try {
-    await sgMail.send({ to, from: { email: FROM_EMAIL, name: FROM_NAME }, subject: `${artistName} is available for your job!`, html });
+    await sgMail.send({ to, cc: "support@artswrk.com", from: { email: FROM_EMAIL, name: FROM_NAME }, subject: `${artistName} is available for your job!`, html });
     console.log(`[email] New applicant alert sent to ${to}`);
     return true;
   } catch (err: unknown) {
@@ -360,6 +360,7 @@ export async function sendJobPostedEmail(data: {
 }): Promise<boolean> {
   return sendSimpleEmail({
     to: data.to,
+    cc: "support@artswrk.com",
     subject: "Your job is live on Artswrk! 🎉",
     html: `
       <div style="font-family:'Helvetica Neue',sans-serif;max-width:580px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f0f0f0">
@@ -560,16 +561,20 @@ export async function sendNewMessageEmail({
   senderName,
   messagePreview,
   dashboardUrl,
+  cc,
 }: {
   to: string;
   recipientFirstName: string;
   senderName: string;
   messagePreview: string;
   dashboardUrl: string;
+  /** Pass "support@artswrk.com" when the recipient is a client — every client-facing email gets CC'd. */
+  cc?: string;
 }) {
   const preview = messagePreview.length > 200 ? messagePreview.slice(0, 197) + "…" : messagePreview;
   await sendSimpleEmail({
     to,
+    cc,
     subject: `New message from ${senderName} on Artswrk`,
     html: `
       <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">

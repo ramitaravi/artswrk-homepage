@@ -187,12 +187,14 @@ function ApplicantDetailView({
   jobId,
   job,
   onBack,
+  onConfirmed,
 }: {
   applicantId: number;
   allApplicantIds: number[];
   jobId: number;
   job: any;
   onBack: () => void;
+  onConfirmed: () => void;
 }) {
   const [currentId, setCurrentId] = useState(applicantId);
   const [msgOpen, setMsgOpen] = useState(false);
@@ -435,6 +437,8 @@ function ApplicantDetailView({
             setConfirmOpen(false);
             utils.clientJobs.getConfirmedArtists.invalidate({ jobId });
             utils.clientJobs.getApplicants.invalidate({ jobId });
+            utils.clientJobs.getApplicantDetail.invalidate({ applicantId: currentId });
+            onConfirmed();
           }}
         />
       )}
@@ -804,11 +808,24 @@ function ConfirmModal({
   );
   const [rateInput, setRateInput] = useState(quotedRateValue != null ? String(quotedRateValue) : "");
   const [rateEditing, setRateEditing] = useState(!jobHasFixedRate);
-  const [hours, setHours] = useState(applicant.totalHours != null ? String(applicant.totalHours) : "");
+  const [hours, setHours] = useState(
+    applicant.totalHours != null ? String(applicant.totalHours) : (job?.hours != null ? String(job.hours) : "")
+  );
   const [startDate, setStartDate] = useState(toDateInput(applicant.startDate ?? job?.startDate));
-  const [endDate, setEndDate] = useState(toDateInput(applicant.endDate ?? job?.endDate));
+  // A single-date job has no real end date — default it to the same day as
+  // the start rather than trusting a stored end date that may land on the
+  // next calendar day (a UTC/local-time parsing artifact from the AI parser).
+  const [endDate, setEndDate] = useState(
+    job?.dateType === "Single Date"
+      ? toDateInput(applicant.startDate ?? job?.startDate)
+      : toDateInput(applicant.endDate ?? job?.endDate)
+  );
   const [locationAddress, setLocationAddress] = useState(job?.locationAddress || job?.location || "");
   const [notes, setNotes] = useState(job?.description || "");
+  // Everything below defaults to a compact, already-filled-in summary — this
+  // is meant to feel like confirming details that are already right, not
+  // filling out a form. "Edit details" expands the full editable fields.
+  const [detailsEditing, setDetailsEditing] = useState(false);
 
   const confirmMutation = trpc.clientJobs.confirmArtist.useMutation({
     onSuccess: (res) => {
@@ -845,6 +862,13 @@ function ConfirmModal({
   const jobTitle = (job as any)?.title || job?.description?.slice(0, 60) || `Job #${jobId}`;
   const company = job?.clientCompanyName || job?.clientFirstName || "Your Studio";
 
+  const fmtDateShort = (d: string) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
+  const dateSummary = startDate
+    ? (endDate && endDate !== startDate ? `${fmtDateShort(startDate)} – ${fmtDateShort(endDate)}` : fmtDateShort(startDate))
+    : "Not set";
+  const rateSummary = rateDollars > 0 ? `$${rateDollars}${rateType === "hourly" ? "/hr" : " flat"}` : "Not set";
+  const hoursSummary = hours ? `${hours} hr${parseFloat(hours) === 1 ? "" : "s"}` : "Not set";
+
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-lg p-0 overflow-hidden max-h-[90vh] overflow-y-auto">
@@ -866,9 +890,17 @@ function ConfirmModal({
         </div>
 
         <div className="px-6 py-5 space-y-5">
-          {/* Job details summary */}
+          {/* Summary — reads like a confirmation, not a form. "Edit details"
+              reveals the actual inputs only when something needs changing. */}
           <div className="bg-gray-50 rounded-xl p-4">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Job Details</p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Details</p>
+              {!detailsEditing && (
+                <button type="button" onClick={() => setDetailsEditing(true)} className="text-xs font-semibold text-[#F25722] hover:underline">
+                  Edit details
+                </button>
+              )}
+            </div>
             <div className="space-y-2">
               {[["Role", jobTitle], ["Company", company]].map(([l, v]) => (
                 <div key={l} className="flex justify-between gap-4">
@@ -876,119 +908,138 @@ function ConfirmModal({
                   <span className="text-sm font-semibold text-[#111] text-right">{v}</span>
                 </div>
               ))}
-              {quotedRate && (
-                <div className="flex justify-between gap-4">
-                  <span className="text-xs text-gray-400 w-20 flex-shrink-0">Quoted</span>
-                  <span className="text-sm font-semibold text-[#F25722] text-right">{quotedRate}</span>
-                </div>
+              {!detailsEditing && (
+                <>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-xs text-gray-400 w-20 flex-shrink-0">Rate</span>
+                    <span className="text-sm font-semibold text-[#111] text-right">{rateSummary}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-xs text-gray-400 w-20 flex-shrink-0">Hours</span>
+                    <span className="text-sm font-semibold text-[#111] text-right">{hoursSummary}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-xs text-gray-400 w-20 flex-shrink-0">Date</span>
+                    <span className="text-sm font-semibold text-[#111] text-right">{dateSummary}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-xs text-gray-400 w-20 flex-shrink-0">Location</span>
+                    <span className="text-sm font-semibold text-[#111] text-right">{locationAddress || "Not set"}</span>
+                  </div>
+                </>
               )}
             </div>
           </div>
 
-          {/* Rate — locked to the job's listed rate when it's a fixed rate; only
-              an open-rate job (or an explicit Edit) shows the flat/hourly toggle. */}
+          {detailsEditing && (
+            <>
+              {/* Rate — locked to the job's listed rate when it's a fixed rate; only
+                  an open-rate job (or an explicit Edit) shows the flat/hourly toggle. */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className={labelCls + " mb-0"}>Rate</label>
+                  {jobHasFixedRate && !rateEditing && (
+                    <button type="button" onClick={() => setRateEditing(true)} className="text-xs font-semibold text-[#F25722] hover:underline">
+                      Edit
+                    </button>
+                  )}
+                </div>
+                {jobHasFixedRate && !rateEditing ? (
+                  <div className="border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-bold text-[#111] bg-gray-50">
+                    ${rateInput}{rateType === "hourly" ? "/hr" : " flat"}
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex gap-2 mb-2">
+                      {(["flat", "hourly"] as const).map((t) => (
+                        <button key={t} type="button" onClick={() => setRateType(t)}
+                          className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${rateType === t ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}>
+                          {t === "flat" ? "Flat Rate" : "Hourly Rate"}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                      <input type="number" min="0" value={rateInput} onChange={(e) => setRateInput(e.target.value)}
+                        placeholder={rateType === "flat" ? "500" : "35"}
+                        className="w-full border border-gray-200 rounded-xl pl-7 pr-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#F25722]/30 focus:border-[#F25722] transition" />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Hours — always required so pay is calculated correctly regardless of rate type */}
+              <div>
+                <label className={labelCls}>Hours</label>
+                <input type="number" min="0" step="0.5" value={hours} onChange={(e) => setHours(e.target.value)}
+                  placeholder="e.g. 2.5"
+                  className={fieldCls} />
+                {rateDollars > 0 && hours && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {rateType === "hourly"
+                      ? `Total: $${Math.round(rateDollars * parseFloat(hours)).toLocaleString()}`
+                      : `Flat rate · ${hours} hr${parseFloat(hours) === 1 ? "" : "s"} booked`}
+                  </p>
+                )}
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Start Date</label>
+                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={fieldCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>End Date <span className="font-normal text-gray-400">(opt)</span></label>
+                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={fieldCls} />
+                </div>
+              </div>
+
+              {/* Location */}
+              <div>
+                <label className={labelCls}>Location</label>
+                <input value={locationAddress} onChange={(e) => setLocationAddress(e.target.value)}
+                  placeholder="City, State or address"
+                  className={fieldCls} />
+              </div>
+
+              <button type="button" onClick={() => setDetailsEditing(false)} className="text-xs font-semibold text-gray-500 hover:text-[#111]">
+                ← Done editing
+              </button>
+            </>
+          )}
+
+          {/* Payment method — Artswrk is the default; direct pay is an opt-out toggle, not an equal choice */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className={labelCls + " mb-0"}>Rate</label>
-              {jobHasFixedRate && !rateEditing && (
-                <button type="button" onClick={() => setRateEditing(true)} className="text-xs font-semibold text-[#F25722] hover:underline">
-                  Edit
-                </button>
-              )}
-            </div>
-            {jobHasFixedRate && !rateEditing ? (
-              <div className="border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-bold text-[#111] bg-gray-50">
-                ${rateInput}{rateType === "hourly" ? "/hr" : " flat"}
+            <p className={labelCls}>Payment</p>
+            {paymentMethod === "artswrk" ? (
+              <div className="flex items-start gap-3 p-3.5 rounded-xl border border-gray-200 bg-white">
+                <div className="w-8 h-8 rounded-lg bg-[#F25722] flex items-center justify-center flex-shrink-0">
+                  <CreditCard size={14} className="text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-[#111]">Artswrk will invoice {company}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    5% processing fee{clientTotal > 0 ? <> · Total billed: <strong className="text-gray-600">${clientTotal.toLocaleString()}</strong></> : null}
+                  </p>
+                  <button type="button" onClick={() => setPaymentMethod("direct")} className="text-xs font-semibold text-[#F25722] hover:underline mt-1.5">
+                    Pay directly instead
+                  </button>
+                </div>
               </div>
             ) : (
-              <>
-                <div className="flex gap-2 mb-2">
-                  {(["flat", "hourly"] as const).map((t) => (
-                    <button key={t} type="button" onClick={() => setRateType(t)}
-                      className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${rateType === t ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}>
-                      {t === "flat" ? "Flat Rate" : "Hourly Rate"}
-                    </button>
-                  ))}
+              <div className="flex items-start gap-3 p-3.5 rounded-xl border border-gray-200 bg-white">
+                <div className="w-8 h-8 rounded-lg bg-[#111] flex items-center justify-center flex-shrink-0">
+                  <Banknote size={14} className="text-white" />
                 </div>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                  <input type="number" min="0" value={rateInput} onChange={(e) => setRateInput(e.target.value)}
-                    placeholder={rateType === "flat" ? "500" : "35"}
-                    className="w-full border border-gray-200 rounded-xl pl-7 pr-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#F25722]/30 focus:border-[#F25722] transition" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-[#111]">{company} pays {name} directly</p>
+                  <p className="text-xs text-gray-400 mt-0.5">You'll need to onboard this artist to your own payroll. Subscribe to Artswrk for payroll access.</p>
+                  <button type="button" onClick={() => setPaymentMethod("artswrk")} className="text-xs font-semibold text-gray-500 hover:text-[#111] hover:underline mt-1.5">
+                    ← Use Artswrk instead
+                  </button>
                 </div>
-              </>
-            )}
-          </div>
-
-          {/* Hours — always required so pay is calculated correctly regardless of rate type */}
-          <div>
-            <label className={labelCls}>Hours</label>
-            <input type="number" min="0" step="0.5" value={hours} onChange={(e) => setHours(e.target.value)}
-              placeholder="e.g. 2.5"
-              className={fieldCls} />
-            {rateDollars > 0 && hours && (
-              <p className="text-xs text-gray-400 mt-1">
-                {rateType === "hourly"
-                  ? `Total: $${Math.round(rateDollars * parseFloat(hours)).toLocaleString()}`
-                  : `Flat rate · ${hours} hr${parseFloat(hours) === 1 ? "" : "s"} booked`}
-              </p>
-            )}
-          </div>
-
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Start Date</label>
-              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={fieldCls} />
-            </div>
-            <div>
-              <label className={labelCls}>End Date <span className="font-normal text-gray-400">(opt)</span></label>
-              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={fieldCls} />
-            </div>
-          </div>
-
-          {/* Location */}
-          <div>
-            <label className={labelCls}>Location</label>
-            <input value={locationAddress} onChange={(e) => setLocationAddress(e.target.value)}
-              placeholder="City, State or address"
-              className={fieldCls} />
-          </div>
-
-          {/* Payment method */}
-          <div>
-            <p className={labelCls}>Payment Method</p>
-            <div className="grid grid-cols-2 gap-2.5">
-              <button onClick={() => setPaymentMethod("artswrk")}
-                className={`flex flex-col items-start p-4 rounded-xl border-2 text-left transition-all ${paymentMethod === "artswrk" ? "border-[#F25722] bg-orange-50/60" : "border-gray-100 hover:border-gray-200 bg-white"}`}>
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${paymentMethod === "artswrk" ? "bg-[#F25722]" : "bg-gray-100"}`}>
-                  <CreditCard size={14} className={paymentMethod === "artswrk" ? "text-white" : "text-gray-500"} />
-                </div>
-                <p className="text-sm font-bold text-[#111]">Pay via Artswrk</p>
-                <p className="text-xs text-gray-400 mt-0.5">Artswrk handles invoicing</p>
-              </button>
-              <button onClick={() => setPaymentMethod("direct")}
-                className={`flex flex-col items-start p-4 rounded-xl border-2 text-left transition-all ${paymentMethod === "direct" ? "border-[#111] bg-gray-50" : "border-gray-100 hover:border-gray-200 bg-white"}`}>
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${paymentMethod === "direct" ? "bg-[#111]" : "bg-gray-100"}`}>
-                  <Banknote size={14} className={paymentMethod === "direct" ? "text-white" : "text-gray-500"} />
-                </div>
-                <p className="text-sm font-bold text-[#111]">Pay Directly</p>
-                <p className="text-xs text-gray-400 mt-0.5">Handle payment yourself</p>
-              </button>
-            </div>
-            {paymentMethod === "artswrk" && (
-              <div className="mt-2.5 flex items-start gap-2 px-3.5 py-2.5 rounded-lg bg-amber-50 border border-amber-200">
-                <span className="text-amber-500 mt-0.5 flex-shrink-0">⚠</span>
-                <p className="text-xs text-amber-700 leading-relaxed">
-                  A <strong>5% processing fee</strong> will be added.
-                  {clientTotal > 0 && <span className="ml-1">Total billed: <strong>${clientTotal.toLocaleString()}</strong></span>}
-                </p>
               </div>
-            )}
-            {paymentMethod === "direct" && (
-              <p className="text-xs text-gray-400 mt-2 leading-relaxed">
-                Paying outside Artswrk? You'll need to onboard this artist to your own payroll. Subscribe to Artswrk for payroll access.
-              </p>
             )}
           </div>
 
@@ -1063,11 +1114,9 @@ function ConfirmedArtistsTab({ jobId }: { jobId: number }) {
         const name = b.artistFirstName
           ? `${b.artistFirstName}${b.artistLastName ? " " + b.artistLastName[0] + "." : ""}`
           : b.artistName ?? `Artist #${b.artistUserId}`;
-        const payBadge = b.paymentMethod === "artswrk"
-          ? { label: "Pay via Artswrk", cls: "bg-orange-50 text-[#F25722]" }
-          : { label: "Direct Payment", cls: "bg-gray-100 text-gray-600" };
+        const payLabel = b.paymentMethod === "artswrk" ? "Pay via Artswrk" : "Direct payment";
         return (
-          <div key={b.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <Link key={b.id} href={`/app/bookings/${b.id}`} className="block bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:border-gray-200 hover:shadow-md transition-all cursor-pointer">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 {b.artistPhoto ? (
@@ -1084,14 +1133,7 @@ function ConfirmedArtistsTab({ jobId }: { jobId: number }) {
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2 flex-wrap justify-end">
-                <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-green-600">
-                  <CheckCircle2 size={10} /> Confirmed
-                </span>
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${payBadge.cls}`}>
-                  {payBadge.label}
-                </span>
-              </div>
+              <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
             </div>
             <div className="flex items-center gap-4 mt-3 text-xs text-gray-400 flex-wrap">
               {b.startDate && (
@@ -1104,9 +1146,10 @@ function ConfirmedArtistsTab({ jobId }: { jobId: number }) {
                   <DollarSign size={10} /> Artist rate: ${b.artistRate}
                 </span>
               )}
+              <span>{payLabel}</span>
               <span className="ml-auto text-gray-300">Confirmed {fmtDate(b.createdAt)}</span>
             </div>
-          </div>
+          </Link>
         );
       })}
     </div>
@@ -1457,6 +1500,7 @@ export default function ClientJobDetail() {
           jobId={jobId}
           job={job}
           onBack={() => setSelectedApplicant(null)}
+          onConfirmed={() => { setSelectedApplicant(null); setTab("confirmed"); }}
         />
       )}
       {tab === "applicants" && !selectedApplicant && (

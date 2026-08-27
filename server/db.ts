@@ -1480,6 +1480,7 @@ export interface CreateJobInput {
   /** Job status — "Pending Payment" until Stripe confirms, then "Active" */
   requestStatus?: string;
   slug?: string;
+  hours?: number;
 }
 
 /**
@@ -1510,6 +1511,7 @@ export async function createJob(input: CreateJobInput) {
       transportation: input.transportation ?? false,
       requestStatus: input.requestStatus ?? "Pending Payment",
       slug: input.slug,
+      hours: input.hours,
     });
   const newId = (result as { insertId: number }).insertId;
   const [job] = await db.select().from(jobs).where(eq(jobs.id, newId));
@@ -3759,6 +3761,7 @@ export async function markArtswrkInvoiceSubmitted(
     .update(bookings)
     .set({
       artswrkInvoiceSubmittedAt: new Date(),
+      bookingStatus: "Pay Now",
       ...(opts?.invoicePaymentToken ? { invoicePaymentToken: opts.invoicePaymentToken } : {}),
       ...(opts?.invoiceStripeCheckoutUrl ? { invoiceStripeCheckoutUrl: opts.invoiceStripeCheckoutUrl } : {}),
       ...(opts?.invoiceTotalCents !== undefined ? { invoiceTotalCents: opts.invoiceTotalCents } : {}),
@@ -3818,6 +3821,7 @@ export async function markInvoicePaid(
       invoicePaidAt: new Date(),
       invoiceStripePaymentIntentId: stripePaymentIntentId,
       paymentStatus: "Paid",
+      bookingStatus: "Confirmed",
     })
     .where(eq(bookings.id, bookingId));
   return true;

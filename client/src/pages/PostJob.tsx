@@ -57,6 +57,7 @@ interface ParsedJob {
   dateType: DateType;
   startDate: string | null;
   endDate: string | null;
+  hours: number | null;
   isHourly: boolean;
   openRate: boolean;
   clientHourlyRate: number | null;
@@ -75,6 +76,7 @@ interface FormData {
   startDate: string;
   endDate: string;
   multipleDates: string[];
+  hours: string;
   isHourly: boolean;
   openRate: boolean;
   clientHourlyRate: string;
@@ -327,6 +329,7 @@ function Step2({
     startDate: isoToLocalDatetimeInput(parsed.startDate),
     endDate: isoToLocalDatetimeInput(parsed.endDate),
     multipleDates: [],
+    hours: parsed.hours != null ? String(parsed.hours) : "",
     isHourly: parsed.isHourly,
     openRate: parsed.openRate,
     clientHourlyRate: parsed.clientHourlyRate?.toString() || "",
@@ -457,6 +460,7 @@ function Step2({
       dateType: form.dateType as any,
       startDate: localDatetimeInputToISO(form.startDate),
       endDate: localDatetimeInputToISO(form.endDate),
+      hours: form.hours ? parseFloat(form.hours) : undefined,
       isHourly: form.isHourly,
       openRate: form.openRate,
       clientHourlyRate: form.clientHourlyRate ? parseFloat(form.clientHourlyRate) : undefined,
@@ -870,6 +874,21 @@ function Step2({
           )}
         </div>
 
+        {/* Hours */}
+        <div className="p-5">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">Estimated Hours</label>
+          <Input
+            type="number"
+            step="0.25"
+            min="0"
+            value={form.hours}
+            onChange={(e) => set("hours", e.target.value)}
+            placeholder="e.g. 2.5"
+            className="border-gray-200 max-w-[160px]"
+          />
+          <p className="text-xs text-gray-400 mt-1.5">Carries over automatically when you confirm an artist for this job.</p>
+        </div>
+
         {/* Transportation */}
         <div className="p-5">
           <div className="flex items-center justify-between">
@@ -1205,6 +1224,7 @@ function Step3({
       dateType: form.dateType as "Single Date" | "Weekly" | "Multiple Dates" | "Dates Flexible" | "Ongoing" | "Recurring",
       startDate: localDatetimeInputToISO(form.startDate),
       endDate: localDatetimeInputToISO(form.endDate),
+      hours: form.hours ? parseFloat(form.hours) : undefined,
       isHourly: form.isHourly,
       openRate: form.openRate,
       clientHourlyRate: form.clientHourlyRate ? parseFloat(form.clientHourlyRate) : undefined,
