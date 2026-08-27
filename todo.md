@@ -741,3 +741,15 @@
 - [x] PostJob.tsx passes hiringCategory from useAuth to Step3 to determine competition vs studio flow
 - [x] Google Places autocomplete: PlacesInput now calls ensureMapsLoaded() to inject Maps script via Manus proxy
 - [x] Best Value badge on PostJob plan cards repositioned to not overlap price text
+
+## Sunday Launch — Bubble Migration and Sync Readiness
+- [ ] Inventory Bubble API credentials, live endpoints, sync scripts, webhook handler, and scheduled jobs
+- [ ] Produce a source-to-destination reconciliation for users, jobs, premium jobs, applications, bookings, conversations, messages, payments, reimbursements, companies, and unlock records
+- [ ] Resolve user identity conflicts so Bubble ID is the stable migration key while preserving unique emails and login continuity
+- [ ] Reconcile all subscriber users against Bubble and Stripe, including plan, interval, status, customer ID, subscription ID, renewal, and entitlement fields
+- [ ] Backfill every missing historical record with idempotent upserts and auditable sync-run logs
+- [ ] Validate relational links for each user's applications, bookings, messages, payments, reimbursements, companies, jobs, and premium jobs
+- [ ] Verify the Bubble webhook path, secret validation, retry behavior, deduplication, and idempotency
+- [ ] Verify frequent and daily background sync jobs, execution history, alerting, and failure recovery
+- [ ] Add automated reconciliation and launch-readiness tests for counts, duplicates, orphan records, identities, and subscriber access
+- [ ] Run a final pre-launch dry run and document cutover, rollback, monitoring, and post-launch validation steps
