@@ -8,6 +8,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { Search, MapPin, Users, Loader2, ChevronRight, Sparkles, Star } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { formatLocation } from "@/lib/utils";
 import Navbar from "@/components/Navbar";
 import { getLoginUrl } from "@/const";
 
@@ -27,9 +28,13 @@ function getArtistColor(seed: string | null | undefined) {
 }
 
 function getDisplayName(firstName?: string | null, lastName?: string | null, name?: string | null) {
-  if (firstName && lastName) return `${firstName} ${lastName}`;
+  if (firstName && lastName) return `${firstName} ${lastName[0]}.`;
   if (firstName) return firstName;
-  if (name) return name;
+  if (name) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+    return name;
+  }
   return "Artist";
 }
 
@@ -228,13 +233,7 @@ function WrkExperienceGrid() {
   );
 }
 
-// ─── Role filter pills ────────────────────────────────────────────────────────
-
-const ROLES = [
-  "Dance Educator", "Choreographer", "Dancer", "Movement Director",
-  "Photographer", "Dance Adjudicator", "Videographer", "Acting Coach",
-  "Vocal Coach", "Music Teacher", "Yoga Instructor", "Pilates Instructor",
-];
+// ─── Service type pills (static — no live product-side lookup table yet) ─────
 
 const SERVICE_TYPES = [
   "Competition Choreography", "Substitute Teacher", "Recurring Classes",
@@ -294,7 +293,7 @@ function ArtistCard({ artist, blurred }: { artist: any; blurred?: boolean }) {
           <p className="text-sm font-bold text-[#111] truncate">{displayName}</p>
           {artist.location && (
             <p className="text-xs text-gray-400 truncate mt-0.5 flex items-center gap-1">
-              <MapPin size={10} className="flex-shrink-0" />{artist.location}
+              <MapPin size={10} className="flex-shrink-0" />{formatLocation(artist.location)}
             </p>
           )}
           {primaryType && (
@@ -324,6 +323,9 @@ export default function BrowseArtists() {
     search: search || undefined,
     artistType: roleFilter || undefined,
   }, { enabled: mode === "all" });
+
+  const { data: typeCounts } = trpc.artists.getArtistTypeCounts.useQuery();
+  const roles = (typeCounts ?? []).map((t) => t.type);
 
   const artists = data?.artists ?? [];
   const total = data?.total ?? 0;
@@ -405,7 +407,7 @@ export default function BrowseArtists() {
               >
                 All
               </button>
-              {ROLES.map((role) => (
+              {roles.map((role) => (
                 <button
                   key={role}
                   onClick={() => handleRole(roleFilter === role ? "" : role)}
@@ -512,6 +514,21 @@ export default function BrowseArtists() {
 
             {/* Right sidebar */}
             <div className="hidden lg:flex flex-col gap-4 w-60 flex-shrink-0">
+              {/* Service type filter */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Service Type</p>
+                <select
+                  onChange={(e) => handleRole(e.target.value)}
+                  value={roleFilter}
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 focus:outline-none focus:border-[#FFBC5D] transition-all bg-white"
+                >
+                  <option value="">All Service Types</option>
+                  {SERVICE_TYPES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
               {/* WRK Experience promo */}
               <div className="bg-[#111] rounded-2xl p-5 relative overflow-hidden">
                 <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 80% 20%, rgba(242,87,34,0.4) 0%, transparent 60%)" }} />
@@ -538,21 +555,6 @@ export default function BrowseArtists() {
                 >
                   ☆ Post a Job →
                 </Link>
-              </div>
-
-              {/* Service type filter */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Service Type</p>
-                <select
-                  onChange={(e) => handleRole(e.target.value)}
-                  value={roleFilter}
-                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 focus:outline-none focus:border-[#FFBC5D] transition-all bg-white"
-                >
-                  <option value="">All Service Types</option>
-                  {SERVICE_TYPES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
               </div>
 
               {/* Stats */}

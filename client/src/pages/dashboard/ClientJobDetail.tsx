@@ -96,8 +96,8 @@ function parseList(raw: string | null | undefined): string[] {
 }
 
 function displayName(a: { artistFirstName?: string | null; artistLastName?: string | null; artistName?: string | null }): string {
-  const full = [a.artistFirstName, a.artistLastName].filter(Boolean).join(" ");
-  return full || a.artistName || "Artist";
+  if (a.artistFirstName) return `${a.artistFirstName}${a.artistLastName ? " " + a.artistLastName[0] + "." : ""}`;
+  return a.artistName || "Artist";
 }
 
 // ─── Message Modal ─────────────────────────────────────────────────────────────
@@ -517,7 +517,9 @@ function ApplicantsTab({
                 const lastName = p?.lastName || p?.artistLastName || null;
                 const rawPic = p?.profilePicture || p?.artistProfilePicture || null;
                 const pic = rawPic ? (rawPic.startsWith("//") ? "https:" + rawPic : rawPic) : null;
-                const dName = [firstName, lastName].filter(Boolean).join(" ") || `Artist ${i + 1}`;
+                const dName = firstName
+                  ? `${firstName}${lastName ? " " + lastName[0] + "." : ""}`
+                  : `Artist ${i + 1}`;
                 return (
                   <div key={i} className="flex flex-col items-center gap-2 w-20">
                     <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 border-2 border-white shadow-md flex-shrink-0">
@@ -955,8 +957,8 @@ function ConfirmedArtistsTab({ jobId }: { jobId: number }) {
     <div className="space-y-3">
       <p className="text-xs text-gray-400 font-medium">{confirmed.length} confirmed artist{confirmed.length !== 1 ? "s" : ""}</p>
       {confirmed.map((b: any) => {
-        const name = b.artistFirstName && b.artistLastName
-          ? `${b.artistFirstName} ${b.artistLastName}`
+        const name = b.artistFirstName
+          ? `${b.artistFirstName}${b.artistLastName ? " " + b.artistLastName[0] + "." : ""}`
           : b.artistName ?? `Artist #${b.artistUserId}`;
         const payBadge = b.paymentMethod === "artswrk"
           ? { label: "Pay via Artswrk", cls: "bg-orange-50 text-[#F25722]" }
@@ -1102,7 +1104,9 @@ function BookingsTab({ jobId }: { jobId: number }) {
     <div className="space-y-3">
       <p className="text-xs text-gray-400 font-medium">{bookings.length} booking{bookings.length !== 1 ? "s" : ""}</p>
       {bookings.map((b: any) => {
-        const name = [b.artistFirstName, b.artistLastName].filter(Boolean).join(" ") || b.artistName || "Artist";
+        const name = b.artistFirstName
+          ? `${b.artistFirstName}${b.artistLastName ? " " + b.artistLastName[0] + "." : ""}`
+          : b.artistName || "Artist";
         return (
           <div key={b.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
             <div className="flex items-center gap-3">

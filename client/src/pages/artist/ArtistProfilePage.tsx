@@ -14,6 +14,7 @@
 import { useState } from "react";
 import { MapPin, Calendar, Share2, Star, ExternalLink } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { formatLocation } from "@/lib/utils";
 import { useAuth } from "@/_core/hooks/useAuth";
 import EditProfileModal from "./EditProfileModal";
 
@@ -441,7 +442,7 @@ export default function ArtistProfilePage() {
                 {p.location && (
                   <span className="flex items-center gap-1">
                     <MapPin size={12} className="text-gray-400" />
-                    {p.location}
+                    {formatLocation(p.location)}
                   </span>
                 )}
                 {joinDate && (

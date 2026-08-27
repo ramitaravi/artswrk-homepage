@@ -41,6 +41,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { formatLocation } from "@/lib/utils";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -503,7 +504,7 @@ function ArtistRow({ artist }: { artist: any }) {
         {artist.location && (
           <p className="text-xs text-gray-400 flex items-center gap-1">
             <MapPin size={10} />
-            {artist.location}
+            {formatLocation(artist.location)}
           </p>
         )}
       </div>
@@ -1624,7 +1625,7 @@ function ApplicantDetailView({
                 )}
               </div>
               {applicant.location && (
-                <p className="text-xs text-gray-400 flex items-center gap-1">{applicant.location}</p>
+                <p className="text-xs text-gray-400 flex items-center gap-1">{formatLocation(applicant.location)}</p>
               )}
               {rate && (
                 <p className="text-sm font-black text-[#F25722] mt-2">{rate}</p>
@@ -2226,7 +2227,7 @@ function JobDetailView({
                             </div>
                             {a.location && (
                               <p className="text-xs text-gray-400 flex items-center gap-1 mb-1.5">
-                                <MapPin size={10} /> {a.location}
+                                <MapPin size={10} /> {formatLocation(a.location)}
                               </p>
                             )}
                             {msgPreview && (

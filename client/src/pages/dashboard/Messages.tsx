@@ -186,7 +186,7 @@ function ConversationRow({ c, active, onClick }: {
 }) {
   const displayName =
     c.artistFirstName && c.artistLastName
-      ? `${c.artistFirstName} ${c.artistLastName}`
+      ? `${c.artistFirstName} ${c.artistLastName[0]}.`
       : c.clientCompanyName ?? c.artistName ?? "Unknown";
 
   const hasUnread = (c.unreadCount ?? 0) > 0;
@@ -413,7 +413,10 @@ export default function Messages() {
 
   const activeConvo = conversations?.find((c) => c.id === activeConvoId);
   const otherPartyName = activeConvo
-    ? [activeConvo.artistFirstName, activeConvo.artistLastName].filter(Boolean).join(" ") || (activeConvo as any).clientCompanyName || activeConvo.artistName || "Unknown"
+    ? (activeConvo.artistFirstName
+        ? `${activeConvo.artistFirstName}${activeConvo.artistLastName ? " " + activeConvo.artistLastName[0] + "." : ""}`
+        : null)
+      || (activeConvo as any).clientCompanyName || activeConvo.artistName || "Unknown"
     : null;
 
   const isFromMe = (msg: Message) => {

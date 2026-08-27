@@ -152,7 +152,7 @@ export default function Payments() {
               <div className="space-y-3">
                 {pending.map((b) => {
                   const artistName = b.artistFirstName && b.artistLastName
-                    ? `${b.artistFirstName} ${b.artistLastName}`
+                    ? `${b.artistFirstName} ${b.artistLastName[0]}.`
                     : b.artistName ?? "Unknown Artist";
                   return (
                     <div key={b.id} className="flex items-center gap-3">
@@ -223,7 +223,7 @@ export default function Payments() {
             <div className="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
               {recentPayments.map((p) => {
                 const artistName = p.artistFirstName && p.artistLastName
-                  ? `${p.artistFirstName} ${p.artistLastName}`
+                  ? `${p.artistFirstName} ${p.artistLastName[0]}.`
                   : p.artistName ?? "Unknown Artist";
                 const dateStr = formatDate(p.paymentDate ?? p.bubbleCreatedAt);
                 const amountStr = formatCents(p.stripeAmount);

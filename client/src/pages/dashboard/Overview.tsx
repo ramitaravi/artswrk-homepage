@@ -198,7 +198,7 @@ function AvatarStack({ applicants }: { applicants: any[] }) {
       {visible.map((a, i) => {
         const url = fixUrl(a.artistProfilePicture);
         const name = a.artistFirstName && a.artistLastName
-          ? `${a.artistFirstName} ${a.artistLastName}` : a.artistName ?? "?";
+          ? `${a.artistFirstName} ${a.artistLastName[0]}.` : a.artistName ?? "?";
         return (
           <div key={a.id ?? i} className="w-8 h-8 rounded-full border-2 border-white -ml-2 first:ml-0 overflow-hidden flex-shrink-0 bg-gradient-to-br from-[#FFBC5D] to-[#F25722]">
             {url

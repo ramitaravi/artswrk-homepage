@@ -109,7 +109,7 @@ function BookingRow({ booking }: { booking: AnyBooking }) {
   const initials = getInitials(artistFirstName, artistLastName, artistId);
   const color = avatarColor(artistId);
    const displayName = artistFirstName && artistLastName
-    ? `${artistFirstName} ${artistLastName}`
+    ? `${artistFirstName} ${artistLastName[0]}.`
     : artistName ?? `Artist #${artistId.slice(-6) || "—"}`;
 
   function handleArtistClick() {
@@ -377,7 +377,9 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
   const paidPeriods = periods.filter((p: any) => p.status === "client_paid");
 
   const clientName = booking.clientCompanyName || (booking.clientFirstName ? `${booking.clientFirstName} ${booking.clientLastName ?? ""}`.trim() : null);
-  const artistName = booking.artistFirstName ? `${booking.artistFirstName} ${booking.artistLastName ?? ""}`.trim() : booking.artistName;
+  const artistName = booking.artistFirstName
+    ? `${booking.artistFirstName}${booking.artistLastName ? " " + booking.artistLastName[0] + "." : ""}`
+    : booking.artistName;
 
   const statusColor = (s: string) => ({
     upcoming: "text-gray-400 bg-gray-50",

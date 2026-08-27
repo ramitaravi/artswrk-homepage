@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { formatLocation } from "@/lib/utils";
 import Navbar from "@/components/Navbar";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -43,9 +44,11 @@ function StarRow({ rating, size = 16 }: { rating: number; size?: number }) {
 
 // ─── About Tab ────────────────────────────────────────────────────────────────
 
-function AboutTab({ profile }: { profile: any }) {
+function AboutTab({ profile, isLoggedOut }: { profile: any; isLoggedOut?: boolean }) {
   const mediaPhotos: string[] = Array.isArray(profile.mediaPhotos) ? profile.mediaPhotos : [];
-  const resumeFiles: { url: string; name: string }[] = Array.isArray(profile.resumeFiles) ? profile.resumeFiles : [];
+  const resumeFiles: { url: string; name: string }[] = isLoggedOut
+    ? []
+    : Array.isArray(profile.resumeFiles) ? profile.resumeFiles : [];
 
   return (
     <div className="space-y-8">
@@ -223,6 +226,8 @@ export default function ArtistProfile() {
   const { slug } = useParams<{ slug: string }>();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<Tab>("about");
+  const [connectEmail, setConnectEmail] = useState("");
+  const [connectError, setConnectError] = useState("");
   const { user } = useAuth();
 
   const { data: profile, isLoading } = trpc.artistProfile.getProfileBySlug.useQuery(
@@ -285,6 +290,22 @@ export default function ArtistProfile() {
     ? `${p.firstName} ${p.lastName ? p.lastName[0] + "." : ""}`.trim()
     : p.name ?? "";
 
+  const firstName = p.firstName || displayName.split(" ")[0] || "them";
+
+  function handleConnectSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(connectEmail.trim())) {
+      setConnectError("Please enter a valid email address.");
+      return;
+    }
+    const params = new URLSearchParams({
+      role: "client",
+      email: connectEmail.trim(),
+      next: `/book/${slug}`,
+    });
+    navigate(`/join?${params.toString()}`);
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -333,7 +354,7 @@ export default function ArtistProfile() {
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
                   {p.location && (
                     <span className="flex items-center gap-1">
-                      <MapPin size={12} className="text-gray-400" /> {p.location}
+                      <MapPin size={12} className="text-gray-400" /> {formatLocation(p.location)}
                     </span>
                   )}
                   {joinDate && (
@@ -359,8 +380,8 @@ export default function ArtistProfile() {
                   </div>
                 )}
 
-                {/* Social links */}
-                {(p.instagram || p.website || p.youtube || p.tiktok || p.portfolio) && (
+                {/* Social links — direct-contact vectors, hidden from logged-out visitors */}
+                {user && (p.instagram || p.website || p.youtube || p.tiktok || p.portfolio) && (
                   <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-100 mt-3">
                     {p.instagram && (
                       <a
@@ -390,19 +411,38 @@ export default function ArtistProfile() {
                   </div>
                 )}
 
-                {/* Owner: go back to edit; Visitor: contact */}
+                {/* Owner: go back to edit; logged-in visitor: contact; logged-out: capture email */}
                 {isOwner ? (
                   <a href="/app/profile">
                     <button className="w-full py-3 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 mt-1">
                       <Pencil size={14} /> Edit Profile
                     </button>
                   </a>
-                ) : (
+                ) : user ? (
                   <a href="/app/messages">
                     <button className="w-full py-3 rounded-xl bg-[#ec008c] text-white text-sm font-bold hover:bg-[#c40075] transition-colors flex items-center justify-center gap-2 mt-1">
                       <MessageCircle size={15} /> Contact
                     </button>
                   </a>
+                ) : (
+                  <form onSubmit={handleConnectSubmit} className="pt-3 mt-1 border-t border-gray-100 space-y-2">
+                    <p className="text-sm font-bold text-[#111]">Want to connect with {firstName}?</p>
+                    <p className="text-xs text-gray-500">Join Artswrk to message artists directly.</p>
+                    <input
+                      type="email"
+                      value={connectEmail}
+                      onChange={(e) => { setConnectEmail(e.target.value); setConnectError(""); }}
+                      placeholder="you@email.com"
+                      className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#ec008c] transition-colors"
+                    />
+                    {connectError && <p className="text-xs text-red-500">{connectError}</p>}
+                    <button
+                      type="submit"
+                      className="w-full py-3 rounded-xl bg-[#ec008c] text-white text-sm font-bold hover:bg-[#c40075] transition-colors flex items-center justify-center gap-2"
+                    >
+                      <MessageCircle size={15} /> Connect with {firstName}
+                    </button>
+                  </form>
                 )}
 
                 {/* Share */}
@@ -435,7 +475,7 @@ export default function ArtistProfile() {
               ))}
             </div>
 
-            {activeTab === "about" && <AboutTab profile={p} />}
+            {activeTab === "about" && <AboutTab profile={p} isLoggedOut={!user} />}
             {activeTab === "services" && <ServicesTab userId={p.id} />}
             {activeTab === "reviews" && <ReviewsTab userId={p.id} />}
           </div>

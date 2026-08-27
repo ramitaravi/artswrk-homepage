@@ -12,6 +12,7 @@ import {
   Heart, ArrowRight, CalendarCheck,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { formatLocation } from "@/lib/utils";
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -57,32 +58,6 @@ function getShortName(a: any): string {
   return a.artistFirstName ?? a.artistName ?? "Artist";
 }
 
-const STATE_ABBR: Record<string, string> = {
-  "alabama":"AL","alaska":"AK","arizona":"AZ","arkansas":"AR","california":"CA",
-  "colorado":"CO","connecticut":"CT","delaware":"DE","florida":"FL","georgia":"GA",
-  "hawaii":"HI","idaho":"ID","illinois":"IL","indiana":"IN","iowa":"IA","kansas":"KS",
-  "kentucky":"KY","louisiana":"LA","maine":"ME","maryland":"MD","massachusetts":"MA",
-  "michigan":"MI","minnesota":"MN","mississippi":"MS","missouri":"MO","montana":"MT",
-  "nebraska":"NE","nevada":"NV","new hampshire":"NH","new jersey":"NJ","new mexico":"NM",
-  "new york":"NY","north carolina":"NC","north dakota":"ND","ohio":"OH","oklahoma":"OK",
-  "oregon":"OR","pennsylvania":"PA","rhode island":"RI","south carolina":"SC",
-  "south dakota":"SD","tennessee":"TN","texas":"TX","utah":"UT","vermont":"VT",
-  "virginia":"VA","washington":"WA","west virginia":"WV","wisconsin":"WI","wyoming":"WY",
-};
-
-function formatCity(location?: string | null): string | null {
-  if (!location) return null;
-  const parts = location.split(",").map(p => p.trim()).filter(Boolean);
-  const city = parts[0];
-  if (!city) return null;
-  if (parts.length < 2) return city;
-  const raw = parts[1].trim();
-  const abbr = raw.length <= 3
-    ? raw.toUpperCase()
-    : STATE_ABBR[raw.toLowerCase()] ?? raw.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
-  return `${city}, ${abbr}`;
-}
-
 // ─── Artist Card (for My Artists tab) ────────────────────────────────────────
 
 function ArtistCard({
@@ -99,7 +74,7 @@ function ArtistCard({
   onToggleSave: () => void;
 }) {
   const url = fixUrl(profilePicture);
-  const cityLine = formatCity(location);
+  const cityLine = formatLocation(location);
   const initials = name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "?";
   const color = getArtistColor(name);
   return (
@@ -593,7 +568,7 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
                   </div>
                   <div className="p-3">
                     <p className="text-sm font-bold text-[#111] truncate">{displayName}</p>
-                    {a.location && <p className="text-xs text-gray-400 truncate mt-0.5">{a.location}</p>}
+                    {a.location && <p className="text-xs text-gray-400 truncate mt-0.5">{formatLocation(a.location)}</p>}
                     {primaryType && (
                       <span className="mt-2 inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#ec008c]/10 text-[#ec008c]">
                         {primaryType}
@@ -639,7 +614,7 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
                       <p className="text-sm font-bold text-[#111] truncate">{displayName}</p>
                       {a.artswrkPro && <span className="bg-black/80 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tracking-wide flex-shrink-0">PRO</span>}
                     </div>
-                    {a.location && <p className="text-xs text-gray-400 truncate">{a.location}</p>}
+                    {a.location && <p className="text-xs text-gray-400 truncate">{formatLocation(a.location)}</p>}
                   </div>
                   {primaryType && (
                     <span className="flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#ec008c]/10 text-[#ec008c]">

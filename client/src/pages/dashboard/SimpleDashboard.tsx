@@ -64,7 +64,7 @@ function AvatarStack({ applicants }: { applicants: any[] }) {
       {visible.map((a, i) => {
         const url = fixUrl(a.artistProfilePicture);
         const name = a.artistFirstName && a.artistLastName
-          ? `${a.artistFirstName} ${a.artistLastName}`
+          ? `${a.artistFirstName} ${a.artistLastName[0]}.`
           : a.artistName ?? "?";
         return (
           <div
@@ -164,7 +164,7 @@ function ApplicationsSidebar({ applicants, loading }: { applicants: any[]; loadi
           {applicants.slice(0, 20).map((a) => {
             const url = fixUrl(a.artistProfilePicture);
             const name = a.artistFirstName && a.artistLastName
-              ? `${a.artistFirstName} ${a.artistLastName}`
+              ? `${a.artistFirstName} ${a.artistLastName[0]}.`
               : a.artistName ?? "Artist";
             const jobTitle = a.jobDescription
               ? a.jobDescription.split(/[\n.!?]/)[0].trim().slice(0, 20)
@@ -261,7 +261,7 @@ function ArtistsTab({ applicants, loading }: { applicants: any[]; loading: boole
       {unique.map((a) => {
         const url = fixUrl(a.artistProfilePicture);
         const name = a.artistFirstName && a.artistLastName
-          ? `${a.artistFirstName} ${a.artistLastName}`
+          ? `${a.artistFirstName} ${a.artistLastName[0]}.`
           : a.artistName ?? "Artist";
         return (
           <div key={a.artistUserId ?? a.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-3 shadow-sm">

@@ -13,6 +13,7 @@ import {
   Share2,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { formatLocation } from "@/lib/utils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -509,7 +510,7 @@ export default function ArtistProfile() {
             {/* Location + Joined */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
               {p.location && (
-                <span className="flex items-center gap-1"><MapPin size={12} className="text-gray-400" />{p.location}</span>
+                <span className="flex items-center gap-1"><MapPin size={12} className="text-gray-400" />{formatLocation(p.location)}</span>
               )}
               {joinDate && (
                 <span className="flex items-center gap-1">
