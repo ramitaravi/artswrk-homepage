@@ -288,10 +288,11 @@ export default function Messages() {
   const hasScrolledToUnread = useRef(false);
   const [, navigate] = useLocation();
 
-  const { data: artswrkUser } = trpc.artswrkUsers.getByEmail.useQuery(
-    { email: user?.email ?? "" },
-    { enabled: !!user?.email }
-  );
+  // auth.me already returns the full DB row — a secondary getByEmail lookup
+  // here silently failed for accounts with a null/blank email (duplicate
+  // migrated rows), which broke isArtist. Same fix as App.tsx's route
+  // dispatcher (4abfa1f) and DashboardLayout.tsx.
+  const artswrkUser = user as any;
   const myUserId = artswrkUser?.id;
   const isArtist = artswrkUser?.userRole === "Artist";
 

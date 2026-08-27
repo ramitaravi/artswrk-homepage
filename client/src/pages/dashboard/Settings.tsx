@@ -208,10 +208,11 @@ function ProfileTab() {
 
 function AccountTab() {
   const { user } = useAuth();
-  const { data: artswrkUser } = trpc.artswrkUsers.getByEmail.useQuery(
-    { email: user?.email ?? "" },
-    { enabled: !!user?.email }
-  );
+  // auth.me already returns the full DB row — a secondary getByEmail lookup
+  // here silently failed for accounts with a null/blank email (duplicate
+  // migrated rows), which broke isArtist and misrouted the sidebar. Same
+  // fix as App.tsx's route dispatcher (4abfa1f).
+  const artswrkUser = user as any;
   const [resetSent, setResetSent] = useState(false);
 
   const forgotPw = trpc.auth.forgotPassword.useMutation({
@@ -295,10 +296,8 @@ function PlanFeature({ text }: { text: string }) {
 
 function SubscriptionTab() {
   const { user } = useAuth();
-  const { data: artswrkUser } = trpc.artswrkUsers.getByEmail.useQuery(
-    { email: user?.email ?? "" },
-    { enabled: !!user?.email }
-  );
+  // auth.me already returns the full DB row — see AccountTab above.
+  const artswrkUser = user as any;
 
   const isPremium = (artswrkUser as any)?.clientPremium ?? false;
 

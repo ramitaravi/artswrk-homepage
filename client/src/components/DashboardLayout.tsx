@@ -34,7 +34,6 @@ import {
   UserCheck,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { trpc } from "@/lib/trpc";
 
 interface NavItem {
   label: string;
@@ -191,11 +190,14 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
     }
   }, []);
 
-  // Fetch the full artswrk user record from DB
-  const { data: artswrkUser } = trpc.artswrkUsers.getByEmail.useQuery(
-    { email: user?.email ?? "" },
-    { enabled: !!user?.email }
-  );
+  // auth.me already returns the full DB User row (userRole, plan flags,
+  // profile fields all included) — a secondary artswrkUsers.getByEmail
+  // lookup here was redundant, and silently broke for any account whose
+  // email is null/blank (duplicate migrated rows), since the query is
+  // `enabled: !!user?.email` — it never fired, isArtist fell back to
+  // false, and the sidebar rendered the client nav for a real artist.
+  // Same fix already applied to App.tsx's route dispatcher (4abfa1f).
+  const artswrkUser = user as any;
 
   // Redirect to login if not authenticated
   useEffect(() => {
