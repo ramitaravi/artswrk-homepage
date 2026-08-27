@@ -55,7 +55,7 @@ export default function AcrobaticArts() {
         <div className="w-full max-w-md mx-auto">
           <StudioJobWizard
             heading="Post a Job in Minutes"
-            subheading="Free to post · Powered by AI · 6,000+ artists"
+            subheading="Hire Certified Acrobatic Arts Teachers"
             businessType="Acrobatic Arts Studio"
           />
         </div>
