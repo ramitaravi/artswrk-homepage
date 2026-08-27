@@ -455,10 +455,11 @@ export default function ArtistProfile() {
     ? `${p.firstName}${p.lastName ? " " + p.lastName[0] + "." : ""}`.trim()
     : p.name ?? "Artist";
 
-  const workTypes: string[] = [
-    ...(Array.isArray(p.masterArtistTypes) ? p.masterArtistTypes : []),
-    ...(Array.isArray(p.workTypes) ? p.workTypes : []),
-  ].filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
+  // p.masterArtistTypes holds raw Bubble internal IDs, not display names —
+  // deliberately excluded. p.workTypes is the pre-resolved, human-readable
+  // equivalent already synced for display.
+  const workTypes: string[] = (Array.isArray(p.workTypes) ? p.workTypes : [])
+    .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
 
   const ratingDisplay = p.ratingScore ? p.ratingScore / 10 : 0;
   const joinDate = p.bubbleCreatedAt || p.joinedAt || null;

@@ -32,6 +32,7 @@ import {
   Eye,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { formatLocation } from "@/lib/utils";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import Navbar from "@/components/Navbar";
@@ -389,8 +390,7 @@ export default function ApplyPage() {
     [job]
   );
   const cityDisplay = useMemo(() => {
-    if (!job?.locationAddress) return "Remote";
-    return job.locationAddress.split(",").slice(0, 2).join(",").trim();
+    return formatLocation(job?.locationAddress) ?? "Remote";
   }, [job?.locationAddress]);
 
   const company = job?.clientCompanyName ?? job?.clientName ?? "Artswrk Client";
@@ -681,7 +681,7 @@ export default function ApplyPage() {
     breadcrumbs.map((b) => ({ name: b.label, url: b.href ?? "" }))
   );
 
-  const isOpenRate = job.openRate;
+  const isOpenRate = !!job.openRate;
 
   return shell(
     <>
@@ -857,66 +857,71 @@ export default function ApplyPage() {
                   </div>
                 </div>
 
-                {/* ── Rate ── */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                  <h2 className="text-base font-black text-[#111] mb-1">
-                    Your rate{" "}
-                    {isOpenRate && (
+                {/* ── Rate — only shown when the job is open-rate; a fixed-rate job
+                     has nothing for the artist to pitch, so we skip asking. ── */}
+                {isOpenRate && (
+                  <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                    <h2 className="text-base font-black text-[#111] mb-1">
+                      Your rate{" "}
                       <span className="text-xs font-normal text-[#F25722] ml-1">
                         (open — pitch yours)
                       </span>
-                    )}
-                  </h2>
-                  <p className="text-xs text-gray-400 mb-3">
-                    {isHourlyPitch ? "Hourly rate in USD" : "Flat rate in USD"}
-                    {!isOpenRate && rate !== "Rate negotiable" && ` · Listed: ${rate}`}
-                  </p>
-                  <div className="flex gap-2 mb-3">
-                    <button
-                      type="button"
-                      onClick={() => setIsHourlyPitch(false)}
-                      className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
-                        !isHourlyPitch
-                          ? "bg-[#F25722] text-white border-[#F25722]"
-                          : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
-                      }`}
-                    >
-                      Flat Rate
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsHourlyPitch(true)}
-                      className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
-                        isHourlyPitch
-                          ? "bg-[#F25722] text-white border-[#F25722]"
-                          : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
-                      }`}
-                    >
-                      Hourly Rate
-                    </button>
+                    </h2>
+                    <p className="text-xs text-gray-400 mb-3">
+                      {isHourlyPitch ? "Hourly rate in USD" : "Flat rate in USD"}
+                    </p>
+                    <div className="flex gap-2 mb-3">
+                      <button
+                        type="button"
+                        onClick={() => setIsHourlyPitch(false)}
+                        className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                          !isHourlyPitch
+                            ? "bg-[#F25722] text-white border-[#F25722]"
+                            : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        Flat Rate
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsHourlyPitch(true)}
+                        className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                          isHourlyPitch
+                            ? "bg-[#F25722] text-white border-[#F25722]"
+                            : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        Hourly Rate
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">
+                        $
+                      </span>
+                      <Input
+                        type="number"
+                        min={0}
+                        placeholder="Enter your rate"
+                        value={rateInput}
+                        onChange={(e) => setRateInput(e.target.value)}
+                        className="pl-7 pr-12 border-gray-200 focus:border-[#F25722] rounded-xl text-sm"
+                      />
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold pointer-events-none">
+                        {isHourlyPitch ? "/hr" : "flat"}
+                      </span>
+                    </div>
                   </div>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">
-                      $
-                    </span>
-                    <Input
-                      type="number"
-                      min={0}
-                      placeholder={isOpenRate ? "Enter your rate" : ""}
-                      value={rateInput}
-                      onChange={(e) => setRateInput(e.target.value)}
-                      className="pl-7 pr-12 border-gray-200 focus:border-[#F25722] rounded-xl text-sm"
-                    />
-                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold pointer-events-none">
-                      {isHourlyPitch ? "/hr" : "flat"}
-                    </span>
-                  </div>
-                </div>
+                )}
 
                 {/* ── Submit ── */}
                 <Button
                   type="submit"
-                  disabled={applyMutation.isPending || !selectedResumeId || !message.trim()}
+                  disabled={
+                    applyMutation.isPending ||
+                    !selectedResumeId ||
+                    !message.trim() ||
+                    (isOpenRate && !rateInput.trim())
+                  }
                   className="w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity h-auto disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {applyMutation.isPending ? (

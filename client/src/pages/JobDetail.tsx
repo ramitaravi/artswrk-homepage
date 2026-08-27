@@ -9,11 +9,12 @@
 import { useEffect, useMemo } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import {
-  MapPin, Clock, Calendar, DollarSign, ArrowLeft,
-  Loader2, AlertCircle, CheckCircle2,
+  MapPin, Calendar, DollarSign, ArrowLeft,
+  Loader2, AlertCircle, CheckCircle2, FileText, ExternalLink,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { formatLocation, getJobTitle } from "@/lib/utils";
 import Navbar from "@/components/Navbar";
 import InlineAuth from "@/components/InlineAuth";
 import RichText from "@/components/RichText";
@@ -33,39 +34,6 @@ export function slugify(str: string): string {
 export function extractIdFromSlug(slug: string): number | null {
   const match = slug.match(/-(\d+)$/);
   return match ? parseInt(match[1], 10) : null;
-}
-
-function extractTitleFromDescription(description: string | null | undefined, clientName?: string | null): string {
-  if (!description) return "Open Position";
-  const first = description.split("\n")[0].trim();
-  // Skip a first line that is just the poster's own name (legacy Bubble imports).
-  const isPosterName = !!clientName && first.toLowerCase() === clientName.toLowerCase();
-  if (first.length > 0 && first.length <= 80 && !isPosterName) return first;
-  const patterns: [RegExp, string][] = [
-    [/sub(stitute)?\s+teacher/i, "Substitute Teacher"],
-    [/ballet/i, "Ballet Teacher"],
-    [/hip\s*hop/i, "Hip Hop Instructor"],
-    [/tap/i, "Tap Teacher"],
-    [/jazz/i, "Jazz Teacher"],
-    [/lyrical/i, "Lyrical Teacher"],
-    [/contemporary/i, "Contemporary Teacher"],
-    [/acro/i, "Acro Teacher"],
-    [/piano/i, "Piano Teacher"],
-    [/violin/i, "Violin Teacher"],
-    [/voice|vocal/i, "Vocal Coach"],
-    [/judge|adjudicat/i, "Dance Adjudicator"],
-    [/choreograph/i, "Choreographer"],
-    [/photograph/i, "Photographer"],
-    [/videograph/i, "Videographer"],
-    [/yoga/i, "Yoga Instructor"],
-    [/pilates/i, "Pilates Instructor"],
-    [/recurring|weekly|instructor/i, "Dance Instructor"],
-    [/teacher|coach/i, "Dance Teacher"],
-  ];
-  for (const [re, label] of patterns) {
-    if (re.test(description)) return label;
-  }
-  return first.slice(0, 60) + (first.length > 60 ? "…" : "");
 }
 
 function formatRate(
@@ -111,7 +79,7 @@ export function toJobUrl(job: {
   description?: string | null;
 }): string {
   if (job.slug) return `/jobs/${job.slug}`;
-  const title = extractTitleFromDescription(job.description ?? null);
+  const title = getJobTitle(null, job.description);
   return `/jobs/${slugify(title)}-${job.id}`;
 }
 
@@ -140,15 +108,27 @@ export default function JobDetail() {
   );
   const applied = !!(jobId !== null && (myApplications as any[] ?? []).some((a: any) => a.jobId === jobId));
 
-  const title = useMemo(() => (job as any)?.title || extractTitleFromDescription(job?.description, (job as any)?.clientCompanyName ?? (job as any)?.clientName), [job]);
+  const { data: applicationCheck } = trpc.jobs.checkApplication.useQuery(
+    { jobId: jobId! },
+    { enabled: jobId !== null && isAuthenticated && applied }
+  );
+  const appliedSummary = applicationCheck?.applied ? {
+    message: applicationCheck.message ?? undefined,
+    resumeLink: applicationCheck.resumeLink ?? undefined,
+    rate: applicationCheck.rate ?? undefined,
+  } : null;
+
+  const title = useMemo(() => getJobTitle((job as any)?.title, job?.description, (job as any)?.clientCompanyName ?? (job as any)?.clientName), [job]);
   const rate = useMemo(
     () => job ? formatRate(job.isHourly, job.openRate, job.artistHourlyRate, job.clientHourlyRate) : "",
     [job]
   );
-  const cityDisplay = useMemo(() => {
-    if (!job?.locationAddress) return "Remote";
-    return job.locationAddress.split(",").slice(0, 2).join(",").trim();
-  }, [job?.locationAddress]);
+  const cityDisplay = useMemo(() => formatLocation(job?.locationAddress) ?? "Remote", [job?.locationAddress]);
+  const mapsUrl = useMemo(() => (
+    job?.locationAddress
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.locationAddress)}`
+      : null
+  ), [job?.locationAddress]);
 
   // Canonical redirect (legacy two-segment URLs)
   useEffect(() => {
@@ -178,7 +158,9 @@ export default function JobDetail() {
   // Logged-in users get the same dashboard chrome (sidebar, gray canvas,
   // centered width) as every other page; logged-out visitors get the
   // standalone public page with its own Navbar.
-  const jobsBackHref = isAuthenticated ? "/app/jobs" : "/jobs";
+  const jobsBackHref = isAuthenticated
+    ? (applied ? "/app/jobs?tab=applications" : "/app/jobs")
+    : (applied ? "/jobs?tab=applications" : "/jobs");
   const shell = (content: React.ReactNode) =>
     isAuthenticated ? <DashboardLayout>{content}</DashboardLayout> : content;
 
@@ -221,6 +203,7 @@ export default function JobDetail() {
   const company = job.clientCompanyName ?? job.clientName ?? "Artswrk Client";
   const dateLabel = job.dateType === "Ongoing" ? "Ongoing"
     : job.dateType === "Recurring" ? "Recurring"
+    : job.dateType === "Dates Flexible" ? "Flexible"
     : formatDate(job.startDate);
 
   // ── Sidebar / bottom CTA ─────────────────────────────────────────────────
@@ -244,11 +227,9 @@ export default function JobDetail() {
       </a>
     </div>
   ) : applied ? (
-    <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-      <div className="flex items-center gap-2 px-5 py-3 rounded-xl bg-green-50 border border-green-100 text-green-700 font-semibold text-sm justify-center">
-        <CheckCircle2 size={16} /> Applied!
-      </div>
-    </div>
+    // The full application summary further down the page is the single
+    // source of truth once applied — no separate indicator needed up here.
+    null
   ) : (
     <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
       <p className="text-base font-black text-[#111] mb-1">Ready to apply?</p>
@@ -310,27 +291,38 @@ export default function JobDetail() {
                   )}
                 </div>
 
-                {/* Meta chips */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-full">
-                    <MapPin size={11} /> {cityDisplay}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#F25722] bg-orange-50 border border-orange-100 px-3 py-1.5 rounded-full">
-                    <DollarSign size={11} /> {rate}
-                  </span>
-                  {(job.startDate || job.dateType) && (
-                    <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-full">
-                      <Calendar size={11} /> {dateLabel}
-                    </span>
+                <p className="text-xs text-gray-400">Posted {timeAgo(job.bubbleCreatedAt)}</p>
+              </div>
+
+              {/* Details */}
+              <div className="rounded-2xl border border-gray-100 divide-y divide-gray-100 bg-white">
+                <div className="px-5 py-3.5">
+                  <p className="text-xs font-semibold text-gray-400 mb-0.5">Date</p>
+                  <p className="text-sm font-medium text-[#111]">
+                    {dateLabel}
+                    {job.dateType !== "Single Date" && job.dateDetails
+                      ? ` · ${job.dateDetails}` : ""}
+                  </p>
+                </div>
+                <div className="px-5 py-3.5 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-gray-400 mb-0.5">Location</p>
+                    <p className="text-sm font-medium text-[#111] truncate">{cityDisplay}</p>
+                  </div>
+                  {mapsUrl && (
+                    <a
+                      href={mapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-[#F25722] hover:underline"
+                    >
+                      <MapPin size={12} /> View map <ExternalLink size={10} />
+                    </a>
                   )}
-                  {(job.dateType === "Ongoing" || job.dateType === "Recurring") && job.dateDetails && (
-                    <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-full">
-                      <Calendar size={11} /> {job.dateDetails}
-                    </span>
-                  )}
-                  <span className="inline-flex items-center gap-1.5 text-xs text-gray-400 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-full">
-                    <Clock size={11} /> Posted {timeAgo(job.bubbleCreatedAt)}
-                  </span>
+                </div>
+                <div className="px-5 py-3.5">
+                  <p className="text-xs font-semibold text-gray-400 mb-0.5">Rate</p>
+                  <p className="text-sm font-semibold text-[#F25722]">{rate}</p>
                 </div>
               </div>
 
@@ -339,6 +331,47 @@ export default function JobDetail() {
                 <div className="border-t border-gray-100 pt-5">
                   <h2 className="text-sm font-black text-[#111] mb-3">About this role</h2>
                   <RichText html={job.description} className="text-gray-600" />
+                </div>
+              )}
+
+              {/* Full application summary — replaces the mobile CTA once applied */}
+              {applied && appliedSummary && (
+                <div className="rounded-2xl border border-green-100 bg-green-50 p-5 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 size={18} className="text-green-600 flex-shrink-0" />
+                    <p className="text-sm font-bold text-green-700">Application submitted</p>
+                  </div>
+                  {(appliedSummary.message || appliedSummary.resumeLink || appliedSummary.rate) && (
+                    <div className="border-t border-green-100 pt-3 space-y-2.5">
+                      {appliedSummary.rate && (
+                        <div className="flex items-center gap-2 text-xs text-green-700">
+                          <DollarSign size={12} className="flex-shrink-0 text-green-500" />
+                          <span className="font-semibold">Your rate:</span>
+                          <span>{appliedSummary.rate}</span>
+                        </div>
+                      )}
+                      {appliedSummary.resumeLink && (
+                        <div className="flex items-center gap-2 text-xs text-green-700">
+                          <FileText size={12} className="flex-shrink-0 text-green-500" />
+                          <span className="font-semibold">Resume:</span>
+                          <a
+                            href={appliedSummary.resumeLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="truncate underline underline-offset-2 hover:text-green-900 transition-colors"
+                          >
+                            View resume →
+                          </a>
+                        </div>
+                      )}
+                      {appliedSummary.message && (
+                        <div className="flex items-start gap-2 text-xs text-green-700">
+                          <span className="font-semibold flex-shrink-0 mt-0.5">Your message:</span>
+                          <span className="leading-relaxed">{appliedSummary.message}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

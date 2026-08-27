@@ -16,7 +16,7 @@ import {
   Calendar, Lock, Unlock, ExternalLink, MessageCircle,
   CheckCircle2, Users, Loader2, Star, X, Send,
   Building2, Clock, FileText, Globe, Instagram,
-  UserCheck, CreditCard, Banknote, Zap,
+  UserCheck, CreditCard, Banknote, Zap, Share2,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -322,7 +322,7 @@ function ApplicantDetailView({
 
           {/* Application message */}
           {applicant.message && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="bg-gray-50 rounded-2xl border border-gray-100 p-5">
               <div className="flex items-center gap-2 mb-3">
                 {picUrl && <img src={picUrl} alt="" className="w-6 h-6 rounded-full object-cover border border-gray-100" />}
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
@@ -622,10 +622,10 @@ function ApplicantsTab({
     );
   }
 
-  const applicants = data.applicants ?? [];
-  const allIds = applicants.map((a: any) => a.id);
+  const allApplicants = data.applicants ?? [];
+  const allIds = allApplicants.map((a: any) => a.id);
 
-  if (applicants.length === 0) {
+  if (allApplicants.length === 0) {
     return (
       <div className="text-center py-16 text-gray-400">
         <Users size={32} className="mx-auto mb-3 opacity-20" />
@@ -634,77 +634,187 @@ function ApplicantsTab({
     );
   }
 
+  return <ApplicantsList applicants={allApplicants} allIds={allIds} onSelectApplicant={onSelectApplicant} />;
+}
+
+type ApplicantFilter = "all" | "new" | "Confirmed" | "Booked" | "Rejected";
+
+function ApplicantsList({ applicants, allIds, onSelectApplicant }: {
+  applicants: any[];
+  allIds: number[];
+  onSelectApplicant: (id: number, allIds: number[]) => void;
+}) {
+  const [filter, setFilter] = useState<ApplicantFilter>("all");
+  const [sort, setSort] = useState<"newest" | "oldest">("newest");
+
+  const isNew = (a: any) => !a.status || a.status === "Interested" || a.status === "New";
+  const counts = {
+    all: applicants.length,
+    new: applicants.filter(isNew).length,
+    Confirmed: applicants.filter((a) => a.status === "Confirmed").length,
+    Booked: applicants.filter((a) => a.status === "Booked").length,
+    Rejected: applicants.filter((a) => a.status === "Rejected").length,
+  };
+
+  const filtered = applicants.filter((a) => {
+    if (filter === "all") return true;
+    if (filter === "new") return isNew(a);
+    return a.status === filter;
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    const da = new Date(a.bubbleCreatedAt ?? a.createdAt ?? 0).getTime();
+    const db = new Date(b.bubbleCreatedAt ?? b.createdAt ?? 0).getTime();
+    return sort === "newest" ? db - da : da - db;
+  });
+
+  const allTabs: { key: ApplicantFilter; label: string; count: number }[] = [
+    { key: "all", label: "All", count: counts.all },
+    { key: "new", label: "New", count: counts.new },
+    { key: "Confirmed", label: "Confirmed", count: counts.Confirmed },
+    { key: "Booked", label: "Booked", count: counts.Booked },
+    { key: "Rejected", label: "Rejected", count: counts.Rejected },
+  ];
+  const tabs = allTabs.filter((t) => t.key === "all" || t.count > 0);
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="divide-y divide-gray-100">
-        <p className="text-xs text-gray-400 font-medium px-5 pt-4 pb-3">
-          {applicants.length} applicant{applicants.length !== 1 ? "s" : ""}
-        </p>
-        {applicants.map((a: any) => {
-          const name = displayName(a);
-          const rate = a.artistHourlyRate ? `$${a.artistHourlyRate}/hr` : a.clientHourlyRate ? `$${a.clientHourlyRate}/hr` : null;
-          const msgPreview = a.message
-            ? a.message.length > 160 ? a.message.slice(0, 160).trimEnd() + " …" : a.message
-            : null;
-          return (
-            <div key={a.id} className="px-5 py-4 hover:bg-gray-50/60 transition-colors">
-              <div className="flex items-start gap-3">
-                {/* Avatar */}
-                {a.artistProfilePicture ? (
-                  <img
-                    src={a.artistProfilePicture}
-                    alt={name}
-                    className="w-11 h-11 rounded-full object-cover border-2 border-gray-100 flex-shrink-0 mt-0.5"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                  />
-                ) : (
-                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-sm flex-shrink-0 mt-0.5">
-                    {(name[0] || "?").toUpperCase()}
-                  </div>
-                )}
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                        <span className="font-bold text-[#111] text-sm">{name}</span>
-                        {a.artswrkPro && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{backgroundColor: '#f9ecf3', color: '#ec008c'}}>PRO</span>
-                        )}
-                        {a.status && (
-                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${appStatusColor(a.status)}`}>{a.status}</span>
-                        )}
-                      </div>
-                      {a.artistLocation && (
-                        <p className="text-xs text-gray-400 flex items-center gap-1 mb-1.5">
-                          <MapPin size={10} /> {a.artistLocation}
-                        </p>
-                      )}
-                      {msgPreview && (
-                        <p className="text-sm text-gray-500 leading-relaxed">{msgPreview}</p>
-                      )}
+      {/* Filter + sort bar */}
+      <div className="flex items-center justify-between gap-3 flex-wrap px-5 pt-4 pb-3 border-b border-gray-100">
+        <div className="flex items-center gap-1 flex-wrap">
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setFilter(t.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                filter === t.key ? "bg-[#111] text-white" : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              {t.label}
+              <span className={`text-[10px] rounded-full px-1.5 ${filter === t.key ? "bg-white/20" : "bg-gray-100"}`}>{t.count}</span>
+            </button>
+          ))}
+        </div>
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as "newest" | "oldest")}
+          className="text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-gray-400 bg-white"
+        >
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
+      </div>
+
+      {sorted.length === 0 ? (
+        <div className="text-center py-12 text-gray-400 text-sm">No applicants match this filter</div>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {sorted.map((a: any) => {
+            const name = displayName(a);
+            const rate = a.artistHourlyRate ? `$${a.artistHourlyRate}/hr` : a.clientHourlyRate ? `$${a.clientHourlyRate}/hr` : null;
+            const msgPreview = a.message
+              ? a.message.length > 160 ? a.message.slice(0, 160).trimEnd() + " …" : a.message
+              : null;
+            const disciplines = parseList(a.artistDisciplines).slice(0, 3);
+            const appliedDate = a.bubbleCreatedAt || a.createdAt
+              ? new Date(a.bubbleCreatedAt || a.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+              : null;
+            return (
+              <div key={a.id} className="px-5 py-4 hover:bg-gray-50/60 transition-colors">
+                <div className="flex items-start gap-3">
+                  {/* Avatar */}
+                  {a.artistProfilePicture ? (
+                    <img
+                      src={a.artistProfilePicture}
+                      alt={name}
+                      className="w-11 h-11 rounded-full object-cover border-2 border-gray-100 flex-shrink-0 mt-0.5"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  ) : (
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-sm flex-shrink-0 mt-0.5">
+                      {(name[0] || "?").toUpperCase()}
                     </div>
-                    {/* Right: rate + CTA */}
-                    <div className="flex-shrink-0 flex flex-col items-end gap-2 min-w-[140px]">
-                      {rate && (
-                        <span className="text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap" style={{background:'#fff3ee', color:'#F25722', border:'1px solid #ffd5c0'}}>
-                          {rate}
-                        </span>
-                      )}
-                      <button
-                        onClick={() => onSelectApplicant(a.id, allIds)}
-                        className="flex items-center gap-1 px-3.5 py-1.5 rounded-lg bg-[#111] text-white text-xs font-bold hover:bg-gray-800 transition-colors whitespace-nowrap"
-                      >
-                        View Submission <ChevronRight size={11} />
-                      </button>
+                  )}
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                          <span className="font-bold text-[#111] text-sm">{name}</span>
+                          {a.artswrkPro && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{backgroundColor: '#f9ecf3', color: '#ec008c'}}>PRO</span>
+                          )}
+                          {a.status && (
+                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${appStatusColor(a.status)}`}>{a.status}</span>
+                          )}
+                          {a.converted && (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full text-green-600 bg-green-50 flex items-center gap-0.5">
+                              <CheckCircle2 size={9} /> Booked
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2.5 flex-wrap mb-1.5">
+                          {a.artistLocation && (
+                            <span className="text-xs text-gray-400 flex items-center gap-1">
+                              <MapPin size={10} /> {a.artistLocation}
+                            </span>
+                          )}
+                          {a.ratingScore != null && (
+                            <span className="text-xs text-gray-400 flex items-center gap-1">
+                              <Star size={10} className="fill-amber-400 text-amber-400" /> {Number(a.ratingScore).toFixed(1)}
+                            </span>
+                          )}
+                          {appliedDate && (
+                            <span className="text-xs text-gray-400 flex items-center gap-1">
+                              <Clock size={10} /> Applied {appliedDate}
+                            </span>
+                          )}
+                        </div>
+                        {disciplines.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-1.5">
+                            {disciplines.map((t) => (
+                              <span key={t} className="text-[10px] px-2 py-0.5 rounded-full bg-pink-50 text-pink-600 font-medium">{t}</span>
+                            ))}
+                          </div>
+                        )}
+                        {msgPreview && (
+                          <p className="text-sm text-gray-500 leading-relaxed">{msgPreview}</p>
+                        )}
+                        <div className="flex items-center gap-3 mt-1.5">
+                          {a.resumeLink && (
+                            <a href={a.resumeLink} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-[11px] font-semibold text-[#F25722] hover:underline flex items-center gap-1">
+                              <FileText size={10} /> Resume
+                            </a>
+                          )}
+                          {a.artistSlug && (
+                            <a href={`/book/${a.artistSlug}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-[11px] font-semibold text-blue-500 hover:underline flex items-center gap-1">
+                              <Globe size={10} /> Profile
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                      {/* Right: rate + CTA */}
+                      <div className="flex-shrink-0 flex flex-col items-end gap-2 min-w-[140px]">
+                        {rate && (
+                          <span className="text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap" style={{background:'#fff3ee', color:'#F25722', border:'1px solid #ffd5c0'}}>
+                            {rate}
+                          </span>
+                        )}
+                        <button
+                          onClick={() => onSelectApplicant(a.id, allIds)}
+                          className="flex items-center gap-1 px-3.5 py-1.5 rounded-lg bg-[#111] text-white text-xs font-bold hover:bg-gray-800 transition-colors whitespace-nowrap"
+                        >
+                          View Submission <ChevronRight size={11} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -724,14 +834,21 @@ function ConfirmModal({
   onClose: () => void;
   onConfirmed: () => void;
 }) {
-  const [paymentMethod, setPaymentMethod] = useState<"artswrk" | "direct" | null>(null);
-  const [rateType, setRateType] = useState<"flat" | "hourly">("flat");
-  const [rateInput, setRateInput] = useState("");
-  const [hours, setHours] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const quotedRateValue = applicant.artistHourlyRate ?? applicant.artistFlatRate ?? applicant.clientHourlyRate ?? applicant.clientFlatRate ?? null;
+  const jobHasFixedRate = !job?.openRate && quotedRateValue != null;
+  const toDateInput = (d: string | null | undefined) => d ? String(d).slice(0, 10) : "";
+
+  const [paymentMethod, setPaymentMethod] = useState<"artswrk" | "direct">("artswrk");
+  const [rateType, setRateType] = useState<"flat" | "hourly">(
+    Number(applicant.isHourlyRate) === 0 ? "flat" : "hourly"
+  );
+  const [rateInput, setRateInput] = useState(quotedRateValue != null ? String(quotedRateValue) : "");
+  const [rateEditing, setRateEditing] = useState(!jobHasFixedRate);
+  const [hours, setHours] = useState(applicant.totalHours != null ? String(applicant.totalHours) : "");
+  const [startDate, setStartDate] = useState(toDateInput(applicant.startDate ?? job?.startDate));
+  const [endDate, setEndDate] = useState(toDateInput(applicant.endDate ?? job?.endDate));
   const [locationAddress, setLocationAddress] = useState(job?.locationAddress || job?.location || "");
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(job?.description || "");
 
   const confirmMutation = trpc.clientJobs.confirmArtist.useMutation({
     onSuccess: (res) => {
@@ -808,32 +925,53 @@ function ConfirmModal({
             </div>
           </div>
 
-          {/* Rate */}
+          {/* Rate — locked to the job's listed rate when it's a fixed rate; only
+              an open-rate job (or an explicit Edit) shows the flat/hourly toggle. */}
           <div>
-            <label className={labelCls}>Rate</label>
-            <div className="flex gap-2 mb-2">
-              {(["flat", "hourly"] as const).map((t) => (
-                <button key={t} type="button" onClick={() => setRateType(t)}
-                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${rateType === t ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}>
-                  {t === "flat" ? "Flat Rate" : "Hourly Rate"}
+            <div className="flex items-center justify-between mb-1.5">
+              <label className={labelCls + " mb-0"}>Rate</label>
+              {jobHasFixedRate && !rateEditing && (
+                <button type="button" onClick={() => setRateEditing(true)} className="text-xs font-semibold text-[#F25722] hover:underline">
+                  Edit
                 </button>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                <input type="number" min="0" value={rateInput} onChange={(e) => setRateInput(e.target.value)}
-                  placeholder={rateType === "flat" ? "500" : "35"}
-                  className="w-full border border-gray-200 rounded-xl pl-7 pr-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#F25722]/30 focus:border-[#F25722] transition" />
-              </div>
-              {rateType === "hourly" && (
-                <input type="number" min="0" step="0.5" value={hours} onChange={(e) => setHours(e.target.value)}
-                  placeholder="hrs"
-                  className="w-24 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#F25722]/30 focus:border-[#F25722] transition" />
               )}
             </div>
-            {rateType === "hourly" && rateDollars > 0 && hours && (
-              <p className="text-xs text-gray-400 mt-1">Total: ${Math.round(rateDollars * parseFloat(hours)).toLocaleString()}</p>
+            {jobHasFixedRate && !rateEditing ? (
+              <div className="border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-bold text-[#111] bg-gray-50">
+                ${rateInput}{rateType === "hourly" ? "/hr" : " flat"}
+              </div>
+            ) : (
+              <>
+                <div className="flex gap-2 mb-2">
+                  {(["flat", "hourly"] as const).map((t) => (
+                    <button key={t} type="button" onClick={() => setRateType(t)}
+                      className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${rateType === t ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}>
+                      {t === "flat" ? "Flat Rate" : "Hourly Rate"}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                  <input type="number" min="0" value={rateInput} onChange={(e) => setRateInput(e.target.value)}
+                    placeholder={rateType === "flat" ? "500" : "35"}
+                    className="w-full border border-gray-200 rounded-xl pl-7 pr-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#F25722]/30 focus:border-[#F25722] transition" />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Hours — always required so pay is calculated correctly regardless of rate type */}
+          <div>
+            <label className={labelCls}>Hours</label>
+            <input type="number" min="0" step="0.5" value={hours} onChange={(e) => setHours(e.target.value)}
+              placeholder="e.g. 2.5"
+              className={fieldCls} />
+            {rateDollars > 0 && hours && (
+              <p className="text-xs text-gray-400 mt-1">
+                {rateType === "hourly"
+                  ? `Total: $${Math.round(rateDollars * parseFloat(hours)).toLocaleString()}`
+                  : `Flat rate · ${hours} hr${parseFloat(hours) === 1 ? "" : "s"} booked`}
+              </p>
             )}
           </div>
 
@@ -887,12 +1025,17 @@ function ConfirmModal({
                 </p>
               </div>
             )}
+            {paymentMethod === "direct" && (
+              <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+                Paying outside Artswrk? You'll need to onboard this artist to your own payroll. Subscribe to Artswrk for payroll access.
+              </p>
+            )}
           </div>
 
-          {/* Notes */}
+          {/* Description — pulled from the job by default */}
           <div>
-            <label className={labelCls}>Notes for Artist <span className="font-normal text-gray-400">(optional)</span></label>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
+            <label className={labelCls}>Description</label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4}
               placeholder="Any details, next steps, or instructions…"
               className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#F25722]/30 focus:border-[#F25722] transition" />
           </div>
@@ -903,9 +1046,9 @@ function ConfirmModal({
           <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
           <Button
             className="flex-1 bg-[#111] hover:bg-gray-800 text-white"
-            disabled={!paymentMethod || confirmMutation.isPending}
+            disabled={!paymentMethod || rateDollars <= 0 || !hours || !startDate || !notes.trim() || confirmMutation.isPending}
             onClick={() => {
-              if (!paymentMethod) return;
+              if (!paymentMethod || rateDollars <= 0 || !hours || !startDate || !notes.trim()) return;
               confirmMutation.mutate({
                 applicantId: applicant.id,
                 paymentMethod,
@@ -1035,10 +1178,6 @@ function OverviewTab({ job }: { job: any }) {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Details</p>
           <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-gray-400 text-xs">Job ID</span>
-              <span className="font-mono text-xs text-gray-600">{job.id}</span>
-            </div>
             <div className="flex justify-between">
               <span className="text-gray-400 text-xs">Posted</span>
               <span className="text-xs text-gray-600">{fmtDate(job.bubbleCreatedAt || job.createdAt)}</span>
@@ -1223,6 +1362,10 @@ export default function ClientJobDetail() {
 
   const jobTitle = (job as any).title || job.description?.slice(0, 60) || `Job #${job.id}`;
   const showBookings = (job.bookingCount ?? 0) > 0;
+  // Coerce explicitly — this comes from a raw SQL `SELECT j.*`, where a
+  // TINYINT(1) can come back as a non-boolean (e.g. a truthy "0" string or
+  // Buffer) instead of real false, which was rendering a stray boost bar.
+  const jobIsBoosted = Number((job as any).isBoosted) === 1;
 
   const TABS: { id: Tab; label: string }[] = [
     { id: "applicants", label: "Applicants" },
@@ -1254,6 +1397,7 @@ export default function ClientJobDetail() {
 
       {/* Hero card */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
           {job.clientProfilePicture ? (
             <img
@@ -1282,7 +1426,7 @@ export default function ClientJobDetail() {
                   <MapPin size={10} /> {job.locationAddress}
                 </span>
               )}
-              {(job as any).isBoosted ? (
+              {jobIsBoosted ? (
                 <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200">
                   ⚡ Boosted
                 </span>
@@ -1295,10 +1439,25 @@ export default function ClientJobDetail() {
                 </button>
               )}
             </div>
-            {(job as any).isBoosted && (
+            {jobIsBoosted && (
               <BoostPerformanceBar applicantCount={(job as any).applicantCount ?? 0} />
             )}
           </div>
+        </div>
+        <button
+          onClick={() => {
+            const url = job.slug ? `${window.location.origin}/jobs/${job.slug}` : window.location.href;
+            if (navigator.share) {
+              navigator.share({ title: jobTitle, url }).catch(() => {});
+            } else {
+              navigator.clipboard.writeText(url);
+              toast.success("Job link copied!");
+            }
+          }}
+          className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold text-gray-500 border border-gray-200 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors whitespace-nowrap"
+        >
+          <Share2 size={13} /> Share
+        </button>
         </div>
       </div>
 

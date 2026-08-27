@@ -176,6 +176,7 @@ export async function sendApplicationConfirmationEmail({
  * NEVER sent to the actual client — we are not live yet.
  */
 export async function sendNewApplicantAlertEmail({
+  to,
   artistName,
   artistEmail,
   jobTitle,
@@ -185,6 +186,7 @@ export async function sendNewApplicantAlertEmail({
   message,
   resumeLink,
 }: {
+  to: string;
   artistName: string;
   artistEmail: string;
   jobTitle: string;
@@ -194,39 +196,54 @@ export async function sendNewApplicantAlertEmail({
   message?: string;
   resumeLink?: string;
 }): Promise<boolean> {
-  // ⚠️  PRE-LAUNCH: always send to team inbox only
-  const TO = "contact@artswrk.com";
+  // Matches the PRO-job applicant alert template (sendProJobApplicantAlertEmail)
+  // for a consistent look between the two flows.
+  const firstName = artistName.split(" ")[0] || artistName;
 
   const html = `
-    <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;">
-      <div style="margin-bottom:24px;">
-        <span style="font-weight:900;font-size:22px;color:#F25722;">ARTS</span><span style="font-weight:900;font-size:22px;background:#111;color:#fff;padding:2px 6px;border-radius:4px;margin-left:2px;">WRK</span>
+    <div style="font-family:'Helvetica Neue',sans-serif;max-width:580px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f0f0f0">
+      <div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:28px 36px">
+        <div style="display:inline-flex;align-items:center;gap:6px">
+          <span style="font-size:20px;font-weight:900;color:#fff;letter-spacing:-0.5px">ARTS</span>
+          <span style="font-size:20px;font-weight:900;background:#111;color:#fff;padding:2px 8px;border-radius:6px">WRK</span>
+        </div>
       </div>
-      <h2 style="font-size:20px;font-weight:700;color:#111;margin-bottom:8px;">New application received 📬</h2>
-      <div style="background:#f9f9f9;border-radius:12px;padding:20px;margin-bottom:20px;">
-        <p style="margin:0 0 6px;font-size:13px;color:#999;text-transform:uppercase;letter-spacing:.05em;">Applicant</p>
-        <p style="margin:0 0 4px;font-size:17px;font-weight:700;color:#111;">${artistName}</p>
-        <p style="margin:0;font-size:14px;color:#555;">${artistEmail}</p>
-        ${resumeLink ? `<p style="margin:8px 0 0;"><a href="${resumeLink}" style="color:#F25722;font-size:14px;">View Resume →</a></p>` : ""}
+      <div style="padding:36px">
+        <h1 style="font-size:22px;font-weight:900;color:#111;margin:0 0 20px">${artistName} is available for your job!</h1>
+        <p style="font-size:15px;color:#555;margin:0 0 4px">Hi there,</p>
+        <p style="font-size:15px;color:#555;margin:0 0 24px">${firstName} is interested in the job below:</p>
+        ${message ? `<div style="background:#f5f5f5;border-radius:10px;padding:20px 24px;margin-bottom:24px">
+          <p style="font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:1px;margin:0 0 10px">MESSAGE FROM ${firstName.toUpperCase()}:</p>
+          <p style="font-size:14px;color:#444;margin:0;line-height:1.6">${message}</p>
+        </div>` : ""}
+        <div style="border-left:4px solid #F25722;padding-left:20px;margin-bottom:28px">
+          <p style="font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:1px;margin:0 0 14px">JOB DETAILS:</p>
+          <p style="font-size:14px;color:#111;margin:0 0 8px"><strong>Job Title:</strong> ${jobTitle}</p>
+          <p style="font-size:14px;color:#111;margin:0 0 8px"><strong>Location:</strong> ${jobLocation}</p>
+          <p style="font-size:14px;color:#111;margin:0 0 8px"><strong>Rate:</strong> ${jobRate}</p>
+          ${resumeLink ? `<p style="font-size:14px;color:#111;margin:0"><strong>Resume:</strong> <a href="${resumeLink}" style="color:#F25722">View resume →</a></p>` : ""}
+        </div>
+        <p style="font-size:13px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px">VIEW &amp; CONFIRM ARTISTS</p>
+        <p style="font-size:14px;color:#555;line-height:1.6;margin:0 0 24px">
+          You can visit your client dashboard to view interested artists and their profiles. If you need more information from an artist before confirming, feel free to message them on Artswrk.
+        </p>
+        <a href="${jobUrl}" style="display:inline-block;background:#111;color:#fff;font-weight:700;font-size:14px;padding:14px 36px;border-radius:50px;text-decoration:none;margin-bottom:28px">
+          View Submission →
+        </a>
+        <hr style="border:none;border-top:1px solid #f0f0f0;margin:0 0 20px" />
+        <p style="font-size:14px;color:#555;line-height:1.6;margin:0 0 16px">As always, if you have any questions or concerns, don't hesitate to reach out to us.</p>
+        <p style="font-size:14px;color:#111;margin:0">Best,<br/>The Artswrk Team</p>
       </div>
-      <div style="background:#fff3ee;border-radius:12px;padding:20px;margin-bottom:20px;border:1px solid #ffe0d0;">
-        <p style="margin:0 0 6px;font-size:13px;color:#999;text-transform:uppercase;letter-spacing:.05em;">Job applied to</p>
-        <p style="margin:0 0 4px;font-size:17px;font-weight:700;color:#111;">${jobTitle}</p>
-        <p style="margin:0 0 4px;font-size:14px;color:#555;">📍 ${jobLocation}</p>
-        <p style="margin:0;font-size:14px;color:#555;">💰 ${jobRate}</p>
-      </div>
-      ${message ? `<div style="background:#f9f9f9;border-radius:12px;padding:16px;margin-bottom:20px;"><p style="margin:0 0 6px;font-size:13px;color:#999;text-transform:uppercase;letter-spacing:.05em;">Cover message</p><p style="margin:0;font-size:14px;color:#333;white-space:pre-wrap;">${message}</p></div>` : ""}
-      <a href="${jobUrl}" style="display:inline-block;background:#111;color:#fff;font-weight:700;font-size:15px;padding:14px 28px;border-radius:8px;text-decoration:none;">View Job →</a>
     </div>
   `;
 
   if (!process.env.SENDGRID_API_KEY) {
-    console.log(`[email] DEV — new applicant alert would send to ${TO}`);
+    console.log(`[email] DEV — new applicant alert would send to ${to}`);
     return false;
   }
   try {
-    await sgMail.send({ to: TO, from: { email: FROM_EMAIL, name: FROM_NAME }, subject: `New applicant: ${artistName} → ${jobTitle}`, html });
-    console.log(`[email] New applicant alert sent to ${TO}`);
+    await sgMail.send({ to, from: { email: FROM_EMAIL, name: FROM_NAME }, subject: `${artistName} is available for your job!`, html });
+    console.log(`[email] New applicant alert sent to ${to}`);
     return true;
   } catch (err: unknown) {
     console.error("[email] Failed to send new applicant alert:", err instanceof Error ? err.message : err);

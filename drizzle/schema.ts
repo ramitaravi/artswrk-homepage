@@ -187,6 +187,8 @@ export const jobs = mysqlTable("jobs", {
   bubbleCreatedById: varchar("bubbleCreatedById", { length: 64 }),
   /** Bubble client company ID */
   bubbleClientCompanyId: varchar("bubbleClientCompanyId", { length: 64 }),
+  /** FK → client_companies.id — which of the poster's companies this job was posted under (null = posted as themselves, no company) */
+  clientCompanyId: int("clientCompanyId"),
   /** Bubble artist ID stored on converted or filled requests */
   bubbleArtistId: varchar("bubbleArtistId", { length: 64 }),
   /** Bubble artist type reference */

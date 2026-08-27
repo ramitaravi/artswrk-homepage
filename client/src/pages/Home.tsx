@@ -445,7 +445,7 @@ function TrustedBy() {
 
 // ─── For Hirers ────────────────────────────────────────────────────────────────
 const HIRER_FEATURES = [
-  { icon: <Zap size={16} />, title: "Post in 60 seconds", desc: "Describe the role naturally — AI fills the rest." },
+  { icon: <Zap size={16} />, title: "Post in 60 seconds", desc: "Describe the role naturally — we fill in the rest." },
   { icon: <Users size={16} />, title: "Track every applicant", desc: "One dashboard. All applications. No spreadsheets." },
   { icon: <MessageCircle size={16} />, title: "Message artists directly", desc: "No middleman. Chat, negotiate, and confirm." },
   { icon: <CreditCard size={16} />, title: "Pay securely", desc: "Digital payments or your own payroll — your choice." },

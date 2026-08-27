@@ -460,6 +460,7 @@ function Step2({
       transportation: form.transportation,
       transportationInstructions: form.transportationInstructions || undefined,
       studioName: form.studioName || undefined,
+      companyId: form.selectedCompanyId ?? undefined,
     });
   }
 
@@ -641,9 +642,9 @@ function Step2({
             <div className="mt-2 flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
               <AlertTriangle size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
               <p className="text-xs text-amber-700">
-                Your AI-parsed location differs from{" "}
+                This location is different from{" "}
                 <span className="font-semibold">{selectedCompany.name}</span>'s address (
-                {selectedCompany.locationAddress}). The field above shows the AI-parsed location — update it if needed.
+                {selectedCompany.locationAddress}) — update it above if that's not intended.
               </p>
             </div>
           )}
@@ -1081,9 +1082,8 @@ function Step3({
   const [boostDuration, setBoostDuration] = useState(7);
   const boostTotal = boostBudget * boostDuration;
 
-  // Performance estimates — scale linearly with spend
-  const estArtistsReached = Math.round(boostTotal * 38);
-  const estApplicants = Math.max(1, Math.round(boostTotal * 1.1));
+  // Qualitative performance tier — no fabricated reach/applicant numbers,
+  // just an honest relative indicator of how the budget compares.
   const perfLabel = boostBudget >= 60 ? "Maximum" : boostBudget >= 35 ? "High" : boostBudget >= 15 ? "Good" : "Basic";
   const perfColor = boostBudget >= 35 ? "#F25722" : "#FFBC5D";
   // 8 signal bars — how many are lit based on budget (5→100)
@@ -1206,6 +1206,8 @@ function Step3({
       clientHourlyRate: form.clientHourlyRate ? parseFloat(form.clientHourlyRate) : undefined,
       clientFlatRate: form.clientFlatRate ? parseFloat(form.clientFlatRate) : undefined,
       transportation: form.transportation,
+      studioName: form.studioName || undefined,
+      companyId: form.selectedCompanyId ?? undefined,
       plan: tier.plan,
       origin: window.location.origin,
     });
@@ -1215,6 +1217,14 @@ function Step3({
   if (subStep === "almost_ready") {
     return (
       <div className="max-w-xl mx-auto">
+
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 text-green-600 text-xs font-semibold mb-3">
+            <CheckCircle2 size={12} />
+            Your job is live
+          </div>
+          <h2 className="text-2xl font-black text-[#111]">🎉 Job Posted!</h2>
+        </div>
 
         {/* ── Job live card ── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6 flex items-center gap-4">
@@ -1256,7 +1266,7 @@ function Step3({
               <h2 className="text-xl font-black text-[#111]">Sponsor your listing</h2>
             </div>
             <p className="text-sm text-gray-500">
-              Your job is already live — boost it to the top of search results for even more applicants.
+              Want even more applicants? Sponsor this listing for extra visibility.
             </p>
           </div>
 
@@ -1264,8 +1274,7 @@ function Step3({
           <div className="px-6 py-4 border-b border-gray-100 space-y-2.5">
             {[
               { icon: "📌", text: "Pinned to the top of search results" },
-              { icon: "📣", text: "Boosted across social media & email to our artist network" },
-              { icon: "⚡", text: "Get applications faster — sponsored posts see up to 3× more reach" },
+              { icon: "⚡", text: "Get applicants faster with added visibility" },
             ].map(({ icon, text }) => (
               <div key={text} className="flex items-center gap-3">
                 <span className="text-base leading-none">{icon}</span>
@@ -1326,17 +1335,7 @@ function Step3({
                 })}
               </div>
 
-              {/* Stats row */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-[11px] text-gray-400 mb-0.5">Est. artists reached</p>
-                  <p className="text-sm font-black text-[#111]">{estArtistsReached.toLocaleString()}+</p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-gray-400 mb-0.5">Est. applicants</p>
-                  <p className="text-sm font-black text-[#111]">{estApplicants}+</p>
-                </div>
-              </div>
+              <p className="text-[11px] text-gray-400">Higher budgets get more search placement and visibility.</p>
             </div>
 
             {/* Duration */}

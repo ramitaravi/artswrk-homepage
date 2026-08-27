@@ -12,9 +12,9 @@
  */
 
 import { useState } from "react";
-import { MapPin, Calendar, Share2, Star, ExternalLink } from "lucide-react";
+import { MapPin, Calendar, Share2, Star, ExternalLink, Instagram, Globe, Youtube } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { formatLocation } from "@/lib/utils";
+import { formatLocation, normalizeInstagram } from "@/lib/utils";
 import { useAuth } from "@/_core/hooks/useAuth";
 import EditProfileModal from "./EditProfileModal";
 
@@ -114,10 +114,10 @@ function AboutTab({ profile }: { profile: any }) {
         </div>
       )}
 
-      {/* Affiliations */}
-      <div>
-        <h3 className="text-sm font-semibold text-gray-800 mb-3">Affiliations</h3>
-        {(affiliations as any[]).length > 0 ? (
+      {/* Affiliations — hidden entirely when there are none */}
+      {(affiliations as any[]).length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800 mb-3">Affiliations</h3>
           <div className="flex flex-wrap gap-3">
             {(affiliations as any[]).map((aff: any, i: number) => (
               <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white">
@@ -137,10 +137,8 @@ function AboutTab({ profile }: { profile: any }) {
               </div>
             ))}
           </div>
-        ) : (
-          <p className="text-sm text-gray-400">No affiliations added yet.</p>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -250,19 +248,27 @@ function ReviewsTab() {
           <StarRow rating={review.rating} />
           <p className="text-sm text-gray-700 leading-relaxed my-3">{review.body}</p>
           <div className="flex items-center gap-3">
-            {review.reviewerAvatar ? (
+            {review.reviewerAvatar && (
               <img
                 src={review.reviewerAvatar}
                 alt={review.reviewerName}
                 className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  el.style.display = "none";
+                  const fb = el.nextElementSibling as HTMLElement | null;
+                  if (fb) fb.style.display = "flex";
+                }}
               />
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-semibold text-gray-500">
-                  {review.reviewerName?.[0] ?? "?"}
-                </span>
-              </div>
             )}
+            <div
+              className="w-9 h-9 rounded-full hirer-grad-bg items-center justify-center flex-shrink-0"
+              style={{ display: review.reviewerAvatar ? "none" : "flex" }}
+            >
+              <span className="text-xs font-semibold text-white">
+                {review.reviewerName?.[0] ?? "?"}
+              </span>
+            </div>
             <div>
               <p className="text-sm font-semibold text-[#111] leading-tight">{review.reviewerName}</p>
               {review.reviewerStudio && (
@@ -312,7 +318,10 @@ export default function ArtistProfilePage() {
         website: bubbleLive.website || profile.website,
         pronouns: bubbleLive.pronouns || profile.pronouns,
         phoneNumber: bubbleLive.phoneNumber || profile.phoneNumber,
-        bookingCount: bubbleLive.totalBookings ?? profile.bookingCount,
+        // bookingCount deliberately NOT overridden from live Bubble — this page
+        // and the public /book/:slug page must show the same number, and the
+        // public page can't afford a live Bubble call on every pageview. Both
+        // now read the same cached DB column, kept fresh by the Bubble sync jobs.
         ratingScore: bubbleLive.ratingAverage ? Math.round(bubbleLive.ratingAverage * 10) : profile.ratingScore,
       }
     : profile;
@@ -366,11 +375,12 @@ export default function ArtistProfilePage() {
   // Use merged profile (Bubble live data wins where available)
   const p = (activeProfile ?? profile) as any;
 
-  // Server returns these as parsed arrays already
-  const workTypes: string[] = [
-    ...(p.masterArtistTypes || []),
-    ...(p.workTypes || []),
-  ].filter((v: string, i: number, a: string[]) => a.indexOf(v) === i); // dedupe
+  // Server returns these as parsed arrays already. p.masterArtistTypes holds
+  // raw Bubble internal IDs (e.g. "1652795286947x398019932738813950"), not
+  // display names — deliberately excluded. p.workTypes is the pre-resolved,
+  // human-readable equivalent already synced for display.
+  const workTypes: string[] = (p.workTypes || [])
+    .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i); // dedupe
   // ratingScore stored as integer ×10 (e.g. 50 = 5.0 stars)
   const ratingDisplay = p.ratingScore ? p.ratingScore / 10 : 0;
   const joinDate = p.bubbleCreatedAt || p.joinedAt || null;
@@ -467,6 +477,55 @@ export default function ArtistProfilePage() {
                 </div>
               )}
 
+              {/* Social links — always shown here (even empty) so you know
+                  these fields exist; click a missing one to add it. */}
+              <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-100 mt-1">
+                {(() => {
+                  const ig = normalizeInstagram(p.instagram);
+                  return ig ? (
+                    <a
+                      href={ig.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-pink-500 hover:underline"
+                    >
+                      <Instagram size={12} /> @{ig.handle}
+                    </a>
+                  ) : (
+                    <button onClick={() => setEditOpen(true)} className="flex items-center gap-1 text-xs text-gray-400 hover:underline">
+                      <Instagram size={12} /> + Add Instagram
+                    </button>
+                  );
+                })()}
+                {p.website ? (
+                  <a href={p.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-gray-500 hover:underline">
+                    <Globe size={12} /> Website
+                  </a>
+                ) : (
+                  <button onClick={() => setEditOpen(true)} className="flex items-center gap-1 text-xs text-gray-400 hover:underline">
+                    <Globe size={12} /> + Add Website
+                  </button>
+                )}
+                {p.youtube ? (
+                  <a href={p.youtube} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-red-500 hover:underline">
+                    <Youtube size={12} /> YouTube
+                  </a>
+                ) : (
+                  <button onClick={() => setEditOpen(true)} className="flex items-center gap-1 text-xs text-gray-400 hover:underline">
+                    <Youtube size={12} /> + Add YouTube
+                  </button>
+                )}
+                {p.portfolio ? (
+                  <a href={p.portfolio} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-500 hover:underline">
+                    <ExternalLink size={12} /> Portfolio
+                  </a>
+                ) : (
+                  <button onClick={() => setEditOpen(true)} className="flex items-center gap-1 text-xs text-gray-400 hover:underline">
+                    <ExternalLink size={12} /> + Add Portfolio
+                  </button>
+                )}
+              </div>
+
               {/* Edit Profile button */}
               <button
                 onClick={() => setEditOpen(true)}
@@ -488,7 +547,7 @@ export default function ArtistProfilePage() {
               {/* Share */}
               <button
                 onClick={handleShare}
-                className="w-full flex items-center justify-center gap-2 py-1.5 text-sm text-gray-600 hover:text-[#111] transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-2.5 mt-2 text-sm text-gray-600 hover:text-[#111] transition-colors"
               >
                 <Share2 size={15} />
                 Share

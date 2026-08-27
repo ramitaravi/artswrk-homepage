@@ -180,14 +180,13 @@ export default function DashJobs() {
     status: statusFilters[activeTab],
   });
 
-  // Filter jobs by selected company via bubbleClientCompanyId (the reliable join key)
+  // Filter jobs by the selected company's real clientCompanyId (each job now
+  // stores which company it was posted under — previously there was no such
+  // link, which is why cards could show jobs from the wrong company).
   const filteredJobs = useMemo(() => {
     if (!jobs) return [];
     if (selectedCompanyId === null) return jobs;
-    const company = companies.find((c) => c.id === selectedCompanyId);
-    if (!company?.bubbleClientCompanyId) return jobs;
-    const matched = jobs.filter((j) => j.bubbleClientCompanyId === company.bubbleClientCompanyId);
-    return matched.length > 0 ? matched : jobs;
+    return jobs.filter((j: any) => j.clientCompanyId === selectedCompanyId);
   }, [jobs, selectedCompanyId, companies]);
 
   const navigateToPostJob = () => {
@@ -315,19 +314,22 @@ export default function DashJobs() {
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredJobs.map((job) => (
+              {filteredJobs.map((job: any) => {
+                const jobCompanyLogo = fixUrl(job.companyLogo);
+                const jobCompanyName = job.companyName || "My Studio";
+                return (
                 <div
                   key={job.id}
                   className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
                   onClick={() => navigate(`/app/jobs/${job.id}`)}
                 >
                   <div className="flex items-start gap-4 p-5">
-                    {/* Logo */}
+                    {/* Logo — this job's own company, not the currently-selected tab */}
                     <div className="w-11 h-11 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100 flex items-center justify-center">
-                      {displayLogo ? (
-                        <img src={displayLogo} alt={displayName} className="w-full h-full object-cover" />
+                      {jobCompanyLogo ? (
+                        <img src={jobCompanyLogo} alt={jobCompanyName} className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-xs font-black text-gray-400">{getInitials(displayName)}</span>
+                        <span className="text-xs font-black text-gray-400">{getInitials(jobCompanyName)}</span>
                       )}
                     </div>
 
@@ -337,9 +339,14 @@ export default function DashJobs() {
                           <p className="text-sm font-bold text-[#111] leading-snug">
                             {job.title || job.description?.slice(0, 60) || "Job Posting"}
                           </p>
-                          <p className="text-xs text-gray-400 mt-0.5">{displayName}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{jobCompanyName}</p>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
+                          {job.applicantCount > 0 && (
+                            <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
+                              <Briefcase size={10} /> {job.applicantCount} applicant{job.applicantCount === 1 ? "" : "s"}
+                            </span>
+                          )}
                           {job.requestStatus && (
                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor(job.requestStatus)}`}>
                               {job.requestStatus}
@@ -390,7 +397,8 @@ export default function DashJobs() {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

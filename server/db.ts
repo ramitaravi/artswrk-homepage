@@ -201,13 +201,27 @@ export async function getJobsByUserId(
     conditions.push(or(...statusConditions)!);
   }
 
-  return db
-    .select()
+  // Each job's OWN company (via clientCompanyId), falling back to the
+  // poster's personal clientCompanyName/profilePicture for jobs posted
+  // without a company selected. Never derive this from anything other
+  // than the job's own row — that was the bug (every card showed whichever
+  // company tab happened to be selected in the UI).
+  const rows = await db
+    .select({
+      job: jobs,
+      companyName: sql<string | null>`COALESCE(${clientCompanies.name}, ${users.clientCompanyName})`,
+      companyLogo: sql<string | null>`COALESCE(${clientCompanies.logo}, ${users.profilePicture})`,
+      applicantCount: sql<number>`(SELECT COUNT(*) FROM interested_artists ia WHERE ia.jobId = ${jobs.id})`,
+    })
     .from(jobs)
+    .leftJoin(clientCompanies, eq(jobs.clientCompanyId, clientCompanies.id))
+    .leftJoin(users, eq(jobs.clientUserId, users.id))
     .where(and(...conditions))
     .orderBy(desc(jobs.id))
     .limit(limit)
     .offset(offset);
+
+  return rows.map((r) => ({ ...r.job, companyName: r.companyName, companyLogo: r.companyLogo, applicantCount: Number(r.applicantCount) }));
 }
 
 /**
@@ -301,37 +315,23 @@ export async function getPublicJobsEnriched(
   const db = await getDb();
   if (!db) return [];
 
-  // Build WHERE clauses — match dashboard: Active + Submissions Paused
-  const whereClauses: string[] = ["j.requestStatus IN ('Active', 'Submissions Paused')"];
+  // Build WHERE clauses — mirrors the live Bubble "Search for Requests":
+  // Request Status = Active, direct? = "no". (Bubble does not include
+  // "Submissions Paused" here — verified against the Bubble editor.)
+  const whereClauses: string[] = [
+    "j.requestStatus = 'Active'",
+    "(j.direct IS NULL OR j.direct = 0)",
+  ];
 
-  // Artist type keyword mapping — maps display names to keywords found in job descriptions
-  const ARTIST_TYPE_KEYWORDS: Record<string, string[]> = {
-    'Dance Educator': ['teacher', 'instructor', 'coach', 'sub', 'substitute', 'educator', 'faculty'],
-    'Dance Adjudicator': ['judge', 'adjudicat', 'adjudicator'],
-    'Photographer': ['photo', 'photographer', 'photography'],
-    'Videographer': ['video', 'videographer', 'videography', 'film'],
-    'Acting Coach': ['acting', 'actor', 'actress', 'drama', 'theater', 'theatre'],
-    'Vocal Coach': ['vocal', 'voice', 'singing', 'singer', 'choir'],
-    'Side Jobs': ['admin', 'assistant', 'coordinator', 'manager', 'front desk', 'office'],
-    'Music Teacher': ['music', 'piano', 'violin', 'guitar', 'drums', 'instrument'],
-    'Dance Competition Staff': ['competition', 'staff', 'emcee', 'mc', 'tabulator', 'registration'],
-  };
-
+  // Artist type / service type: match Bubble's real ID-based equality
+  // (bubbleArtistTypeId / masterServiceTypeId), not a description-text guess.
+  // The client sends the option's bubbleId as the filter value.
   if (filters?.serviceType) {
-    // Service type: search description for the service type name
     const escaped = filters.serviceType.replace(/'/g, "''");
-    whereClauses.push(`j.description LIKE '%${escaped}%'`);
+    whereClauses.push(`j.masterServiceTypeId = '${escaped}'`);
   } else if (filters?.artistType) {
-    // Artist type: use keyword mapping for broader matching
-    const keywords = ARTIST_TYPE_KEYWORDS[filters.artistType];
-    if (keywords && keywords.length > 0) {
-      const keywordClauses = keywords.map(k => `j.description LIKE '%${k.replace(/'/g, "''")}%'`).join(' OR ');
-      whereClauses.push(`(${keywordClauses})`);
-    } else {
-      // Fallback: search by the type name itself
-      const escaped = filters.artistType.replace(/'/g, "''");
-      whereClauses.push(`j.description LIKE '%${escaped}%'`);
-    }
+    const escaped = filters.artistType.replace(/'/g, "''");
+    whereClauses.push(`j.bubbleArtistTypeId = '${escaped}'`);
   }
 
   if (filters?.locationQuery) {
@@ -362,14 +362,15 @@ export async function getPublicJobsEnriched(
        j.masterServiceTypeId,
        j.isBoosted, j.boostEndDate
        ${distanceSelect},
-       u.clientCompanyName,
+       COALESCE(c.name, u.clientCompanyName) as clientCompanyName,
        COALESCE(
          NULLIF(TRIM(CONCAT(COALESCE(u.firstName,''), ' ', COALESCE(u.lastName,''))), ''),
          u.name
        ) as clientName,
-       COALESCE(u.enterpriseLogoUrl, u.profilePicture) as clientProfilePicture
+       COALESCE(c.logo, u.enterpriseLogoUrl, u.profilePicture) as clientProfilePicture
      FROM jobs j
      LEFT JOIN users u ON j.clientUserId = u.id
+     LEFT JOIN client_companies c ON j.clientCompanyId = c.id
      WHERE ${whereSQL}
      ORDER BY (j.isBoosted = 1 AND (j.boostEndDate IS NULL OR j.boostEndDate > NOW())) DESC, COALESCE(j.bubbleCreatedAt, j.createdAt) DESC
      LIMIT ${limit} OFFSET ${offset}`
@@ -414,11 +415,12 @@ export async function getJobDetailById(id: number): Promise<{
        j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate,
        j.locationAddress, j.locationLat, j.locationLng,
        j.description, j.direct, j.bubbleCreatedAt, j.clientUserId,
-       u.clientCompanyName,
+       COALESCE(c.name, u.clientCompanyName) as clientCompanyName,
        COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.firstName,''), ' ', COALESCE(u.lastName,''))), ''), u.name) as clientName,
-       COALESCE(u.enterpriseLogoUrl, u.profilePicture) as clientProfilePicture
+       COALESCE(c.logo, u.enterpriseLogoUrl, u.profilePicture) as clientProfilePicture
      FROM jobs j
      LEFT JOIN users u ON j.clientUserId = u.id
+     LEFT JOIN client_companies c ON j.clientCompanyId = c.id
      WHERE j.id = ${id}
      LIMIT 1`
   );
@@ -454,11 +456,12 @@ export async function getArtistJobApplications(artistUserId: number, limit = 50,
        j.title, j.description, j.locationAddress, ${utcIsoSql('j.startDate')} AS startDate, j.dateType,
        j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate,
        j.requestStatus,
-       u.clientCompanyName,
-       COALESCE(u.enterpriseLogoUrl, u.profilePicture) as clientProfilePicture
+       COALESCE(c.name, u.clientCompanyName) as clientCompanyName,
+       COALESCE(c.logo, u.enterpriseLogoUrl, u.profilePicture) as clientProfilePicture
      FROM interested_artists ia
      JOIN jobs j ON ia.jobId = j.id
      LEFT JOIN users u ON j.clientUserId = u.id
+     LEFT JOIN client_companies c ON j.clientCompanyId = c.id
      WHERE ia.artistUserId = ${artistUserId}
      ORDER BY ia.createdAt DESC
      LIMIT ${limit} OFFSET ${offset}`
@@ -476,10 +479,11 @@ export async function getAdminJobById(jobId: number) {
     `SELECT j.*,
        u.firstName AS clientFirstName, u.lastName AS clientLastName,
        u.name AS clientName, u.email AS clientEmail,
-       u.clientCompanyName, u.id AS clientDbId,
-       COALESCE(u.enterpriseLogoUrl, u.profilePicture) AS clientProfilePicture
+       COALESCE(c.name, u.clientCompanyName) AS clientCompanyName, u.id AS clientDbId,
+       COALESCE(c.logo, u.enterpriseLogoUrl, u.profilePicture) AS clientProfilePicture
      FROM jobs j
      LEFT JOIN users u ON j.clientUserId = u.id
+     LEFT JOIN client_companies c ON j.clientCompanyId = c.id
      WHERE j.id = ${jobId}
      LIMIT 1`
   );
@@ -500,7 +504,7 @@ export async function getAdminJobApplicants(jobId: number) {
        u.id AS artistId, u.firstName AS artistFirstName, u.lastName AS artistLastName,
        u.name AS artistName, u.email AS artistEmail, u.profilePicture AS artistProfilePicture,
        u.location AS artistLocation, u.artswrkPro, u.artswrkBasic, u.slug AS artistSlug,
-       u.masterArtistTypes AS artistDisciplines
+       u.artistDisciplines
      FROM interested_artists ia
      LEFT JOIN users u ON ia.artistUserId = u.id
      WHERE ia.jobId = ${jobId}
@@ -612,11 +616,12 @@ export async function getAdminArtistApplications(artistUserId: number, limit = 1
        j.description, j.locationAddress, ${utcIsoSql('j.startDate')} AS startDate, j.requestStatus, j.dateType,
        j.isHourly, j.openRate, j.artistHourlyRate AS jobArtistRate, j.clientHourlyRate AS jobClientRate,
        u.hiringCategory,
-       u.clientCompanyName, u.id AS clientUserId,
-       COALESCE(u.enterpriseLogoUrl, u.profilePicture) AS clientProfilePicture
+       COALESCE(c.name, u.clientCompanyName) AS clientCompanyName, u.id AS clientUserId,
+       COALESCE(c.logo, u.enterpriseLogoUrl, u.profilePicture) AS clientProfilePicture
      FROM interested_artists ia
      JOIN jobs j ON ia.jobId = j.id
      LEFT JOIN users u ON j.clientUserId = u.id
+     LEFT JOIN client_companies c ON j.clientCompanyId = c.id
      WHERE ia.artistUserId = ${artistUserId}
      ORDER BY COALESCE(ia.bubbleCreatedAt, ia.createdAt) DESC
      LIMIT ${limit} OFFSET ${offset}`
@@ -855,7 +860,7 @@ export async function getBookingsByClientId(
     .from(bookings)
     .leftJoin(artistUser, eq(bookings.artistUserId, artistUser.id))
     .where(and(...conditions))
-    .orderBy(desc(bookings.startDate))
+    .orderBy(desc(sql`COALESCE(${bookings.bubbleCreatedAt}, ${bookings.createdAt})`))
     .limit(limit)
     .offset(offset);
 }
@@ -918,6 +923,30 @@ export async function getBookingById(id: number) {
   if (!db) return undefined;
   const result = await db.select().from(bookings).where(eq(bookings.id, id)).limit(1);
   return result.length > 0 ? result[0] : undefined;
+}
+
+/**
+ * Full booking detail for the client-facing booking detail page — the
+ * booking itself, the artist's profile summary, and the job it came from.
+ * Scoped to clientUserId so a client can only ever see their own bookings.
+ */
+export async function getClientBookingDetail(bookingId: number, clientUserId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.execute(
+    `SELECT b.*,
+       a.firstName AS artistFirstName, a.lastName AS artistLastName, a.name AS artistName,
+       a.profilePicture AS artistProfilePicture, a.slug AS artistSlug, a.location AS artistLocation,
+       a.ratingScore AS artistRatingScore, a.bookingCount AS artistBookingCount,
+       j.title AS jobTitle, j.description AS jobDescription, j.slug AS jobSlug
+     FROM bookings b
+     LEFT JOIN users a ON b.artistUserId = a.id
+     LEFT JOIN jobs j ON b.jobId = j.id
+     WHERE b.id = ${bookingId} AND b.clientUserId = ${clientUserId}
+     LIMIT 1`
+  );
+  const arr = rows[0] as unknown as any[];
+  return arr[0] ?? null;
 }
 
 /**
@@ -1433,6 +1462,7 @@ export async function getArtistHistoryForClient(artistUserId: number, clientUser
 
 export interface CreateJobInput {
   clientUserId?: number;
+  clientCompanyId?: number;
   clientEmail?: string;
   title?: string;
   description?: string;
@@ -1463,6 +1493,7 @@ export async function createJob(input: CreateJobInput) {
     .insert(jobs)
     .values({
       clientUserId: input.clientUserId,
+      clientCompanyId: input.clientCompanyId,
       clientEmail: input.clientEmail,
       title: input.title,
       description: input.description,
@@ -2344,7 +2375,7 @@ export async function getPremiumJobsByUserId(userId: number) {
     .select()
     .from(premiumJobs)
     .where(eq(premiumJobs.createdByUserId, userId))
-    .orderBy(desc(premiumJobs.createdAt));
+    .orderBy(desc(sql`COALESCE(${premiumJobs.bubbleCreatedAt}, ${premiumJobs.createdAt})`));
 }
 
 /**
@@ -2388,7 +2419,7 @@ export async function getAllPremiumJobs({
     .select()
     .from(premiumJobs)
     .where(where)
-    .orderBy(desc(premiumJobs.createdAt))
+    .orderBy(desc(sql`COALESCE(${premiumJobs.bubbleCreatedAt}, ${premiumJobs.createdAt})`))
     .limit(limit)
     .offset(offset);
 
@@ -2658,6 +2689,7 @@ export async function getArtistJobsFeed(
   offset = 0,
   lat?: number,
   lng?: number,
+  artistUserId?: number,
 ): Promise<{
   id: number;
   title: string | null;
@@ -2688,18 +2720,55 @@ export async function getArtistJobsFeed(
           + sin(radians(${lat})) * sin(radians(CAST(j.locationLat AS DECIMAL(10,6))))))) <= 80.467)`
     : "";
 
+  // Personalization — mirrors the "Jobs for You" list filter in Bubble:
+  // Current User's Master Artist Types contains This Request's artist type,
+  // AND Current User's List of Master Services contains This Request's
+  // master service type. A job missing one of those fields isn't restricted
+  // on that dimension (rather than being excluded outright), and an artist
+  // with no preferences set sees everything unfiltered.
+  let personalizationClause = "";
+  if (artistUserId != null) {
+    const [artist] = await db
+      .select({ masterArtistTypes: users.masterArtistTypes, artistServices: users.artistServices })
+      .from(users)
+      .where(eq(users.id, artistUserId))
+      .limit(1);
+    const parseIds = (val: string | null | undefined): string[] => {
+      if (!val) return [];
+      try {
+        const parsed = JSON.parse(val);
+        return Array.isArray(parsed) ? parsed.filter((v) => typeof v === "string" && v) : [];
+      } catch {
+        return [];
+      }
+    };
+    const artistTypeIds = parseIds(artist?.masterArtistTypes);
+    const serviceIds = parseIds(artist?.artistServices);
+    const escapeSql = (s: string) => s.replace(/'/g, "''");
+    if (artistTypeIds.length > 0) {
+      const list = artistTypeIds.map((id) => `'${escapeSql(id)}'`).join(",");
+      personalizationClause += ` AND (j.bubbleArtistTypeId IS NULL OR j.bubbleArtistTypeId IN (${list}))`;
+    }
+    if (serviceIds.length > 0) {
+      const list = serviceIds.map((id) => `'${escapeSql(id)}'`).join(",");
+      personalizationClause += ` AND (j.masterServiceTypeId IS NULL OR j.masterServiceTypeId IN (${list}))`;
+    }
+  }
+
   const rows = await db.execute(
      `SELECT j.id, j.slug, j.title, j.description, j.dateType, ${utcIsoSql('j.startDate')} AS startDate, ${utcIsoSql('j.endDate')} AS endDate,
      j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate, j.createdAt,
      j.locationAddress, j.locationLat, j.locationLng,
      j.isBoosted, j.boostEndDate,
-     u.clientCompanyName,
+     COALESCE(c.name, u.clientCompanyName) as clientCompanyName,
      COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.firstName,''), ' ', COALESCE(u.lastName,''))), ''), u.name) as clientName,
-     COALESCE(u.enterpriseLogoUrl, u.profilePicture) as clientLogo
+     COALESCE(c.logo, u.enterpriseLogoUrl, u.profilePicture) as clientLogo
      FROM jobs j
      LEFT JOIN users u ON j.clientUserId = u.id
-     WHERE j.requestStatus IN ('Active', 'Submissions Paused')
+     LEFT JOIN client_companies c ON j.clientCompanyId = c.id
+     WHERE j.requestStatus = 'Active' AND (j.direct IS NULL OR j.direct = 0)
      ${radiusClause}
+     ${personalizationClause}
      ORDER BY (j.isBoosted = 1 AND (j.boostEndDate IS NULL OR j.boostEndDate > NOW())) DESC, COALESCE(j.bubbleCreatedAt, j.createdAt) DESC
      LIMIT ${limit} OFFSET ${offset}`
   );
@@ -2737,7 +2806,7 @@ export async function getArtistProJobsFeed(limit = 20, offset = 0): Promise<{
     `SELECT id, serviceType, company, logo, workFromAnywhere, budget, location, description, createdAt
      FROM premium_jobs
      WHERE status = 'Active'
-     ORDER BY createdAt DESC
+     ORDER BY COALESCE(bubbleCreatedAt, createdAt) DESC
      LIMIT ${limit} OFFSET ${offset}`
   );
   return (rows[0] as unknown as any[]);
@@ -3316,11 +3385,12 @@ export async function getApplicantDetail(interestedArtistId: number) {
     `SELECT ia.id, ia.status, ia.createdAt, ia.bubbleCreatedAt, ia.converted,
        ia.artistHourlyRate, ia.clientHourlyRate, ia.artistFlatRate, ia.clientFlatRate,
        ia.totalHours, ia.isHourlyRate, ia.message, ia.resumeLink,
+       ${utcIsoSql('ia.startDate')} AS startDate, ${utcIsoSql('ia.endDate')} AS endDate,
        ia.jobId,
        u.id AS artistId, u.firstName AS artistFirstName, u.lastName AS artistLastName,
        u.name AS artistName, u.email AS artistEmail, u.profilePicture AS artistProfilePicture,
        u.location AS artistLocation, u.artswrkPro, u.artswrkBasic, u.slug AS artistSlug,
-       u.masterArtistTypes AS artistDisciplines, u.artistServices, u.bio AS artistBio,
+       u.artistDisciplines, u.artistServices, u.bio AS artistBio,
        u.website AS artistWebsite, u.instagram AS artistInstagram, u.portfolio AS artistPortfolio,
        u.bookingCount, u.ratingScore, u.reviewCount, u.tagline AS artistTagline,
        u.credits AS artistCredits, u.mediaPhotos, u.resumeFiles, u.workTypes,
@@ -3347,7 +3417,7 @@ export async function getJobApplicantsWithDetails(jobId: number) {
        u.id AS artistId, u.firstName AS artistFirstName, u.lastName AS artistLastName,
        u.name AS artistName, u.email AS artistEmail, u.profilePicture AS artistProfilePicture,
        u.location AS artistLocation, u.artswrkPro, u.artswrkBasic, u.slug AS artistSlug,
-       u.masterArtistTypes AS artistDisciplines, u.bio AS artistBio,
+       u.artistDisciplines, u.bio AS artistBio,
        u.bookingCount, u.ratingScore, u.tagline AS artistTagline, u.workTypes,
        u.optionAvailability
      FROM interested_artists ia

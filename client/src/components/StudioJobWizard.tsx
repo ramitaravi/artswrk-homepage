@@ -36,7 +36,7 @@ interface UserInfo {
 
 export function StudioJobWizard({
   heading = "Post a Job in Minutes",
-  subheading = "Describe what you need — our AI will build your listing and send it to 6,000+ artists.",
+  subheading = "Describe what you need — we'll build your listing and send it to 6,000+ artists.",
   businessType = "Studio",
   companyFieldLabel,
 }: StudioJobWizardProps) {
@@ -211,7 +211,7 @@ export function StudioJobWizard({
                 rows={4}
                 className="w-full px-4 py-3.5 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-300 focus:outline-none focus:border-[#FFBC5D] transition-all resize-none leading-relaxed"
               />
-              <p className="text-xs text-gray-400 mt-1.5">Our AI extracts the title, date, rate & more automatically</p>
+              <p className="text-xs text-gray-400 mt-1.5">We'll pull out the title, date, rate & more automatically</p>
             </div>
 
             {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
@@ -463,7 +463,7 @@ export function StudioJobWizard({
             </div>
             <div>
               <p className="text-base font-black text-[#111] mb-1">Setting up your job post...</p>
-              <p className="text-sm text-gray-400">Our AI is reading your description — just a moment</p>
+              <p className="text-sm text-gray-400">Reading your description — just a moment</p>
             </div>
           </div>
         )}

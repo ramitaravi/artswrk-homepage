@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { formatLocation } from "@/lib/utils";
+import { formatLocation, normalizeInstagram } from "@/lib/utils";
 import Navbar from "@/components/Navbar";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -199,13 +199,25 @@ function ReviewsTab({ userId }: { userId: number }) {
           <StarRow rating={review.rating} />
           <p className="text-sm text-gray-700 leading-relaxed my-3">{review.body}</p>
           <div className="flex items-center gap-3">
-            {review.reviewerAvatar ? (
-              <img src={review.reviewerAvatar} alt={review.reviewerName} className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-semibold text-gray-500">{review.reviewerName?.[0] ?? "?"}</span>
-              </div>
+            {review.reviewerAvatar && (
+              <img
+                src={review.reviewerAvatar}
+                alt={review.reviewerName}
+                className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  el.style.display = "none";
+                  const fb = el.nextElementSibling as HTMLElement | null;
+                  if (fb) fb.style.display = "flex";
+                }}
+              />
             )}
+            <div
+              className="w-9 h-9 rounded-full hirer-grad-bg items-center justify-center flex-shrink-0"
+              style={{ display: review.reviewerAvatar ? "none" : "flex" }}
+            >
+              <span className="text-xs font-semibold text-white">{review.reviewerName?.[0] ?? "?"}</span>
+            </div>
             <div>
               <p className="text-sm font-semibold text-[#111] leading-tight">{review.reviewerName}</p>
               {review.reviewerStudio && <p className="text-xs text-gray-500">{review.reviewerStudio}</p>}
@@ -278,10 +290,13 @@ export default function ArtistProfile() {
   // Owner detection: logged-in user's slug matches this profile's slug
   const isOwner = !!(user && p.slug && (user as any).slug === p.slug);
 
-  const workTypes: string[] = [
-    ...(Array.isArray(p.masterArtistTypes) ? p.masterArtistTypes : []),
-    ...(Array.isArray(p.workTypes) ? p.workTypes : []),
-  ].filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
+  // NOTE: p.masterArtistTypes holds raw Bubble internal IDs (e.g.
+  // "1652795286947x398019932738813950"), not display names — deliberately
+  // excluded here. p.workTypes is the pre-resolved, human-readable
+  // equivalent already synced for display.
+  const workTypes: string[] = Array.isArray(p.workTypes)
+    ? p.workTypes.filter((v: string, i: number, a: string[]) => a.indexOf(v) === i)
+    : [];
 
   const ratingDisplay = p.ratingScore ? p.ratingScore / 10 : 0;
   const joinDate = p.bubbleCreatedAt || p.joinedAt || null;
@@ -380,34 +395,55 @@ export default function ArtistProfile() {
                   </div>
                 )}
 
-                {/* Social links — direct-contact vectors, hidden from logged-out visitors */}
-                {user && (p.instagram || p.website || p.youtube || p.tiktok || p.portfolio) && (
+                {/* Social links — direct-contact vectors, hidden from logged-out
+                    visitors. For the owner, the row always shows (even fully
+                    empty) so they know these fields exist and can add them. */}
+                {user && (isOwner || p.instagram || p.website || p.youtube || p.tiktok || p.portfolio) && (
                   <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-100 mt-3">
-                    {p.instagram && (
-                      <a
-                        href={`https://instagram.com/${p.instagram.replace("@", "")}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-xs text-pink-500 hover:underline"
-                      >
-                        <Instagram size={12} /> @{p.instagram.replace("@", "")}
-                      </a>
-                    )}
-                    {p.website && (
+                    {(() => {
+                      const ig = normalizeInstagram(p.instagram);
+                      return ig ? (
+                        <a
+                          href={ig.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-pink-500 hover:underline"
+                        >
+                          <Instagram size={12} /> @{ig.handle}
+                        </a>
+                      ) : isOwner ? (
+                        <a href="/app/profile" className="flex items-center gap-1 text-xs text-gray-400 hover:underline">
+                          <Instagram size={12} /> + Add Instagram
+                        </a>
+                      ) : null;
+                    })()}
+                    {p.website ? (
                       <a href={p.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-gray-500 hover:underline">
                         <Globe size={12} /> Website
                       </a>
-                    )}
-                    {p.youtube && (
+                    ) : isOwner ? (
+                      <a href="/app/profile" className="flex items-center gap-1 text-xs text-gray-400 hover:underline">
+                        <Globe size={12} /> + Add Website
+                      </a>
+                    ) : null}
+                    {p.youtube ? (
                       <a href={p.youtube} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-red-500 hover:underline">
                         <Youtube size={12} /> YouTube
                       </a>
-                    )}
-                    {p.portfolio && (
+                    ) : isOwner ? (
+                      <a href="/app/profile" className="flex items-center gap-1 text-xs text-gray-400 hover:underline">
+                        <Youtube size={12} /> + Add YouTube
+                      </a>
+                    ) : null}
+                    {p.portfolio ? (
                       <a href={p.portfolio} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-500 hover:underline">
                         <ExternalLink size={12} /> Portfolio
                       </a>
-                    )}
+                    ) : isOwner ? (
+                      <a href="/app/profile" className="flex items-center gap-1 text-xs text-gray-400 hover:underline">
+                        <ExternalLink size={12} /> + Add Portfolio
+                      </a>
+                    ) : null}
                   </div>
                 )}
 

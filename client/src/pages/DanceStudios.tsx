@@ -49,7 +49,7 @@ function StudioLeadForm() {
         </div>
         <StudioJobWizard
           heading="Post a Job in Minutes"
-          subheading="Describe what you need — our AI will build your listing and send it to 6,000+ artists."
+          subheading="Describe what you need — we'll build your listing and send it to 6,000+ artists."
           businessType="Dance Studio"
         />
       </div>

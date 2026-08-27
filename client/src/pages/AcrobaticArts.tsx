@@ -22,7 +22,7 @@ export default function AcrobaticArts() {
             Hire Acrobatic<br />Arts Instructors
           </h1>
           <p className="text-white/70 text-sm max-w-xs leading-relaxed">
-            Post your job in seconds. Our AI builds your listing and sends it to 6,000+ vetted artists nationwide.
+            Post your job in seconds. We build your listing and send it to 6,000+ vetted artists nationwide.
           </p>
 
           <div className="flex items-center gap-6 mt-8">

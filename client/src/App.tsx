@@ -47,6 +47,7 @@ import Terms from "./pages/Terms";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import CancellationPolicy from "./pages/CancellationPolicy";
 import ClientJobDetail from "./pages/dashboard/ClientJobDetail";
+import ClientBookingDetail from "./pages/dashboard/ClientBookingDetail";
 import Settings from "./pages/dashboard/Settings";
 import PublicArtistProfile from "./pages/ArtistProfile";
 import PublicCompanyPage from "./pages/PublicCompanyPage";
@@ -257,6 +258,15 @@ function Router() {
         {() => <AppRoute clientComponent={Bookings} />}
       </Route>
 
+      {/* Client booking detail — a real page instead of the old inline expand */}
+      <Route path="/app/bookings/:bookingId">
+        {() => (
+          <DashboardLayout>
+            <ClientBookingDetail />
+          </DashboardLayout>
+        )}
+      </Route>
+
       {/* Payments: artists see earnings, clients see billing */}
       <Route path="/app/payments">
         {() => <AppRoute clientComponent={Payments} />}
@@ -320,6 +330,7 @@ function Router() {
       {/* Public artist profile page */}
       <Route path="/book/:slug" component={PublicArtistProfile} />
       <Route path="/studio/:userId" component={PublicCompanyPage} />
+      <Route path="/studio/:userId/:companyId" component={PublicCompanyPage} />
 
       {/* Enterprise dashboard — job-level deep link must come before the base route */}
       <Route path="/enterprise/messages">

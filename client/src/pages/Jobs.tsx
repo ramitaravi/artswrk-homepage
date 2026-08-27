@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { Link, useSearch, useLocation as useWouterLocation, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { formatLocation, getJobTitle } from "@/lib/utils";
+import JobListCard, { ApplyCta } from "@/components/JobListCard";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toJobUrl } from "./JobDetail";
 import { toProJobUrl } from "./ProJobDetail";
@@ -63,6 +65,7 @@ interface DisplayApplication {
   postedAgo: string;
   datetime: string;    // formatted date/time of the job
   rate: string | null;
+  detailUrl: string | null;
   status: string | null;
   jobId: number | null;
   clientProfilePicture: string | null;
@@ -93,6 +96,7 @@ function formatDatetime(
 ): string {
   if (dateType === "Ongoing") return "Ongoing";
   if (dateType === "Recurring") return "Recurring";
+  if (dateType === "Dates Flexible") return "Flexible";
   if (start) {
     const s = new Date(start);
     if (!isNaN(s.getTime())) {
@@ -128,40 +132,6 @@ function extractLocationFromDescription(description: string | null | undefined):
     }
   }
   return null;
-}
-
-function extractTitle(description: string | null | undefined, clientName?: string | null): string {
-  if (!description) return "Open Position";
-  const first = description.split("\n")[0].trim();
-  // Skip a first line that is just the poster's own name (legacy Bubble imports
-  // like "Kylie Admin" / "Studio") so it never becomes the displayed title.
-  const isPosterName = !!clientName && first.toLowerCase() === clientName.toLowerCase();
-  if (first.length > 0 && first.length <= 80 && !isPosterName) return first;
-  const patterns: [RegExp, string][] = [
-    [/sub(stitute)?\s+teacher/i, "Substitute Teacher"],
-    [/ballet/i, "Ballet Teacher"],
-    [/hip\s*hop/i, "Hip Hop Instructor"],
-    [/tap/i, "Tap Teacher"],
-    [/jazz/i, "Jazz Teacher"],
-    [/lyrical/i, "Lyrical Teacher"],
-    [/contemporary/i, "Contemporary Teacher"],
-    [/acro/i, "Acro Teacher"],
-    [/piano/i, "Piano Teacher"],
-    [/violin/i, "Violin Teacher"],
-    [/voice|vocal/i, "Vocal Coach"],
-    [/judge|adjudicat/i, "Dance Adjudicator"],
-    [/choreograph/i, "Choreographer"],
-    [/photograph/i, "Photographer"],
-    [/videograph/i, "Videographer"],
-    [/yoga/i, "Yoga Instructor"],
-    [/pilates/i, "Pilates Instructor"],
-    [/recurring|weekly|instructor/i, "Dance Instructor"],
-    [/teacher|coach/i, "Dance Teacher"],
-  ];
-  for (const [re, label] of patterns) {
-    if (re.test(description)) return label;
-  }
-  return first.slice(0, 60) + (first.length > 60 ? "…" : "");
 }
 
 function formatRate(
@@ -316,80 +286,25 @@ function JobCard({
   applied?: boolean;
 }) {
   return (
-    <Link href={job.detailUrl}>
-      <div className="flex items-start gap-4 p-5 rounded-2xl border border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm transition-all duration-150 cursor-pointer">
-        {/* Company avatar */}
-        <div className="flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
-          {job.clientProfilePicture ? (
-            <img
-              src={job.clientProfilePicture}
-              alt={job.companyName ?? ""}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                const el = e.currentTarget;
-                el.style.display = "none";
-                const fb = el.nextElementSibling as HTMLElement;
-                if (fb) fb.style.display = "flex";
-              }}
-            />
-          ) : null}
-          <div
-            className="w-full h-full flex items-center justify-center text-white text-base font-black artist-grad-bg"
-            style={{ display: job.clientProfilePicture ? "none" : "flex" }}
-          >
-            {(job.companyName ?? job.title)[0]?.toUpperCase() ?? "?"}
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          {job.isBoosted && (
-            <div className="flex items-center gap-1 mb-1.5">
-              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722]">
-                <Zap size={9} className="fill-[#F25722]" /> Priority Listing
-              </span>
-            </div>
-          )}
-          <div className="flex items-start justify-between gap-3 mb-1">
-            <div className="min-w-0">
-              <h3 className="font-bold text-[#111] text-base leading-tight truncate">{job.title}</h3>
-              {/* Only show studio name to authenticated users */}
-              {isAuthenticated && job.companyName && (
-                <p className="text-sm text-gray-500 truncate mt-0.5">{job.companyName}</p>
-              )}
-            </div>
-            <span
-              className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold ${
-                applied
-                  ? "text-green-700 bg-green-50 border border-green-200"
-                  : "text-white bg-[#111]"
-              }`}
-            >
-              {applied ? "Applied" : "Apply →"}
-            </span>
-          </div>
-          <div className="flex items-center gap-1 text-xs text-gray-400 mt-2">
-            <MapPin size={10} className="flex-shrink-0" />
-            <span className="truncate">{job.location}</span>
-            <span className="text-gray-200 mx-1">·</span>
-            <span className="flex-shrink-0">Posted {job.postedAgo}</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs flex-wrap mt-2.5">
-            <span className="flex items-center gap-1 text-[#F25722] font-medium">
-              <Clock size={10} />
-              {job.datetime}
-            </span>
-            <span
-              className={`font-medium border rounded-full px-2 py-0.5 ${
-                job.rate ? "text-gray-600 border-gray-200" : "text-gray-400 border-gray-100"
-              }`}
-            >
-              {job.rate ?? "Open rate"}
-            </span>
-          </div>
-        </div>
-      </div>
-    </Link>
+    <JobListCard
+      href={job.detailUrl}
+      avatarUrl={job.clientProfilePicture}
+      avatarFallbackText={job.companyName ?? job.title}
+      title={job.title}
+      subtitle={isAuthenticated ? job.companyName : null}
+      location={job.location}
+      postedAgo={job.postedAgo}
+      dateLabel={job.datetime}
+      rate={job.rate ?? "Open rate"}
+      cta={<ApplyCta applied={applied} />}
+      topBadge={
+        job.isBoosted ? (
+          <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722]">
+            <Zap size={9} className="fill-[#F25722]" /> Priority Listing
+          </span>
+        ) : undefined
+      }
+    />
   );
 }
 
@@ -412,64 +327,34 @@ function ProJobCard({
   const showCompany = isAuthenticated && isPro;
 
   return (
-    <Link href={job.detailUrl}>
-      <div className="flex items-start gap-4 p-5 rounded-2xl border border-pink-100 bg-white hover:border-pink-200 hover:shadow-sm transition-all duration-150 cursor-pointer">
-        <div className="flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
-          {job.logo ? (
-            // Logo is always in the payload — just blurred (not hidden) until unlocked,
-            // so there's still a hint of the studio's brand/photo like on the old site.
-            <img
-              src={job.logo}
-              alt={showCompany ? (job.company ?? "") : ""}
-              className={`w-full h-full object-cover ${showCompany ? "" : "blur-md scale-125"}`}
-            />
-          ) : showCompany ? (
-            <span className="text-base font-black text-gray-500">
-              {(job.company ?? job.title)[0]?.toUpperCase() ?? "?"}
-            </span>
-          ) : (
-            <div className="w-full h-full bg-gray-300" />
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Star size={10} className="text-yellow-500 fill-yellow-500 flex-shrink-0" />
-            <span className="text-[10px] font-bold text-yellow-600 uppercase tracking-wide">PRO Job</span>
-          </div>
-          <div className="flex items-start justify-between gap-3 mb-1">
-            <div className="min-w-0">
-              <h3 className="font-bold text-[#111] text-base leading-tight truncate">{job.title}</h3>
-              {showCompany && job.company && <p className="text-sm text-gray-500 truncate mt-0.5">{job.company}</p>}
-            </div>
-            {!isAuthenticated ? (
-              <span className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-[#111]">
-                Apply →
-              </span>
-            ) : !isPro ? (
-              <span className="flex-shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-[#111]">
-                <Lock size={11} /> Unlock PRO
-              </span>
-            ) : (
-              <span className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold ${
-                applied
-                  ? "text-green-700 bg-green-50 border border-green-200"
-                  : "text-white bg-[#111]"
-              }`}>
-                {applied ? "Applied" : "Apply →"}
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-gray-400 flex items-center gap-1 mt-2">
-            <MapPin size={10} className="flex-shrink-0" /> {job.location}
-          </p>
-          {job.budget && (
-            <span className="inline-flex items-center gap-1 mt-2.5 text-xs font-semibold text-[#F25722] bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-full">
-              💳 {job.budget}
-            </span>
-          )}
-        </div>
-      </div>
-    </Link>
+    <JobListCard
+      href={job.detailUrl}
+      borderVariant="pro"
+      avatarUrl={job.logo}
+      avatarFallbackText={showCompany ? (job.company ?? job.title) : "?"}
+      avatarBlurred={!showCompany}
+      title={job.title}
+      subtitle={showCompany ? job.company : null}
+      location={job.location}
+      dateLabel={job.budget ? `💳 ${job.budget}` : undefined}
+      cta={
+        !isAuthenticated ? (
+          <span className="px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-[#111]">Apply →</span>
+        ) : !isPro ? (
+          <span className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-[#111]">
+            <Lock size={11} /> Unlock PRO
+          </span>
+        ) : (
+          <ApplyCta applied={applied} />
+        )
+      }
+      topBadge={
+        <span className="flex items-center gap-1.5">
+          <Star size={10} className="text-yellow-500 fill-yellow-500 flex-shrink-0" />
+          <span className="text-[10px] font-bold text-yellow-600 uppercase tracking-wide">PRO Job</span>
+        </span>
+      }
+    />
   );
 }
 
@@ -501,62 +386,22 @@ const APP_STATUS_CONFIG: Record<
 function ApplicationCard({ job, status }: { job: DisplayApplication; status: AppStatus }) {
   const cfg = APP_STATUS_CONFIG[status as AppStatus] ?? APP_STATUS_CONFIG.Interested;
   return (
-    <div className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-white hover:shadow-sm transition-all">
-      <div className="flex-shrink-0 w-11 h-11 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
-        {job.clientProfilePicture ? (
-          <img
-            src={job.clientProfilePicture}
-            alt={job.companyName ?? ""}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              const el = e.currentTarget;
-              el.style.display = "none";
-              const fb = el.nextElementSibling as HTMLElement;
-              if (fb) fb.style.display = "flex";
-            }}
-          />
-        ) : null}
-        <div
-          className="w-full h-full flex items-center justify-center text-white text-sm font-black artist-grad-bg"
-          style={{ display: job.clientProfilePicture ? "none" : "flex" }}
-        >
-          {(job.companyName ?? job.title)[0]?.toUpperCase() ?? "?"}
-        </div>
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <div className="min-w-0">
-            <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{job.title}</h3>
-            {/* Applications are only visible to logged-in users — always show company name */}
-            {job.companyName && (
-              <p className="text-xs text-gray-500 truncate">{job.companyName}</p>
-            )}
-          </div>
-          <span
-            className={`flex-shrink-0 flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${cfg.className}`}
-          >
-            {cfg.icon} {cfg.label}
-          </span>
-        </div>
-        <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
-          <MapPin size={10} className="flex-shrink-0" />
-          <span className="truncate">{job.location}</span>
-          <span className="text-gray-200 mx-1">·</span>
-          <span className="flex-shrink-0">Posted {job.postedAgo}</span>
-        </div>
-        <div className="flex items-center gap-2 text-xs flex-wrap">
-          <span className="flex items-center gap-1 text-[#F25722] font-medium">
-            <Clock size={10} />
-            {job.datetime}
-          </span>
-          {job.rate && (
-            <span className="text-gray-500 font-medium border border-gray-100 rounded-full px-2 py-0.5">
-              {job.rate}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
+    <JobListCard
+      href={job.detailUrl ?? "#"}
+      avatarUrl={job.clientProfilePicture}
+      avatarFallbackText={job.companyName ?? job.title}
+      title={job.title}
+      subtitle={job.companyName}
+      location={job.location}
+      postedAgo={job.postedAgo}
+      dateLabel={job.datetime}
+      rate={job.rate}
+      cta={
+        <span className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${cfg.className}`}>
+          {cfg.icon} {cfg.label}
+        </span>
+      }
+    />
   );
 }
 
@@ -640,7 +485,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
 
   // Stable filter input to avoid infinite re-fetch
   const filterInput = useMemo(() => ({
-    limit: 200,
+    limit: 600,
     artistType: artistType || undefined,
     serviceType: serviceType || undefined,
     locationLat: locationFilter.lat,
@@ -666,10 +511,10 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
     if (!rawJobs) return [];
     return rawJobs.map((j: any) => ({
       id: j.id,
-      title: j.title || extractTitle(j.description, j.clientCompanyName ?? j.clientName),
+      title: getJobTitle(j.title, j.description, j.clientCompanyName ?? j.clientName),
       companyName: j.clientCompanyName ?? j.clientName ?? null,
       location: j.locationAddress
-        ? j.locationAddress.split(",").slice(0, 2).join(",").trim()
+        ? (formatLocation(j.locationAddress) ?? "Remote / Flexible")
         : (extractLocationFromDescription(j.description) ?? (j.locationLat && j.locationLng ? "See map" : "Remote / Flexible")),
       postedAgo: timeAgo(j.bubbleCreatedAt),
       datetime: formatDatetime(j.startDate, j.dateType),
@@ -707,11 +552,12 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
     if (!rawApplications) return [];
     return (rawApplications as any[]).map((a) => ({
       id: a.id,
-      title: a.title || extractTitle(a.description, a.clientCompanyName),
+      title: getJobTitle(a.title, a.description, a.clientCompanyName),
       companyName: a.clientCompanyName ?? null,
-      location: a.locationAddress
-        ? a.locationAddress.split(",").slice(0, 2).join(",").trim()
-        : "Location TBD",
+      location: formatLocation(a.locationAddress) ?? "Location TBD",
+      detailUrl: a.jobId
+        ? toJobUrl({ id: a.jobId, locationAddress: a.locationAddress, description: a.description })
+        : null,
       postedAgo: timeAgo(a.createdAt),
       datetime: formatDatetime(a.startDate, a.dateType),
       rate: formatRate(a.isHourly, a.openRate, a.artistHourlyRate, a.clientHourlyRate),
@@ -853,7 +699,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
                 >
                   <option value="">Artist Type</option>
                   {(filterOptions?.artistTypes ?? []).map((t) => (
-                    <option key={t.bubbleId} value={t.name}>{t.name}</option>
+                    <option key={t.bubbleId} value={t.bubbleId}>{t.name}</option>
                   ))}
                 </select>
                 <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -866,9 +712,9 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
                 >
                   <option value="">Service Type</option>
                   {(filterOptions?.serviceTypes ?? [])
-                    .filter((s) => !artistType || (filterOptions?.artistTypes ?? []).find((a) => a.name === artistType)?.bubbleId === s.artistTypeBubbleId || !s.artistTypeBubbleId)
+                    .filter((s) => !artistType || s.artistTypeBubbleId === artistType || !s.artistTypeBubbleId)
                     .map((s) => (
-                      <option key={s.bubbleId} value={s.name}>{s.name}</option>
+                      <option key={s.bubbleId} value={s.bubbleId}>{s.name}</option>
                     ))}
                 </select>
                 <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -920,7 +766,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
                 <p className="text-xs text-gray-300 mt-1">Try adjusting your filters</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {filtered.map((job) => (
                   <JobCard
                     key={job.id}
@@ -968,7 +814,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
                 <span className="text-sm">Loading PRO jobs...</span>
               </div>
             ) : proJobs.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {proJobs.map((job) => (
                   <ProJobCard
                     key={job.id}
@@ -1036,7 +882,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
               <div className="space-y-6">
                 {/* Regular job applications */}
                 {myApplications.length > 0 && (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <h2 className="text-sm font-black text-[#111]">
                       Jobs ({myApplications.length})
                     </h2>
@@ -1052,41 +898,31 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
 
                 {/* PRO job applications */}
                 {rawProApplications && rawProApplications.length > 0 && (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <h2 className="text-sm font-black text-[#111] flex items-center gap-1.5">
                       <Star size={13} className="text-yellow-500 fill-yellow-500" />
                       PRO Jobs ({rawProApplications.length})
                     </h2>
                     {(rawProApplications as any[]).map((app) => (
-                      <a
+                      <JobListCard
                         key={app.id}
+                        borderVariant="pro"
                         href={`/pro/${(app.serviceType ?? "open-position").toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-")}-${app.premiumJobId}`}
-                        className="flex items-center gap-3 p-4 rounded-xl border border-gray-100 bg-white hover:shadow-sm transition-all"
-                      >
-                        <div className="flex-shrink-0 w-10 h-10 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
-                          {app.logo ? (
-                            <img src={app.logo} alt={app.company ?? ""} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-sm font-black text-gray-400">
-                              {(app.company ?? "?")[0]?.toUpperCase()}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-[#111] truncate">{app.serviceType ?? "Open Position"}</p>
-                          {app.company && <p className="text-xs text-gray-500 truncate">{app.company}</p>}
-                          <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                            <MapPin size={10} /> {app.workFromAnywhere ? "Work From Anywhere" : (app.location ?? "Location TBD")}
-                          </p>
-                        </div>
-                        <span className={`flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${
-                          app.status === "Confirmed" ? "bg-green-50 text-green-600"
-                          : app.status === "Declined" ? "bg-red-50 text-red-500"
-                          : "bg-blue-50 text-blue-600"
-                        }`}>
-                          {app.status === "Confirmed" ? "Confirmed" : app.status === "Declined" ? "Declined" : "Applied"}
-                        </span>
-                      </a>
+                        avatarUrl={app.logo}
+                        avatarFallbackText={app.company ?? "?"}
+                        title={app.serviceType ?? "Open Position"}
+                        subtitle={app.company}
+                        location={app.workFromAnywhere ? "Work From Anywhere" : (formatLocation(app.location) ?? "Location TBD")}
+                        cta={
+                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                            app.status === "Confirmed" ? "bg-green-50 text-green-600"
+                            : app.status === "Declined" ? "bg-red-50 text-red-500"
+                            : "bg-blue-50 text-blue-600"
+                          }`}>
+                            {app.status === "Confirmed" ? "Confirmed" : app.status === "Declined" ? "Declined" : "Applied"}
+                          </span>
+                        }
+                      />
                     ))}
                   </div>
                 )}

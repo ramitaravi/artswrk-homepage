@@ -273,12 +273,18 @@ function ChatBubble({ msg, isFromMe }: { msg: Message; isFromMe: boolean }) {
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
+function initialConvoIdFromUrl(): number | null {
+  const raw = new URLSearchParams(window.location.search).get("conversationId");
+  const n = raw ? Number(raw) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
 export default function Messages() {
   const { user } = useAuth();
-  const [activeConvoId, setActiveConvoId] = useState<number | null>(null);
+  const [activeConvoId, setActiveConvoId] = useState<number | null>(initialConvoIdFromUrl);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
-  const [mobileChatOpen, setMobileChatOpen] = useState(false);
+  const [mobileChatOpen, setMobileChatOpen] = useState(() => initialConvoIdFromUrl() !== null);
   const [optimisticMsgs, setOptimisticMsgs] = useState<Message[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const unreadDividerRef = useRef<HTMLDivElement>(null);

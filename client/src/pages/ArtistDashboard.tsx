@@ -40,6 +40,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { formatLocation, getJobTitle } from "@/lib/utils";
 import { toProJobUrl } from "./ProJobDetail";
 
 // ─── Placeholder data (to be replaced with real API data) ─────────────────────
@@ -131,7 +132,7 @@ function SquareAvatar({ name, logo }: { name: string; logo?: string | null }) {
   }
 
   return (
-    <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center font-semibold text-gray-500 text-sm">
+    <div className="flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center font-semibold text-white text-sm artist-grad-bg">
       {initials}
     </div>
   );
@@ -156,20 +157,11 @@ function postedAgo(date: Date | string | null): string {
   return `${Math.floor(mos / 12)} year${Math.floor(mos / 12) !== 1 ? "s" : ""} ago`;
 }
 
-// Mirrors the Jobs page fallback: use the real title column, else the first
-// line of the description - unless that line is just the poster's own name
-// (legacy Bubble imports), in which case fall through to the studio name.
-function extractTitle(description: string | null | undefined, clientName?: string | null): string | null {
-  if (!description) return null;
-  const first = description.split("\n")[0].trim();
-  const isPosterName = !!clientName && first.toLowerCase() === clientName.toLowerCase();
-  if (first.length > 0 && first.length <= 80 && !isPosterName) return first;
-  return null;
-}
 
 function formatJobDate(job: any): string {
   if (job.dateType === "Ongoing") return "Ongoing";
   if (job.dateType === "Recurring") return "Recurring";
+  if (job.dateType === "Dates Flexible") return "Flexible";
   if (!job.startDate) return job.dateType ?? "";
   const s = new Date(job.startDate);
   if (isNaN(s.getTime())) return "";
@@ -214,6 +206,16 @@ function DashboardTab({ user }: { user: any }) {
 
   const { data: msgStats } = trpc.messages.myStats.useQuery();
   const unreadMessages = msgStats?.unreadMessages ?? 0;
+
+  const { data: myBookings } = trpc.artistDashboard.getBookings.useQuery();
+  const nextBooking = (myBookings as any[] ?? [])
+    .filter((b) => b.bookingStatus === "Confirmed" && b.startDate && new Date(b.startDate) > new Date())
+    .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())[0] ?? null;
+
+  const { data: connectStatus, isLoading: connectStatusLoading } = trpc.artistDashboard.stripeConnectStatus.useQuery();
+  const connectStripe = trpc.artistDashboard.createStripeConnectUrl.useMutation({
+    onSuccess: ({ url }) => { window.location.href = url; },
+  });
 
   const { data: jobsFeed, isLoading: feedLoading } = trpc.artistDashboard.getJobsFeed.useQuery(
     { limit: 20, offset: 0, lat: coords?.lat, lng: coords?.lng },
@@ -275,15 +277,34 @@ function DashboardTab({ user }: { user: any }) {
           >
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-[#111]">Your Tasks</span>
-              {unreadMessages > 0 && (
-                <span className="w-5 h-5 rounded-full bg-[#ec008c] text-white text-[10px] font-semibold flex items-center justify-center">{unreadMessages}</span>
+              {(unreadMessages > 0 || nextBooking) && (
+                <span className="w-5 h-5 rounded-full bg-[#ec008c] text-white text-[10px] font-semibold flex items-center justify-center">
+                  {unreadMessages + (nextBooking ? 1 : 0)}
+                </span>
               )}
             </div>
             <ChevronRight size={16} className={`text-gray-400 transition-transform ${tasksOpen ? "rotate-90" : ""}`} />
           </button>
           {tasksOpen && (
             <div className="px-5 pb-4 space-y-2">
-              {unreadMessages > 0 ? (
+              {nextBooking && (
+                <div
+                  className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => window.location.href = "/app/bookings"}
+                >
+                  <Calendar size={16} className="text-[#ec008c] flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-[#111]">
+                      Upcoming booking{nextBooking.clientCompanyName ? ` — ${nextBooking.clientCompanyName}` : ""}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {new Date(nextBooking.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </p>
+                  </div>
+                  <ChevronRight size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                </div>
+              )}
+              {unreadMessages > 0 && (
                 <div
                   className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
                   onClick={() => window.location.href = "/app/messages"}
@@ -297,7 +318,8 @@ function DashboardTab({ user }: { user: any }) {
                   </div>
                   <ChevronRight size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
                 </div>
-              ) : (
+              )}
+              {!nextBooking && unreadMessages === 0 && (
                 <p className="text-xs text-gray-400 py-1">No pending tasks — you're all caught up!</p>
               )}
               {!isPro && (
@@ -314,12 +336,41 @@ function DashboardTab({ user }: { user: any }) {
             </div>
           )}
         </div>
+
+        {/* Payouts — connected Stripe account status, always visible */}
+        {!connectStatusLoading && (
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Banknote size={16} className={connectStatus?.connected ? "text-green-600" : "text-gray-400"} />
+              <span className="text-sm font-semibold text-[#111]">Payouts</span>
+            </div>
+            {connectStatus?.connected ? (
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-green-600">
+                <CheckCircle2 size={13} /> Connected to Stripe
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-gray-500 mb-3">Connect a Stripe account so you can get paid for bookings.</p>
+                <button
+                  onClick={() => connectStripe.mutate({ origin: window.location.origin })}
+                  disabled={connectStripe.isPending}
+                  className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-[#111] px-4 py-2.5 rounded-xl hover:opacity-80 transition-opacity disabled:opacity-50"
+                >
+                  {connectStripe.isPending ? <Loader2 size={13} className="animate-spin" /> : null}
+                  Connect to Stripe
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Right column: jobs (primary CTA) ──────────────────────────── */}
       <div className="flex-1 min-w-0 w-full overflow-x-hidden space-y-6">
 
-        {/* PRO Jobs — horizontal scroll cards */}
+        {/* PRO Jobs — horizontal scroll cards (hidden when the section below is
+            already showing PRO jobs as the primary feed, to avoid duplicates) */}
+        {!showProJobsAsPrimary && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-semibold text-[#111] flex items-center gap-2">
@@ -340,7 +391,7 @@ function DashboardTab({ user }: { user: any }) {
                 const isApplied = appliedProJobIds.has(job.id);
                 const title = job.serviceType || job.title || "Job";
                 const company = job.companyName || job.company || "";
-                const location = job.workFromAnywhere ? "Work From Anywhere" : (job.location && !job.location.includes("[object") ? job.location : "Work From Anywhere");
+                const location = job.workFromAnywhere ? "Work From Anywhere" : (formatLocation(job.location) ?? "Work From Anywhere");
                 return (
                   <div key={job.id} className="flex-shrink-0 w-52 bg-white rounded-2xl border border-gray-100 p-4 flex flex-col justify-between relative">
                     {/* PRO badge */}
@@ -374,6 +425,7 @@ function DashboardTab({ user }: { user: any }) {
             </div>
           )}
         </div>
+        )}
 
         {/* Jobs for You (or PRO fallback if < 2 nearby) */}
         <div>
@@ -395,7 +447,7 @@ function DashboardTab({ user }: { user: any }) {
                 const isApplied = appliedProJobIds.has(job.id);
                 const title = job.serviceType || job.title || "Job";
                 const company = job.companyName || job.company || "";
-                const location = job.workFromAnywhere ? "Work From Anywhere" : (job.location && !job.location.includes("[object") ? job.location : "");
+                const location = job.workFromAnywhere ? "Work From Anywhere" : (formatLocation(job.location) ?? "");
                 const ago = postedAgo(job.createdAt);
                 const rate = formatRate(job);
                 const dateLabel = formatJobDate(job);
@@ -434,7 +486,7 @@ function DashboardTab({ user }: { user: any }) {
               })
             ) : nearbyJobs.map((job: any) => {
               const studio = job.clientCompanyName || job.clientName || "Studio";
-              const location = job.locationAddress && !job.locationAddress.includes("[object") ? job.locationAddress : "";
+              const location = formatLocation(job.locationAddress) ?? "";
               const ago = postedAgo(job.createdAt);
               const rate = formatRate(job);
               const dateLabel = job.dateType === "Ongoing" ? "Ongoing" : formatJobDate(job);
@@ -446,7 +498,7 @@ function DashboardTab({ user }: { user: any }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <div className="min-w-0">
-                        <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{job.title || extractTitle(job.description, studio) || studio}</h3>
+                        <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{getJobTitle(job.title, job.description, studio)}</h3>
                         <p className="text-xs text-gray-500 truncate">{studio}</p>
                       </div>
                       <a
@@ -552,7 +604,7 @@ function JobsTab({ user }: { user: any }) {
                       <p className="text-sm font-semibold text-[#111]">{job.studioName || job.creatorName}</p>
                       <p className="text-sm text-gray-700">{job.title || job.serviceType}</p>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        {job.location && !job.location.includes("[object") ? job.location : (job.workFromAnywhere ? "Work From Anywhere" : "Location TBD")}
+                        {job.workFromAnywhere ? "Work From Anywhere" : (formatLocation(job.location) ?? "Location TBD")}
                         {job.postedAgo ? ` · Posted ${job.postedAgo}` : ""}
                       </p>
                       <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
@@ -606,7 +658,7 @@ function JobsTab({ user }: { user: any }) {
                         <p className="text-sm font-semibold text-[#111] truncate">{job.serviceType}</p>
                         <p className="text-xs text-gray-500">{job.companyName}</p>
                         <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                          <MapPin size={10} /> {job.workFromAnywhere ? "Work From Anywhere" : (job.location && !job.location.includes("[object") ? job.location : "Location TBD")}
+                          <MapPin size={10} /> {job.workFromAnywhere ? "Work From Anywhere" : (formatLocation(job.location) ?? "Location TBD")}
                         </p>
                       </div>
                     </div>
@@ -778,10 +830,20 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
     },
     onError: (e: any) => toast.error(e.message || "Failed to submit invoice"),
   });
+  const { data: connectStatus } = trpc.artistDashboard.stripeConnectStatus.useQuery();
+  const connectStripe = trpc.artistDashboard.createStripeConnectUrl.useMutation({
+    onSuccess: ({ url }) => { window.location.href = url; },
+    onError: (e: any) => toast.error(e.message || "Couldn't start Stripe connect"),
+  });
 
   const totalReimb = (reimbursements ?? []).reduce((s: number, r: any) => s + (r.value ?? 0), 0);
-  const processingFee = Math.round((rate + totalReimb) * 0.04);
-  const invoiceTotal = rate + totalReimb + processingFee;
+  const isHourlyBooking = booking.hours != null && booking.hours > 0;
+  // `rate` is the per-hour (or flat) rate the artist can edit — the actual
+  // amount owed multiplies by hours for hourly bookings. This was previously
+  // sent straight through unmultiplied, silently undercounting hourly pay.
+  const earnedAmount = isHourlyBooking ? rate * booking.hours : rate;
+  const processingFee = Math.round((earnedAmount + totalReimb) * 0.04);
+  const invoiceTotal = earnedAmount + totalReimb + processingFee;
 
   async function handleAddReimbursement() {
     if (!reimbValue || isNaN(parseFloat(reimbValue))) return;
@@ -901,24 +963,44 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
               </div>
             )}
 
-            {/* Payment method toggle — hidden when already paid */}
+            {/* Payment method — the studio sets this when confirming the booking.
+                For those, this is just a status readout, not something the
+                artist should be able to flip. Only truly legacy bookings with
+                no paymentMethod on record (from before that was captured) get
+                the picker, so it can be resolved once. */}
             {!isAlreadyPaid && (
               <div>
-                <p className="text-xs font-bold text-gray-500 mb-2">How was this paid?</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPaymentMethod.mutate({ bookingId: booking.id, method: "artswrk" })}
-                    className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${effectiveMethod === "artswrk" ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}
-                  >
-                    Paid via Artswrk
-                  </button>
-                  <button
-                    onClick={() => setPaymentMethod.mutate({ bookingId: booking.id, method: "direct" })}
-                    className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${effectiveMethod === "direct" ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}
-                  >
-                    Paid directly
-                  </button>
-                </div>
+                <p className="text-xs font-bold text-gray-500 mb-2">Payment method</p>
+                {booking.paymentMethod ? (
+                  <div className="flex items-center gap-2 py-2 px-3 rounded-xl bg-gray-50 border border-gray-100">
+                    {effectiveMethod === "artswrk" ? (
+                      <CreditCard size={14} className="text-gray-500 flex-shrink-0" />
+                    ) : (
+                      <Banknote size={14} className="text-gray-500 flex-shrink-0" />
+                    )}
+                    <span className="text-xs font-bold text-[#111]">
+                      {effectiveMethod === "artswrk" ? "Paid via Artswrk" : "Paid directly by the studio"}
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-xs text-gray-400 mb-2">Not set yet — let us know how you were paid for this booking:</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setPaymentMethod.mutate({ bookingId: booking.id, method: "artswrk" })}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${effectiveMethod === "artswrk" ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}
+                      >
+                        Paid via Artswrk
+                      </button>
+                      <button
+                        onClick={() => setPaymentMethod.mutate({ bookingId: booking.id, method: "direct" })}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${effectiveMethod === "direct" ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}
+                      >
+                        Paid directly
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -982,20 +1064,26 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
             )}
 
             {/* Rate summary — always visible when there's a non-zero rate or reimbursements */}
-            {(booking.artistRate > 0 || totalReimb > 0) && (
-              <div className="border-t border-gray-50 pt-4 space-y-1.5 text-sm">
-                {booking.artistRate > 0 && booking.hours != null && booking.hours > 0 && (
-                  <div className="flex justify-between text-gray-500 text-xs">
-                    <span>Hourly rate</span>
-                    <span>${booking.artistRate}/hr × {booking.hours} hrs</span>
+            {(booking.artistRate > 0 || totalReimb > 0) && (() => {
+              const isHourlyBooking = booking.hours != null && booking.hours > 0;
+              // Hours were previously shown but never actually multiplied into
+              // the total — the number just sat there unused. Fixed.
+              const baseAmount = isHourlyBooking ? booking.artistRate * booking.hours : booking.artistRate;
+              return (
+                <div className="border-t border-gray-50 pt-4 space-y-1.5 text-sm">
+                  {isHourlyBooking && (
+                    <div className="flex justify-between text-gray-500 text-xs">
+                      <span>Hourly rate</span>
+                      <span>${booking.artistRate}/hr × {booking.hours} hrs = ${baseAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-[#111] text-base pt-1">
+                    <span>Total Rate</span>
+                    <span>${(baseAmount + totalReimb).toFixed(2)}</span>
                   </div>
-                )}
-                <div className="flex justify-between font-bold text-[#111] text-base pt-1">
-                  <span>Total Rate</span>
-                  <span>${(booking.artistRate + totalReimb).toFixed(2)}</span>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Payment action forms — hidden when already paid */}
             {!isAlreadyPaid && (<>
@@ -1017,7 +1105,23 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
               )}
 
               {/* Artswrk invoice */}
-              {effectiveMethod === "artswrk" && !isInvoiceSubmitted && (
+              {effectiveMethod === "artswrk" && !isInvoiceSubmitted && connectStatus && !connectStatus.connected && (
+                <div className="border-t border-gray-50 pt-4">
+                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-2.5">
+                    <p className="text-sm font-bold text-[#111]">Connect your payout account first</p>
+                    <p className="text-xs text-gray-500">You need a connected Stripe account before you can invoice a studio — that's where the payment lands.</p>
+                    <button
+                      onClick={() => connectStripe.mutate({ origin: window.location.origin })}
+                      disabled={connectStripe.isPending}
+                      className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {connectStripe.isPending ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />}
+                      Connect to Stripe
+                    </button>
+                  </div>
+                </div>
+              )}
+              {effectiveMethod === "artswrk" && !isInvoiceSubmitted && connectStatus?.connected && (
                 <div className="space-y-3 border-t border-gray-50 pt-4">
                   <p className="text-xs font-bold text-gray-500">Submit Invoice to Artswrk</p>
                   <input
@@ -1027,12 +1131,14 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                   />
                   {rate > 0 && (
                     <div className="bg-pink-50 rounded-xl p-3 space-y-1.5 text-xs">
-                      <div className="flex justify-between text-gray-600"><span>Artist rate</span><span>${rate}</span></div>
+                      {isHourlyBooking && (
+                        <div className="flex justify-between text-gray-600"><span>Rate</span><span>${rate}/hr × {booking.hours} hrs</span></div>
+                      )}
                       <div className="flex justify-between text-gray-600"><span>Reimbursements</span><span>${totalReimb}</span></div>
-                      <div className="flex justify-between text-gray-600"><span>4% processing fee</span><span>${processingFee}</span></div>
                       <div className="flex justify-between font-bold text-[#111] border-t border-pink-100 pt-1.5">
-                        <span>Invoice total</span><span className="text-[#ec008c]">${invoiceTotal}</span>
+                        <span>You'll receive</span><span className="text-[#ec008c]">${(earnedAmount + totalReimb).toFixed(2)}</span>
                       </div>
+                      <p className="text-[11px] text-gray-400 pt-0.5">You get your full rate — we add a small Stripe processing fee on top, billed to the studio.</p>
                     </div>
                   )}
                   <textarea value={invoiceNotes} onChange={(e) => setInvoiceNotes(e.target.value)} rows={2}
@@ -1040,7 +1146,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                     className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-[#ec008c] resize-none"
                   />
                   <button
-                    onClick={() => submitInvoice.mutate({ bookingId: booking.id, artistRate: rate || undefined, notes: invoiceNotes || undefined, origin: window.location.origin })}
+                    onClick={() => submitInvoice.mutate({ bookingId: booking.id, artistRate: earnedAmount || undefined, notes: invoiceNotes || undefined, origin: window.location.origin })}
                     disabled={submitInvoice.isPending || rate <= 0}
                     className="w-full py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#ff7171] to-[#ec008c] hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
@@ -1050,8 +1156,25 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                 </div>
               )}
               {effectiveMethod === "artswrk" && isInvoiceSubmitted && (
-                <div className="flex items-center gap-2 text-sm text-green-600 font-semibold">
-                  <CheckCircle2 size={15} /> Invoice submitted on {new Date(booking.artswrkInvoiceSubmittedAt).toLocaleDateString()}
+                <div className="bg-green-50 border border-green-100 rounded-xl p-4 space-y-2.5">
+                  <div className="flex items-center gap-2 text-sm text-green-700 font-semibold">
+                    <CheckCircle2 size={15} /> Invoice submitted on {new Date(booking.artswrkInvoiceSubmittedAt).toLocaleDateString()}
+                  </div>
+                  <div className="border-t border-green-100 pt-2.5 space-y-1.5 text-xs">
+                    {isHourlyBooking && (
+                      <div className="flex justify-between text-gray-600"><span>Rate</span><span>${booking.artistRate}/hr × {booking.hours} hrs</span></div>
+                    )}
+                    {totalReimb > 0 && (
+                      <div className="flex justify-between text-gray-600"><span>Reimbursements</span><span>${totalReimb.toFixed(2)}</span></div>
+                    )}
+                    <div className="flex justify-between font-bold text-[#111]">
+                      <span>You'll receive</span><span>${(earnedAmount + totalReimb).toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <div className={`flex items-center gap-1.5 text-xs font-semibold pt-1 ${isAlreadyPaid ? "text-green-600" : "text-amber-600"}`}>
+                    {isAlreadyPaid ? <CheckCircle2 size={12} /> : <Clock size={12} />}
+                    {isAlreadyPaid ? "Paid" : "Payment pending from the studio"}
+                  </div>
                 </div>
               )}
             </>)}
@@ -1227,8 +1350,10 @@ function ConfirmationCard({ booking }: { booking: any }) {
 
   const totalReimb = (reimbursements ?? []).reduce((s: number, r: any) => s + (r.value ?? 0), 0);
   const rate = parseFloat(artistRate) || 0;
-  const processingFee = Math.round((rate + totalReimb) * 0.04);
-  const invoiceTotal = rate + totalReimb + processingFee;
+  const isHourlyBooking = booking.hours != null && booking.hours > 0;
+  const earnedAmount = isHourlyBooking ? rate * booking.hours : rate;
+  const processingFee = Math.round((earnedAmount + totalReimb) * 0.04);
+  const invoiceTotal = earnedAmount + totalReimb + processingFee;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -1392,18 +1517,18 @@ function ConfirmationCard({ booking }: { booking: any }) {
                   {/* Invoice summary */}
                   <div className="bg-pink-50 rounded-xl p-3 space-y-1.5 text-xs">
                     <p className="font-semibold text-[#111] mb-2">Invoice Summary</p>
-                    <div className="flex justify-between text-gray-600">
-                      <span>Artist rate</span><span>${rate}</span>
-                    </div>
+                    {isHourlyBooking && (
+                      <div className="flex justify-between text-gray-600">
+                        <span>Rate</span><span>${rate}/hr × {booking.hours} hrs</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-gray-600">
                       <span>Reimbursements</span><span>${totalReimb}</span>
                     </div>
-                    <div className="flex justify-between text-gray-600">
-                      <span>4% processing fee</span><span>${processingFee}</span>
-                    </div>
                     <div className="flex justify-between font-bold text-[#111] border-t border-pink-100 pt-1.5 mt-1.5">
-                      <span>Total to invoice client</span><span className="text-[#ec008c]">${invoiceTotal}</span>
+                      <span>You'll receive</span><span className="text-[#ec008c]">${(earnedAmount + totalReimb).toFixed(2)}</span>
                     </div>
+                    <p className="text-[11px] text-gray-400 pt-0.5">You get your full rate — we add a small Stripe processing fee on top, billed to the studio.</p>
                   </div>
 
                   {/* Notes */}
@@ -1421,7 +1546,7 @@ function ConfirmationCard({ booking }: { booking: any }) {
                   <button
                     onClick={() => submitInvoice.mutate({
                       bookingId: booking.id,
-                      artistRate: rate || undefined,
+                      artistRate: earnedAmount || undefined,
                       notes: invoiceNotes || undefined,
                       origin: window.location.origin,
                     })}
@@ -1778,7 +1903,7 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
                   <p className="text-sm font-semibold text-[#111]">{job.serviceType || "Open Position"}</p>
                   <p className="text-xs text-gray-500">{job.company}</p>
                   <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                    <MapPin size={10} /> {job.workFromAnywhere ? "Work From Anywhere" : (job.location ?? "Location TBD")}
+                    <MapPin size={10} /> {job.workFromAnywhere ? "Work From Anywhere" : (formatLocation(job.location) ?? "Location TBD")}
                   </p>
                 </div>
                 <a

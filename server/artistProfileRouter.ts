@@ -2,10 +2,21 @@ import { z } from "zod";
 import { eq, count } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
-import { users, artistReviews, artistServiceCategories, bookings } from "../drizzle/schema";
+import { users, artistReviews, artistServiceCategories, artistResumes, bookings } from "../drizzle/schema";
 
 // ─── Helper: parse JSON array safely ──────────────────────────────────────────
 function parseJsonArray(val: string | null | undefined): string[] {
+  if (!val) return [];
+  try {
+    const parsed = JSON.parse(val);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+type SubServiceSetting = { name: string; listOnProfile: boolean; jobEmailEnabled: boolean };
+function parseSubServiceSettings(val: string | null | undefined): SubServiceSetting[] {
   if (!val) return [];
   try {
     const parsed = JSON.parse(val);
@@ -155,13 +166,24 @@ export const artistProfileRouter = router({
         .from(artistServiceCategories)
         .where(eq(artistServiceCategories.artistUserId, input.userId))
         .orderBy(artistServiceCategories.sortOrder);
-      return cats.map(c => ({
-        id: c.id,
-        name: c.name,
-        imageUrl: c.imageUrl || "",
-        subServices: parseJsonArray(c.subServices),
-        sortOrder: c.sortOrder ?? 0,
-      }));
+      return cats
+        .map(c => {
+          const savedSettings = parseSubServiceSettings(c.subServiceSettings);
+          const settingsByName = new Map(savedSettings.map(s => [s.name, s]));
+          // Only show sub-services the artist hasn't unchecked "List on
+          // Profile" for. No saved setting (older categories) defaults to shown.
+          const subServices = parseJsonArray(c.subServices).filter(
+            name => settingsByName.get(name)?.listOnProfile !== false
+          );
+          return {
+            id: c.id,
+            name: c.name,
+            imageUrl: c.imageUrl || "",
+            subServices,
+            sortOrder: c.sortOrder ?? 0,
+          };
+        })
+        .filter(c => c.subServices.length > 0);
     }),
 
   /** Get a public profile by user ID */
@@ -241,13 +263,25 @@ export const artistProfileRouter = router({
       .from(artistServiceCategories)
       .where(eq(artistServiceCategories.artistUserId, ctx.user.id))
       .orderBy(artistServiceCategories.sortOrder);
-    return cats.map(c => ({
-      id: c.id,
-      name: c.name,
-      imageUrl: c.imageUrl || "",
-      subServices: parseJsonArray(c.subServices),
-      sortOrder: c.sortOrder ?? 0,
-    }));
+    return cats.map(c => {
+      const subServices = parseJsonArray(c.subServices);
+      const savedSettings = parseSubServiceSettings(c.subServiceSettings);
+      const settingsByName = new Map(savedSettings.map(s => [s.name, s]));
+      return {
+        id: c.id,
+        name: c.name,
+        imageUrl: c.imageUrl || "",
+        subServices,
+        // Every sub-service gets a setting row — defaulting to listed/enabled
+        // for older categories saved before this per-item toggle existed.
+        subServiceSettings: subServices.map(name => settingsByName.get(name) ?? {
+          name,
+          listOnProfile: true,
+          jobEmailEnabled: true,
+        }),
+        sortOrder: c.sortOrder ?? 0,
+      };
+    });
   }),
 
   /** Update service categories for the current user */
@@ -399,6 +433,25 @@ export const artistProfileRouter = router({
         .update(users)
         .set(updateData as any)
         .where(eq(users.id, ctx.user.id));
+
+      // A resume saved here (Edit Profile) should also show up in the resume
+      // picker on the job application page, which reads from the separate
+      // artist_resumes table — insert any not already synced there.
+      if (input.resumeFiles !== undefined && input.resumeFiles.length > 0) {
+        const existing = await db
+          .select({ fileUrl: artistResumes.fileUrl })
+          .from(artistResumes)
+          .where(eq(artistResumes.artistUserId, ctx.user.id));
+        const existingUrls = new Set(existing.map(r => r.fileUrl));
+        const toInsert = input.resumeFiles.filter(r => !existingUrls.has(r.url));
+        for (const r of toInsert) {
+          await db.insert(artistResumes).values({
+            artistUserId: ctx.user.id,
+            title: r.name,
+            fileUrl: r.url,
+          });
+        }
+      }
 
       return { success: true };
     }),

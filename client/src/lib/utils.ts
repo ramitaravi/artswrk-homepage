@@ -50,3 +50,85 @@ export function formatLocation(location?: string | null): string | null {
   const region = abbreviateRegion(parts[parts.length - 2]);
   return region ? `${city}, ${region}` : city;
 }
+
+const JOB_TITLE_PATTERNS: [RegExp, string][] = [
+  [/sub(stitute)?\s+teacher/i, "Substitute Teacher"],
+  [/ballet/i, "Ballet Teacher"],
+  [/hip\s*hop/i, "Hip Hop Instructor"],
+  [/tap/i, "Tap Teacher"],
+  [/jazz/i, "Jazz Teacher"],
+  [/lyrical/i, "Lyrical Teacher"],
+  [/contemporary/i, "Contemporary Teacher"],
+  [/acro/i, "Acro Teacher"],
+  [/piano/i, "Piano Teacher"],
+  [/violin/i, "Violin Teacher"],
+  [/voice|vocal/i, "Vocal Coach"],
+  [/judge|adjudicat/i, "Dance Adjudicator"],
+  [/choreograph/i, "Choreographer"],
+  [/photograph/i, "Photographer"],
+  [/videograph/i, "Videographer"],
+  [/yoga/i, "Yoga Instructor"],
+  [/pilates/i, "Pilates Instructor"],
+  [/recurring|weekly|instructor/i, "Dance Instructor"],
+  [/teacher|coach/i, "Dance Teacher"],
+];
+
+/**
+ * A "short sweet title" for a regular (non-PRO) job — the single source of
+ * truth used everywhere a job title is displayed. Bubble-sourced jobs often
+ * have a full sentence/pitch stored directly in the title column (not just
+ * missing), so a raw, non-empty `title` is not automatically trusted: it's
+ * only used as-is when it actually reads like a short title. Otherwise falls
+ * back to the first line of the description, then keyword-pattern matching,
+ * then a truncated first line as a last resort.
+ */
+export function getJobTitle(
+  title: string | null | undefined,
+  description: string | null | undefined,
+  posterName?: string | null,
+): string {
+  const rawTitle = title?.trim();
+  const looksLikeShortTitle = !!rawTitle && rawTitle.length <= 60 && !/[.!?]$/.test(rawTitle);
+  if (looksLikeShortTitle) return rawTitle!;
+
+  const text = description?.trim() || rawTitle || "";
+  if (!text) return "Open Position";
+
+  const first = text.split("\n")[0].trim();
+  const isPosterName = !!posterName && first.toLowerCase() === posterName.toLowerCase();
+  if (first.length > 0 && first.length <= 60 && !isPosterName) return first;
+
+  for (const [re, label] of JOB_TITLE_PATTERNS) {
+    if (re.test(text)) return label;
+  }
+
+  return first.length > 60 ? `${first.slice(0, 60)}…` : (first || "Open Position");
+}
+
+/**
+ * Normalizes an Instagram profile field that may be stored as a plain
+ * handle ("ramita.ravi"), an "@handle", or a full pasted URL
+ * ("https://www.instagram.com/ramita.ravi/") — all three show up in
+ * synced Bubble data. Returns a clean handle for display and a correct
+ * profile URL for the link, or null if the value can't be parsed.
+ */
+export function normalizeInstagram(raw?: string | null): { handle: string; url: string } | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const path = new URL(trimmed).pathname;
+      const handle = path.split("/").filter(Boolean)[0];
+      if (!handle) return null;
+      return { handle, url: `https://instagram.com/${handle}` };
+    } catch {
+      return null;
+    }
+  }
+
+  const handle = trimmed.replace(/^@/, "").split("/").filter(Boolean)[0];
+  if (!handle) return null;
+  return { handle, url: `https://instagram.com/${handle}` };
+}

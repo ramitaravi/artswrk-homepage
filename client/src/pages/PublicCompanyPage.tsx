@@ -21,10 +21,60 @@ function getInitials(name?: string | null): string {
   return name.slice(0, 2).toUpperCase();
 }
 
+// ─── Company Chooser ─────────────────────────────────────────────────────────
+// Shown at /studio/:userId when the owner has multiple distinct companies —
+// each is its own business, so we ask which one you're looking for instead of
+// mashing their jobs together under one shared brand.
+function CompanyChooser({ userId, owner, companies }: {
+  userId: number;
+  owner: { name?: string | null; clientCompanyName?: string | null };
+  companies: { id: number; name?: string | null; logo?: string | null; locationAddress?: string | null; description?: string | null }[];
+}) {
+  const ownerName = owner.clientCompanyName || owner.name || "This hirer";
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="h-40 w-full" style={{ background: "linear-gradient(135deg, #F25722 0%, #FFBC5D 100%)" }} />
+      <div className="max-w-3xl mx-auto px-6 py-10">
+        <h1 className="text-2xl font-black text-[#111] mb-1">{ownerName}</h1>
+        <p className="text-gray-500 mb-8">{ownerName} runs {companies.length} companies on Artswrk — choose one to see open roles.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {companies.map((c) => (
+            <Link
+              key={c.id}
+              href={`/studio/${userId}/${c.id}`}
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4 hover:shadow-md hover:border-orange-200 transition-all"
+            >
+              <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 flex items-center justify-center">
+                {fixUrl(c.logo) ? (
+                  <img src={fixUrl(c.logo)!} alt={c.name ?? ""} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-lg font-black text-gray-400">{getInitials(c.name)}</span>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-base font-bold text-[#111] truncate">{c.name || "Studio"}</p>
+                {c.locationAddress && (
+                  <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                    <MapPin size={10} /> {c.locationAddress}
+                  </p>
+                )}
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PublicCompanyPage() {
-  const params = useParams<{ userId: string }>();
+  const params = useParams<{ userId: string; companyId?: string }>();
   const userId = parseInt(params.userId ?? "0", 10);
-  const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
+  // A companyId in the URL means "this is one specific company's page" —
+  // each company gets its own identity instead of being mashed into a
+  // shared "Locations" dropdown under one brand.
+  const urlCompanyId = params.companyId ? parseInt(params.companyId, 10) : null;
+  const [selectedLocationId, setSelectedLocationId] = useState<number | null>(urlCompanyId);
 
   const { data, isLoading, error } = trpc.companies.getPublicPage.useQuery(
     { userId },
@@ -38,15 +88,17 @@ export default function PublicCompanyPage() {
     const { jobs, companies } = data;
     const base = selectedLocationId ? (() => {
       const activeCompany = companies.find((c) => c.id === selectedLocationId);
-      if (!activeCompany?.bubbleClientCompanyId) return jobs;
+      if (!activeCompany?.bubbleClientCompanyId) return urlCompanyId ? [] : jobs;
       const matched = jobs.filter((j) => (j as any).bubbleClientCompanyId === activeCompany.bubbleClientCompanyId);
-      return matched.length > 0 ? matched : jobs;
+      // Only fall back to "all jobs" on the multi-location dropdown view —
+      // a dedicated company page should never silently show another company's jobs.
+      return matched.length > 0 ? matched : (urlCompanyId ? [] : jobs);
     })() : jobs;
     return [...base].sort((a, b) => {
       const aB = !!(a as any).isBoosted; const bB = !!(b as any).isBoosted;
       return aB === bB ? 0 : aB ? -1 : 1;
     });
-  }, [data, selectedLocationId]);
+  }, [data, selectedLocationId, urlCompanyId]);
 
   if (isLoading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -64,10 +116,17 @@ export default function PublicCompanyPage() {
 
   const { owner, companies } = data;
 
-  // Active location (from tab selection or first company)
+  // No companyId in the URL and this owner has multiple distinct companies —
+  // show a chooser instead of mashing them together under one brand.
+  if (!urlCompanyId && companies.length > 1) {
+    return <CompanyChooser userId={userId} owner={owner} companies={companies} />;
+  }
+
+  // Active location (from tab selection, URL companyId, or the single company)
   const activeCompany = companies.length > 0
     ? (companies.find((c) => c.id === selectedLocationId) ?? companies[0])
     : null;
+  const sisterCompanies = urlCompanyId ? companies.filter((c) => c.id !== urlCompanyId) : [];
 
   const companyName = activeCompany?.name || owner.clientCompanyName || owner.name || "Studio";
   const logo = fixUrl(activeCompany?.logo) || fixUrl(owner.profilePicture);
@@ -91,8 +150,8 @@ export default function PublicCompanyPage() {
             <h1 className="text-3xl font-black text-[#111] mb-1">Open Positions</h1>
             <p className="text-gray-500 mb-5">Apply to our open roles below!</p>
 
-            {/* Location dropdown — only shown when there are multiple */}
-            {companies.length > 1 && (
+            {/* Location dropdown — only on the merged multi-location view, never on a dedicated company page */}
+            {companies.length > 1 && !urlCompanyId && (
               <div className="relative w-fit mb-6">
                 <select
                   value={selectedLocationId ?? ""}
@@ -115,7 +174,7 @@ export default function PublicCompanyPage() {
                 <p className="text-xs mt-1">Check back soon for new opportunities.</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {filteredJobs.map((job) => (
                   <div key={job.id} className={`bg-white rounded-2xl border shadow-sm px-5 py-4 flex items-center gap-4 hover:shadow-md transition-shadow ${(job as any).isBoosted ? "border-orange-200" : "border-gray-100"}`}>
                     {/* Logo */}
@@ -195,8 +254,8 @@ export default function PublicCompanyPage() {
                   )}
                 </div>
 
-                {/* All locations list in card */}
-                {companies.length > 0 && (
+                {/* Location — single address, or the merged-view location switcher */}
+                {companies.length > 0 && !urlCompanyId && (
                   <div className="mb-4">
                     <h3 className="text-xs font-bold text-[#111] mb-2 flex items-center gap-1.5">
                       <MapPin size={11} /> {companies.length > 1 ? "Locations" : "Location"}
@@ -220,6 +279,39 @@ export default function PublicCompanyPage() {
                             )}
                           </div>
                         </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {urlCompanyId && location && (
+                  <div className="mb-4">
+                    <h3 className="text-xs font-bold text-[#111] mb-2 flex items-center gap-1.5">
+                      <MapPin size={11} /> Location
+                    </h3>
+                    <p className="text-xs text-gray-500 leading-snug">{location}</p>
+                  </div>
+                )}
+
+                {/* Sister companies — same owner, different business */}
+                {sisterCompanies.length > 0 && (
+                  <div className="mb-4 pt-3 border-t border-gray-100">
+                    <h3 className="text-xs font-bold text-[#111] mb-2">Sister Companies</h3>
+                    <div className="space-y-1.5">
+                      {sisterCompanies.map((c) => (
+                        <Link
+                          key={c.id}
+                          href={`/studio/${userId}/${c.id}`}
+                          className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-left text-gray-500 hover:bg-gray-50 hover:text-[#F25722] transition-colors"
+                        >
+                          <div className="w-6 h-6 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 flex items-center justify-center">
+                            {fixUrl(c.logo) ? (
+                              <img src={fixUrl(c.logo)!} alt={c.name ?? ""} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-[9px] font-black text-gray-400">{getInitials(c.name)}</span>
+                            )}
+                          </div>
+                          <p className="text-xs font-semibold leading-snug">{c.name || "Studio"}</p>
+                        </Link>
                       ))}
                     </div>
                   </div>

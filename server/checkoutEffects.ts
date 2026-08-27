@@ -135,7 +135,19 @@ export async function applyCheckoutSessionCompleted(session: any): Promise<void>
           const artist = await getUser(booking.artistUserId);
           if (artist?.email) {
             const { sendSimpleEmail } = await import("./email");
-            const totalDollars = (session.amount_total ?? 0) / 100;
+            // Show what the artist actually receives, not the total the studio
+            // paid — that total includes Artswrk's cut of the rate spread.
+            let totalDollars = (session.amount_total ?? 0) / 100;
+            if (paymentIntentId) {
+              try {
+                const { getStripe } = await import("./stripe");
+                const pi = await getStripe().paymentIntents.retrieve(paymentIntentId);
+                const feeCents = (pi as any).application_fee_amount ?? 0;
+                totalDollars = ((session.amount_total ?? 0) - feeCents) / 100;
+              } catch (feeErr: any) {
+                console.error("[Checkout] Couldn't retrieve application fee, showing gross amount:", feeErr.message);
+              }
+            }
             const periodLabel = period ? new Date(period.periodStart).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "";
             await sendSimpleEmail({
               to: artist.email,
@@ -166,7 +178,20 @@ export async function applyCheckoutSessionCompleted(session: any): Promise<void>
           const artist = await getUser(booking.artistUserId);
           if (artist?.email) {
             const { sendSimpleEmail } = await import("./email");
-            const totalDollars = (session.amount_total ?? 0) / 100;
+            // Show what the artist actually receives, not the total the studio
+            // paid — that total includes the Artswrk processing fee, which
+            // artists never see anywhere else in the product.
+            let totalDollars = (session.amount_total ?? 0) / 100;
+            if (paymentIntentId) {
+              try {
+                const { getStripe } = await import("./stripe");
+                const pi = await getStripe().paymentIntents.retrieve(paymentIntentId);
+                const feeCents = (pi as any).application_fee_amount ?? 0;
+                totalDollars = ((session.amount_total ?? 0) - feeCents) / 100;
+              } catch (feeErr: any) {
+                console.error("[Checkout] Couldn't retrieve application fee, showing gross amount:", feeErr.message);
+              }
+            }
             await sendSimpleEmail({
               to: artist.email,
               subject: `Payment Received — Booking #${bookingId}`,

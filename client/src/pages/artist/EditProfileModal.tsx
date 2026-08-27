@@ -4,7 +4,7 @@
  */
 
 import { useState, useRef, useCallback } from "react";
-import { ArrowLeft, Loader2, Upload, Trash2, Pencil, X, Check } from "lucide-react";
+import { ArrowLeft, Loader2, Upload, Trash2, Pencil, X, Check, Eye } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -107,12 +107,11 @@ export default function EditProfilePage({ onClose, initialTab = "about" }: EditP
   const [allEmailsDisabled, setAllEmailsDisabled] = useState(false);
 
   if (serviceCategories && !services) {
-    const mapped: ServiceCategory[] = serviceCategories.map((cat, i) => {
-      const subSettings: SubServiceSetting[] = cat.subServices.map(sub => ({
-        name: sub,
-        listOnProfile: true,
-        jobEmailEnabled: true,
-      }));
+    const mapped: ServiceCategory[] = serviceCategories.map((cat) => {
+      const savedByName = new Map((cat.subServiceSettings ?? []).map(s => [s.name, s]));
+      const subSettings: SubServiceSetting[] = cat.subServices.map(sub => (
+        savedByName.get(sub) ?? { name: sub, listOnProfile: true, jobEmailEnabled: true }
+      ));
       return {
         id: cat.id,
         name: cat.name,
@@ -681,6 +680,15 @@ export default function EditProfilePage({ onClose, initialTab = "about" }: EditP
                       ) : (
                         <span className="flex-1 text-sm text-gray-800 truncate">{resume.name}</span>
                       )}
+                      <a
+                        href={resume.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        title="Preview"
+                      >
+                        <Eye size={15} />
+                      </a>
                       <button
                         onClick={() => { setEditingResumeName(idx); setEditResumeValue(resume.name); }}
                         className="text-gray-400 hover:text-gray-600 transition-colors"

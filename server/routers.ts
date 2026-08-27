@@ -1132,7 +1132,7 @@ export const appRouter = router({
      */
     publicListEnriched: publicProcedure
       .input(z.object({
-        limit: z.number().min(1).max(200).default(100),
+        limit: z.number().min(1).max(1000).default(100),
         offset: z.number().min(0).default(0),
         artistType: z.string().optional(),
         serviceType: z.string().optional(),
@@ -1237,8 +1237,9 @@ export const appRouter = router({
             const citySlug = (job.locationAddress ?? "remote").split(",")[0].trim().toLowerCase().replace(/\s+/g, "-");
             const titleSlug = jobTitle.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-");
             const jobUrl = `${origin}/jobs/${citySlug}/${titleSlug}-${job.id}`;
+            const clientDashboardUrl = `${origin}/app/jobs/${job.id}`;
 
-            await Promise.allSettled([
+            const emailTasks: Promise<boolean>[] = [
               sendApplicationConfirmationEmail({
                 artistName: user.firstName ?? user.name ?? "Artist",
                 jobTitle,
@@ -1246,17 +1247,26 @@ export const appRouter = router({
                 jobRate,
                 jobUrl,
               }),
-              sendNewApplicantAlertEmail({
-                artistName: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.name || user.email || "Unknown",
-                artistEmail: user.email ?? "(no email)",
-                jobTitle,
-                jobLocation,
-                jobRate,
-                jobUrl,
-                message: input.message,
-                resumeLink: input.resumeLink || undefined,
-              }),
-            ]);
+            ];
+
+            const clientUser = job.clientUserId ? await getUserById(job.clientUserId) : null;
+            if (clientUser?.email) {
+              emailTasks.push(
+                sendNewApplicantAlertEmail({
+                  to: clientUser.email,
+                  artistName: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.name || user.email || "Unknown",
+                  artistEmail: user.email ?? "(no email)",
+                  jobTitle,
+                  jobLocation,
+                  jobRate,
+                  jobUrl: clientDashboardUrl,
+                  message: input.message,
+                  resumeLink: input.resumeLink || undefined,
+                })
+              );
+            }
+
+            await Promise.allSettled(emailTasks);
           }
         } catch (emailErr) {
           console.error("[submitApplication] Email error (non-fatal):", emailErr);
@@ -1278,6 +1288,36 @@ export const appRouter = router({
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) return [];
         return getArtistJobApplications(user.id, input.limit, input.offset);
+      }),
+
+    /** Whether the logged-in artist has already applied to a specific regular job, with what they submitted. */
+    checkApplication: protectedProcedure
+      .input(z.object({ jobId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const { getDb } = await import('./db');
+        const dbConn = await getDb();
+        if (!dbConn) return { applied: false, message: null, resumeLink: null, rate: null };
+        const { interestedArtists } = await import('../drizzle/schema');
+        const { eq, and } = await import('drizzle-orm');
+        const existing = await dbConn.select({
+          id: interestedArtists.id,
+          message: interestedArtists.message,
+          resumeLink: interestedArtists.resumeLink,
+          isHourlyRate: interestedArtists.isHourlyRate,
+          artistHourlyRate: interestedArtists.artistHourlyRate,
+          artistFlatRate: interestedArtists.artistFlatRate,
+        })
+          .from(interestedArtists)
+          .where(and(
+            eq(interestedArtists.artistUserId, ctx.user.id),
+            eq(interestedArtists.jobId, input.jobId)
+          ))
+          .limit(1);
+        if (existing.length === 0) return { applied: false, message: null, resumeLink: null, rate: null };
+        const rec = existing[0];
+        const rateValue = rec.isHourlyRate ? rec.artistHourlyRate : rec.artistFlatRate;
+        const rate = rateValue ? `$${rateValue}${rec.isHourlyRate ? "/hr" : " flat"}` : null;
+        return { applied: true, message: rec.message ?? null, resumeLink: rec.resumeLink ?? null, rate };
       }),
   }),
 
@@ -1376,6 +1416,21 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
         return getBookingById(input.id);
+      }),
+
+    /**
+     * Full booking detail for the client-facing booking detail page —
+     * booking + artist profile summary + the job it came from.
+     */
+    clientDetail: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const { getClientBookingDetail } = await import("./db");
+        const booking = await getClientBookingDetail(input.id, user.id);
+        if (!booking) throw new Error("Booking not found");
+        return booking;
       }),
 
     /**
@@ -1700,6 +1755,26 @@ export const appRouter = router({
           fileUrl: url,
         });
         const insertId = (result as any).insertId;
+
+        // Also sync into the profile's resume list (users.resumeFiles) so a
+        // resume uploaded here shows up on the Edit Profile > Resume tab too.
+        const { users: usersTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        let currentResumeFiles: { url: string; name: string }[] = [];
+        try {
+          currentResumeFiles = JSON.parse(user.resumeFiles || "[]");
+          if (!Array.isArray(currentResumeFiles)) currentResumeFiles = [];
+        } catch {
+          currentResumeFiles = [];
+        }
+        if (!currentResumeFiles.some(r => r.url === url)) {
+          currentResumeFiles.push({ url, name: title });
+          await db
+            .update(usersTable)
+            .set({ resumeFiles: JSON.stringify(currentResumeFiles) })
+            .where(eq(usersTable.id, user.id));
+        }
+
         return { id: `lib-${insertId}`, title, fileUrl: url, source: "library" as const };
       }),
 
@@ -1827,12 +1902,14 @@ Fields to extract:
         transportation: z.boolean().default(false),
         transportationInstructions: z.string().optional(),
         studioName: z.string().optional(),
+        companyId: z.number().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
         const job = await createJob({
           clientUserId: user.id,
+          clientCompanyId: input.companyId,
           clientEmail: user.email ?? undefined,
           title: input.title,
           description: input.description,
@@ -1899,6 +1976,7 @@ Fields to extract:
         transportation: z.boolean().default(false),
         transportationInstructions: z.string().optional(),
         studioName: z.string().optional(),
+        companyId: z.number().optional(),
         plan: z.enum(["one_time", "subscription"]).default("one_time"),
         origin: z.string().url(),
       }))
@@ -1909,6 +1987,7 @@ Fields to extract:
         // Create the job in "Pending Payment" status
         const job = await createJob({
           clientUserId: user.id,
+          clientCompanyId: input.companyId,
           clientEmail: user.email ?? undefined,
           title: input.title,
           description: input.description,
@@ -2866,8 +2945,8 @@ Fields to extract:
         lat: z.number().optional(),
         lng: z.number().optional(),
       }))
-      .query(async ({ input }) => {
-        return getArtistJobsFeed(input.limit, input.offset, input.lat, input.lng);
+      .query(async ({ input, ctx }) => {
+        return getArtistJobsFeed(input.limit, input.offset, input.lat, input.lng, ctx.user?.id);
       }),
     /** Get the logged-in artist's affiliations */
     getMyAffiliations: protectedProcedure.query(async ({ ctx }) => {
@@ -3093,6 +3172,13 @@ Fields to extract:
         if (!booking) throw new Error("Booking not found");
         if (booking.artistUserId !== user.id) throw new Error("Not authorized");
 
+        // Every payout must land in the artist's own connected Stripe account —
+        // never let an invoice go out (and get paid) with nowhere for the money to go.
+        const connectAccountId = await getArtistStripeConnectAccount(user.id);
+        if (!connectAccountId) {
+          throw new Error("Connect your Stripe payout account before invoicing a studio. Go to Settings → Manage Payouts.");
+        }
+
         // Fetch the client (studio) user
         const clientUser = booking.clientUserId ? await getUserById(booking.clientUserId) : null;
 
@@ -3102,6 +3188,7 @@ Fields to extract:
         const processingFee = Math.round((artistRate + totalReimb) * 0.04);
         const totalDollars = artistRate + totalReimb + processingFee;
         const totalCents = Math.round(totalDollars * 100);
+        const applicationFeeCents = Math.round(processingFee * 100);
 
         // Generate a unique invoice payment token
         const { randomBytes } = await import("crypto");
@@ -3133,6 +3220,12 @@ Fields to extract:
               }],
               customer_email: clientUser?.email ?? undefined,
               allow_promotion_codes: true,
+              payment_intent_data: {
+                application_fee_amount: applicationFeeCents,
+                transfer_data: {
+                  destination: connectAccountId,
+                },
+              },
               metadata: {
                 booking_id: String(input.bookingId),
                 invoice_payment_token: invoicePaymentToken,
@@ -3283,8 +3376,8 @@ Fields to extract:
         if (!user) throw new Error("User not found");
         const accountId = await getArtistStripeConnectAccount(user.id);
         if (!accountId) throw new Error("No Stripe Connect account configured");
-        const stripe = new (await import("stripe")).default(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2023-10-16" as any });
-        const link = await stripe.accounts.createLoginLink(accountId);
+        const { getStripe } = await import("./stripe");
+        const link = await getStripe().accounts.createLoginLink(accountId);
         return { url: link.url };
       }),
 
@@ -3981,15 +4074,24 @@ Fields to extract:
         if (!booking) throw new Error("Booking not found");
         if (booking.artistUserId !== user.id) throw new Error("Not authorized");
 
+        // Every payout must land in the artist's own connected Stripe account —
+        // never let an invoice go out (and get paid) with nowhere for the money to go.
+        const connectAccountId = await getArtistStripeConnectAccount(user.id);
+        if (!connectAccountId) {
+          throw new Error("Connect your Stripe payout account before invoicing a studio. Go to Settings → Manage Payouts.");
+        }
+
         const reimbList = await getReimbursementsByPeriodId(input.periodId);
         const totalReimb = reimbList.reduce((s: number, r: any) => s + (r.value ?? 0), 0);
         const artistRatePerHour = booking.artistRate ?? 0;
         const clientRatePerHour = booking.clientRate ?? 0;
 
-        // No processing fee for admin bookings — client pays clientRate spread only
+        // No processing fee for admin bookings — client pays clientRate spread only.
+        // The platform's cut is the rate spread itself (clientTotal - artistTotal).
         const artistTotal = artistRatePerHour * input.actualHours + totalReimb;
         const clientTotal = clientRatePerHour * input.actualHours + totalReimb;
         const totalCents = Math.round(clientTotal * 100);
+        const applicationFeeCents = Math.max(0, totalCents - Math.round(artistTotal * 100));
 
         const { randomBytes } = await import("crypto");
         const invoicePaymentToken = randomBytes(24).toString("hex");
@@ -4019,6 +4121,12 @@ Fields to extract:
               }],
               customer_email: clientUser?.email ?? undefined,
               allow_promotion_codes: true,
+              payment_intent_data: {
+                application_fee_amount: applicationFeeCents,
+                transfer_data: {
+                  destination: connectAccountId,
+                },
+              },
               metadata: {
                 booking_period_id: String(input.periodId),
                 invoice_payment_token: invoicePaymentToken,

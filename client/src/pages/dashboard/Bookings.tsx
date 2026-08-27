@@ -7,7 +7,7 @@ import { useState, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import {
   Calendar, Clock, MapPin, DollarSign, CheckCircle, AlertCircle,
-  ChevronDown, ChevronUp, CreditCard, User, Briefcase, ExternalLink,
+  ChevronDown, ChevronUp, ChevronRight, CreditCard,
   TrendingUp, Loader2, RefreshCw, Send, ArrowRight, Building2
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -91,7 +91,6 @@ const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, { label: string; className: s
 // ── Booking Row ───────────────────────────────────────────────────────────────
 
 function BookingRow({ booking }: { booking: AnyBooking }) {
-  const [expanded, setExpanded] = useState(false);
   const [, navigate] = useLocation();
   const artistUserId = (booking as any).artistUserId as number | null | undefined;
 
@@ -208,83 +207,14 @@ function BookingRow({ booking }: { booking: AnyBooking }) {
               </a>
             )}
             <button
-              onClick={() => setExpanded(!expanded)}
+              onClick={() => navigate(`/app/bookings/${booking.id}`)}
               className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
             >
-              {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              {expanded ? "Less" : "Details"}
+              Details <ChevronRight size={14} />
             </button>
           </div>
         </div>
       </div>
-
-      {/* Expanded details */}
-      {expanded && (
-        <div className="border-t border-gray-100 px-5 py-4 bg-gray-50 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Booking Details</p>
-            <div className="flex items-center gap-2 text-gray-600">
-              <User size={13} className="text-gray-400 flex-shrink-0" />
-              <span className="text-xs">Artist: <span className="font-semibold text-gray-700">{displayName}</span></span>
-            </div>
-            {booking.bubbleRequestId && (
-              <div className="flex items-center gap-2 text-gray-600">
-                <Briefcase size={13} className="text-gray-400 flex-shrink-0" />
-                <span className="text-xs">Job ID: <span className="font-mono text-gray-500">{booking.bubbleRequestId.slice(-8)}</span></span>
-              </div>
-            )}
-            {booking.startDate && (
-              <div className="flex items-center gap-2 text-gray-600">
-                <Calendar size={13} className="text-gray-400 flex-shrink-0" />
-                <span className="text-xs">Start: {formatDate(booking.startDate)}</span>
-              </div>
-            )}
-            {booking.endDate && (
-              <div className="flex items-center gap-2 text-gray-600">
-                <Calendar size={13} className="text-gray-400 flex-shrink-0" />
-                <span className="text-xs">End: {formatDate(booking.endDate)}</span>
-              </div>
-            )}
-            {booking.locationAddress && (
-              <div className="flex items-center gap-2 text-gray-600">
-                <MapPin size={13} className="text-gray-400 flex-shrink-0" />
-                <span className="text-xs">{booking.locationAddress}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Financials</p>
-            <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-500">Client Rate</span>
-                <span className="font-semibold">{formatCurrency(booking.totalClientRate ?? booking.clientRate)}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-500">Artist Rate</span>
-                <span className="font-semibold">{formatCurrency(booking.totalArtistRate ?? booking.artistRate)}</span>
-              </div>
-              {booking.stripeFee != null && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">Stripe Fee</span>
-                  <span className="text-gray-400">{formatCurrency(booking.stripeFee)}</span>
-                </div>
-              )}
-              {booking.grossProfit != null && (
-                <div className="flex justify-between text-xs border-t border-gray-100 pt-1.5 mt-1.5">
-                  <span className="text-gray-500 font-semibold">Gross Profit</span>
-                  <span className="font-bold text-green-600">{formatCurrency(booking.grossProfit)}</span>
-                </div>
-              )}
-            </div>
-            {booking.externalPayment && (
-              <p className="text-xs text-gray-400 flex items-center gap-1">
-                <ExternalLink size={11} /> Paid externally (outside Stripe)
-              </p>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
