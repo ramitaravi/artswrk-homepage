@@ -8,7 +8,7 @@ import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
 import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById } from "./db";
 import { invokeLLM } from "./_core/llm";
-import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail } from "./email";
+import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail, sendArtistBookingConfirmedEmail, sendClientBookingConfirmedEmail, sendClientPayArtistEmail } from "./email";
 import crypto from "crypto";
 import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistBasicCheckoutSession, createArtistPortalSession, createEnterpriseJobUnlockCheckoutSession, createEnterpriseSubscriptionCheckoutSession, createClientJobUnlockCheckoutSession, createClientSubscriptionCheckoutSession } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
@@ -3376,18 +3376,22 @@ Fields to extract:
 </td></tr></table>
 </body></html>`;
 
-        // Send to the studio (client) + CC Artswrk
+        // Send to the studio (client) via the SendGrid "Client - Pay Artist" template + CC Artswrk internally
         const studioEmail = clientUser?.email;
         try {
           if (studioEmail) {
-            await sendSimpleEmail({
+            await sendClientPayArtistEmail({
               to: studioEmail,
-              cc: "support@artswrk.com",
-              subject: `Payment Request for ${artistDisplayName} ${bookingDate}`,
-              html: emailHtml,
+              artistName: artistDisplayName,
+              clientRate: `$${artistRate.toFixed(2)}`,
+              date: bookingDate,
+              reimbursements: reimbText,
+              startDate: bookingDate,
+              totalClientRate: `$${totalDollars.toFixed(2)}`,
+              payUrl: paymentPageUrl,
             });
           }
-          // Always CC Artswrk
+          // Always notify the internal Artswrk team with the full detail
           await sendSimpleEmail({
             to: "contact@artswrk.com",
             subject: `[Invoice] ${artistDisplayName} → ${studioName} — $${totalDollars.toFixed(2)} — Booking #${input.bookingId}`,
@@ -3986,16 +3990,48 @@ Fields to extract:
           if (db2) await db2.update(bookingsTable).set({ hours: input.hours } as any).where(eq(bookingsTable.id, bookingId));
         }
         try {
+          const studioName = (user as any).clientCompanyName ?? user.name ?? "A studio";
+          const jobTitle = (job.description ?? "").split("\n")[0].slice(0, 60);
+          const payMethodText = input.paymentMethod === "artswrk"
+            ? "Pay via Artswrk (5% processing fee)"
+            : "Direct payment from studio";
+          const bookingStartDate = input.startDate ?? applicant.startDate ?? null;
+          const dateDisplay = bookingStartDate
+            ? new Date(bookingStartDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            : "TBD";
+          const locationDisplay = input.locationAddress ?? job.locationAddress ?? "TBD";
+          const rateDisplay = artistRateDollars != null
+            ? `$${artistRateDollars}${input.rateType === "hourly" ? "/hr" : ""}`
+            : "TBD";
+          const bookingUrl = `https://artswrk.com/app/bookings/${bookingId}`;
+          const artistDisplayName = applicant.artistName ?? applicant.artistFirstName ?? "Artist";
+
           if (applicant.artistEmail) {
-            const studioName = (user as any).clientCompanyName ?? user.name ?? "A studio";
-            const jobTitle = (job.description ?? "").split("\n")[0].slice(0, 60);
-            const payMethodText = input.paymentMethod === "artswrk"
-              ? "Pay via Artswrk (5% processing fee)"
-              : "Direct payment from studio";
-            await sendSimpleEmail({
+            await sendArtistBookingConfirmedEmail({
               to: applicant.artistEmail,
-              subject: `You have been confirmed for: ${jobTitle}`,
-              html: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto"><div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:24px 32px;border-radius:12px 12px 0 0"><span style="font-size:18px;font-weight:900;color:#fff">ARTS</span><span style="font-size:18px;font-weight:900;background:#111;color:#fff;padding:2px 8px;border-radius:4px;margin-left:2px">WRK</span></div><div style="padding:32px;background:#fff;border:1px solid #f0f0f0;border-radius:0 0 12px 12px"><h1 style="font-size:22px;font-weight:900;color:#111;margin:0 0 8px">You have been confirmed!</h1><p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 20px">Hi ${applicant.artistFirstName ?? "there"}, <strong>${studioName}</strong> has confirmed you for <strong>${jobTitle}</strong>.</p><div style="background:#f9f9f9;border-radius:10px;padding:16px 20px;margin-bottom:20px"><p style="margin:0 0 6px;font-size:13px;color:#999;font-weight:700;text-transform:uppercase">Payment Method</p><p style="margin:0;font-size:15px;color:#111;font-weight:600">${payMethodText}</p></div><p style="color:#555;font-size:14px">Log in to your Artswrk dashboard to view your confirmation and manage payment.</p><a href="https://artswrk.com/app" style="display:inline-block;background:linear-gradient(90deg,#FFBC5D,#F25722);color:#fff;font-weight:800;font-size:14px;padding:12px 28px;border-radius:10px;text-decoration:none;margin-top:8px">View Dashboard</a></div></div>`,
+              artistName: applicant.artistFirstName ?? artistDisplayName,
+              artistType: applicant.artistDisciplines ?? "",
+              clientName: studioName,
+              date: dateDisplay,
+              details: jobTitle,
+              location: locationDisplay,
+              rate: rateDisplay,
+              serviceType: job.serviceType || jobTitle,
+              bookingUrl,
+            });
+          }
+          if (user.email) {
+            await sendClientBookingConfirmedEmail({
+              to: user.email,
+              artistName: artistDisplayName,
+              artistType: applicant.artistDisciplines ?? "",
+              clientName: studioName,
+              date: dateDisplay,
+              details: jobTitle,
+              location: locationDisplay,
+              rate: rateDisplay,
+              serviceType: job.serviceType || jobTitle,
+              bookingUrl,
             });
           }
         } catch (e) {

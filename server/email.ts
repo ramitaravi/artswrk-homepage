@@ -6,12 +6,32 @@ if (process.env.SENDGRID_API_KEY) {
 }
 
 // ─── Template IDs ────────────────────────────────────────────────────────────
+// Pulled directly from the SendGrid account via the API — these are the real,
+// designed templates. Fields listed are each template's exact merge-field
+// names (Handlebars {{Field}} placeholders in the live version's content).
 export const SENDGRID_TEMPLATES = {
-  /** "Client - Request Posted" — sent after a job goes live */
+  /** "Client - Request Posted" — FirstName, Service, ArtistType, Date, Location, TransportDetails, TransportReimbursed, Description, joblink, subject */
   JOB_POSTED: "d-e2dcf8797ac545d68a03f610a7323fce",
+  /** "Client - Artist Available For Your Job" — ArtistName, ArtistLastName, ArtistType, Date, Description, Location, Message, Service, TransportDetails, TransportReimbursed, URL, link, subject */
+  CLIENT_NEW_APPLICANT: "d-0b9f0bd603c34da5b71e380acad0c35b",
+  /** "Enterprise - Artist Available For Your Job" — ArtistName, ArtistLastName, Description, Location, Message, Service, URL, link, subject */
+  ENTERPRISE_NEW_APPLICANT: "d-3960001d76fb4b4f977490fc2a73d2f6",
+  /** "Artist / Client - Message Received" — SenderFirstName, SenderLastName, MessageClip, magic_link */
+  MESSAGE_RECEIVED: "d-e3237d6a85da487b8865b0ff70d5e9f9",
+  /** "Client - Booking Confirmed" — ArtistName, ArtistType, Client, Date, Details, Location, Rate, Service, TransportationDetails, TransportationReimbursement, URL, subject */
+  CLIENT_BOOKING_CONFIRMED: "d-61d5e3a74692421383c8598e0a8559b1",
+  /** "Artist - Booking Confirmed" — same fields as CLIENT_BOOKING_CONFIRMED */
+  ARTIST_BOOKING_CONFIRMED: "d-6c4b6004194f41518dffa2827172d59f",
+  /** "Client - Pay Artist" — ArtistName, Client_Rate, Date, Reimbursements, StartDate, Total_Client_Rate, URL, subject */
+  CLIENT_PAY_ARTIST: "d-b68c3c35c9ab4fc89e3968cae3f757ce",
   /** Password reset link email */
   PASSWORD_RESET: "d-password-reset-placeholder",
 } as const;
+
+// The account's one unsubscribe group ("Transactional emails", default).
+// Required on every templated send so {{unsubscribe}}/{{unsubscribe_preferences}}
+// actually resolve instead of rendering as raw placeholder text.
+const ASM_GROUP_ID = 24547;
 
 // ─── From address ─────────────────────────────────────────────────────────────
 const FROM_EMAIL = "contact@artswrk.com";
@@ -44,10 +64,12 @@ export interface JobPostedEmailData {
 // ─── Generic transactional email sender ──────────────────────────────────────
 export async function sendTransactionalEmail<T extends Record<string, unknown>>({
   to,
+  cc,
   templateId,
   dynamicData,
 }: {
   to: string;
+  cc?: string | string[];
   templateId: string;
   dynamicData: T;
 }): Promise<boolean> {
@@ -59,9 +81,11 @@ export async function sendTransactionalEmail<T extends Record<string, unknown>>(
   try {
     await sgMail.send({
       to,
+      ...(cc ? { cc } : {}),
       from: { email: FROM_EMAIL, name: FROM_NAME },
       templateId,
       dynamicTemplateData: dynamicData,
+      asm: { groupId: ASM_GROUP_ID },
     });
     console.log(`[email] Sent template ${templateId} to ${to}`);
     return true;
@@ -196,59 +220,31 @@ export async function sendNewApplicantAlertEmail({
   message?: string;
   resumeLink?: string;
 }): Promise<boolean> {
-  // Matches the PRO-job applicant alert template (sendProJobApplicantAlertEmail)
-  // for a consistent look between the two flows.
-  const firstName = artistName.split(" ")[0] || artistName;
-
-  const html = `
-    <div style="font-family:'Helvetica Neue',sans-serif;max-width:580px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f0f0f0">
-      <div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:28px 36px">
-        <div style="display:inline-flex;align-items:center;gap:6px">
-          <span style="font-size:20px;font-weight:900;color:#fff;letter-spacing:-0.5px">ARTS</span>
-          <span style="font-size:20px;font-weight:900;background:#111;color:#fff;padding:2px 8px;border-radius:6px">WRK</span>
-        </div>
-      </div>
-      <div style="padding:36px">
-        <h1 style="font-size:22px;font-weight:900;color:#111;margin:0 0 20px">${artistName} is available for your job!</h1>
-        <p style="font-size:15px;color:#555;margin:0 0 4px">Hi there,</p>
-        <p style="font-size:15px;color:#555;margin:0 0 24px">${firstName} is interested in the job below:</p>
-        ${message ? `<div style="background:#f5f5f5;border-radius:10px;padding:20px 24px;margin-bottom:24px">
-          <p style="font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:1px;margin:0 0 10px">MESSAGE FROM ${firstName.toUpperCase()}:</p>
-          <p style="font-size:14px;color:#444;margin:0;line-height:1.6">${message}</p>
-        </div>` : ""}
-        <div style="border-left:4px solid #F25722;padding-left:20px;margin-bottom:28px">
-          <p style="font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:1px;margin:0 0 14px">JOB DETAILS:</p>
-          <p style="font-size:14px;color:#111;margin:0 0 8px"><strong>Job Title:</strong> ${jobTitle}</p>
-          <p style="font-size:14px;color:#111;margin:0 0 8px"><strong>Location:</strong> ${jobLocation}</p>
-          <p style="font-size:14px;color:#111;margin:0 0 8px"><strong>Rate:</strong> ${jobRate}</p>
-          ${resumeLink ? `<p style="font-size:14px;color:#111;margin:0"><strong>Resume:</strong> <a href="${resumeLink}" style="color:#F25722">View resume →</a></p>` : ""}
-        </div>
-        <p style="font-size:13px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px">VIEW &amp; CONFIRM ARTISTS</p>
-        <p style="font-size:14px;color:#555;line-height:1.6;margin:0 0 24px">
-          You can visit your client dashboard to view interested artists and their profiles. If you need more information from an artist before confirming, feel free to message them on Artswrk.
-        </p>
-        <a href="${jobUrl}" style="display:inline-block;background:#111;color:#fff;font-weight:700;font-size:14px;padding:14px 36px;border-radius:50px;text-decoration:none;margin-bottom:28px">
-          View Submission →
-        </a>
-        <hr style="border:none;border-top:1px solid #f0f0f0;margin:0 0 20px" />
-        <p style="font-size:14px;color:#555;line-height:1.6;margin:0 0 16px">As always, if you have any questions or concerns, don't hesitate to reach out to us.</p>
-        <p style="font-size:14px;color:#111;margin:0">Best,<br/>The Artswrk Team</p>
-      </div>
-    </div>
-  `;
-
-  if (!process.env.SENDGRID_API_KEY) {
-    console.log(`[email] DEV — new applicant alert would send to ${to}`);
-    return false;
-  }
-  try {
-    await sgMail.send({ to, cc: "support@artswrk.com", from: { email: FROM_EMAIL, name: FROM_NAME }, subject: `${artistName} is available for your job!`, html });
-    console.log(`[email] New applicant alert sent to ${to}`);
-    return true;
-  } catch (err: unknown) {
+  const [firstName, ...lastParts] = artistName.trim().split(" ");
+  const lastName = lastParts.join(" ");
+  return sendTransactionalEmail({
+    to,
+    cc: "support@artswrk.com",
+    templateId: SENDGRID_TEMPLATES.CLIENT_NEW_APPLICANT,
+    dynamicData: {
+      subject: `${artistName} is available for your job!`,
+      ArtistName: firstName || artistName,
+      ArtistLastName: lastName,
+      ArtistType: "",
+      Date: "",
+      Description: "",
+      Location: jobLocation,
+      Message: message ?? "",
+      Service: jobTitle,
+      TransportDetails: "",
+      TransportReimbursed: "",
+      URL: jobUrl,
+      link: jobUrl,
+    },
+  }).catch((err: unknown) => {
     console.error("[email] Failed to send new applicant alert:", err instanceof Error ? err.message : err);
     return false;
-  }
+  });
 }
 
 // ─── Simple raw HTML email ────────────────────────────────────────────────────
@@ -357,91 +353,25 @@ export async function sendJobPostedEmail(data: {
   description: string;
   jobLink: string;
   transportation: boolean;
+  /** Discipline/category, distinct from the job title — maps to {{ArtistType}}. Optional; the real template's field, not always available at every call site. */
+  artistType?: string;
 }): Promise<boolean> {
-  return sendSimpleEmail({
+  return sendTransactionalEmail({
     to: data.to,
     cc: "support@artswrk.com",
-    subject: "Your job is live on Artswrk! 🎉",
-    html: `
-      <div style="font-family:'Helvetica Neue',sans-serif;max-width:580px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f0f0f0">
-        <!-- Header -->
-        <div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:28px 36px">
-          <div style="display:inline-flex;align-items:center;gap:6px">
-            <span style="font-size:20px;font-weight:900;color:#fff;letter-spacing:-0.5px">ARTS</span>
-            <span style="font-size:20px;font-weight:900;background:#111;color:#fff;padding:2px 8px;border-radius:6px">WRK</span>
-          </div>
-          <p style="color:rgba(255,255,255,0.85);font-size:13px;margin:8px 0 0">Job Confirmation</p>
-        </div>
-
-        <!-- Body -->
-        <div style="padding:36px">
-          <h1 style="font-size:22px;font-weight:900;color:#111;margin:0 0 6px">Your job is live! 🎉</h1>
-          <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 28px">
-            Hey ${data.firstName}, your job posting is now live on Artswrk and artists can start applying.
-          </p>
-
-          <!-- Job details card -->
-          <div style="background:#f9f9f9;border-radius:12px;padding:20px 24px;margin-bottom:28px">
-            <h2 style="font-size:17px;font-weight:800;color:#111;margin:0 0 16px">${data.serviceType}</h2>
-            <table style="width:100%;border-collapse:collapse">
-              <tr>
-                <td style="padding:6px 0;vertical-align:top;width:110px">
-                  <span style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px">Date</span>
-                </td>
-                <td style="padding:6px 0;vertical-align:top">
-                  <span style="font-size:14px;color:#111;font-weight:600">${data.date}</span>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding:6px 0;vertical-align:top">
-                  <span style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px">Location</span>
-                </td>
-                <td style="padding:6px 0;vertical-align:top">
-                  <span style="font-size:14px;color:#111;font-weight:600">${data.location}</span>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding:6px 0;vertical-align:top">
-                  <span style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px">Rate</span>
-                </td>
-                <td style="padding:6px 0;vertical-align:top">
-                  <span style="font-size:14px;color:#111;font-weight:600">${data.rate}</span>
-                </td>
-              </tr>
-              ${data.transportation ? `
-              <tr>
-                <td style="padding:6px 0;vertical-align:top">
-                  <span style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px">Transport</span>
-                </td>
-                <td style="padding:6px 0;vertical-align:top">
-                  <span style="font-size:14px;color:#111;font-weight:600">Reimbursed ✓</span>
-                </td>
-              </tr>` : ""}
-              ${data.description ? `
-              <tr>
-                <td style="padding:12px 0 6px;vertical-align:top" colspan="2">
-                  <span style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px">Description</span>
-                </td>
-              </tr>
-              <tr>
-                <td colspan="2" style="padding:0 0 6px">
-                  <span style="font-size:14px;color:#444;line-height:1.5">${data.description}</span>
-                </td>
-              </tr>` : ""}
-            </table>
-          </div>
-
-          <a href="${data.jobLink}" style="display:inline-block;background:linear-gradient(90deg,#FFBC5D,#F25722);color:#fff;font-weight:800;font-size:14px;padding:14px 32px;border-radius:12px;text-decoration:none;margin-bottom:28px">
-            View Your Job Posting →
-          </a>
-
-          <hr style="border:none;border-top:1px solid #f0f0f0;margin:0 0 20px" />
-          <p style="color:#999;font-size:13px;line-height:1.6;margin:0">
-            Questions? Email us at <a href="mailto:contact@artswrk.com" style="color:#F25722">contact@artswrk.com</a>
-          </p>
-        </div>
-      </div>
-    `,
+    templateId: SENDGRID_TEMPLATES.JOB_POSTED,
+    dynamicData: {
+      subject: "Your job is live on Artswrk! 🎉",
+      FirstName: data.firstName,
+      Service: data.serviceType,
+      ArtistType: data.artistType ?? "",
+      Date: data.date,
+      Location: data.location,
+      TransportReimbursed: data.transportation ? "Yes" : "",
+      TransportDetails: "",
+      Description: data.description,
+      joblink: data.jobLink,
+    },
   });
 }
 
@@ -572,33 +502,19 @@ export async function sendNewMessageEmail({
   cc?: string;
 }) {
   const preview = messagePreview.length > 200 ? messagePreview.slice(0, 197) + "…" : messagePreview;
-  await sendSimpleEmail({
+  const [senderFirstName, ...senderLastParts] = senderName.trim().split(" ");
+  await sendTransactionalEmail({
     to,
     cc,
-    subject: `New message from ${senderName} on Artswrk`,
-    html: `
-      <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
-        <div style="background:linear-gradient(90deg,#FFBC5D,#F25722);padding:24px 28px;">
-          <span style="font-size:22px;font-weight:900;letter-spacing:-0.5px;color:#fff;">ARTS<span style="background:#111;padding:2px 6px;border-radius:4px;margin-left:2px;font-size:18px;">WRK</span></span>
-        </div>
-        <div style="padding:28px;">
-          <p style="font-size:16px;font-weight:700;color:#111;margin:0 0 6px;">Hey ${recipientFirstName},</p>
-          <p style="font-size:14px;color:#6b7280;margin:0 0 20px;">You have a new message from <strong style="color:#111;">${senderName}</strong> on Artswrk.</p>
-
-          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-left:4px solid #F25722;border-radius:8px;padding:16px 18px;margin-bottom:24px;">
-            <p style="font-size:13px;color:#374151;margin:0;line-height:1.6;">"${preview}"</p>
-          </div>
-
-          <a href="${dashboardUrl}" style="display:inline-block;background:linear-gradient(90deg,#FFBC5D,#F25722);color:#fff;font-size:14px;font-weight:700;padding:12px 28px;border-radius:50px;text-decoration:none;">
-            Reply on Artswrk →
-          </a>
-
-          <p style="font-size:12px;color:#9ca3af;margin-top:24px;">
-            You're receiving this because someone sent you a message on <a href="https://artswrk.com" style="color:#F25722;">Artswrk</a>. You can reply directly from your dashboard.
-          </p>
-        </div>
-      </div>
-    `,
+    templateId: SENDGRID_TEMPLATES.MESSAGE_RECEIVED,
+    dynamicData: {
+      // No `subject` field on this template — it builds its own subject line
+      // from SenderFirstName/SenderLastName directly.
+      SenderFirstName: senderFirstName || senderName,
+      SenderLastName: senderLastParts.join(" "),
+      MessageClip: preview,
+      magic_link: dashboardUrl,
+    },
   });
 }
 
@@ -615,48 +531,24 @@ export async function sendProJobApplicantAlertEmail(data: {
 }): Promise<boolean> {
   const descriptionText = data.description
     ? data.description.replace(/<[^>]*>/g, "").trim()
-    : null;
+    : "";
   const artistDisplay = `${data.artistFirstName} ${data.artistLastInitial}.`;
 
-  return sendSimpleEmail({
+  return sendTransactionalEmail({
     to: data.to,
     cc: "support@artswrk.com",
-    subject: `${artistDisplay} is available for your job!`,
-    html: `
-      <div style="font-family:'Helvetica Neue',sans-serif;max-width:580px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f0f0f0">
-        <div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:28px 36px">
-          <div style="display:inline-flex;align-items:center;gap:6px">
-            <span style="font-size:20px;font-weight:900;color:#fff;letter-spacing:-0.5px">ARTS</span>
-            <span style="font-size:20px;font-weight:900;background:#111;color:#fff;padding:2px 8px;border-radius:6px">WRK</span>
-          </div>
-        </div>
-        <div style="padding:36px">
-          <h1 style="font-size:22px;font-weight:900;color:#111;margin:0 0 20px">${artistDisplay} is available for your job!</h1>
-          <p style="font-size:15px;color:#555;margin:0 0 4px">Hi there,</p>
-          <p style="font-size:15px;color:#555;margin:0 0 24px">${data.artistFirstName} is interested in the job below:</p>
-          <div style="background:#f5f5f5;border-radius:10px;padding:20px 24px;margin-bottom:24px">
-            <p style="font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:1px;margin:0 0 10px">MESSAGE FROM ${data.artistFirstName.toUpperCase()} :</p>
-            <p style="font-size:14px;color:#444;margin:0;line-height:1.6">${data.message || "…"}</p>
-          </div>
-          <div style="border-left:4px solid #F25722;padding-left:20px;margin-bottom:28px">
-            <p style="font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:1px;margin:0 0 14px">JOB DETAILS:</p>
-            <p style="font-size:14px;color:#111;margin:0 0 8px"><strong>Job Title:</strong> ${data.serviceType}</p>
-            <p style="font-size:14px;color:#111;margin:0 0 8px"><strong>Location:</strong> ${data.location}</p>
-            ${descriptionText ? `<p style="font-size:14px;color:#111;margin:0"><strong>Details:</strong> ${descriptionText}</p>` : ""}
-          </div>
-          <p style="font-size:13px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px">VIEW &amp; CONFIRM ARTISTS</p>
-          <p style="font-size:14px;color:#555;line-height:1.6;margin:0 0 24px">
-            You can visit your client dashboard to view interested artists and their profiles. If you need more information from an artist before confirming, feel free to message them on Artswrk.
-          </p>
-          <a href="${data.jobLink}" style="display:inline-block;background:#111;color:#fff;font-weight:700;font-size:14px;padding:14px 36px;border-radius:50px;text-decoration:none;margin-bottom:28px">
-            View Submission →
-          </a>
-          <hr style="border:none;border-top:1px solid #f0f0f0;margin:0 0 20px" />
-          <p style="font-size:14px;color:#555;line-height:1.6;margin:0 0 16px">As always, if you have any questions or concerns, don't hesitate to reach out to us.</p>
-          <p style="font-size:14px;color:#111;margin:0">Best,<br/>The Artswrk Team</p>
-        </div>
-      </div>
-    `,
+    templateId: SENDGRID_TEMPLATES.ENTERPRISE_NEW_APPLICANT,
+    dynamicData: {
+      subject: `${artistDisplay} is available for your job!`,
+      ArtistName: data.artistFirstName,
+      ArtistLastName: data.artistLastInitial,
+      Description: descriptionText,
+      Location: data.location,
+      Message: data.message ?? "",
+      Service: data.serviceType,
+      URL: data.jobLink,
+      link: data.jobLink,
+    },
   });
 }
 
@@ -704,5 +596,104 @@ export async function sendProJobSubmissionConfirmationEmail(data: {
         </div>
       </div>
     `,
+  });
+}
+
+// ─── Booking confirmed: notify the artist ─────────────────────────────────────
+export async function sendArtistBookingConfirmedEmail(data: {
+  to: string;
+  artistName: string;
+  artistType: string;
+  clientName: string;
+  date: string;
+  details: string;
+  location: string;
+  rate: string;
+  serviceType: string;
+  transportDetails?: string;
+  transportReimbursed?: string;
+  bookingUrl: string;
+}): Promise<boolean> {
+  return sendTransactionalEmail({
+    to: data.to,
+    templateId: SENDGRID_TEMPLATES.ARTIST_BOOKING_CONFIRMED,
+    dynamicData: {
+      subject: `You're confirmed for ${data.serviceType}!`,
+      ArtistName: data.artistName,
+      ArtistType: data.artistType,
+      Client: data.clientName,
+      Date: data.date,
+      Details: data.details,
+      Location: data.location,
+      Rate: data.rate,
+      Service: data.serviceType,
+      TransportationDetails: data.transportDetails ?? "",
+      TransportationReimbursement: data.transportReimbursed ?? "",
+      URL: data.bookingUrl,
+    },
+  });
+}
+
+// ─── Booking confirmed: notify the client ─────────────────────────────────────
+export async function sendClientBookingConfirmedEmail(data: {
+  to: string;
+  artistName: string;
+  artistType: string;
+  clientName: string;
+  date: string;
+  details: string;
+  location: string;
+  rate: string;
+  serviceType: string;
+  transportDetails?: string;
+  transportReimbursed?: string;
+  bookingUrl: string;
+}): Promise<boolean> {
+  return sendTransactionalEmail({
+    to: data.to,
+    cc: "support@artswrk.com",
+    templateId: SENDGRID_TEMPLATES.CLIENT_BOOKING_CONFIRMED,
+    dynamicData: {
+      subject: `Booking confirmed with ${data.artistName}!`,
+      ArtistName: data.artistName,
+      ArtistType: data.artistType,
+      Client: data.clientName,
+      Date: data.date,
+      Details: data.details,
+      Location: data.location,
+      Rate: data.rate,
+      Service: data.serviceType,
+      TransportationDetails: data.transportDetails ?? "",
+      TransportationReimbursement: data.transportReimbursed ?? "",
+      URL: data.bookingUrl,
+    },
+  });
+}
+
+// ─── Studio payment request: Client - Pay Artist ──────────────────────────────
+export async function sendClientPayArtistEmail(data: {
+  to: string;
+  artistName: string;
+  clientRate: string;
+  date: string;
+  reimbursements?: string;
+  startDate: string;
+  totalClientRate: string;
+  payUrl: string;
+}): Promise<boolean> {
+  return sendTransactionalEmail({
+    to: data.to,
+    cc: "support@artswrk.com",
+    templateId: SENDGRID_TEMPLATES.CLIENT_PAY_ARTIST,
+    dynamicData: {
+      subject: `Payment due for ${data.artistName}`,
+      ArtistName: data.artistName,
+      Client_Rate: data.clientRate,
+      Date: data.date,
+      Reimbursements: data.reimbursements ?? "",
+      StartDate: data.startDate,
+      Total_Client_Rate: data.totalClientRate,
+      URL: data.payUrl,
+    },
   });
 }
