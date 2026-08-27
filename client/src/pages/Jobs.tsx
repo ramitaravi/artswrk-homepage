@@ -432,6 +432,8 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
   }, [path, searchStr]);
 
   const [search, setSearch] = useState("");
+  const [proSearch, setProSearch] = useState("");
+  const [appSearch, setAppSearch] = useState("");
   const [locationFilter, setLocationFilter] = useState<LocationFilter>({ query: searchParams.get("location") ?? "" });
   const [artistType, setArtistType] = useState("");
   const [serviceType, setServiceType] = useState("");
@@ -592,6 +594,40 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
   }, [allJobs, search]);
 
   const hasFilters = !!(search || locationFilter.query || artistType || serviceType);
+
+  // Fuzzy (substring) client-side search for PRO jobs
+  const filteredProJobs = useMemo(() => {
+    if (!proSearch) return proJobs;
+    const q = proSearch.toLowerCase();
+    return proJobs.filter((j) =>
+      j.title.toLowerCase().includes(q) ||
+      (j.company ?? "").toLowerCase().includes(q) ||
+      j.location.toLowerCase().includes(q) ||
+      (j.description ?? "").toLowerCase().includes(q)
+    );
+  }, [proJobs, proSearch]);
+
+  // Fuzzy (substring) client-side search across both regular + PRO applications
+  const filteredApplications = useMemo(() => {
+    if (!appSearch) return myApplications;
+    const q = appSearch.toLowerCase();
+    return myApplications.filter((a) =>
+      a.title.toLowerCase().includes(q) ||
+      (a.companyName ?? "").toLowerCase().includes(q) ||
+      a.location.toLowerCase().includes(q)
+    );
+  }, [myApplications, appSearch]);
+
+  const filteredProApplications = useMemo(() => {
+    if (!rawProApplications) return [];
+    if (!appSearch) return rawProApplications as any[];
+    const q = appSearch.toLowerCase();
+    return (rawProApplications as any[]).filter((app) =>
+      (app.serviceType ?? "").toLowerCase().includes(q) ||
+      (app.company ?? "").toLowerCase().includes(q) ||
+      (app.location ?? "").toLowerCase().includes(q)
+    );
+  }, [rawProApplications, appSearch]);
 
   const TABS: { id: Tab; label: string; count?: number }[] = [
     { id: "near-me", label: "Jobs Near Me", count: allJobs.length },
@@ -808,14 +844,26 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
               </div>
             )}
 
+            {/* Search */}
+            <div className="relative mb-5">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search PRO jobs..."
+                value={proSearch}
+                onChange={(e) => setProSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] focus:bg-white transition-all"
+              />
+            </div>
+
             {proJobsLoading ? (
               <div className="flex items-center justify-center py-16 text-gray-400">
                 <Loader2 size={20} className="animate-spin mr-2" />
                 <span className="text-sm">Loading PRO jobs...</span>
               </div>
-            ) : proJobs.length > 0 ? (
+            ) : filteredProJobs.length > 0 ? (
               <div className="space-y-4">
-                {proJobs.map((job) => (
+                {filteredProJobs.map((job) => (
                   <ProJobCard
                     key={job.id}
                     job={job}
@@ -824,6 +872,14 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
                     applied={appliedProJobIds.has(job.id)}
                   />
                 ))}
+              </div>
+            ) : proSearch ? (
+              <div className="text-center py-16">
+                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                  <Search size={20} className="text-gray-300" />
+                </div>
+                <p className="text-sm font-semibold text-gray-400">No PRO jobs match "{proSearch}"</p>
+                <p className="text-xs text-gray-300 mt-1">Try a different search term</p>
               </div>
             ) : (
               <div className="text-center py-16">
@@ -880,10 +936,32 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
               </div>
             ) : (
               <div className="space-y-6">
+                {/* Search */}
+                <div className="relative">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search your applications..."
+                    value={appSearch}
+                    onChange={(e) => setAppSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] focus:bg-white transition-all"
+                  />
+                </div>
+
+                {appSearch && filteredApplications.length === 0 && filteredProApplications.length === 0 && (
+                  <div className="text-center py-16">
+                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                      <Search size={20} className="text-gray-300" />
+                    </div>
+                    <p className="text-sm font-semibold text-gray-400">No applications match "{appSearch}"</p>
+                    <p className="text-xs text-gray-300 mt-1">Try a different search term</p>
+                  </div>
+                )}
+
                 {/* Regular job applications */}
-                {myApplications.length > 0 && (
+                {filteredApplications.length > 0 && (
                   <div className="space-y-4">
-                    {myApplications.map((app) => (
+                    {filteredApplications.map((app) => (
                       <ApplicationCard
                         key={app.id}
                         job={app}
@@ -894,13 +972,13 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
                 )}
 
                 {/* PRO job applications */}
-                {rawProApplications && rawProApplications.length > 0 && (
+                {filteredProApplications.length > 0 && (
                   <div className="space-y-4">
                     <h2 className="text-sm font-black text-[#111] flex items-center gap-1.5">
                       <Star size={13} className="text-yellow-500 fill-yellow-500" />
-                      PRO Jobs ({rawProApplications.length})
+                      PRO Jobs ({filteredProApplications.length})
                     </h2>
-                    {(rawProApplications as any[]).map((app) => (
+                    {filteredProApplications.map((app) => (
                       <JobListCard
                         key={app.id}
                         borderVariant="pro"
