@@ -2826,12 +2826,13 @@ export async function getArtistProJobsFeed(limit = 20, offset = 0): Promise<{
   budget: string | null;
   location: string | null;
   description: string | null;
+  category: string | null;
   createdAt: Date | null;
 }[]> {
   const db = await getDb();
   if (!db) return [];
   const rows = await db.execute(
-    `SELECT id, serviceType, company, logo, workFromAnywhere, budget, location, description, createdAt
+    `SELECT id, serviceType, company, logo, workFromAnywhere, budget, location, description, category, createdAt
      FROM premium_jobs
      WHERE status = 'Active'
      ORDER BY COALESCE(bubbleCreatedAt, createdAt) DESC

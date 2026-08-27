@@ -55,6 +55,7 @@ interface DisplayProJob {
   postedAgo: string;
   workFromAnywhere: boolean;
   detailUrl: string;
+  category: string | null;
 }
 
 interface DisplayApplication {
@@ -433,6 +434,8 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
 
   const [search, setSearch] = useState("");
   const [proSearch, setProSearch] = useState("");
+  const [proCategory, setProCategory] = useState("");
+  const [proRemoteOnly, setProRemoteOnly] = useState(false);
   const [appSearch, setAppSearch] = useState("");
   const [locationFilter, setLocationFilter] = useState<LocationFilter>({ query: searchParams.get("location") ?? "" });
   const [artistType, setArtistType] = useState("");
@@ -546,6 +549,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
       postedAgo: timeAgo(j.createdAt),
       workFromAnywhere: !!j.workFromAnywhere,
       detailUrl: toProJobUrl({ id: j.id, company: j.company, serviceType: j.serviceType }),
+      category: j.category ?? null,
     }));
   }, [rawProJobs]);
 
@@ -595,17 +599,31 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
 
   const hasFilters = !!(search || locationFilter.query || artistType || serviceType);
 
-  // Fuzzy (substring) client-side search for PRO jobs
+  // Category options derived from the loaded PRO jobs feed
+  const proCategories = useMemo(() => {
+    const set = new Set<string>();
+    proJobs.forEach((j) => { if (j.category) set.add(j.category); });
+    return Array.from(set).sort();
+  }, [proJobs]);
+
+  // Fuzzy (substring) search + category/remote filters for PRO jobs
   const filteredProJobs = useMemo(() => {
-    if (!proSearch) return proJobs;
-    const q = proSearch.toLowerCase();
-    return proJobs.filter((j) =>
-      j.title.toLowerCase().includes(q) ||
-      (j.company ?? "").toLowerCase().includes(q) ||
-      j.location.toLowerCase().includes(q) ||
-      (j.description ?? "").toLowerCase().includes(q)
-    );
-  }, [proJobs, proSearch]);
+    let base = proJobs;
+    if (proSearch) {
+      const q = proSearch.toLowerCase();
+      base = base.filter((j) =>
+        j.title.toLowerCase().includes(q) ||
+        (j.company ?? "").toLowerCase().includes(q) ||
+        j.location.toLowerCase().includes(q) ||
+        (j.description ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (proCategory) base = base.filter((j) => j.category === proCategory);
+    if (proRemoteOnly) base = base.filter((j) => j.workFromAnywhere);
+    return base;
+  }, [proJobs, proSearch, proCategory, proRemoteOnly]);
+
+  const hasProFilters = !!(proSearch || proCategory || proRemoteOnly);
 
   // Fuzzy (substring) client-side search across both regular + PRO applications
   const filteredApplications = useMemo(() => {
@@ -844,16 +862,51 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
               </div>
             )}
 
-            {/* Search */}
-            <div className="relative mb-5">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search PRO jobs..."
-                value={proSearch}
-                onChange={(e) => setProSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] focus:bg-white transition-all"
-              />
+            {/* Search + filters */}
+            <div className="flex flex-col sm:flex-row gap-2 mb-5">
+              <div className="relative flex-1">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search PRO jobs..."
+                  value={proSearch}
+                  onChange={(e) => setProSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] focus:bg-white transition-all"
+                />
+              </div>
+              {proCategories.length > 0 && (
+                <div className="relative sm:w-48 flex-shrink-0">
+                  <select
+                    value={proCategory}
+                    onChange={(e) => setProCategory(e.target.value)}
+                    className="w-full appearance-none pl-3 pr-7 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] text-gray-600 cursor-pointer"
+                  >
+                    <option value="">All Categories</option>
+                    {proCategories.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+              )}
+              <button
+                onClick={() => setProRemoteOnly((v) => !v)}
+                className={`flex-shrink-0 flex items-center justify-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-lg border transition-colors whitespace-nowrap ${
+                  proRemoteOnly
+                    ? "bg-[#111] border-[#111] text-white"
+                    : "bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300"
+                }`}
+              >
+                Remote Only
+              </button>
+              {hasProFilters && (
+                <button
+                  onClick={() => { setProSearch(""); setProCategory(""); setProRemoteOnly(false); }}
+                  className="flex items-center justify-center gap-1 text-xs font-semibold text-[#F25722] hover:text-[#d44a1a] transition-colors whitespace-nowrap px-2"
+                >
+                  <X size={12} /> Reset
+                </button>
+              )}
             </div>
 
             {proJobsLoading ? (
@@ -873,13 +926,13 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
                   />
                 ))}
               </div>
-            ) : proSearch ? (
+            ) : hasProFilters ? (
               <div className="text-center py-16">
                 <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
                   <Search size={20} className="text-gray-300" />
                 </div>
-                <p className="text-sm font-semibold text-gray-400">No PRO jobs match "{proSearch}"</p>
-                <p className="text-xs text-gray-300 mt-1">Try a different search term</p>
+                <p className="text-sm font-semibold text-gray-400">No PRO jobs match your filters</p>
+                <p className="text-xs text-gray-300 mt-1">Try adjusting your search or filters</p>
               </div>
             ) : (
               <div className="text-center py-16">
