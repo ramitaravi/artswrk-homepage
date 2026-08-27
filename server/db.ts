@@ -389,6 +389,7 @@ export async function getJobDetailById(id: number): Promise<{
   startDate: string | null;
   endDate: string | null;
   dateType: string | null;
+  dateDetails: string | null;
   isHourly: boolean | null;
   openRate: boolean | null;
   artistHourlyRate: number | null;
@@ -409,7 +410,7 @@ export async function getJobDetailById(id: number): Promise<{
   const rows = await db.execute(
     `SELECT j.id, j.slug, j.title, j.requestStatus,
        ${utcIsoSql('j.startDate')} AS startDate, ${utcIsoSql('j.endDate')} AS endDate,
-       j.dateType,
+       j.dateType, j.dateDetails,
        j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate,
        j.locationAddress, j.locationLat, j.locationLng,
        j.description, j.direct, j.bubbleCreatedAt, j.clientUserId,
@@ -2660,13 +2661,14 @@ export async function getArtistJobsFeed(
 ): Promise<{
   id: number;
   title: string | null;
-  serviceType: string | null;
+  description: string | null;
   dateType: string | null;
   startDate: string | null;
   endDate: string | null;
   isHourly: boolean | null;
   openRate: boolean | null;
   artistHourlyRate: number | null;
+  clientHourlyRate: number | null;
   createdAt: Date | null;
   clientCompanyName: string | null;
   clientName: string | null;
@@ -2687,20 +2689,18 @@ export async function getArtistJobsFeed(
     : "";
 
   const rows = await db.execute(
-     `SELECT j.id, j.slug, j.title, j.dateType, ${utcIsoSql('j.startDate')} AS startDate, ${utcIsoSql('j.endDate')} AS endDate,
-     j.isHourly, j.openRate, j.artistHourlyRate, j.createdAt,
+     `SELECT j.id, j.slug, j.title, j.description, j.dateType, ${utcIsoSql('j.startDate')} AS startDate, ${utcIsoSql('j.endDate')} AS endDate,
+     j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate, j.createdAt,
      j.locationAddress, j.locationLat, j.locationLng,
      j.isBoosted, j.boostEndDate,
      u.clientCompanyName,
      COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.firstName,''), ' ', COALESCE(u.lastName,''))), ''), u.name) as clientName,
-     COALESCE(u.enterpriseLogoUrl, u.profilePicture) as clientLogo,
-     mst.name as serviceType
+     COALESCE(u.enterpriseLogoUrl, u.profilePicture) as clientLogo
      FROM jobs j
      LEFT JOIN users u ON j.clientUserId = u.id
-     LEFT JOIN master_service_types mst ON mst.bubbleId = j.masterServiceTypeId
      WHERE j.requestStatus IN ('Active', 'Submissions Paused')
      ${radiusClause}
-     ORDER BY (j.isBoosted = 1 AND (j.boostEndDate IS NULL OR j.boostEndDate > NOW())) DESC, j.createdAt DESC
+     ORDER BY (j.isBoosted = 1 AND (j.boostEndDate IS NULL OR j.boostEndDate > NOW())) DESC, COALESCE(j.bubbleCreatedAt, j.createdAt) DESC
      LIMIT ${limit} OFFSET ${offset}`
   );
   return (rows[0] as unknown as any[]);

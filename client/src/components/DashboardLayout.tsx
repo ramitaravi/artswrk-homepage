@@ -391,13 +391,6 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
             >
               <Menu size={20} />
             </button>
-            {/* Artswrk logo in the content header — visible at all viewport widths */}
-            <Link href="/app">
-              <span className="font-black text-base tracking-tight">
-                <span className={isArtist ? "artist-grad-text" : "hirer-grad-text"}>ARTS</span>
-                <span className="bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">WRK</span>
-              </span>
-            </Link>
             <div>
               <p className="text-sm font-bold text-[#111]">{displayStudio}</p>
               {isArtist && (

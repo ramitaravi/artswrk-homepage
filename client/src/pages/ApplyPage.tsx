@@ -48,10 +48,12 @@ import { toast } from "sonner";
 
 // ─── Helpers (shared with JobDetail) ─────────────────────────────────────────
 
-function extractTitleFromDescription(description: string | null | undefined): string {
+function extractTitleFromDescription(description: string | null | undefined, clientName?: string | null): string {
   if (!description) return "Open Position";
   const first = description.split("\n")[0].trim();
-  if (first.length > 0 && first.length <= 80) return first;
+  // Skip a first line that is just the poster's own name (legacy Bubble imports).
+  const isPosterName = !!clientName && first.toLowerCase() === clientName.toLowerCase();
+  if (first.length > 0 && first.length <= 80 && !isPosterName) return first;
   const patterns: [RegExp, string][] = [
     [/sub(stitute)?\s+teacher/i, "Substitute Teacher"],
     [/ballet/i, "Ballet Teacher"],
@@ -381,7 +383,7 @@ export default function ApplyPage() {
     return [...localResumes, ...resumes.filter((r) => !ids.has(r.id))];
   }, [resumes, localResumes]);
 
-  const title = useMemo(() => (job as any)?.title || extractTitleFromDescription(job?.description), [job]);
+  const title = useMemo(() => (job as any)?.title || extractTitleFromDescription(job?.description, (job as any)?.clientCompanyName ?? (job as any)?.clientName), [job]);
   const rate = useMemo(
     () => (job ? formatRate(job.isHourly, job.openRate, job.artistHourlyRate, job.clientHourlyRate) : ""),
     [job]

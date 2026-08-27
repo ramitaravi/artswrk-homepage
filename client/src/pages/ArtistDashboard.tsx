@@ -143,6 +143,9 @@ function postedAgo(date: Date | string | null): string {
   if (!date) return "";
   const ms = Date.now() - new Date(date).getTime();
   const mins = Math.floor(ms / 60000);
+  // Synced rows can carry a future createdAt (legacy ET wall-clock read as UTC);
+  // never render a negative "ago".
+  if (mins < 1) return "just now";
   if (mins < 60) return `${mins} min${mins !== 1 ? "s" : ""} ago`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs} hour${hrs !== 1 ? "s" : ""} ago`;
@@ -151,6 +154,17 @@ function postedAgo(date: Date | string | null): string {
   const mos = Math.floor(days / 30);
   if (mos < 12) return `${mos} month${mos !== 1 ? "s" : ""} ago`;
   return `${Math.floor(mos / 12)} year${Math.floor(mos / 12) !== 1 ? "s" : ""} ago`;
+}
+
+// Mirrors the Jobs page fallback: use the real title column, else the first
+// line of the description - unless that line is just the poster's own name
+// (legacy Bubble imports), in which case fall through to the studio name.
+function extractTitle(description: string | null | undefined, clientName?: string | null): string | null {
+  if (!description) return null;
+  const first = description.split("\n")[0].trim();
+  const isPosterName = !!clientName && first.toLowerCase() === clientName.toLowerCase();
+  if (first.length > 0 && first.length <= 80 && !isPosterName) return first;
+  return null;
 }
 
 function formatJobDate(job: any): string {
@@ -177,7 +191,9 @@ function formatJobDate(job: any): string {
 
 function formatRate(job: any): string {
   if (job.openRate) return "Open rate";
-  if (job.artistHourlyRate) return `$${Number(job.artistHourlyRate).toFixed(2)}/hr`;
+  // Rates are unified: the client rate is what the artist earns (no commission).
+  const rate = job.clientHourlyRate ?? job.artistHourlyRate;
+  if (rate) return `$${Number(rate).toFixed(2)}/hr`;
   return "";
 }
 
@@ -418,7 +434,6 @@ function DashboardTab({ user }: { user: any }) {
               })
             ) : nearbyJobs.map((job: any) => {
               const studio = job.clientCompanyName || job.clientName || "Studio";
-              const serviceType = job.serviceType || "";
               const location = job.locationAddress && !job.locationAddress.includes("[object") ? job.locationAddress : "";
               const ago = postedAgo(job.createdAt);
               const rate = formatRate(job);
@@ -431,7 +446,7 @@ function DashboardTab({ user }: { user: any }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <div className="min-w-0">
-                        <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{job.title || serviceType || studio}</h3>
+                        <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{job.title || extractTitle(job.description, studio) || studio}</h3>
                         <p className="text-xs text-gray-500 truncate">{studio}</p>
                       </div>
                       <a
