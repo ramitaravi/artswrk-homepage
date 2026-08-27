@@ -2627,6 +2627,8 @@ Fields to extract:
         workFromAnywhere: z.boolean().default(false),
         description: z.string().optional(),
         applyEmail: z.string().email().optional().or(z.literal('')),
+        applyLink: z.string().url().optional().or(z.literal('')),
+        applyDirect: z.boolean().default(false),
         bubbleClientCompanyId: z.string().optional(),
         appUrl: z.string().optional(),
       }))
@@ -2641,6 +2643,8 @@ Fields to extract:
           workFromAnywhere: input.workFromAnywhere === true,
           description: input.description || null,
           applyEmail: input.applyEmail || null,
+          applyLink: input.applyLink || null,
+          applyDirect: input.applyDirect,
           createdByUserId: ctx.user.id,
           bubbleClientCompanyId: input.bubbleClientCompanyId || null,
         });
@@ -2684,6 +2688,8 @@ Fields to extract:
         budget: z.string().optional(),
         description: z.string().optional(),
         applyEmail: z.string().email().optional().or(z.literal("")),
+        applyLink: z.string().url().optional().or(z.literal("")),
+        applyDirect: z.boolean().optional(),
         status: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -2712,6 +2718,8 @@ Fields to extract:
         if (fields.budget !== undefined) patch.budget = fields.budget || null;
         if (fields.description !== undefined) patch.description = fields.description || null;
         if (fields.applyEmail !== undefined) patch.applyEmail = fields.applyEmail || null;
+        if (fields.applyLink !== undefined) patch.applyLink = fields.applyLink || null;
+        if (fields.applyDirect !== undefined) patch.applyDirect = fields.applyDirect;
         if (fields.status !== undefined) patch.status = fields.status;
 
         if (Object.keys(patch).length > 0) {

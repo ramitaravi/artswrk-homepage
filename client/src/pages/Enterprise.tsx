@@ -721,6 +721,8 @@ function PostJobModal({
     workFromAnywhere: false,
     description: "",
     applyEmail: user?.email || "",
+    applyDirect: false,
+    applyLink: "",
   });
 
   const postJob = trpc.enterprise.postJob.useMutation({
@@ -774,6 +776,8 @@ function PostJobModal({
       workFromAnywhere: form.workFromAnywhere,
       description: form.description || undefined,
       applyEmail: form.applyEmail || undefined,
+      applyDirect: form.applyDirect,
+      applyLink: form.applyDirect ? (form.applyLink || undefined) : undefined,
       bubbleClientCompanyId: form.bubbleClientCompanyId || undefined,
       appUrl: window.location.origin,
     });
@@ -970,6 +974,47 @@ function PostJobModal({
                 )}
                 {form.askArtistRate && (
                   <p className="text-xs text-gray-400">Artists will be prompted to enter their rate when applying.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Apply directly through Artswrk vs. off-site */}
+            <div className="flex items-start gap-4 py-4 border-b border-gray-100">
+              <label className="w-36 text-sm font-bold text-[#111] pt-2 flex-shrink-0">
+                How to Apply
+              </label>
+              <div className="flex-1 space-y-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, applyDirect: false }))}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-colors ${!form.applyDirect ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}
+                  >
+                    Through Artswrk
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, applyDirect: true }))}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-colors ${form.applyDirect ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}
+                  >
+                    Send Off-Site
+                  </button>
+                </div>
+                {form.applyDirect ? (
+                  <div>
+                    <input
+                      type="url"
+                      placeholder="https://yourcompany.com/apply"
+                      value={form.applyLink}
+                      onChange={(e) => setForm((f) => ({ ...f, applyLink: e.target.value }))}
+                      className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
+                    />
+                    <p className="text-xs text-gray-400 mt-1.5">
+                      Artists see an "Apply Now" button that sends them to this link{form.applyEmail && !form.applyLink ? ` — or to ${form.applyEmail} if no link is set` : ""}. Applications won't come through your Artswrk dashboard.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400">Applicants apply here on Artswrk and show up in your dashboard.</p>
                 )}
               </div>
             </div>
@@ -1793,6 +1838,8 @@ function JobDetailView({
     askArtistRate: !job.budget && !job.rate,
     description: job.description || "",
     applyEmail: job.applyEmail || "",
+    applyDirect: !!job.applyDirect,
+    applyLink: job.applyLink || "",
   });
   const utils = trpc.useUtils();
 
@@ -1812,6 +1859,8 @@ function JobDetailView({
         rate: editForm.askArtistRate ? null : (editForm.budget || job.rate),
         description: editForm.description ?? job.description,
         applyEmail: editForm.applyEmail || job.applyEmail,
+        applyDirect: editForm.applyDirect,
+        applyLink: editForm.applyDirect ? editForm.applyLink : null,
       });
       utils.enterprise.getJobs.invalidate();
     },
@@ -1838,6 +1887,8 @@ function JobDetailView({
       budget: editForm.askArtistRate ? "" : editForm.budget,
       description: editForm.description || undefined,
       applyEmail: editForm.applyEmail || undefined,
+      applyDirect: editForm.applyDirect,
+      applyLink: editForm.applyDirect ? (editForm.applyLink || undefined) : "",
     });
   }
 
@@ -2376,6 +2427,24 @@ function JobDetailView({
               </div>
               {!editForm.askArtistRate && (
                 <input value={editForm.budget} onChange={e => setEditForm(f => ({ ...f, budget: e.target.value }))} className={fieldCls} placeholder="e.g. $350/day, $500 flat, $50/hr" />
+              )}
+            </div>
+
+            {/* How to Apply */}
+            <div>
+              <label className={labelCls}>How to Apply</label>
+              <div className="flex items-center gap-2 mb-2">
+                <button type="button" onClick={() => setEditForm(f => ({ ...f, applyDirect: false }))}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-colors ${!editForm.applyDirect ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}>
+                  Through Artswrk
+                </button>
+                <button type="button" onClick={() => setEditForm(f => ({ ...f, applyDirect: true }))}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-colors ${editForm.applyDirect ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}>
+                  Send Off-Site
+                </button>
+              </div>
+              {editForm.applyDirect && (
+                <input type="url" value={editForm.applyLink} onChange={e => setEditForm(f => ({ ...f, applyLink: e.target.value }))} className={fieldCls} placeholder="https://yourcompany.com/apply" />
               )}
             </div>
 

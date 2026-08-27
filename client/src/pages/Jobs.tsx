@@ -883,9 +883,6 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
                 {/* Regular job applications */}
                 {myApplications.length > 0 && (
                   <div className="space-y-4">
-                    <h2 className="text-sm font-black text-[#111]">
-                      Jobs ({myApplications.length})
-                    </h2>
                     {myApplications.map((app) => (
                       <ApplicationCard
                         key={app.id}

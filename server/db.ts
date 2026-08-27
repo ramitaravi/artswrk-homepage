@@ -2682,6 +2682,8 @@ export async function createPremiumJob(data: {
   workFromAnywhere?: boolean;
   description?: string | null;
   applyEmail?: string | null;
+  applyLink?: string | null;
+  applyDirect?: boolean;
   createdByUserId: number;
   bubbleClientCompanyId?: string | null;
 }): Promise<number> {
@@ -2697,6 +2699,8 @@ export async function createPremiumJob(data: {
     workFromAnywhere: data.workFromAnywhere === true,
     description: data.description ?? null,
     applyEmail: data.applyEmail ?? null,
+    applyLink: data.applyLink ?? null,
+    applyDirect: data.applyDirect === true,
     createdByUserId: data.createdByUserId,
     bubbleClientCompanyId: data.bubbleClientCompanyId ?? null,
     status: "Active",

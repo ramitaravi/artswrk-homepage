@@ -10,7 +10,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import {
   MapPin, Clock, ArrowLeft, Star, Loader2, AlertCircle, CheckCircle2,
-  FileText, Upload, DollarSign, Share2,
+  FileText, Upload, DollarSign, Share2, ExternalLink,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -422,6 +422,13 @@ export default function ProJobDetail() {
   }
 
   const j = job as any;
+  // Some PRO jobs are configured to receive applications outside Artswrk
+  // entirely (a link or an email address) instead of through the in-platform
+  // apply form — this was tracked on the record (applyDirect/applyLink/
+  // applyEmail) but never actually surfaced to artists here.
+  const externalApplyHref: string | null = j.applyDirect
+    ? (j.applyLink || (j.applyEmail ? `mailto:${j.applyEmail}` : null))
+    : null;
   const title = j.serviceType ?? "Open Position";
   const location = j.workFromAnywhere ? "Work From Anywhere" : (j.location ?? "Location TBD");
   const company = j.company ?? "Artswrk Client";
@@ -514,7 +521,16 @@ export default function ProJobDetail() {
 
           {/* ── Action buttons / Applied summary chip ── */}
           <div className="flex items-center gap-3 mb-8 flex-wrap">
-            {applied && appliedSummary ? (
+            {externalApplyHref ? (
+              <a
+                href={externalApplyHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-[#111] hover:opacity-80 transition-opacity"
+              >
+                Apply Now <ExternalLink size={14} />
+              </a>
+            ) : applied && appliedSummary ? (
               <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-50 border border-green-100">
                 <CheckCircle2 size={15} className="text-green-600 flex-shrink-0" />
                 <div className="min-w-0">
@@ -555,7 +571,9 @@ export default function ProJobDetail() {
             </div>
           )}
 
-          {/* ── Inline apply section ── */}
+          {/* ── Inline apply section — only for jobs that apply through Artswrk;
+              external-apply jobs already sent the artist off-site above ── */}
+          {!externalApplyHref && (
           <div ref={applyRef} className="mt-10 pt-8 border-t border-gray-100 scroll-mt-20">
             <h2 className="text-xl font-black text-[#111] mb-1">
               {applied ? "Application submitted" : "Apply for this role"}
@@ -672,6 +690,7 @@ export default function ProJobDetail() {
               />
             )}
           </div>
+          )}
 
         </div>
       </div>
@@ -684,7 +703,16 @@ export default function ProJobDetail() {
           <p className="text-xs text-gray-400 truncate">{location}</p>
         </div>
 
-        {applied ? (
+        {externalApplyHref ? (
+          <a
+            href={externalApplyHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-shrink-0 flex items-center gap-1.5 px-6 py-3 rounded-2xl text-sm font-bold text-white bg-[#111] hover:opacity-80 transition-opacity"
+          >
+            Apply <ExternalLink size={14} />
+          </a>
+        ) : applied ? (
           <span className="flex items-center gap-1.5 text-sm font-semibold text-green-600 flex-shrink-0">
             <CheckCircle2 size={16} /> Applied!
           </span>
