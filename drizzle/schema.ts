@@ -2,6 +2,7 @@ import {
   boolean,
   double,
   int,
+  longtext,
   mysqlEnum,
   mysqlTable,
   text,
@@ -191,11 +192,11 @@ export const jobs = mysqlTable("jobs", {
   /** Bubble artist type reference */
   bubbleArtistTypeId: varchar("bubbleArtistTypeId", { length: 64 }),
   /** Bubble booking IDs associated with this request */
-  bubbleBookingIds: text("bubbleBookingIds"),
+  bubbleBookingIds: longtext("bubbleBookingIds"),
   /** Bubble Interested Artist record IDs associated with this request */
-  bubbleInterestedArtistIds: text("bubbleInterestedArtistIds"),
+  bubbleInterestedArtistIds: longtext("bubbleInterestedArtistIds"),
   /** Bubble artist user IDs associated with interested artists */
-  bubbleInterestedArtistUserIds: text("bubbleInterestedArtistUserIds"),
+  bubbleInterestedArtistUserIds: longtext("bubbleInterestedArtistUserIds"),
 
   // ── Content ────────────────────────────────────────────────────────────────
   description: text("description"),
@@ -243,13 +244,13 @@ export const jobs = mysqlTable("jobs", {
   sameDay: boolean("sameDay").default(false),
   unlocked: boolean("unlocked").default(false),
   outreachStatus: varchar("outreachStatus", { length: 128 }),
-  sentTo: text("sentTo"),
+  sentTo: longtext("sentTo"),
 
   // ── Service Type ───────────────────────────────────────────────────────────
   /** Bubble master_service_type ID — will resolve to name in future */
   masterServiceTypeId: varchar("masterServiceTypeId", { length: 64 }),
   /** JSON array of Bubble master style IDs */
-  bubbleMasterStyleIds: text("bubbleMasterStyleIds"),
+  bubbleMasterStyleIds: longtext("bubbleMasterStyleIds"),
 
   // ── Client contact ─────────────────────────────────────────────────────────
   clientEmail: varchar("clientEmail", { length: 320 }),
