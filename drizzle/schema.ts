@@ -21,6 +21,8 @@ export const users = mysqlTable("users", {
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   /** Bubble internal record ID (e.g. "1659533883431x527826980339748400") */
   bubbleId: varchar("bubbleId", { length: 64 }),
+  /** True when this Bubble ID exists in the latest complete live-source reconciliation. */
+  bubbleSourcePresent: boolean("bubbleSourcePresent").default(false),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -174,12 +176,26 @@ export const jobs = mysqlTable("jobs", {
   id: int("id").autoincrement().primaryKey(),
   /** Bubble internal record ID */
   bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  /** True when this Bubble ID exists in the latest complete live-source reconciliation. */
+  bubbleSourcePresent: boolean("bubbleSourcePresent").default(false),
   /** FK → users.id (the hirer who created this job) */
   clientUserId: int("clientUserId"),
   /** Bubble client user ID (for cross-referencing during migration) */
   bubbleClientId: varchar("bubbleClientId", { length: 64 }),
+  /** Bubble user ID recorded in the source record's Created By field */
+  bubbleCreatedById: varchar("bubbleCreatedById", { length: 64 }),
   /** Bubble client company ID */
   bubbleClientCompanyId: varchar("bubbleClientCompanyId", { length: 64 }),
+  /** Bubble artist ID stored on converted or filled requests */
+  bubbleArtistId: varchar("bubbleArtistId", { length: 64 }),
+  /** Bubble artist type reference */
+  bubbleArtistTypeId: varchar("bubbleArtistTypeId", { length: 64 }),
+  /** Bubble booking IDs associated with this request */
+  bubbleBookingIds: text("bubbleBookingIds"),
+  /** Bubble Interested Artist record IDs associated with this request */
+  bubbleInterestedArtistIds: text("bubbleInterestedArtistIds"),
+  /** Bubble artist user IDs associated with interested artists */
+  bubbleInterestedArtistUserIds: text("bubbleInterestedArtistUserIds"),
 
   // ── Content ────────────────────────────────────────────────────────────────
   description: text("description"),
@@ -195,6 +211,7 @@ export const jobs = mysqlTable("jobs", {
   // ── Scheduling ─────────────────────────────────────────────────────────────
   /** Single Date | Ongoing | Recurring */
   dateType: varchar("dateType", { length: 32 }),
+  dateDetails: text("dateDetails"),
   startDate: timestamp("startDate"),
   endDate: timestamp("endDate"),
 
@@ -208,6 +225,10 @@ export const jobs = mysqlTable("jobs", {
   openRate: boolean("openRate").default(false),
   artistHourlyRate: int("artistHourlyRate"),
   clientHourlyRate: int("clientHourlyRate"),
+  artistFlatRate: int("artistFlatRate"),
+  clientFlatRate: int("clientFlatRate"),
+  hours: double("hours"),
+  rateType: varchar("rateType", { length: 64 }),
 
   // ── Audience ───────────────────────────────────────────────────────────────
   /** JSON array of age ranges e.g. ["6-10", "11-14"] */
@@ -217,11 +238,18 @@ export const jobs = mysqlTable("jobs", {
   direct: boolean("direct").default(false),
   sentToNetwork: boolean("sentToNetwork").default(false),
   transportation: boolean("transportation").default(false),
+  transportationDetails: text("transportationDetails"),
   converted: boolean("converted").default(false),
+  sameDay: boolean("sameDay").default(false),
+  unlocked: boolean("unlocked").default(false),
+  outreachStatus: varchar("outreachStatus", { length: 128 }),
+  sentTo: text("sentTo"),
 
   // ── Service Type ───────────────────────────────────────────────────────────
   /** Bubble master_service_type ID — will resolve to name in future */
   masterServiceTypeId: varchar("masterServiceTypeId", { length: 64 }),
+  /** JSON array of Bubble master style IDs */
+  bubbleMasterStyleIds: text("bubbleMasterStyleIds"),
 
   // ── Client contact ─────────────────────────────────────────────────────────
   clientEmail: varchar("clientEmail", { length: 320 }),

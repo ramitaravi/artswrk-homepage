@@ -1831,12 +1831,16 @@ export async function getAdminOverviewStats() {
   const db = await getDb();
   if (!db) return null;
 
-  const [totalUsers] = await db.select({ count: sql<number>`count(*)` }).from(users);
-  const [totalArtists] = await db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.userRole, "Artist"));
-  const [totalClients] = await db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.userRole, "Client"));
-  const [proArtists] = await db.select({ count: sql<number>`count(*)` }).from(users).where(and(eq(users.userRole, "Artist"), eq(users.artswrkPro, true)));
-  const [basicArtists] = await db.select({ count: sql<number>`count(*)` }).from(users).where(and(eq(users.userRole, "Artist"), eq(users.artswrkBasic, true)));
-  const [premiumClients] = await db.select({ count: sql<number>`count(*)` }).from(users).where(and(eq(users.userRole, "Client"), eq(users.clientPremium, true)));
+  // Source-facing headline metrics count one canonical record per live Bubble ID.
+  // Destination-only OAuth/test users and preserved historical rows remain stored
+  // without inflating the migration totals shown to administrators.
+  const liveBubbleUser = eq(users.bubbleSourcePresent, true);
+  const [totalUsers] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(liveBubbleUser);
+  const [totalArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist")));
+  const [totalClients] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Client")));
+  const [proArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist"), eq(users.artswrkPro, true)));
+  const [basicArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist"), eq(users.artswrkBasic, true)));
+  const [premiumClients] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Client"), eq(users.clientPremium, true)));
   const [totalBookings] = await db.select({ count: sql<number>`count(*)` }).from(bookings).where(eq(bookings.deleted, false));
   const [totalJobs] = await db.select({ count: sql<number>`count(*)` }).from(jobs);
 

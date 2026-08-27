@@ -1,0 +1,1 @@
+ALTER TABLE `jobs` ADD `bubbleCreatedById` varchar(64);
