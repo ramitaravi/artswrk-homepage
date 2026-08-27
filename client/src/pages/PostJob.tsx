@@ -312,9 +312,6 @@ function Step2({
   const companiesQuery = trpc.postJob.getMyCompanies.useQuery(undefined, {
     enabled: isAuthenticated,
   });
-  const lastJobQuery = trpc.postJob.getLastJobDefaults.useQuery(undefined, {
-    enabled: isAuthenticated,
-  });
 
   const companies = companiesQuery.data?.companies ?? [];
   const userFullName = companiesQuery.data?.userFullName ?? (user?.name || user?.firstName || "");
@@ -339,10 +336,17 @@ function Step2({
     serviceType: parsed.serviceType || "",
   }));
 
-  // ── Auto-populate from last job on first load (only fills blanks, never overwrites AI-parsed values) ──
-  const [lastJobApplied, setLastJobApplied] = useState(false);
+  // ── Auto-populate from last job for the selected company (only fills
+  // blanks, never overwrites AI-parsed values). Re-runs whenever the
+  // selected company changes, so each studio's own rate/transport history
+  // is remembered independently instead of blending across studios. ──
+  const lastJobQuery = trpc.postJob.getLastJobDefaults.useQuery(
+    { companyId: form.selectedCompanyId ?? undefined },
+    { enabled: isAuthenticated }
+  );
+  const [lastJobAppliedForCompany, setLastJobAppliedForCompany] = useState<number | null | undefined>(undefined);
   useEffect(() => {
-    if (lastJobApplied || !lastJobQuery.data) return;
+    if (lastJobAppliedForCompany === form.selectedCompanyId || !lastJobQuery.data) return;
     const d = lastJobQuery.data;
     setForm((f) => {
       const hasRate = f.openRate || !!f.clientHourlyRate || !!f.clientFlatRate;
@@ -356,8 +360,8 @@ function Step2({
         transportation: d.transportation ?? f.transportation,
       };
     });
-    setLastJobApplied(true);
-  }, [lastJobQuery.data, lastJobApplied]);
+    setLastJobAppliedForCompany(form.selectedCompanyId);
+  }, [lastJobQuery.data, lastJobAppliedForCompany, form.selectedCompanyId]);
 
      // Auto-select first company on load ──
   const [companyAutoSelected, setCompanyAutoSelected] = useState(false);
@@ -383,10 +387,10 @@ function Step2({
     [companies, form.selectedCompanyId]
   );
   const locationConflict = useMemo(() => {
-    if (!selectedCompany?.locationAddress || !parsed.locationAddress) return false;
+    if (!selectedCompany?.locationAddress || !form.locationAddress) return false;
     const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-    return normalize(selectedCompany.locationAddress) !== normalize(parsed.locationAddress);
-  }, [selectedCompany, parsed.locationAddress]);
+    return normalize(selectedCompany.locationAddress) !== normalize(form.locationAddress);
+  }, [selectedCompany, form.locationAddress]);
 
   // ── Add Company inline form ──
   const [showAddCompany, setShowAddCompany] = useState(false);

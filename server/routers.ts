@@ -2041,12 +2041,22 @@ Fields to extract:
      * Used to auto-populate Step 2 fields for returning hirers.
      */
     getLastJobDefaults: protectedProcedure
-      .query(async ({ ctx }) => {
+      .input(z.object({ companyId: z.number().optional() }).optional())
+      .query(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
-        const jobList = await getJobsByUserId(user.id, 1);
-        if (!jobList || jobList.length === 0) return null;
-        const last = jobList[0];
+        // Each company keeps its own rate/transport memory — a client with
+        // multiple studios shouldn't have one studio's rate bleed into
+        // another's. Prefer the selected company's own last job; fall back
+        // to the user's most recent job overall if that company has none yet.
+        const companyId = input?.companyId;
+        let jobList = companyId ? await getJobsByUserId(user.id, 20) : [];
+        let last = companyId ? jobList.find((j: any) => j.clientCompanyId === companyId) : undefined;
+        if (!last) {
+          jobList = await getJobsByUserId(user.id, 1);
+          last = jobList?.[0];
+        }
+        if (!last) return null;
         return {
           isHourly: last.isHourly ?? true,
           openRate: last.openRate ?? false,
@@ -4269,6 +4279,8 @@ Fields to extract:
         logo: z.string().max(1024).optional().nullable(),
         website: z.string().max(512).optional().nullable(),
         locationAddress: z.string().max(512).optional().nullable(),
+        transportReimbursed: z.boolean().optional().nullable(),
+        transportDetails: z.string().max(500).optional().nullable(),
       }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);

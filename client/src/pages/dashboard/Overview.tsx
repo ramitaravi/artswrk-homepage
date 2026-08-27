@@ -149,7 +149,7 @@ function PostJobBox() {
       <div className="flex items-center justify-between mt-3">
         <p className="text-[10px] text-gray-400 flex items-center gap-1">
           <Sparkles size={10} className="text-amber-400" />
-          AI fills in the form from your description
+          We'll fill in the form from your description
         </p>
         <div className="flex items-center gap-2">
           <Link href="/app/artists">

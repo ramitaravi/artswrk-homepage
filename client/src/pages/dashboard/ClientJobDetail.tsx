@@ -15,7 +15,7 @@ import {
   ArrowLeft, ChevronLeft, ChevronRight, MapPin, DollarSign,
   Calendar, Lock, Unlock, ExternalLink, MessageCircle,
   CheckCircle2, Users, Loader2, Star, X, Send,
-  Building2, Clock, FileText, Globe, Instagram,
+  Building2, Instagram,
   UserCheck, CreditCard, Banknote, Zap, Share2,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -715,10 +715,6 @@ function ApplicantsList({ applicants, allIds, onSelectApplicant }: {
             const msgPreview = a.message
               ? a.message.length > 160 ? a.message.slice(0, 160).trimEnd() + " …" : a.message
               : null;
-            const disciplines = parseList(a.artistDisciplines).slice(0, 3);
-            const appliedDate = a.bubbleCreatedAt || a.createdAt
-              ? new Date(a.bubbleCreatedAt || a.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-              : null;
             return (
               <div key={a.id} className="px-5 py-4 hover:bg-gray-50/60 transition-colors">
                 <div className="flex items-start gap-3">
@@ -747,51 +743,15 @@ function ApplicantsList({ applicants, allIds, onSelectApplicant }: {
                           {a.status && (
                             <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${appStatusColor(a.status)}`}>{a.status}</span>
                           )}
-                          {a.converted && (
-                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full text-green-600 bg-green-50 flex items-center gap-0.5">
-                              <CheckCircle2 size={9} /> Booked
-                            </span>
-                          )}
                         </div>
-                        <div className="flex items-center gap-2.5 flex-wrap mb-1.5">
-                          {a.artistLocation && (
-                            <span className="text-xs text-gray-400 flex items-center gap-1">
-                              <MapPin size={10} /> {a.artistLocation}
-                            </span>
-                          )}
-                          {a.ratingScore != null && (
-                            <span className="text-xs text-gray-400 flex items-center gap-1">
-                              <Star size={10} className="fill-amber-400 text-amber-400" /> {Number(a.ratingScore).toFixed(1)}
-                            </span>
-                          )}
-                          {appliedDate && (
-                            <span className="text-xs text-gray-400 flex items-center gap-1">
-                              <Clock size={10} /> Applied {appliedDate}
-                            </span>
-                          )}
-                        </div>
-                        {disciplines.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mb-1.5">
-                            {disciplines.map((t) => (
-                              <span key={t} className="text-[10px] px-2 py-0.5 rounded-full bg-pink-50 text-pink-600 font-medium">{t}</span>
-                            ))}
-                          </div>
+                        {a.artistLocation && (
+                          <p className="text-xs text-gray-400 flex items-center gap-1 mb-1.5">
+                            <MapPin size={10} /> {a.artistLocation}
+                          </p>
                         )}
                         {msgPreview && (
                           <p className="text-sm text-gray-500 leading-relaxed">{msgPreview}</p>
                         )}
-                        <div className="flex items-center gap-3 mt-1.5">
-                          {a.resumeLink && (
-                            <a href={a.resumeLink} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-[11px] font-semibold text-[#F25722] hover:underline flex items-center gap-1">
-                              <FileText size={10} /> Resume
-                            </a>
-                          )}
-                          {a.artistSlug && (
-                            <a href={`/book/${a.artistSlug}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-[11px] font-semibold text-blue-500 hover:underline flex items-center gap-1">
-                              <Globe size={10} /> Profile
-                            </a>
-                          )}
-                        </div>
                       </div>
                       {/* Right: rate + CTA */}
                       <div className="flex-shrink-0 flex flex-col items-end gap-2 min-w-[140px]">
@@ -1447,11 +1407,10 @@ export default function ClientJobDetail() {
         <button
           onClick={() => {
             const url = job.slug ? `${window.location.origin}/jobs/${job.slug}` : window.location.href;
+            navigator.clipboard.writeText(url);
+            toast.success("Job link copied!");
             if (navigator.share) {
               navigator.share({ title: jobTitle, url }).catch(() => {});
-            } else {
-              navigator.clipboard.writeText(url);
-              toast.success("Job link copied!");
             }
           }}
           className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold text-gray-500 border border-gray-200 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors whitespace-nowrap"
@@ -1459,6 +1418,18 @@ export default function ClientJobDetail() {
           <Share2 size={13} /> Share
         </button>
         </div>
+        {(job.description || job.clientHourlyRate || job.artistHourlyRate || !job.openRate) && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            {(job.clientHourlyRate || job.artistHourlyRate || job.openRate) && (
+              <p className="text-sm font-bold text-[#111] mb-1.5">
+                {job.openRate ? "Open rate" : `$${job.clientHourlyRate ?? job.artistHourlyRate}/hr`}
+              </p>
+            )}
+            {job.description && (
+              <p className="text-sm text-gray-600 leading-relaxed line-clamp-3 whitespace-pre-wrap">{job.description}</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Tabs */}

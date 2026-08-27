@@ -4331,6 +4331,8 @@ export async function updateClientCompanyById(
     logo?: string | null;
     website?: string | null;
     locationAddress?: string | null;
+    transportReimbursed?: boolean | null;
+    transportDetails?: string | null;
   }
 ): Promise<void> {
   const db = await getDb();
@@ -4341,6 +4343,8 @@ export async function updateClientCompanyById(
   if (data.logo !== undefined) updateData.logo = data.logo;
   if (data.website !== undefined) updateData.website = data.website;
   if (data.locationAddress !== undefined) updateData.locationAddress = data.locationAddress;
+  if (data.transportReimbursed !== undefined) updateData.transportReimbursed = data.transportReimbursed;
+  if (data.transportDetails !== undefined) updateData.transportDetails = data.transportDetails;
   if (Object.keys(updateData).length > 0) {
     await db.update(clientCompanies)
       .set(updateData)

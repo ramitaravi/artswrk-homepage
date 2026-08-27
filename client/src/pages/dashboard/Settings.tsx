@@ -5,11 +5,12 @@
 import { useState, useRef, useEffect } from "react";
 import {
   User, CreditCard, HelpCircle, ChevronRight,
-  Camera, Loader2, CheckCircle2, Building2, Pencil, Plus,
+  Camera, Loader2, CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import CompanyManager from "@/components/CompanyManager";
 
 type Tab = "profile" | "account" | "subscription" | "help";
 
@@ -164,30 +165,7 @@ function ProfileTab() {
       {companies.length > 0 && (
         <div>
           <h3 className="text-xl font-black text-[#111] mb-5">My Companies</h3>
-          <div className="space-y-3">
-            {companies.map((c: any) => (
-              <div key={c.id} className="flex items-start gap-4 p-3 rounded-xl hover:bg-gray-50 transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
-                  <Building2 size={16} className="text-[#F25722]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-[#111]">{c.name || "Studio"}</p>
-                  {c.locationAddress && <p className="text-xs text-gray-400 mt-0.5">{c.locationAddress}</p>}
-                  {c.travelReimbursement && <p className="text-xs text-gray-400">• {c.travelReimbursement}</p>}
-                </div>
-                <a href="/app/jobs" className="flex-shrink-0 p-1.5 text-gray-400 hover:text-gray-600 transition-colors">
-                  <Pencil size={15} />
-                </a>
-              </div>
-            ))}
-          </div>
-
-          <button
-            className="w-full mt-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
-            onClick={() => window.location.href = "/app/jobs"}
-          >
-            <Plus size={14} /> Add Another Company
-          </button>
+          <CompanyManager />
         </div>
       )}
 
