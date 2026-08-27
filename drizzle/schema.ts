@@ -288,6 +288,8 @@ export const interestedArtists = mysqlTable("interested_artists", {
   id: int("id").autoincrement().primaryKey(),
   /** Bubble internal record ID */
   bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  /** True when this Bubble ID exists in the latest complete live-source reconciliation. */
+  bubbleSourcePresent: boolean("bubbleSourcePresent").default(false),
 
   // ── Relationships ──────────────────────────────────────────────────────────
   /** FK → jobs.id (the job this application is for) */
@@ -341,6 +343,42 @@ export const interestedArtists = mysqlTable("interested_artists", {
 export type InterestedArtist = typeof interestedArtists.$inferSelect;
 export type InsertInterestedArtist = typeof interestedArtists.$inferInsert;
 
+/**
+ * Canonical mirror of Bubble's interestedartists data type.
+ * One row is retained per Bubble record before records are normalized into
+ * standard-job and premium-job application tables for application queries.
+ */
+export const bubbleInterestedArtistsSource = mysqlTable("bubble_interested_artists_source", {
+  id: int("id").autoincrement().primaryKey(),
+  bubbleId: varchar("bubbleId", { length: 64 }).notNull().unique(),
+  bubbleSourcePresent: boolean("bubbleSourcePresent").default(false),
+  bubbleCreatedById: varchar("bubbleCreatedById", { length: 64 }),
+  bubbleArtistId: varchar("bubbleArtistId", { length: 64 }),
+  bubbleRequestId: varchar("bubbleRequestId", { length: 64 }),
+  bubblePremiumJobId: varchar("bubblePremiumJobId", { length: 64 }),
+  bubbleClientId: varchar("bubbleClientId", { length: 64 }),
+  bubbleBookingId: varchar("bubbleBookingId", { length: 64 }),
+  bubbleServiceId: varchar("bubbleServiceId", { length: 64 }),
+  status: varchar("status", { length: 64 }),
+  converted: boolean("converted").default(false),
+  isHourlyRate: boolean("isHourlyRate").default(false),
+  artistHourlyRate: double("artistHourlyRate"),
+  clientHourlyRate: double("clientHourlyRate"),
+  artistFlatRate: double("artistFlatRate"),
+  clientFlatRate: double("clientFlatRate"),
+  premiumJobRate: varchar("premiumJobRate", { length: 255 }),
+  rateType: varchar("rateType", { length: 64 }),
+  totalHours: double("totalHours"),
+  startDate: timestamp("startDate"),
+  endDate: timestamp("endDate"),
+  resumeLink: text("resumeLink"),
+  message: text("message"),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 // ── Bookings (Bubble: booking) ────────────────────────────────────────────────
 /**
  * Confirmed bookings — the final step in the job → applicant → booking chain.
@@ -350,12 +388,18 @@ export const bookings = mysqlTable("bookings", {
   id: int("id").autoincrement().primaryKey(),
   /** Bubble internal record ID */
   bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  /** True when this Bubble ID exists in the latest complete live-source reconciliation. */
+  bubbleSourcePresent: boolean("bubbleSourcePresent").default(false),
+  /** Bubble user ID recorded in the source record's Created By field */
+  bubbleCreatedById: varchar("bubbleCreatedById", { length: 64 }),
 
   // ── Relationships ──────────────────────────────────────────────────────────
   /** FK → jobs.id */
   jobId: int("jobId"),
   /** Bubble Request/job ID */
   bubbleRequestId: varchar("bubbleRequestId", { length: 64 }),
+  /** Bubble Job relation ID, retained separately from Request */
+  bubbleJobId: varchar("bubbleJobId", { length: 64 }),
   /** FK → interested_artists.id (the applicant that became this booking) */
   interestedArtistId: int("interestedArtistId"),
   /** Bubble interested artist record ID */
@@ -368,6 +412,10 @@ export const bookings = mysqlTable("bookings", {
   artistUserId: int("artistUserId"),
   /** Bubble artist user ID */
   bubbleArtistId: varchar("bubbleArtistId", { length: 64 }),
+  /** Exact Bubble List of Payments relationship */
+  bubblePaymentIds: longtext("bubblePaymentIds"),
+  /** Exact Bubble List of Reimbursement relationship */
+  bubbleReimbursementIds: longtext("bubbleReimbursementIds"),
 
   // ── Status ─────────────────────────────────────────────────────────────────
   /** Confirmed | Completed | Cancelled | Pay Now */
@@ -377,19 +425,19 @@ export const bookings = mysqlTable("bookings", {
 
   // ── Rates & Financials ─────────────────────────────────────────────────────
   /** What the client pays */
-  clientRate: int("clientRate"),
+  clientRate: double("clientRate"),
   /** What the artist receives */
-  artistRate: int("artistRate"),
+  artistRate: double("artistRate"),
   /** Total client rate including reimbursements */
-  totalClientRate: int("totalClientRate"),
+  totalClientRate: double("totalClientRate"),
   /** Total artist rate including reimbursements */
-  totalArtistRate: int("totalArtistRate"),
+  totalArtistRate: double("totalArtistRate"),
   /** Artswrk gross profit (clientRate - artistRate - stripeFee) */
-  grossProfit: int("grossProfit"),
+  grossProfit: double("grossProfit"),
   /** Stripe processing fee */
-  stripeFee: int("stripeFee"),
+  stripeFee: double("stripeFee"),
   /** Revenue after Stripe fee */
-  postFeeRevenue: int("postFeeRevenue"),
+  postFeeRevenue: double("postFeeRevenue"),
   /** Number of hours booked (decimal, e.g. 2.75) */
   hours: double("hours"),
   /** Whether payment was made outside Stripe */
@@ -407,6 +455,8 @@ export const bookings = mysqlTable("bookings", {
   // ── Content ────────────────────────────────────────────────────────────────
   description: text("description"),
   stripeCheckoutUrl: text("stripeCheckoutUrl"),
+  /** Legacy Bubble invoice relation or value */
+  bubbleInvoice: text("bubbleInvoice"),
 
   // ── Payment Method ────────────────────────────────────────────────────────
   /**
@@ -434,6 +484,9 @@ export const bookings = mysqlTable("bookings", {
   // ── Flags ──────────────────────────────────────────────────────────────────
   addedToSpreadsheet: boolean("addedToSpreadsheet").default(false),
   deleted: boolean("deleted").default(false),
+  notificationArtistScheduledReminder: boolean("notificationArtistScheduledReminder").default(false),
+  showAlert: boolean("showAlert").default(false),
+  bubbleWorkflowId2: varchar("bubbleWorkflowId2", { length: 256 }),
   /** Created directly by admin (not via job → applicant flow) */
   isAdminBooking: boolean("isAdminBooking").default(false),
   /** Whether this booking recurs on a fixed cadence */
@@ -460,18 +513,26 @@ export const payments = mysqlTable("payments", {
   id: int("id").autoincrement().primaryKey(),
   /** Bubble internal record ID */
   bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  /** True when this Bubble ID exists in the latest complete live-source reconciliation. */
+  bubbleSourcePresent: boolean("bubbleSourcePresent").default(false),
+  /** Bubble user ID recorded in the source record's Created By field */
+  bubbleCreatedById: varchar("bubbleCreatedById", { length: 64 }),
 
   // ── Relationships ──────────────────────────────────────────────────────────
   /** FK → bookings.id */
   bookingId: int("bookingId"),
   /** Bubble booking ID (for cross-referencing) */
   bubbleBookingId: varchar("bubbleBookingId", { length: 64 }),
+  /** Bubble Request ID retained for legacy payments without a booking */
+  bubbleRequestId: varchar("bubbleRequestId", { length: 64 }),
   /** FK → users.id (the client who paid) */
   clientUserId: int("clientUserId"),
 
   // ── Stripe Data ────────────────────────────────────────────────────────────
   /** Stripe charge ID e.g. ch_3LsIGN... */
   stripeId: varchar("stripeId", { length: 128 }),
+  /** Stripe customer ID retained for migrated Checkout records */
+  stripeCustomer: varchar("stripeCustomer", { length: 128 }),
   /** Stripe charge status e.g. succeeded */
   stripeStatus: varchar("stripeStatus", { length: 32 }),
   /** Overall payment status e.g. Success */
@@ -516,6 +577,10 @@ export const conversations = mysqlTable("conversations", {
   id: int("id").autoincrement().primaryKey(),
   /** Bubble internal record ID */
   bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  /** True when this Bubble ID exists in the latest complete live-source reconciliation. */
+  bubbleSourcePresent: boolean("bubbleSourcePresent").default(false),
+  /** Bubble user ID recorded in the source record's Created By field */
+  bubbleCreatedById: varchar("bubbleCreatedById", { length: 64 }),
 
   // ── Relationships ──────────────────────────────────────────────────────────
   /** FK → users.id (the client/hirer) */
@@ -551,6 +616,10 @@ export const messages = mysqlTable("messages", {
   id: int("id").autoincrement().primaryKey(),
   /** Bubble internal record ID */
   bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  /** True when this Bubble ID exists in the latest complete live-source reconciliation. */
+  bubbleSourcePresent: boolean("bubbleSourcePresent").default(false),
+  /** Bubble user ID recorded in the source record's Created By field */
+  bubbleCreatedById: varchar("bubbleCreatedById", { length: 64 }),
 
   // ── Relationships ──────────────────────────────────────────────────────────
   /** FK → conversations.id */
@@ -587,6 +656,8 @@ export const premiumJobs = mysqlTable("premium_jobs", {
   id: int("id").autoincrement().primaryKey(),
   /** Bubble internal record ID */
   bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  /** True when this Bubble ID exists in the latest complete live-source reconciliation. */
+  bubbleSourcePresent: boolean("bubbleSourcePresent").default(false),
 
   // ── Company / Poster ───────────────────────────────────────────────────────
   /** Company name (stored directly on the record, not derived from user) */
@@ -611,6 +682,8 @@ export const premiumJobs = mysqlTable("premium_jobs", {
   budget: varchar("budget", { length: 256 }),
   /** Location text */
   location: varchar("location", { length: 256 }),
+  locationLat: varchar("locationLat", { length: 32 }),
+  locationLng: varchar("locationLng", { length: 32 }),
   /** Tag (e.g. "#Judges #MasterClasses") */
   tag: varchar("tag", { length: 256 }),
   /** URL slug */
@@ -623,6 +696,8 @@ export const premiumJobs = mysqlTable("premium_jobs", {
   applyEmail: varchar("applyEmail", { length: 320 }),
   /** External link for direct applications */
   applyLink: text("applyLink"),
+  /** Exact Bubble interested_artists relationship list, normalized in the next phase. */
+  bubbleInterestedArtistIds: longtext("bubbleInterestedArtistIds"),
 
   // ── Flags ──────────────────────────────────────────────────────────────────
   /** Whether this job can be done remotely */
@@ -650,6 +725,8 @@ export type InsertPremiumJob = typeof premiumJobs.$inferInsert;
  */
 export const premiumJobInterestedArtists = mysqlTable("premium_job_interested_artists", {
   id: int("id").autoincrement().primaryKey(),
+  /** True when this Bubble record exists in the latest complete live-source reconciliation. */
+  bubbleSourcePresent: boolean("bubbleSourcePresent").default(false),
   /** FK → premium_jobs.id */
   premiumJobId: int("premiumJobId").notNull(),
   /** Bubble premium job ID */
@@ -669,6 +746,8 @@ export const premiumJobInterestedArtists = mysqlTable("premium_job_interested_ar
   /** Status from Bubble */
   status: varchar("status", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
 });
 export type PremiumJobInterestedArtist = typeof premiumJobInterestedArtists.$inferSelect;
 export type InsertPremiumJobInterestedArtist = typeof premiumJobInterestedArtists.$inferInsert;
@@ -681,13 +760,19 @@ export type InsertPremiumJobInterestedArtist = typeof premiumJobInterestedArtist
 export const clientCompanies = mysqlTable("client_companies", {
   id: int("id").autoincrement().primaryKey(),
   /** FK → users.id (the enterprise user who owns this company) */
-  ownerUserId: int("ownerUserId").notNull(),
+  ownerUserId: int("ownerUserId"),
   /** Company display name */
   name: varchar("name", { length: 256 }).notNull(),
   /** Company logo URL */
   logo: text("logo"),
   /** Bubble client company ID (for deduplication) */
   bubbleClientCompanyId: varchar("bubbleClientCompanyId", { length: 64 }),
+  /** True when this Bubble ID exists in the latest complete live-source reconciliation. */
+  bubbleSourcePresent: boolean("bubbleSourcePresent").default(false),
+  /** Bubble user ID recorded in the source record's Created By field */
+  bubbleCreatedById: varchar("bubbleCreatedById", { length: 64 }),
+  /** Exact JSON list from Bubble's Client relationship field */
+  bubbleClientIds: longtext("bubbleClientIds"),
   /** Website URL */
   website: text("website"),
   /** Description */
@@ -701,12 +786,27 @@ export const clientCompanies = mysqlTable("client_companies", {
   /** Instructions for how artists should get to this studio */
   transportDetails: text("transportDetails"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  bubbleCreatedAt: timestamp("bubbleCreatedAt"),
+  bubbleModifiedAt: timestamp("bubbleModifiedAt"),
 }, (t) => ({
-  /** Prevent duplicate company names per owner */
-  ownerNameUniq: uniqueIndex("client_companies_owner_name_uniq").on(t.ownerUserId, t.name),
+  /** One destination company per Bubble ClientCompany record */
+  bubbleCompanyUniq: uniqueIndex("client_companies_bubble_id_uniq").on(t.bubbleClientCompanyId),
 }));
 export type ClientCompany = typeof clientCompanies.$inferSelect;
 export type InsertClientCompany = typeof clientCompanies.$inferInsert;
+
+/** Exact Bubble ClientCompany.Client relationship rows. */
+export const clientCompanyMemberships = mysqlTable("client_company_memberships", {
+  id: int("id").autoincrement().primaryKey(),
+  clientCompanyId: int("clientCompanyId").notNull(),
+  userId: int("userId"),
+  bubbleClientCompanyId: varchar("bubbleClientCompanyId", { length: 64 }).notNull(),
+  bubbleUserId: varchar("bubbleUserId", { length: 64 }).notNull(),
+  isPrimary: boolean("isPrimary").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  companyUserUniq: uniqueIndex("client_company_memberships_company_user_uniq").on(t.clientCompanyId, t.bubbleUserId),
+}));
 
 /**
  * Enterprise Job Unlocks — tracks which on-demand enterprise jobs have been
@@ -1164,6 +1264,10 @@ export type InsertRateConversion = typeof rateConversions.$inferInsert;
 export const benefits = mysqlTable("benefits", {
   id: int("id").autoincrement().primaryKey(),
   bubbleId: varchar("bubbleId", { length: 64 }).unique(),
+  /** True when this Bubble ID exists in the latest complete live-source reconciliation. */
+  bubbleSourcePresent: boolean("bubbleSourcePresent").default(false),
+  /** Bubble user ID recorded in the source record's Created By field */
+  bubbleCreatedById: varchar("bubbleCreatedById", { length: 64 }),
 
   companyName: varchar("companyName", { length: 256 }),
   slug: varchar("slug", { length: 256 }),

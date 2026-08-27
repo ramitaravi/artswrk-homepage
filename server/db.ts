@@ -146,14 +146,24 @@ export async function getUserByOpenId(openId: string) {
 export async function getUserByEmail(email: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, email))
+    .orderBy(desc(users.bubbleSourcePresent), desc(users.updatedAt), desc(users.id))
+    .limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
 export async function getUserByBubbleId(bubbleId: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.bubbleId, bubbleId)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.bubbleId, bubbleId))
+    .orderBy(desc(users.bubbleSourcePresent), desc(users.updatedAt), desc(users.id))
+    .limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
@@ -1826,6 +1836,11 @@ export async function getArtistTypeCounts() {
 
 // ── Admin Helpers ─────────────────────────────────────────────────────────────
 
+/** Bubble booking financial fields are stored as dollar values; admin UI APIs use cents. */
+export function bookingDollarsToCents(value: unknown): number {
+  return Math.round(Number(value ?? 0) * 100);
+}
+
 /** Overview stats for the admin dashboard */
 export async function getAdminOverviewStats() {
   const db = await getDb();
@@ -1840,27 +1855,50 @@ export async function getAdminOverviewStats() {
   const [totalClients] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Client")));
   const [proArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist"), eq(users.artswrkPro, true)));
   const [basicArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist"), eq(users.artswrkBasic, true)));
+  const [priorityArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist"), eq(users.priorityList, true)));
   const [premiumClients] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Client"), eq(users.clientPremium, true)));
-  const [totalBookings] = await db.select({ count: sql<number>`count(*)` }).from(bookings).where(eq(bookings.deleted, false));
-  const [totalJobs] = await db.select({ count: sql<number>`count(*)` }).from(jobs);
-
-  // Revenue = sum of all paid payments
-  const [revenueRow] = await db
-    .select({ total: sql<number>`coalesce(sum(stripeAmount), 0)` })
-    .from(payments)
-    .where(eq(payments.status, "Success"));
-
-  // Commission = sum of application fees
-  const [commissionRow] = await db
-    .select({ total: sql<number>`coalesce(sum(stripeApplicationFeeAmount), 0)` })
-    .from(payments)
-    .where(eq(payments.status, "Success"));
-
-  // Future revenue = sum of confirmed/unpaid bookings clientRate
-  const [futureRevenueRow] = await db
-    .select({ total: sql<number>`coalesce(sum(clientRate), 0)` })
+  const liveBubbleBooking = eq(bookings.bubbleSourcePresent, true);
+  const [totalBookings] = await db
+    .select({ count: sql<number>`count(distinct ${bookings.bubbleId})` })
     .from(bookings)
-    .where(and(eq(bookings.bookingStatus, "Confirmed"), eq(bookings.paymentStatus, "Unpaid"), eq(bookings.deleted, false)));
+    .where(and(liveBubbleBooking, eq(bookings.bookingStatus, "Completed")));
+  const [totalJobs] = await db
+    .select({ count: sql<number>`count(distinct ${jobs.bubbleId})` })
+    .from(jobs)
+    .where(eq(jobs.bubbleSourcePresent, true));
+
+  // Bubble dashboard revenue = non-deleted completed/paid booking totals.
+  const [revenueRow] = await db
+    .select({ total: sql<number>`coalesce(sum(coalesce(${bookings.totalClientRate}, ${bookings.clientRate}, 0)), 0)` })
+    .from(bookings)
+    .where(and(
+      liveBubbleBooking,
+      eq(bookings.bookingStatus, "Completed"),
+      eq(bookings.paymentStatus, "Paid"),
+      eq(bookings.deleted, false),
+    ));
+
+  // Bubble dashboard commission = non-deleted completed/paid booking gross profit.
+  const [commissionRow] = await db
+    .select({ total: sql<number>`coalesce(sum(coalesce(${bookings.grossProfit}, 0)), 0)` })
+    .from(bookings)
+    .where(and(
+      liveBubbleBooking,
+      eq(bookings.bookingStatus, "Completed"),
+      eq(bookings.paymentStatus, "Paid"),
+      eq(bookings.deleted, false),
+    ));
+
+  // Future revenue = non-deleted live confirmed/unpaid booking totals.
+  const [futureRevenueRow] = await db
+    .select({ total: sql<number>`coalesce(sum(coalesce(${bookings.totalClientRate}, ${bookings.clientRate}, 0)), 0)` })
+    .from(bookings)
+    .where(and(
+      liveBubbleBooking,
+      eq(bookings.bookingStatus, "Confirmed"),
+      eq(bookings.paymentStatus, "Unpaid"),
+      eq(bookings.deleted, false),
+    ));
 
   return {
     totalUsers: Number(totalUsers?.count ?? 0),
@@ -1868,12 +1906,13 @@ export async function getAdminOverviewStats() {
     totalClients: Number(totalClients?.count ?? 0),
     proArtists: Number(proArtists?.count ?? 0),
     basicArtists: Number(basicArtists?.count ?? 0),
+    priorityArtists: Number(priorityArtists?.count ?? 0),
     premiumClients: Number(premiumClients?.count ?? 0),
     totalBookings: Number(totalBookings?.count ?? 0),
     totalJobs: Number(totalJobs?.count ?? 0),
-    totalRevenueCents: Number(revenueRow?.total ?? 0),
-    totalCommissionCents: Number(commissionRow?.total ?? 0),
-    futureRevenueCents: Number(futureRevenueRow?.total ?? 0),
+    totalRevenueCents: bookingDollarsToCents(revenueRow?.total),
+    totalCommissionCents: bookingDollarsToCents(commissionRow?.total),
+    futureRevenueCents: bookingDollarsToCents(futureRevenueRow?.total),
   };
 }
 

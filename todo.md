@@ -757,16 +757,20 @@
 ## One-Time Bubble Production Reconciliation
 - [x] Reconcile Bubble users against destination users by Bubble ID, normalized email, OAuth identity, role, and subscriber flags
 - [x] Run an idempotent user upsert and explain every difference between Bubble and admin-dashboard user totals
-- [ ] Reconcile and synchronize standard jobs with exact creator, client, company, status, and location relationships
-- [ ] Reconcile and synchronize ClientCompany records one-to-one by Bubble company ID with all client memberships preserved
-- [ ] Reconcile and synchronize premium jobs with exact client-company and creator relationships
-- [ ] Reconcile and synchronize standard and premium interested-artist applications without duplicates
-- [ ] Reconcile and synchronize bookings and booking periods with job, application, artist, and client links
-- [ ] Reconcile and synchronize payments with exact amounts, statuses, booking links, and Stripe references
-- [ ] Inventory the Bubble transaction data type and synchronize it to an explicit destination structure
-- [ ] Reconcile and synchronize conversations and messages with participants and source timestamps
-- [ ] Reconcile and synchronize benefits and user eligibility relationships
-- [ ] Run a final cross-table count, duplicate, orphan, subscriber, and financial reconciliation report
+- [x] Reconcile and synchronize standard jobs with exact creator, client, company, status, and location relationships
+- [x] Reconcile and synchronize ClientCompany records one-to-one by Bubble company ID with all client memberships preserved
+- [x] Reconcile and synchronize premium jobs with exact client-company and creator relationships
+- [x] Reconcile and synchronize standard and premium interested-artist applications without duplicates
+- [x] Reconcile and synchronize bookings and booking periods with job, application, artist, and client links
+- [x] Reconcile and synchronize payments with exact amounts, statuses, booking links, and Stripe references
+- [x] Inventory the Bubble transaction data type; confirm transactions are derived from canonical bookings/payments because Bubble exposes no separate transaction table
+- [x] Correct legacy booking financial columns to preserve Bubble decimal-dollar precision and reconcile exact transaction totals
+- [x] Align admin dashboard bookings, revenue, commission, and future-revenue metrics with Bubble's canonical live booking definitions
+- [x] Show the canonical live Bubble Priority List count in the admin dashboard
+- [x] Prefer canonical reconciled Bubble rows in email and Bubble-ID login lookups so preserved duplicates cannot shadow subscriber accounts
+- [x] Reconcile and synchronize conversations and messages with participants and source timestamps
+- [x] Reconcile and synchronize benefits and user eligibility relationships
+- [x] Run a final cross-table count, duplicate, orphan, subscriber, and financial reconciliation report
 
 ## Homepage Competition Logo Marquee
 - [x] Replace the moving homepage banner with the ten supplied competition logos

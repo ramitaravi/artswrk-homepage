@@ -266,7 +266,7 @@ function DashboardSection() {
 
       {/* Primary stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Revenue" value={fmt$(stats?.totalRevenueCents ?? 0)} sub="Synced payments only" icon={<DollarSign size={18} />} />
+        <StatCard label="Revenue" value={fmt$(stats?.totalRevenueCents ?? 0)} sub="Completed, non-deleted bookings" icon={<DollarSign size={18} />} />
         <StatCard label="Commission" value={fmt$(stats?.totalCommissionCents ?? 0)} icon={<TrendingUp size={18} />} accent="bg-green-50 text-green-600" />
         <StatCard label="Bookings" value={(stats?.totalBookings ?? 0).toLocaleString()} icon={<BookOpen size={18} />} accent="bg-blue-50 text-blue-600" />
         <StatCard label="Future Revenue" value={fmt$(stats?.futureRevenueCents ?? 0)} icon={<Calendar size={18} />} accent="bg-purple-50 text-purple-600" />
@@ -280,7 +280,7 @@ function DashboardSection() {
             {[
               { label: "Total", value: stats?.totalArtists ?? 0 },
               { label: "Basic", value: stats?.basicArtists ?? 0 },
-              { label: "Priority", value: "—" },
+              { label: "Priority", value: stats?.priorityArtists ?? 0 },
               { label: "PRO", value: stats?.proArtists ?? 0 },
             ].map(s => (
               <div key={s.label} className="text-center">
