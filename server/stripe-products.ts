@@ -7,6 +7,16 @@
  * BOOST          – Dynamic pricing: dailyBudget × durationDays
  */
 
+// Auto-detects test vs. live mode from the configured secret key so the same
+// code works in both — dev/local always has a test key, production has live.
+// Falls back to the live ID if the matching test env var isn't set, so this
+// is safe to deploy even before test products exist.
+const IS_TEST_MODE = (process.env.STRIPE_SECRET_KEY ?? "").startsWith("sk_test_");
+function envOrLive(testEnvVar: string, liveValue: string): string {
+  if (!IS_TEST_MODE) return liveValue;
+  return process.env[testEnvVar] || liveValue;
+}
+
 export const STRIPE_PRODUCTS = {
   /** One-time $30 job post fee */
   ONE_TIME_POST: {
@@ -41,17 +51,17 @@ export const STRIPE_PRODUCTS = {
    * Annual:  price_1PligSA91H1fWNkK56t3L1lZ
    */
   ARTIST_BASIC: {
-    productId: "prod_Qcyd0J11o6fNHz",
+    productId: envOrLive("STRIPE_TEST_ARTIST_BASIC_PRODUCT_ID", "prod_Qcyd0J11o6fNHz"),
     name: "Artswrk Basic",
     description: "Apply to all marketplace jobs and build your artist profile.",
     currency: "usd",
     mode: "subscription" as const,
     monthly: {
-      priceId: "price_1Plig7A91H1fWNkKnH5qb40M",
+      priceId: envOrLive("STRIPE_TEST_ARTIST_BASIC_MONTHLY_PRICE_ID", "price_1Plig7A91H1fWNkKnH5qb40M"),
       interval: "month" as const,
     },
     annual: {
-      priceId: "price_1PligSA91H1fWNkK56t3L1lZ",
+      priceId: envOrLive("STRIPE_TEST_ARTIST_BASIC_ANNUAL_PRICE_ID", "price_1PligSA91H1fWNkK56t3L1lZ"),
       interval: "year" as const,
     },
   },
@@ -61,18 +71,21 @@ export const STRIPE_PRODUCTS = {
    * Annual:  price_1O7Ts6A91H1fWNkKVlYhqdAi ($X/yr)
    */
   ARTIST_PRO: {
-    productId: "prod_OvKXdVHLUpHLCn",
+    productId: envOrLive("STRIPE_TEST_ARTIST_PRO_PRODUCT_ID", "prod_OvKXdVHLUpHLCn"),
     name: "Artswrk PRO",
     description: "PRO jobs, priority placement, profile boost, and advanced analytics.",
     currency: "usd",
     mode: "subscription" as const,
     monthly: {
-      priceId: "price_1O7U0HA91H1fWNkKa9wA0v6X",
+      priceId: envOrLive("STRIPE_TEST_ARTIST_PRO_MONTHLY_PRICE_ID", "price_1O7U0HA91H1fWNkKa9wA0v6X"),
+      // Payment Links are also mode-specific — no test-mode link was created, so this
+      // stays live-only; the dynamic Checkout Session path (priceId above) is what
+      // actually gets used in test mode.
       paymentLinkId: "plink_1OKZtSA91H1fWNkKgr12Dkow",
       interval: "month" as const,
     },
     annual: {
-      priceId: "price_1O7Ts6A91H1fWNkKVlYhqdAi",
+      priceId: envOrLive("STRIPE_TEST_ARTIST_PRO_ANNUAL_PRICE_ID", "price_1O7Ts6A91H1fWNkKVlYhqdAi"),
       paymentLinkId: "plink_1RJFokA91H1fWNkKYbrlxLUH",
       interval: "year" as const,
     },
@@ -83,9 +96,9 @@ export const STRIPE_PRODUCTS = {
    * Price ID: price_1SzOVLA91H1fWNkK5rX69GBU (set via ENTERPRISE_JOB_UNLOCK_PRICE_ID env var)
    */
   ENTERPRISE_ON_DEMAND: {
-    productId: "prod_TxJ7FkYDtKrFS1",
+    productId: envOrLive("STRIPE_TEST_ENTERPRISE_ON_DEMAND_PRODUCT_ID", "prod_TxJ7FkYDtKrFS1"),
     paymentLinkId: "plink_1SzOVjA91H1fWNkKiqwN8q1j",
-    priceId: process.env.ENTERPRISE_JOB_UNLOCK_PRICE_ID ?? "",
+    priceId: envOrLive("STRIPE_TEST_ENTERPRISE_ON_DEMAND_PRICE_ID", process.env.ENTERPRISE_JOB_UNLOCK_PRICE_ID ?? ""),
     name: "Artswrk Enterprise — View Candidates",
     description: "Unlock candidate list for one PRO job posting.",
     amount: 10000, // $100 in cents (fallback if priceId not set)
@@ -100,20 +113,18 @@ export const STRIPE_PRODUCTS = {
    * Annual:  create a $2500/year  recurring price → set ENTERPRISE_SUB_ANNUAL_PRICE_ID
    */
   ENTERPRISE_SUBSCRIPTION: {
-    productId: "prod_Tmmk8mzn4uw8G8",
+    productId: envOrLive("STRIPE_TEST_ENTERPRISE_SUBSCRIPTION_PRODUCT_ID", "prod_Tmmk8mzn4uw8G8"),
     name: "Artswrk Enterprise Subscription",
     description: "Unlimited PRO job postings and candidate access.",
     currency: "usd",
     mode: "subscription" as const,
     monthly: {
-      // TODO: replace with real price ID from Stripe dashboard ($250/mo)
-      priceId: process.env.ENTERPRISE_SUB_MONTHLY_PRICE_ID ?? "",
+      priceId: envOrLive("STRIPE_TEST_ENTERPRISE_SUB_MONTHLY_PRICE_ID", process.env.ENTERPRISE_SUB_MONTHLY_PRICE_ID ?? ""),
       amount: 25000, // $250 in cents (fallback for price_data)
       interval: "month" as const,
     },
     annual: {
-      // TODO: replace with real price ID from Stripe dashboard ($2500/yr)
-      priceId: process.env.ENTERPRISE_SUB_ANNUAL_PRICE_ID ?? "",
+      priceId: envOrLive("STRIPE_TEST_ENTERPRISE_SUB_ANNUAL_PRICE_ID", process.env.ENTERPRISE_SUB_ANNUAL_PRICE_ID ?? ""),
       amount: 250000, // $2500 in cents (fallback for price_data)
       interval: "year" as const,
     },
