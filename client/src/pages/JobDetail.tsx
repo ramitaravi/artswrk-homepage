@@ -6,7 +6,7 @@
  *   logged in, free   → job shown fully, upgrade to basic CTA
  *   logged in, basic+ → full access, apply button
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import {
   MapPin, Clock, Calendar, DollarSign, ArrowLeft,
@@ -132,10 +132,13 @@ export default function JobDetail() {
     { enabled: jobId !== null }
   );
 
-  const applyMutation = trpc.jobs.submitApplication.useMutation();
-  const [applied, setApplied] = useState(false);
+  const { data: myApplications } = trpc.jobs.myApplications.useQuery(
+    { limit: 100 },
+    { enabled: isAuthenticated }
+  );
+  const applied = !!(jobId !== null && (myApplications as any[] ?? []).some((a: any) => a.jobId === jobId));
 
-  const title = useMemo(() => extractTitleFromDescription(job?.description), [job?.description]);
+  const title = useMemo(() => (job as any)?.title || extractTitleFromDescription(job?.description), [job]);
   const rate = useMemo(
     () => job ? formatRate(job.isHourly, job.openRate, job.artistHourlyRate, job.clientHourlyRate) : "",
     [job]
@@ -223,6 +226,7 @@ export default function JobDetail() {
   const ctaSection = !isAuthenticated ? (
     <InlineAuth
       heading="Join Artswrk to apply"
+      variant="artist"
       onSuccess={() => window.location.reload()}
       onNotFound={(email) => { window.location.href = `/join?next=${encodeURIComponent(jobUrl)}&email=${encodeURIComponent(email)}`; }}
     />

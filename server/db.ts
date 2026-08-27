@@ -1,15 +1,63 @@
 import { and, asc, desc, eq, inArray, isNotNull, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { BookingPeriod, ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, affiliations, benefits, bookingPeriods, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, masterServiceTypes, messages, payments, premiumJobInterestedArtists, premiumJobs, reimbursements, savedArtists, userAffiliations, users } from "../drizzle/schema";
+import mysql from "mysql2/promise";
+import { BookingPeriod, ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, affiliations, artistResumes, benefits, bookingPeriods, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, masterServiceTypes, messages, payments, premiumJobInterestedArtists, premiumJobs, reimbursements, savedArtists, userAffiliations, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+
+/**
+ * Wrap a raw-SQL date/timestamp column so it comes back as an unambiguous
+ * UTC ISO-8601 string, e.g. "2026-08-26T21:00:00.000Z", instead of a bare
+ * "YYYY-MM-DD HH:MM:SS" string.
+ *
+ * Raw `db.execute()` queries bypass drizzle's typed column mapping, so date
+ * columns come back as plain driver strings with no timezone marker.
+ * Browsers parse that bare space-separated format as LOCAL time (no 'T', no
+ * 'Z'), so without this wrapper a value that's already correctly stored as
+ * true UTC (see the pool setup below — `timezone: "Z"` + `SET time_zone =
+ * '+00:00'` on every connection make that true for both drizzle's typed
+ * queries and raw ones) gets silently reinterpreted by the client as its own
+ * local time. This must NOT also CONVERT_TZ the value — the pool already
+ * guarantees the column reads back as true UTC, so converting it again here
+ * double-shifts it by the DB host's session offset.
+ */
+function utcIsoSql(column: string): string {
+  return `DATE_FORMAT(${column}, '%Y-%m-%dT%H:%i:%s.000Z')`;
+}
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      // Two things have to agree for jobs.startDate/endDate (MySQL
+      // `timestamp` columns) to round-trip correctly, and previously
+      // neither was pinned down:
+      //   1. `timezone: "Z"` — makes the mysql2 driver always convert JS
+      //      Date <-> wire values assuming UTC, instead of the default
+      //      "local" mode, which ties conversion to whatever
+      //      `process.env.TZ` happens to be on *whichever* server
+      //      process/pod handled the request.
+      //   2. `SET time_zone = '+00:00'` on every pooled connection — makes
+      //      MySQL's own session interpret the wall-clock text the driver
+      //      sends/receives as UTC too. Without this, MySQL falls back to
+      //      its "SYSTEM" session default (the DB host's OS timezone,
+      //      unrelated to the app), so (1) alone is not enough: the driver
+      //      would format a value assuming UTC while MySQL reinterprets
+      //      those same digits in a different zone, silently shifting the
+      //      stored/read instant by the mismatch between the two.
+      // Together these make date round-trips independent of the app
+      // server's ambient TZ *and* the DB host's ambient TZ.
+      const pool = mysql.createPool({ uri: process.env.DATABASE_URL, timezone: "Z" });
+      pool.on("connection", (connection) => {
+        connection.query("SET time_zone = '+00:00'");
+      });
+      // `as any`: pnpm resolves this file's direct `mysql2/promise` import and
+      // drizzle-orm's internal `mysql2` dependency to structurally-identical
+      // but nominally-distinct `Pool` types (TS sees them as unrelated
+      // classes) — a harmless cross-package type-identity artifact, not a
+      // real runtime mismatch.
+      _db = drizzle({ client: pool as any });
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -193,7 +241,11 @@ export async function getPublicJobs(limit = 50, offset = 0) {
       eq(jobs.requestStatus, 'Active'),
       eq(jobs.requestStatus, 'Confirmed'),
     ))
-    .orderBy(desc(jobs.bubbleCreatedAt))
+    // bubbleCreatedAt is only set for jobs migrated from Bubble; natively-posted
+    // jobs have it NULL, which MySQL sorts last under `ORDER BY ... DESC`, so
+    // new jobs never surfaced. Fall back to createdAt (always populated) for
+    // native jobs while keeping the true historical order for migrated ones.
+    .orderBy(desc(sql`COALESCE(${jobs.bubbleCreatedAt}, ${jobs.createdAt})`))
     .limit(limit)
     .offset(offset);
 }
@@ -216,9 +268,10 @@ export async function getPublicJobsEnriched(
 ): Promise<{
   id: number;
   slug: string | null;
+  title: string | null;
   requestStatus: string | null;
-  startDate: Date | null;
-  endDate: Date | null;
+  startDate: string | null;
+  endDate: string | null;
   dateType: string | null;
   isHourly: boolean | null;
   openRate: boolean | null;
@@ -290,7 +343,9 @@ export async function getPublicJobsEnriched(
 
   const whereSQL = whereClauses.join(' AND ');
   const rows = await db.execute(
-    `SELECT j.id, j.slug, j.requestStatus, j.startDate, j.endDate, j.dateType,
+    `SELECT j.id, j.slug, j.title, j.requestStatus,
+       ${utcIsoSql('j.startDate')} AS startDate, ${utcIsoSql('j.endDate')} AS endDate,
+       j.dateType,
        j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate,
        j.locationAddress, j.locationLat, j.locationLng,
        j.description, j.direct, j.bubbleCreatedAt,
@@ -306,7 +361,7 @@ export async function getPublicJobsEnriched(
      FROM jobs j
      LEFT JOIN users u ON j.clientUserId = u.id
      WHERE ${whereSQL}
-     ORDER BY (j.isBoosted = 1 AND (j.boostEndDate IS NULL OR j.boostEndDate > NOW())) DESC, j.bubbleCreatedAt DESC
+     ORDER BY (j.isBoosted = 1 AND (j.boostEndDate IS NULL OR j.boostEndDate > NOW())) DESC, COALESCE(j.bubbleCreatedAt, j.createdAt) DESC
      LIMIT ${limit} OFFSET ${offset}`
   );
   return (rows[0] as unknown as any[]);
@@ -319,9 +374,10 @@ export async function getPublicJobsEnriched(
 export async function getJobDetailById(id: number): Promise<{
   id: number;
   slug: string | null;
+  title: string | null;
   requestStatus: string | null;
-  startDate: Date | null;
-  endDate: Date | null;
+  startDate: string | null;
+  endDate: string | null;
   dateType: string | null;
   isHourly: boolean | null;
   openRate: boolean | null;
@@ -341,7 +397,9 @@ export async function getJobDetailById(id: number): Promise<{
   const db = await getDb();
   if (!db) return null;
   const rows = await db.execute(
-    `SELECT j.id, j.slug, j.requestStatus, j.startDate, j.endDate, j.dateType,
+    `SELECT j.id, j.slug, j.title, j.requestStatus,
+       ${utcIsoSql('j.startDate')} AS startDate, ${utcIsoSql('j.endDate')} AS endDate,
+       j.dateType,
        j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate,
        j.locationAddress, j.locationLat, j.locationLng,
        j.description, j.direct, j.bubbleCreatedAt, j.clientUserId,
@@ -365,9 +423,10 @@ export async function getArtistJobApplications(artistUserId: number, limit = 50,
   status: string | null;
   createdAt: Date | null;
   jobId: number | null;
+  title: string | null;
   description: string | null;
   locationAddress: string | null;
-  startDate: Date | null;
+  startDate: string | null;
   dateType: string | null;
   isHourly: boolean | null;
   openRate: boolean | null;
@@ -381,7 +440,7 @@ export async function getArtistJobApplications(artistUserId: number, limit = 50,
   if (!db) return [];
   const rows = await db.execute(
     `SELECT ia.id, ia.status, ia.createdAt, ia.jobId,
-       j.description, j.locationAddress, j.startDate, j.dateType,
+       j.title, j.description, j.locationAddress, ${utcIsoSql('j.startDate')} AS startDate, j.dateType,
        j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate,
        j.requestStatus,
        u.clientCompanyName,
@@ -490,7 +549,7 @@ export async function getAdminClientJobs(clientUserId: number, limit = 100, offs
   const rows = await db.execute(
     `SELECT
        j.id, j.requestStatus, j.description, j.locationAddress,
-       j.startDate, j.dateType, j.isHourly, j.openRate,
+       ${utcIsoSql('j.startDate')} AS startDate, j.dateType, j.isHourly, j.openRate,
        j.artistHourlyRate, j.clientHourlyRate, j.artistFlatRate, j.clientFlatRate,
        j.bubbleCreatedAt, j.createdAt,
        (SELECT COUNT(*) FROM interested_artists ia WHERE ia.jobId = j.id) AS applicantCount,
@@ -539,7 +598,7 @@ export async function getAdminArtistApplications(artistUserId: number, limit = 1
        ia.artistHourlyRate, ia.clientHourlyRate, ia.artistFlatRate, ia.clientFlatRate,
        ia.totalHours, ia.isHourlyRate, ia.message,
        ia.jobId,
-       j.description, j.locationAddress, j.startDate, j.requestStatus, j.dateType,
+       j.description, j.locationAddress, ${utcIsoSql('j.startDate')} AS startDate, j.requestStatus, j.dateType,
        j.isHourly, j.openRate, j.artistHourlyRate AS jobArtistRate, j.clientHourlyRate AS jobClientRate,
        u.hiringCategory,
        u.clientCompanyName, u.id AS clientUserId,
@@ -1723,6 +1782,48 @@ export async function getAllMasterServiceTypes() {
     .orderBy(masterServiceTypes.name);
 }
 
+/**
+ * Distinct artist type values actually present on real artists (from the
+ * users.masterArtistTypes JSON column), sorted by how many artists have each
+ * one. The Bubble-seeded master_artist_types lookup table was never
+ * populated, so this reads the ground truth directly off live artist rows
+ * instead of a static/hardcoded list.
+ */
+export async function getArtistTypeCounts() {
+  const db = await getDb();
+  if (!db) return [];
+
+  const rows = await db
+    .select({ masterArtistTypes: users.masterArtistTypes })
+    .from(users)
+    .where(
+      and(
+        eq(users.userRole, "Artist"),
+        isNotNull(users.masterArtistTypes),
+        sql`${users.masterArtistTypes} != ''`,
+        sql`${users.masterArtistTypes} != '[]'`,
+      )
+    );
+
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    let types: string[] = [];
+    try {
+      types = JSON.parse(row.masterArtistTypes ?? "[]");
+    } catch {
+      continue;
+    }
+    for (const t of types) {
+      if (!t) continue;
+      counts.set(t, (counts.get(t) ?? 0) + 1);
+    }
+  }
+
+  return [...counts.entries()]
+    .map(([type, count]) => ({ type, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
 // ── Admin Helpers ─────────────────────────────────────────────────────────────
 
 /** Overview stats for the admin dashboard */
@@ -2515,10 +2616,11 @@ export async function getArtistJobsFeed(
   lng?: number,
 ): Promise<{
   id: number;
+  title: string | null;
   serviceType: string | null;
   dateType: string | null;
-  startDate: Date | null;
-  endDate: Date | null;
+  startDate: string | null;
+  endDate: string | null;
   isHourly: boolean | null;
   openRate: boolean | null;
   artistHourlyRate: number | null;
@@ -2542,7 +2644,8 @@ export async function getArtistJobsFeed(
     : "";
 
   const rows = await db.execute(
-     `SELECT j.id, j.slug, j.dateType, j.startDate, j.endDate, j.isHourly, j.openRate, j.artistHourlyRate, j.createdAt,
+     `SELECT j.id, j.slug, j.title, j.dateType, ${utcIsoSql('j.startDate')} AS startDate, ${utcIsoSql('j.endDate')} AS endDate,
+     j.isHourly, j.openRate, j.artistHourlyRate, j.createdAt,
      j.locationAddress, j.locationLat, j.locationLng,
      j.isBoosted, j.boostEndDate,
      u.clientCompanyName,
@@ -2763,6 +2866,20 @@ export async function getArtistResumes(artistUserId: number): Promise<{ id: stri
     return true;
   });
   return all;
+}
+
+/**
+ * Deletes a single resume from the artist_resumes table (the "library"
+ * source only — legacy profile-JSON resumes are not deletable via this fn).
+ * Scoped to the owning artist so one artist can't delete another's resume.
+ */
+export async function deleteArtistResume(artistUserId: number, resumeId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  await db
+    .delete(artistResumes)
+    .where(and(eq(artistResumes.id, resumeId), eq(artistResumes.artistUserId, artistUserId)));
+  return true;
 }
 
 // ─── Apply to Job ─────────────────────────────────────────────────────────────
@@ -3400,7 +3517,7 @@ export async function getArtistConfirmedBookings(artistUserId: number) {
     .leftJoin(jobs, eq(bookings.jobId, jobs.id))
     .leftJoin(users, eq(bookings.clientUserId, users.id))
     .where(and(eq(bookings.artistUserId, artistUserId), eq(bookings.deleted, false)))
-    .orderBy(desc(bookings.createdAt));
+    .orderBy(desc(sql`COALESCE(${bookings.startDate}, ${jobs.startDate}, ${bookings.createdAt})`));
   return rows;
 }
 

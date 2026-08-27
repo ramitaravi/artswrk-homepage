@@ -663,7 +663,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
     if (!rawJobs) return [];
     return rawJobs.map((j: any) => ({
       id: j.id,
-      title: extractTitle(j.description),
+      title: j.title || extractTitle(j.description),
       companyName: j.clientCompanyName ?? j.clientName ?? null,
       location: j.locationAddress
         ? j.locationAddress.split(",").slice(0, 2).join(",").trim()
@@ -704,7 +704,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
     if (!rawApplications) return [];
     return (rawApplications as any[]).map((a) => ({
       id: a.id,
-      title: extractTitle(a.description),
+      title: a.title || extractTitle(a.description),
       companyName: a.clientCompanyName ?? null,
       location: a.locationAddress
         ? a.locationAddress.split(",").slice(0, 2).join(",").trim()

@@ -99,6 +99,27 @@ function isoToLocalDatetimeInput(isoString: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/**
+ * Convert a <input type="datetime-local"> value (a naive string with no
+ * timezone info, e.g. "2026-08-26T17:00") into an unambiguous UTC ISO
+ * string, e.g. "2026-08-26T21:00:00.000Z".
+ *
+ * Without this, the naive string is sent to the server as-is and
+ * `new Date(naiveString)` on the server parses it as local time TO THE
+ * SERVER'S OWN PROCESS, not the hirer's browser — so a hirer in
+ * America/New_York typing "5:00 PM" can silently get stored as 5:00 PM in
+ * whatever timezone the server happens to run in, shifting the real time by
+ * however many hours separate the two. Converting to a real UTC instant
+ * here (using the browser's own, correct notion of "local") removes that
+ * ambiguity before the value ever leaves the client.
+ */
+function localDatetimeInputToISO(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return undefined;
+  return d.toISOString();
+}
+
 // ─── Example prompts ──────────────────────────────────────────────────────────
 
 const EXAMPLES = [
@@ -430,8 +451,8 @@ function Step2({
       description: form.description,
       locationAddress: form.locationAddress || undefined,
       dateType: form.dateType as any,
-      startDate: form.startDate || undefined,
-      endDate: form.endDate || undefined,
+      startDate: localDatetimeInputToISO(form.startDate),
+      endDate: localDatetimeInputToISO(form.endDate),
       isHourly: form.isHourly,
       openRate: form.openRate,
       clientHourlyRate: form.clientHourlyRate ? parseFloat(form.clientHourlyRate) : undefined,
@@ -1174,11 +1195,12 @@ function Step3({
     }
 
     createAndCheckout.mutate({
+      title: form.title || undefined,
       description: form.description,
       locationAddress: form.locationAddress || undefined,
       dateType: form.dateType as "Single Date" | "Weekly" | "Multiple Dates" | "Dates Flexible" | "Ongoing" | "Recurring",
-      startDate: form.startDate || undefined,
-      endDate: form.endDate || undefined,
+      startDate: localDatetimeInputToISO(form.startDate),
+      endDate: localDatetimeInputToISO(form.endDate),
       isHourly: form.isHourly,
       openRate: form.openRate,
       clientHourlyRate: form.clientHourlyRate ? parseFloat(form.clientHourlyRate) : undefined,

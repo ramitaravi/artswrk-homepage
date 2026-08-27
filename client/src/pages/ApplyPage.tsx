@@ -8,7 +8,8 @@
  *  - Resume picker (library resumes from DB + upload new)
  *  - Cover message textarea
  *  - Rate pitch (pre-filled, editable if open rate)
- *  - Breadcrumbs: Jobs → City → Job Title → Apply
+ *  - Breadcrumbs: Jobs → Company → Job Title → Apply (Company crumb links
+ *    to /studio/:clientUserId when available)
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -26,6 +27,9 @@ import {
   DollarSign,
   Clock,
   X,
+  Check,
+  Trash2,
+  Eye,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -176,23 +180,45 @@ function ResumeCard({
   resume,
   selected,
   onSelect,
+  onDelete,
 }: {
   resume: ResumeItem;
   selected: boolean;
   onSelect: () => void;
+  onDelete?: () => void;
 }) {
   const ext = resume.fileUrl.split(".").pop()?.toLowerCase() ?? "";
   const isPdf = ext === "pdf";
   return (
-    <button
-      type="button"
+    // Root is a <div role="button"> rather than a native <button> because the
+    // delete icon-button below needs to live inside this clickable card, and
+    // HTML doesn't allow a <button> nested inside another <button>.
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
-      className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all cursor-pointer ${
         selected
           ? "border-[#F25722] bg-orange-50"
           : "border-gray-100 bg-white hover:border-gray-200"
       }`}
     >
+      {/* Persistent checkbox-style indicator — always visible so it's obvious these cards are selectable */}
+      <div
+        className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+          selected ? "bg-[#F25722] border-[#F25722]" : "bg-white border-gray-300"
+        }`}
+        aria-hidden="true"
+      >
+        {selected && <Check size={12} className="text-white" strokeWidth={3} />}
+      </div>
+
       <div
         className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
           selected ? "bg-[#F25722]" : "bg-gray-100"
@@ -207,7 +233,97 @@ function ResumeCard({
         </p>
       </div>
       {selected && <CheckCircle2 size={18} className="text-[#F25722] flex-shrink-0" />}
-    </button>
+      <div className="flex items-center gap-0.5 flex-shrink-0">
+        {/* Preview — works for every resume regardless of source (library or profile) */}
+        <a
+          href={resume.fileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="p-1.5 rounded-lg text-gray-300 hover:text-[#F25722] hover:bg-orange-50 transition-colors"
+          aria-label={`Preview ${resume.title}`}
+        >
+          <Eye size={15} />
+        </a>
+        {resume.source === "library" && onDelete && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+            aria-label={`Delete ${resume.title}`}
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Confirm-delete-resume modal ─────────────────────────────────────────────
+// Hand-rolled modal (backdrop + centered card), matching the pattern used by
+// DeleteAccountModal in client/src/pages/artist/ArtistSettings.tsx — scoped
+// here to just this one confirmation use case.
+
+function ConfirmDeleteResumeModal({
+  resume,
+  onCancel,
+  onConfirm,
+  isDeleting,
+}: {
+  resume: ResumeItem;
+  onCancel: () => void;
+  onConfirm: () => void;
+  isDeleting: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" onClick={onCancel}>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden p-7"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onCancel}
+          className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+          aria-label="Close"
+        >
+          <X size={16} className="text-gray-600" />
+        </button>
+
+        <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
+          <Trash2 size={20} className="text-red-500" />
+        </div>
+        <h2 className="text-lg font-black text-[#111] mb-1.5">Delete this resume?</h2>
+        <p className="text-sm text-gray-500 mb-6">
+          This will permanently remove &ldquo;{resume.title}&rdquo; from your resume library. This can&apos;t be
+          undone.
+        </p>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 py-3 rounded-xl text-sm font-bold text-[#111] border border-gray-200 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isDeleting}
+            className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            {isDeleting && <Loader2 size={15} className="animate-spin" />}
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -233,17 +349,31 @@ export default function ApplyPage() {
     { enabled: isAuthenticated }
   );
 
+  // Used to detect whether the artist has already applied to this job, so we
+  // never show the (blank) apply form again on a repeat visit — see Fix 3.
+  const { data: myApplications, isLoading: myApplicationsLoading } = trpc.jobs.myApplications.useQuery(
+    { limit: 100 },
+    { enabled: isAuthenticated }
+  );
+
   const applyMutation = trpc.jobs.submitApplication.useMutation();
   const uploadResumeMutation = trpc.artists.uploadResume.useMutation();
+  const deleteResumeMutation = trpc.artists.deleteResume.useMutation();
 
   // Form state
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [rateInput, setRateInput] = useState("");
+  const [isHourlyPitch, setIsHourlyPitch] = useState<boolean>(true); // default set below once job loads
   const [submitted, setSubmitted] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [localResumes, setLocalResumes] = useState<ResumeItem[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<{ resume?: string; message?: string }>({});
+  // Resume pending delete confirmation — set on delete-button click, cleared
+  // on cancel or after the confirmed delete completes. See Fix 2.
+  const [resumeToDelete, setResumeToDelete] = useState<ResumeItem | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const utils = trpc.useUtils();
 
   // Merge DB resumes + locally uploaded ones
   const allResumes = useMemo(() => {
@@ -251,7 +381,7 @@ export default function ApplyPage() {
     return [...localResumes, ...resumes.filter((r) => !ids.has(r.id))];
   }, [resumes, localResumes]);
 
-  const title = useMemo(() => extractTitleFromDescription(job?.description), [job?.description]);
+  const title = useMemo(() => (job as any)?.title || extractTitleFromDescription(job?.description), [job]);
   const rate = useMemo(
     () => (job ? formatRate(job.isHourly, job.openRate, job.artistHourlyRate, job.clientHourlyRate) : ""),
     [job]
@@ -263,12 +393,24 @@ export default function ApplyPage() {
 
   const company = job?.clientCompanyName ?? job?.clientName ?? "Artswrk Client";
 
+  // Has the artist already applied to this exact job? Drives Fix 3 below —
+  // once true, we always show the confirmation state instead of the form.
+  const alreadyApplied = useMemo(() => {
+    if (jobId === null || !myApplications) return false;
+    return (myApplications as { jobId: number | null }[]).some((a) => a.jobId === jobId);
+  }, [myApplications, jobId]);
+
   // Pre-fill rate from job
   useEffect(() => {
     if (job && !rateInput) {
       const r = job.clientHourlyRate ?? job.artistHourlyRate;
       if (r) setRateInput(String(r));
     }
+  }, [job]);
+
+  // Default the rate-type toggle to match the job's listed type; stays user-changeable after.
+  useEffect(() => {
+    if (job) setIsHourlyPitch(!!job.isHourly);
   }, [job]);
 
   // SEO: title + meta
@@ -330,23 +472,52 @@ export default function ApplyPage() {
     }
   }
 
+  // Delete a library resume
+  async function handleDeleteResume(resume: ResumeItem) {
+    if (resume.source !== "library") return;
+    const numericId = parseInt(resume.id.replace(/^lib-/, ""), 10);
+    if (Number.isNaN(numericId)) return;
+    try {
+      await deleteResumeMutation.mutateAsync({ id: numericId });
+      setLocalResumes((prev) => prev.filter((r) => r.id !== resume.id));
+      if (selectedResumeId === resume.id) setSelectedResumeId(null);
+      await utils.jobs.myResumes.invalidate();
+      toast.success("Resume deleted");
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to delete resume");
+    }
+  }
+
+  // Confirm-then-delete: called after the user confirms in ConfirmDeleteResumeModal.
+  async function confirmDeleteResume() {
+    if (!resumeToDelete) return;
+    await handleDeleteResume(resumeToDelete);
+    setResumeToDelete(null);
+  }
+
   // Submit application
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!jobId) return;
 
+    // Fix 1: resume + cover message are both required — validate before submitting.
+    const nextErrors: { resume?: string; message?: string } = {};
+    if (!selectedResumeId) nextErrors.resume = "Please select a resume.";
+    if (!message.trim()) nextErrors.message = "Please add a cover message.";
+    setFieldErrors(nextErrors);
+    if (nextErrors.resume || nextErrors.message) return;
+
     const selectedResume = allResumes.find((r) => r.id === selectedResumeId);
     const rateNum = rateInput ? parseInt(rateInput.replace(/[^0-9]/g, ""), 10) : undefined;
-    const isHourly = !!(job?.isHourly ?? true);
 
     try {
       await applyMutation.mutateAsync({
         jobId,
         message: message.trim() || undefined,
         resumeLink: selectedResume?.fileUrl || undefined,
-        artistHourlyRate: isHourly ? rateNum : undefined,
-        artistFlatRate: !isHourly ? rateNum : undefined,
-        isHourlyRate: isHourly,
+        artistHourlyRate: isHourlyPitch ? rateNum : undefined,
+        artistFlatRate: !isHourlyPitch ? rateNum : undefined,
+        isHourlyRate: isHourlyPitch,
       });
       setSubmitted(true);
     } catch (err: any) {
@@ -431,27 +602,45 @@ export default function ApplyPage() {
     );
   }
 
-  // ── Success state ─────────────────────────────────────────────────────────
+  // ── Already-applied check (Fix 3) ─────────────────────────────────────────
+  // Wait for the applications list before deciding whether to show the form,
+  // so we never flash the blank form then swap to the confirmation state.
 
-  if (submitted) {
+  if (myApplicationsLoading) {
+    return shell(
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-gray-300" />
+      </div>
+    );
+  }
+
+  // ── Success state ─────────────────────────────────────────────────────────
+  // Shown both right after a fresh submit (`submitted`) and on any later
+  // visit to this URL once we know the artist already applied
+  // (`alreadyApplied`) — the artist should never see the blank form again.
+
+  if (submitted || alreadyApplied) {
     return shell(
       <div className="min-h-[60vh] flex items-center justify-center px-4">
         <div className="max-w-sm w-full bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
           <div className="w-16 h-16 rounded-full hirer-grad-bg flex items-center justify-center mx-auto mb-5 shadow-lg">
             <CheckCircle2 size={32} className="text-white" />
           </div>
-          <h1 className="text-2xl font-black text-[#111] mb-2">Application sent!</h1>
+          <h1 className="text-2xl font-black text-[#111] mb-2">
+            {submitted ? "Application sent!" : "You've already applied"}
+          </h1>
           <p className="text-sm text-gray-500 mb-2">
             Your application for{" "}
             <span className="font-semibold text-[#111]">{title}</span> at{" "}
-            <span className="font-semibold text-[#111]">{company}</span> has been submitted.
+            <span className="font-semibold text-[#111]">{company}</span>{" "}
+            {submitted ? "has been submitted." : "was already submitted."}
           </p>
           <p className="text-xs text-gray-400 mb-8">
             The hirer will be in touch if you're a good fit. You can track this in your dashboard.
           </p>
           <div className="space-y-2">
             <Link
-              href="/app/jobs"
+              href="/app/jobs?tab=applications"
               className="block w-full py-3 rounded-xl text-sm font-bold text-white bg-[#F25722] hover:bg-[#d44a1a] transition-colors"
             >
               View My Applications
@@ -471,12 +660,19 @@ export default function ApplyPage() {
   // ── Breadcrumbs & JSON-LD ─────────────────────────────────────────────────
 
   const jobUrl = toJobUrl(job);
-  const breadcrumbs = [
-    { label: "Jobs", href: jobsBackHref },
-    { label: cityDisplay, href: `/jobs?location=${encodeURIComponent(cityDisplay)}` },
-    { label: title, href: jobUrl },
-    { label: "Apply" },
-  ];
+  const companyUrl = job.clientUserId ? `/studio/${job.clientUserId}` : undefined;
+  const breadcrumbs = companyUrl
+    ? [
+        { label: "Jobs", href: jobsBackHref },
+        { label: company, href: companyUrl },
+        { label: title, href: jobUrl },
+        { label: "Apply" },
+      ]
+    : [
+        { label: "Jobs", href: jobsBackHref },
+        { label: title, href: jobUrl },
+        { label: "Apply" },
+      ];
 
   const jsonLdJob = buildJobPostingSchema(job, title, rate);
   const jsonLdBreadcrumbs = buildBreadcrumbSchema(
@@ -486,6 +682,7 @@ export default function ApplyPage() {
   const isOpenRate = job.openRate;
 
   return shell(
+    <>
     <div className={isAuthenticated ? "" : "min-h-screen bg-gray-50"} style={{ fontFamily: "Poppins, sans-serif" }}>
       {/* JSON-LD */}
       <script
@@ -524,12 +721,27 @@ export default function ApplyPage() {
                     Apply for {title}
                   </h1>
                   <p className="text-sm text-gray-500 mt-1">
-                    at <span className="font-semibold text-[#111]">{company}</span> · {cityDisplay}
+                    at{" "}
+                    {companyUrl ? (
+                      <Link
+                        href={companyUrl}
+                        className="font-semibold text-[#111] hover:text-[#F25722] hover:underline transition-colors"
+                      >
+                        {company}
+                      </Link>
+                    ) : (
+                      <span className="font-semibold text-[#111]">{company}</span>
+                    )}{" "}
+                    · {cityDisplay}
                   </p>
                 </div>
 
                 {/* ── Resume picker ── */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                <div
+                  className={`bg-white rounded-2xl border p-5 shadow-sm ${
+                    fieldErrors.resume ? "border-red-300" : "border-gray-100"
+                  }`}
+                >
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h2 className="text-base font-black text-[#111]">Resume</h2>
@@ -583,8 +795,12 @@ export default function ApplyPage() {
                           key={r.id}
                           resume={r}
                           selected={selectedResumeId === r.id}
-                          onSelect={() =>
-                            setSelectedResumeId((prev) => (prev === r.id ? null : r.id))
+                          onSelect={() => {
+                            setSelectedResumeId((prev) => (prev === r.id ? null : r.id));
+                            setFieldErrors((prev) => ({ ...prev, resume: undefined }));
+                          }}
+                          onDelete={
+                            r.source === "library" ? () => setResumeToDelete(r) : undefined
                           }
                         />
                       ))}
@@ -597,25 +813,46 @@ export default function ApplyPage() {
                       Resume selected
                     </div>
                   )}
+                  {fieldErrors.resume && (
+                    <p className="mt-3 text-xs text-red-500 font-medium">{fieldErrors.resume}</p>
+                  )}
                 </div>
 
                 {/* ── Cover message ── */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                <div
+                  className={`bg-white rounded-2xl border p-5 shadow-sm ${
+                    fieldErrors.message ? "border-red-300" : "border-gray-100"
+                  }`}
+                >
                   <h2 className="text-base font-black text-[#111] mb-1">Cover message</h2>
                   <p className="text-xs text-gray-400 mb-3">
-                    Optional — tell the hirer why you're a great fit
+                    Tell the hirer why you're a great fit
                   </p>
                   <Textarea
                     placeholder={`Hi! I'm interested in the ${title} role. I have experience in…`}
                     value={message}
-                    onChange={(e) => setMessage(e.target.value)}
+                    onChange={(e) => {
+                      setMessage(e.target.value);
+                      setFieldErrors((prev) => ({ ...prev, message: undefined }));
+                    }}
                     rows={5}
                     maxLength={2000}
-                    className="resize-none text-sm border-gray-200 focus:border-[#F25722] focus:ring-[#F25722]/20 rounded-xl"
+                    className={`resize-none text-sm focus:ring-[#F25722]/20 rounded-xl ${
+                      fieldErrors.message
+                        ? "border-red-300 focus:border-red-400"
+                        : "border-gray-200 focus:border-[#F25722]"
+                    }`}
                   />
-                  <p className="text-xs text-gray-300 mt-1.5 text-right">
-                    {message.length}/2000
-                  </p>
+                  <div className="flex items-center justify-between mt-1.5">
+                    {fieldErrors.message ? (
+                      <p className="text-xs text-red-500 font-medium">{fieldErrors.message}</p>
+                    ) : (
+                      <span />
+                    )}
+                    <p className="text-xs text-gray-300 text-right">
+                      {message.length}/2000
+                    </p>
+                  </div>
                 </div>
 
                 {/* ── Rate ── */}
@@ -629,9 +866,33 @@ export default function ApplyPage() {
                     )}
                   </h2>
                   <p className="text-xs text-gray-400 mb-3">
-                    {job.isHourly ? "Hourly rate in USD" : "Flat rate in USD"}
+                    {isHourlyPitch ? "Hourly rate in USD" : "Flat rate in USD"}
                     {!isOpenRate && rate !== "Rate negotiable" && ` · Listed: ${rate}`}
                   </p>
+                  <div className="flex gap-2 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsHourlyPitch(false)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                        !isHourlyPitch
+                          ? "bg-[#F25722] text-white border-[#F25722]"
+                          : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      Flat Rate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsHourlyPitch(true)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                        isHourlyPitch
+                          ? "bg-[#F25722] text-white border-[#F25722]"
+                          : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      Hourly Rate
+                    </button>
+                  </div>
                   <div className="relative">
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">
                       $
@@ -642,16 +903,19 @@ export default function ApplyPage() {
                       placeholder={isOpenRate ? "Enter your rate" : ""}
                       value={rateInput}
                       onChange={(e) => setRateInput(e.target.value)}
-                      className="pl-7 border-gray-200 focus:border-[#F25722] rounded-xl text-sm"
+                      className="pl-7 pr-12 border-gray-200 focus:border-[#F25722] rounded-xl text-sm"
                     />
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold pointer-events-none">
+                      {isHourlyPitch ? "/hr" : "flat"}
+                    </span>
                   </div>
                 </div>
 
                 {/* ── Submit ── */}
                 <Button
                   type="submit"
-                  disabled={applyMutation.isPending}
-                  className="w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity h-auto"
+                  disabled={applyMutation.isPending || !selectedResumeId || !message.trim()}
+                  className="w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity h-auto disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {applyMutation.isPending ? (
                     <span className="flex items-center justify-center gap-2">
@@ -662,9 +926,6 @@ export default function ApplyPage() {
                     "Submit Application →"
                   )}
                 </Button>
-                <p className="text-xs text-gray-400 text-center">
-                  Free to apply · No credit card required
-                </p>
               </form>
             </div>
 
@@ -697,7 +958,13 @@ export default function ApplyPage() {
                       <p className="font-black text-[#111] text-sm leading-tight">{title}</p>
                       <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
                         <Building2 size={10} />
-                        {company}
+                        {companyUrl ? (
+                          <Link href={companyUrl} className="hover:text-[#F25722] hover:underline transition-colors">
+                            {company}
+                          </Link>
+                        ) : (
+                          company
+                        )}
                       </p>
                     </div>
                   </div>
@@ -732,21 +999,20 @@ export default function ApplyPage() {
                     </Link>
                   </div>
                 </div>
-
-                {/* Tips card */}
-                <div className="bg-amber-50 rounded-2xl border border-amber-100 p-4">
-                  <p className="text-xs font-bold text-amber-700 mb-2">💡 Application tips</p>
-                  <ul className="text-xs text-amber-600 space-y-1.5">
-                    <li>• Attach a resume to stand out</li>
-                    <li>• Mention relevant experience in your message</li>
-                    <li>• Hirers respond fastest within 24 hrs</li>
-                  </ul>
-                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+    {resumeToDelete && (
+      <ConfirmDeleteResumeModal
+        resume={resumeToDelete}
+        onCancel={() => setResumeToDelete(null)}
+        onConfirm={confirmDeleteResume}
+        isDeleting={deleteResumeMutation.isPending}
+      />
+    )}
+    </>
   );
 }

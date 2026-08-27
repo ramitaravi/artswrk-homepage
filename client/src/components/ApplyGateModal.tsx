@@ -270,7 +270,7 @@ export default function ApplyGateModal({ job, onClose, onLoginSuccess }: Props) 
                   <button
                     type="submit"
                     disabled={checking || !email.trim()}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-lg hirer-grad-bg flex items-center justify-center disabled:opacity-40 transition-opacity hover:opacity-90"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-lg artist-grad-bg flex items-center justify-center disabled:opacity-40 transition-opacity hover:opacity-90"
                     aria-label="Continue"
                   >
                     {checking ? (

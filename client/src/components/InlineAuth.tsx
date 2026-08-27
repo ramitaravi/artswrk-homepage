@@ -24,6 +24,10 @@ interface Props {
   subheading?: string;
   onSuccess?: (data: AuthResult) => void;
   onNotFound?: (email: string) => void;
+  /** Which brand gradient to use for the primary buttons. Defaults to "hirer" for
+   *  role-neutral flows (e.g. the generic /login page). Pass "artist" when this form is
+   *  rendered inside an artist-specific flow (e.g. "Join Artswrk to apply" on a job page). */
+  variant?: "hirer" | "artist";
 }
 
 type Stage = "email" | "password" | "set-password";
@@ -52,7 +56,9 @@ export default function InlineAuth({
   subheading = "Log in to continue",
   onSuccess,
   onNotFound,
+  variant = "hirer",
 }: Props) {
+  const gradientClass = variant === "artist" ? "artist-grad-bg" : "hirer-grad-bg";
   const [stage, setStage] = useState<Stage>("email");
   const [email, setEmail] = useState(prefillEmail);
   const [password, setPassword] = useState("");
@@ -180,7 +186,7 @@ export default function InlineAuth({
             <button
               type="submit"
               disabled={isPending || !email.trim()}
-              className="w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60"
+              className={`w-full py-3.5 rounded-xl text-sm font-bold text-white ${gradientClass} hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60`}
             >
               {lookupEmail.isPending
                 ? <><Loader2 size={15} className="animate-spin" /> Checking...</>
@@ -228,7 +234,7 @@ export default function InlineAuth({
             <button
               type="submit"
               disabled={isPending || !password}
-              className="w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60"
+              className={`w-full py-3.5 rounded-xl text-sm font-bold text-white ${gradientClass} hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60`}
             >
               {passwordLogin.isPending
                 ? <><Loader2 size={15} className="animate-spin" /> Signing in...</>
@@ -295,7 +301,7 @@ export default function InlineAuth({
             <button
               type="submit"
               disabled={isPending || !password || !confirmPassword}
-              className="w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60"
+              className={`w-full py-3.5 rounded-xl text-sm font-bold text-white ${gradientClass} hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60`}
             >
               {setInitialPassword.isPending
                 ? <><Loader2 size={15} className="animate-spin" /> Setting up...</>

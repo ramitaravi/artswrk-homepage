@@ -128,7 +128,7 @@ const STEPS: { label: string; sub: string }[] = [
 function Logo() {
   return (
     <a href="/" className="flex items-center select-none">
-      <span className="font-black text-xl tracking-tight hirer-grad-text">ARTS</span>
+      <span className="font-black text-xl tracking-tight artist-grad-text">ARTS</span>
       <span className="font-black text-xl tracking-tight bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">WRK</span>
     </a>
   );
@@ -844,7 +844,7 @@ function Step4Plan({
             type="button"
             onClick={onChoosePro}
             disabled={loading}
-            className="w-full py-2.5 rounded-xl text-xs font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity disabled:opacity-60"
+            className="w-full py-2.5 rounded-xl text-xs font-bold text-white artist-grad-bg hover:opacity-90 transition-opacity disabled:opacity-60"
           >
             Choose PRO
           </button>

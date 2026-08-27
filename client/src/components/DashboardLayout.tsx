@@ -20,7 +20,6 @@ import {
   Settings,
   LogOut,
   Menu,
-  Bell,
   Crown,
   ChevronRight,
   ChevronDown,
@@ -222,7 +221,7 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
   // Sidebar card subtitle: artists see their plan (more useful than their own
   // first name repeated); clients keep seeing their studio/company name.
   const sidebarSubtitle = isArtist
-    ? ((artswrkUser as any)?.artswrkPro ? "PRO Plan" : (artswrkUser as any)?.artswrkBasic ? "Basic Plan" : "Free Plan")
+    ? ((artswrkUser as any)?.artswrkPro ? "Artswrk PRO" : (artswrkUser as any)?.artswrkBasic ? "Artswrk Basic" : "")
     : displayStudio;
 
   const avatarInitials = displayName
@@ -272,7 +271,7 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
         )}
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-[#111] truncate">{displayName}</p>
-          <p className="text-xs text-gray-400 truncate">{sidebarSubtitle}</p>
+          {sidebarSubtitle && <p className="text-xs text-gray-400 truncate">{sidebarSubtitle}</p>}
           {isPremium && (
             <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200 mt-0.5">
               <Crown size={8} /> PREMIUM
@@ -390,6 +389,13 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
             >
               <Menu size={20} />
             </button>
+            {/* Artswrk logo in the content header — visible at all viewport widths */}
+            <Link href="/app">
+              <span className="font-black text-base tracking-tight">
+                <span className={isArtist ? "artist-grad-text" : "hirer-grad-text"}>ARTS</span>
+                <span className="bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">WRK</span>
+              </span>
+            </Link>
             <div>
               <p className="text-sm font-bold text-[#111]">{displayStudio}</p>
               {isArtist && (
@@ -407,11 +413,6 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
                 </button>
               </Link>
             )}
-
-            {/* Notifications */}
-            <button className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
-              <Bell size={18} />
-            </button>
 
             {/* Avatar — links to settings */}
             <Link href="/app/settings">

@@ -617,6 +617,7 @@ export default function ProJobDetail() {
             ) : !isAuthenticated ? (
               <InlineAuth
                 heading="Join Artswrk to apply"
+                variant="artist"
                 onSuccess={() => window.location.reload()}
                 onNotFound={(email) => { window.location.href = `/join?next=${encodeURIComponent(jobUrl)}&email=${encodeURIComponent(email)}`; }}
               />

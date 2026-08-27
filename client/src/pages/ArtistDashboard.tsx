@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import ArtistProfilePage from "./artist/ArtistProfilePage";
 import ArtistSettings from "./artist/ArtistSettings";
 import MessagesPage from "./dashboard/Messages";
@@ -233,17 +233,13 @@ function DashboardTab({ user }: { user: any }) {
               <h1 className="text-lg lg:text-xl font-semibold text-[#111]">Hey, {firstName} 🎉</h1>
               {isPro ? (
                 <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-pink-50 text-[#ec008c] border border-pink-200 mt-1.5">
-                  <Star size={11} className="fill-[#ec008c] text-[#ec008c]" /> Artswrk PRO Member
+                  <Star size={11} className="fill-[#ec008c] text-[#ec008c]" /> Artswrk PRO
                 </span>
               ) : user?.artswrkBasic ? (
                 <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200 mt-1.5">
-                  Basic Plan
+                  Artswrk Basic
                 </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-50 text-gray-500 border border-gray-200 mt-1.5">
-                  Free Plan
-                </span>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -288,6 +284,17 @@ function DashboardTab({ user }: { user: any }) {
               ) : (
                 <p className="text-xs text-gray-400 py-1">No pending tasks — you're all caught up!</p>
               )}
+              {!isPro && (
+                <a
+                  href="/app/settings"
+                  className="flex items-center justify-between gap-2 mt-2 p-3 rounded-xl bg-gradient-to-r from-pink-50 to-orange-50 border border-pink-100 hover:border-pink-200 transition-colors group"
+                >
+                  <span className="text-xs font-semibold text-[#111]">
+                    {user?.artswrkBasic ? "Upgrade to Artswrk PRO" : "Upgrade"}
+                  </span>
+                  <ArrowRight size={13} className="text-[#ec008c] group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
+                </a>
+              )}
             </div>
           )}
         </div>
@@ -326,7 +333,7 @@ function DashboardTab({ user }: { user: any }) {
                     </span>
                     <div>
                       {/* Blurred avatar for non-PRO */}
-                      <div className={!isPro ? "blur-sm pointer-events-none" : ""}>
+                      <div className={!isPro ? "blur-[2px] pointer-events-none" : ""}>
                         <StudioAvatar name={company || title} logo={job.logo} size="sm" />
                       </div>
                       <p className="text-sm font-semibold text-[#111] mt-2 line-clamp-2 leading-tight pr-10">{title}</p>
@@ -424,7 +431,7 @@ function DashboardTab({ user }: { user: any }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <div className="min-w-0">
-                        <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{serviceType || studio}</h3>
+                        <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{job.title || serviceType || studio}</h3>
                         <p className="text-xs text-gray-500 truncate">{studio}</p>
                       </div>
                       <a
@@ -462,7 +469,14 @@ function DashboardTab({ user }: { user: any }) {
 type JobsSubTab = "jobs-for-you" | "pro-jobs" | "applications";
 
 function JobsTab({ user }: { user: any }) {
-  const [subTab, setSubTab] = useState<JobsSubTab>("jobs-for-you");
+  // Support deep-linking into a specific subtab via ?tab=applications (etc.),
+  // e.g. the "View My Applications" link from the job apply flow.
+  const searchStr = useSearch();
+  const [subTab, setSubTab] = useState<JobsSubTab>(() => {
+    const params = new URLSearchParams(searchStr);
+    const tab = params.get("tab");
+    return tab === "pro-jobs" || tab === "applications" ? tab : "jobs-for-you";
+  });
 
   const { data: jobsFeed, isLoading: feedLoading } = trpc.artistDashboard.getJobsFeed.useQuery({ limit: 30, offset: 0 });
   const { data: proJobs, isLoading: proLoading } = trpc.artistDashboard.getProJobsFeed.useQuery({ limit: 30, offset: 0 });
@@ -521,7 +535,7 @@ function JobsTab({ user }: { user: any }) {
                     <StudioAvatar name={job.studioName || job.creatorName || "Studio"} logo={job.logo} size="md" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-[#111]">{job.studioName || job.creatorName}</p>
-                      <p className="text-sm text-gray-700">{job.serviceType}</p>
+                      <p className="text-sm text-gray-700">{job.title || job.serviceType}</p>
                       <p className="text-xs text-gray-500 mt-0.5">
                         {job.location && !job.location.includes("[object") ? job.location : (job.workFromAnywhere ? "Work From Anywhere" : "Location TBD")}
                         {job.postedAgo ? ` · Posted ${job.postedAgo}` : ""}
@@ -661,7 +675,7 @@ function formatBookingDate(b: any): string {
 
 function isUpcoming(b: any): boolean {
   const s = b.bookingStatus?.toLowerCase() ?? "";
-  if (s === "confirmed" || s === "pay now") return true;
+  if (s === "completed" || s === "cancelled") return false;
   const d = bookingDate(b);
   if (!d) return false;
   return d >= new Date(new Date().toDateString()); // today at midnight
@@ -1054,6 +1068,15 @@ function BookingsTab() {
     if (filter === "completed") return !isUpcoming(b);
     return true;
   });
+  // Upcoming should read soonest-first (your next gig at the top), the
+  // opposite of the query's default most-recent-first ordering.
+  if (filter === "upcoming") {
+    filtered.sort((a: any, b: any) => {
+      const da = bookingDate(a)?.getTime() ?? 0;
+      const db = bookingDate(b)?.getTime() ?? 0;
+      return da - db;
+    });
+  }
 
   // Group by date string
   const groups: { label: string; items: any[] }[] = [];
