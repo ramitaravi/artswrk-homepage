@@ -35,10 +35,12 @@ export function extractIdFromSlug(slug: string): number | null {
   return match ? parseInt(match[1], 10) : null;
 }
 
-function extractTitleFromDescription(description: string | null | undefined): string {
+function extractTitleFromDescription(description: string | null | undefined, clientName?: string | null): string {
   if (!description) return "Open Position";
   const first = description.split("\n")[0].trim();
-  if (first.length > 0 && first.length <= 80) return first;
+  // Skip a first line that is just the poster's own name (legacy Bubble imports).
+  const isPosterName = !!clientName && first.toLowerCase() === clientName.toLowerCase();
+  if (first.length > 0 && first.length <= 80 && !isPosterName) return first;
   const patterns: [RegExp, string][] = [
     [/sub(stitute)?\s+teacher/i, "Substitute Teacher"],
     [/ballet/i, "Ballet Teacher"],
@@ -138,7 +140,7 @@ export default function JobDetail() {
   );
   const applied = !!(jobId !== null && (myApplications as any[] ?? []).some((a: any) => a.jobId === jobId));
 
-  const title = useMemo(() => (job as any)?.title || extractTitleFromDescription(job?.description), [job]);
+  const title = useMemo(() => (job as any)?.title || extractTitleFromDescription(job?.description, (job as any)?.clientCompanyName ?? (job as any)?.clientName), [job]);
   const rate = useMemo(
     () => job ? formatRate(job.isHourly, job.openRate, job.artistHourlyRate, job.clientHourlyRate) : "",
     [job]
@@ -257,6 +259,9 @@ export default function JobDetail() {
       >
         Apply Now →
       </Link>
+      {rate && rate !== "Rate negotiable" && (
+        <p className="text-xs text-gray-400 mt-3 text-center">You keep 100% of this rate - Artswrk takes no commission.</p>
+      )}
     </div>
   );
 
@@ -316,6 +321,11 @@ export default function JobDetail() {
                   {(job.startDate || job.dateType) && (
                     <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-full">
                       <Calendar size={11} /> {dateLabel}
+                    </span>
+                  )}
+                  {(job.dateType === "Ongoing" || job.dateType === "Recurring") && job.dateDetails && (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-full">
+                      <Calendar size={11} /> {job.dateDetails}
                     </span>
                   )}
                   <span className="inline-flex items-center gap-1.5 text-xs text-gray-400 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-full">

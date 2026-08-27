@@ -130,10 +130,13 @@ function extractLocationFromDescription(description: string | null | undefined):
   return null;
 }
 
-function extractTitle(description: string | null | undefined): string {
+function extractTitle(description: string | null | undefined, clientName?: string | null): string {
   if (!description) return "Open Position";
   const first = description.split("\n")[0].trim();
-  if (first.length > 0 && first.length <= 80) return first;
+  // Skip a first line that is just the poster's own name (legacy Bubble imports
+  // like "Kylie Admin" / "Studio") so it never becomes the displayed title.
+  const isPosterName = !!clientName && first.toLowerCase() === clientName.toLowerCase();
+  if (first.length > 0 && first.length <= 80 && !isPosterName) return first;
   const patterns: [RegExp, string][] = [
     [/sub(stitute)?\s+teacher/i, "Substitute Teacher"],
     [/ballet/i, "Ballet Teacher"],
@@ -663,7 +666,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
     if (!rawJobs) return [];
     return rawJobs.map((j: any) => ({
       id: j.id,
-      title: j.title || extractTitle(j.description),
+      title: j.title || extractTitle(j.description, j.clientCompanyName ?? j.clientName),
       companyName: j.clientCompanyName ?? j.clientName ?? null,
       location: j.locationAddress
         ? j.locationAddress.split(",").slice(0, 2).join(",").trim()
@@ -704,7 +707,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
     if (!rawApplications) return [];
     return (rawApplications as any[]).map((a) => ({
       id: a.id,
-      title: a.title || extractTitle(a.description),
+      title: a.title || extractTitle(a.description, a.clientCompanyName),
       companyName: a.clientCompanyName ?? null,
       location: a.locationAddress
         ? a.locationAddress.split(",").slice(0, 2).join(",").trim()
