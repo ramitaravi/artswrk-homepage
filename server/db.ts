@@ -1597,6 +1597,20 @@ export async function createNewUser(input: {
 /**
  * Save onboarding data to the user record.
  */
+/**
+ * Admin-only: directly override a user's plan-level flags in the DB —
+ * no Stripe involved. Used to test permission gating (what a Basic/PRO/
+ * Premium/Enterprise user can see and do) without a real subscription.
+ */
+export async function setUserPlanFlags(
+  userId: number,
+  flags: { artswrkBasic?: boolean; artswrkPro?: boolean; clientPremium?: boolean; enterprise?: boolean }
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set(flags).where(eq(users.id, userId));
+}
+
 export async function updateUserOnboarding(userId: number, data: {
   businessOrIndividual?: string;
   hiringCategory?: string;

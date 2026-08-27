@@ -112,7 +112,7 @@ function CollapsibleNavItem({ label, icon, children, isArtist, defaultOpen = fal
             const isActive = !child.external && (location === child.href || location.startsWith(child.href));
             if (child.external) {
               return (
-                <a key={child.href} href={child.href} target="_blank" rel="noopener noreferrer">
+                <a key={child.href} href={child.href} target="_blank" rel="noopener noreferrer" className="block">
                   <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium cursor-pointer transition-colors text-gray-500 hover:bg-orange-50 hover:text-[#F25722]">
                     {child.icon && <span className="flex-shrink-0">{child.icon}</span>}
                     {child.label}
@@ -122,7 +122,7 @@ function CollapsibleNavItem({ label, icon, children, isArtist, defaultOpen = fal
               );
             }
             return (
-              <Link key={child.href} href={child.href}>
+              <Link key={child.href} href={child.href} className="block">
                 <div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium cursor-pointer transition-colors ${
                   isActive ? subActiveColor : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
                 }`}>
@@ -145,7 +145,7 @@ function NavLink({ item, isArtist }: { item: NavItem; isArtist: boolean }) {
   const badgeColor = isArtist ? "bg-[#ec008c]" : "bg-[#F25722]";
 
   return (
-    <Link href={item.href}>
+    <Link href={item.href} className="block">
       <div
         className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors cursor-pointer ${
           isActive ? activeColor : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"

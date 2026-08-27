@@ -99,13 +99,13 @@ function Sidebar({ active, onSelect, collapsed, onToggle }: {
       {/* Bottom: links to other dashboards */}
       {!collapsed && (
         <div className="p-3 border-t border-white/10 space-y-1">
-          <Link href="/leads">
+          <Link href="/leads" className="block">
             <button className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-white/40 hover:text-white hover:bg-white/10 transition-colors">
               <ArrowUpRight size={13} />
               Leads Dashboard
             </button>
           </Link>
-          <Link href="/app">
+          <Link href="/app" className="block">
             <button className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-white/40 hover:text-white hover:bg-white/10 transition-colors">
               <ArrowUpRight size={13} />
               App Dashboard

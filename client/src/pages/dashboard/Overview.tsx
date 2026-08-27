@@ -329,7 +329,7 @@ function ApplicantsSidebar({ applicants, loading }: { applicants: any[]; loading
               : a.artistName ?? "Artist";
             const lastName = a.artistLastName ? `${a.artistFirstName ?? ""} ${a.artistLastName[0]}.`.trim() : name;
             return (
-              <Link href={a.artistUserId ? `/app/artists/${a.artistUserId}?tab=history` : "/app/artists"} key={a.artistUserId ?? a.bubbleArtistId ?? a.id}>
+              <Link href={a.artistUserId ? `/app/artists/${a.artistUserId}?tab=history` : "/app/artists"} key={a.artistUserId ?? a.bubbleArtistId ?? a.id} className="block">
                 <div className="flex items-center gap-3 cursor-pointer group">
                   <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-200">
                     {url
@@ -346,7 +346,7 @@ function ApplicantsSidebar({ applicants, loading }: { applicants: any[]; loading
             );
           })}
           {artists.length > 15 && (
-            <Link href="/app/artists">
+            <Link href="/app/artists" className="block">
               <p className="text-xs font-semibold text-[#F25722] hover:opacity-70 transition-opacity flex items-center gap-1">
                 See all {artists.length} <ArrowRight size={11} />
               </p>

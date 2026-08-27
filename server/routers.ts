@@ -1061,6 +1061,37 @@ export const appRouter = router({
       }),
 
     /**
+     * Admin-only: directly override a user's plan-level flags (Basic/PRO for
+     * artists, Premium/Enterprise for clients) — no Stripe involved. Lets an
+     * admin test permission gating for any tier without a real subscription.
+     */
+    setUserPlan: protectedProcedure
+      .input(z.object({
+        userId: z.number(),
+        plan: z.enum(["free", "basic", "pro", "premium", "enterprise"]),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") {
+          throw new Error("Forbidden: admin only");
+        }
+        const target = await getUserById(input.userId);
+        if (!target) throw new Error("User not found");
+        const { setUserPlanFlags } = await import("./db");
+        if (target.userRole === "Artist") {
+          await setUserPlanFlags(input.userId, {
+            artswrkBasic: input.plan === "basic",
+            artswrkPro: input.plan === "pro",
+          });
+        } else {
+          await setUserPlanFlags(input.userId, {
+            clientPremium: input.plan === "premium",
+            enterprise: input.plan === "enterprise",
+          });
+        }
+        return { success: true };
+      }),
+
+    /**
      * Stop impersonating — restore the original admin session from the backup cookie.
      */
     stopImpersonating: protectedProcedure
