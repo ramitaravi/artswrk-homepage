@@ -280,6 +280,10 @@ function SubscriptionTab() {
   const isPremium = (artswrkUser as any)?.clientPremium ?? false;
 
   const subMutation = trpc.clientJobs.createSubscriptionCheckout.useMutation();
+  const portalMutation = trpc.clientJobs.createPortalSession.useMutation({
+    onSuccess: ({ url }) => window.open(url, "_blank"),
+    onError: (err) => toast.error("Couldn't open billing portal", { description: err.message }),
+  });
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8 space-y-6">
@@ -333,7 +337,16 @@ function SubscriptionTab() {
           <PlanFeature text="Access a global network of artists" />
           <PlanFeature text="1:1 with Artswrk Team" />
         </div>
-        {!isPremium && (
+        {isPremium ? (
+          <button
+            onClick={() => portalMutation.mutate({ origin: window.location.origin })}
+            disabled={portalMutation.isPending}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors disabled:opacity-50"
+          >
+            {portalMutation.isPending ? <Loader2 size={15} className="animate-spin" /> : null}
+            Manage Subscription →
+          </button>
+        ) : (
           <a
             href="/join"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors"

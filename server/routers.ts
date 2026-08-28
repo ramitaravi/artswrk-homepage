@@ -1055,16 +1055,16 @@ export const appRouter = router({
           monthlyAmountCents,
           status: derivedStatus,
           cancelAtPeriodEnd: sub.cancel_at_period_end as boolean,
-          currentPeriodEnd: new Date(sub.current_period_end * 1000).toISOString(),
+          currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
           canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null,
-          createdAt: new Date(sub.created * 1000).toISOString(),
+          createdAt: sub.created ? new Date(sub.created * 1000).toISOString() : null,
         };
       });
 
       // Sort: active first, then at_risk, then trialing, then canceled; within each by createdAt desc
       const ORDER = { active: 0, trialing: 1, at_risk: 2, past_due: 3, canceled: 4 };
       subscriptions.sort((a, b) =>
-        (ORDER[a.status] - ORDER[b.status]) || (b.createdAt > a.createdAt ? 1 : -1)
+        (ORDER[a.status] - ORDER[b.status]) || ((b.createdAt ?? "") > (a.createdAt ?? "") ? 1 : -1)
       );
 
       const activeCount = subscriptions.filter(s => s.status === "active" || s.status === "trialing").length;
@@ -4012,6 +4012,20 @@ Fields to extract:
           jobId: input.jobId,
           interval: input.interval,
         });
+        return { url };
+      }),
+    /** Stripe Customer Portal session so a client can manage/cancel their Premium subscription. */
+    createPortalSession: protectedProcedure
+      .input(z.object({ origin: z.string().url() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user?.clientStripeCustomerId) {
+          throw new Error("No Stripe customer found. Please subscribe first.");
+        }
+        const { url } = await createArtistPortalSession(
+          user.clientStripeCustomerId,
+          `${input.origin}/app/settings?tab=subscription`
+        );
         return { url };
       }),
     /** Competition Job Unlock checkout — $100 one-time per job (for Dance Competition / Event Company clients). */

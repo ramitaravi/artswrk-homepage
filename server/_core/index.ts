@@ -33,6 +33,67 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
+/**
+ * Revoke paid access for whichever product line a Stripe customer ID belongs
+ * to. A customer ID can only ever match one of these three columns (artists,
+ * clients, and enterprise accounts each get their own Stripe customer), so
+ * checking all three and only writing the one that matches is safe.
+ */
+async function revokeByCustomerId(customerId: string, productId: string | undefined, reason: "deleted" | "payment_failed") {
+  const { getDb } = await import("../db");
+  const db = await getDb();
+  if (!db) return;
+  const { users } = await import("../../drizzle/schema");
+  const { eq } = await import("drizzle-orm");
+  const { STRIPE_PRODUCTS } = await import("../stripe-products");
+
+  if (productId === STRIPE_PRODUCTS.ARTIST_PRO.productId) {
+    const res = await db.update(users).set({ artswrkPro: false, artistStripeProductId: null }).where(eq(users.stripeCustomerId, customerId));
+    if ((res as any).affectedRows) console.log(`[Webhook] Revoked artist PRO (${reason}) for customer ${customerId}`);
+    return;
+  }
+  if (productId === STRIPE_PRODUCTS.ARTIST_BASIC.productId) {
+    const res = await db.update(users).set({ artswrkBasic: false, artistStripeProductId: null }).where(eq(users.stripeCustomerId, customerId));
+    if ((res as any).affectedRows) console.log(`[Webhook] Revoked artist Basic (${reason}) for customer ${customerId}`);
+    return;
+  }
+  if (productId === STRIPE_PRODUCTS.ENTERPRISE_SUBSCRIPTION.productId) {
+    const res = await db.update(users).set({ enterpriseStripeSubscriptionId: null }).where(eq(users.enterpriseStripeCustomerId, customerId));
+    if ((res as any).affectedRows) console.log(`[Webhook] Revoked enterprise subscription (${reason}) for customer ${customerId}`);
+    return;
+  }
+  // Client Premium has no other subscription type sharing clientStripeCustomerId,
+  // so no product-ID check is needed — just match on the customer ID directly.
+  // This also covers the legacy checkout path, which mints a fresh one-off
+  // Stripe product per purchase and so can never be matched by product ID.
+  const clientRes = await db.update(users).set({ clientPremium: false, clientSubscriptionId: null }).where(eq(users.clientStripeCustomerId, customerId));
+  if ((clientRes as any).affectedRows) console.log(`[Webhook] Revoked client Premium (${reason}) for customer ${customerId}`);
+}
+
+/** Mirror of revokeByCustomerId for status *changes* (reactivation, etc.) rather than a hard cancel. */
+async function updateByCustomerId(customerId: string, productId: string | undefined, isActive: boolean) {
+  const { getDb } = await import("../db");
+  const db = await getDb();
+  if (!db) return;
+  const { users } = await import("../../drizzle/schema");
+  const { eq } = await import("drizzle-orm");
+  const { STRIPE_PRODUCTS } = await import("../stripe-products");
+
+  if (productId === STRIPE_PRODUCTS.ARTIST_PRO.productId) {
+    await db.update(users).set({ artswrkPro: isActive }).where(eq(users.stripeCustomerId, customerId));
+    console.log(`[Webhook] Updated artist PRO status to ${isActive} for customer ${customerId}`);
+    return;
+  }
+  if (productId === STRIPE_PRODUCTS.ARTIST_BASIC.productId) {
+    await db.update(users).set({ artswrkBasic: isActive }).where(eq(users.stripeCustomerId, customerId));
+    console.log(`[Webhook] Updated artist Basic status to ${isActive} for customer ${customerId}`);
+    return;
+  }
+  // Client Premium: no product-ID disambiguation needed (see revokeByCustomerId).
+  const clientRes = await db.update(users).set({ clientPremium: isActive }).where(eq(users.clientStripeCustomerId, customerId));
+  if ((clientRes as any).affectedRows) console.log(`[Webhook] Updated client Premium status to ${isActive} for customer ${customerId}`);
+}
+
 async function startServer() {
   const app = express();
   const server = createServer(app);
@@ -67,54 +128,39 @@ async function startServer() {
         await applyCheckoutSessionCompleted(event.data.object);
       }
 
-      // Handle subscription cancellation / expiry (Basic, PRO, or Enterprise)
+      // Handle subscription cancellation / expiry (Basic, PRO, Enterprise, or client Premium)
       if (event.type === "customer.subscription.deleted") {
         const subscription = event.data.object as any;
         const customerId = subscription.customer;
         if (customerId) {
-          const { getDb } = await import("../db");
-          const db = await getDb();
-          if (db) {
-            const { users } = await import("../../drizzle/schema");
-            const { eq } = await import("drizzle-orm");
-            const { STRIPE_PRODUCTS } = await import("../stripe-products");
-            const productId = subscription.items?.data?.[0]?.price?.product;
-            if (productId === STRIPE_PRODUCTS.ARTIST_PRO.productId) {
-              await db.update(users).set({ artswrkPro: false, artistStripeProductId: null }).where(eq(users.stripeCustomerId, customerId));
-              console.log(`[Webhook] Cancelled artist PRO for Stripe customer ${customerId}`);
-            } else if (productId === STRIPE_PRODUCTS.ARTIST_BASIC.productId) {
-              await db.update(users).set({ artswrkBasic: false, artistStripeProductId: null }).where(eq(users.stripeCustomerId, customerId));
-              console.log(`[Webhook] Cancelled artist Basic for Stripe customer ${customerId}`);
-            } else if (productId === STRIPE_PRODUCTS.ENTERPRISE_SUBSCRIPTION.productId) {
-              await db.update(users).set({ enterpriseStripeSubscriptionId: null }).where(eq(users.enterpriseStripeCustomerId, customerId));
-              console.log(`[Webhook] Cancelled enterprise subscription for customer ${customerId}`);
-            }
-          }
+          await revokeByCustomerId(customerId, subscription.items?.data?.[0]?.price?.product, "deleted");
         }
       }
 
-      // Handle artist subscription updates (e.g. reactivation)
+      // Handle subscription status changes (reactivation, or past_due while Stripe retries)
       if (event.type === "customer.subscription.updated") {
         const subscription = event.data.object as any;
         const customerId = subscription.customer;
-        const isActive = subscription.status === "active" || subscription.status === "trialing";
+        // Only "canceled"/"unpaid"/"incomplete_expired" mean access should actually
+        // come off here — "past_due" still has Stripe retrying the card, and
+        // cutting access on every retry attempt is too aggressive. The real
+        // final-failure cutoff is handled below via invoice.payment_failed.
+        const isActive = !["canceled", "unpaid", "incomplete_expired"].includes(subscription.status);
         if (customerId) {
-          const { getDb } = await import("../db");
-          const db = await getDb();
-          if (db) {
-            const { users } = await import("../../drizzle/schema");
-            const { eq } = await import("drizzle-orm");
-            // Only update if this is an artist PRO subscription (check product ID)
-            const productId = subscription.items?.data?.[0]?.price?.product;
-            const { STRIPE_PRODUCTS } = await import("../stripe-products");
-            if (productId === STRIPE_PRODUCTS.ARTIST_PRO.productId) {
-              await db.update(users).set({ artswrkPro: isActive }).where(eq(users.stripeCustomerId, customerId));
-              console.log(`[Webhook] Updated artist PRO status to ${isActive} for customer ${customerId}`);
-            } else if (productId === STRIPE_PRODUCTS.ARTIST_BASIC.productId) {
-              await db.update(users).set({ artswrkBasic: isActive }).where(eq(users.stripeCustomerId, customerId));
-              console.log(`[Webhook] Updated artist Basic status to ${isActive} for customer ${customerId}`);
-            }
-          }
+          await updateByCustomerId(customerId, subscription.items?.data?.[0]?.price?.product, isActive);
+        }
+      }
+
+      // Final payment failure on a renewal (Stripe sets next_payment_attempt to
+      // null once it's done retrying) — this is the real "they stopped paying"
+      // signal, not the first missed charge.
+      if (event.type === "invoice.payment_failed") {
+        const invoice = event.data.object as any;
+        const customerId = invoice.customer;
+        const isFinalFailure = invoice.next_payment_attempt === null;
+        if (customerId && isFinalFailure) {
+          const productId = invoice.lines?.data?.[0]?.price?.product;
+          await revokeByCustomerId(customerId, productId, "payment_failed");
         }
       }
     } catch (err: any) {
