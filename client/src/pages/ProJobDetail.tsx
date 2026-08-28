@@ -427,11 +427,16 @@ export default function ProJobDetail() {
   // apply form. The applyDirect flag itself is unreliable on Bubble-migrated
   // records (many real link-out jobs have applyDirect=0 with applyLink still
   // populated) — the presence of a real link/email is the actual signal.
-  // "contact@artswrk.com" specifically is a migration placeholder, not a real
-  // employer address — jobs with only that value (no real link/email) are
-  // genuinely in-platform, and treating them as external hides the in-platform
-  // apply state entirely, including any application the artist already submitted.
-  const hasRealApplyEmail = !!j.applyEmail && j.applyEmail.toLowerCase() !== "contact@artswrk.com";
+  // Audited every distinct applyEmail value in premium_jobs (2026-08-28) and
+  // found this is a real, recurring migration-quality issue, not a one-off:
+  // internal @artswrk.com aliases (contact@, support@, ramita+*@) and outright
+  // garbage non-email strings (e.g. "Several emails - Nick") are stored in the
+  // same field as real employer addresses. None of those are a real external
+  // apply target — jobs with only one of those (no real link) are genuinely
+  // in-platform, and treating them as external hides the in-platform apply
+  // state entirely, including any application the artist already submitted.
+  const isRealEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) && !v.trim().toLowerCase().endsWith("@artswrk.com");
+  const hasRealApplyEmail = !!j.applyEmail && isRealEmail(j.applyEmail);
   const externalApplyHref: string | null = j.applyLink || (hasRealApplyEmail ? `mailto:${j.applyEmail}` : null);
   const title = j.serviceType ?? "Open Position";
   const location = j.workFromAnywhere ? "Work From Anywhere" : (j.location ?? "Location TBD");
