@@ -1796,6 +1796,70 @@ export async function getArtistsList({
   return { artists, total: Number(countRow?.count ?? 0) };
 }
 
+/**
+ * Browse studio/company profiles (client_companies) — the artist-facing
+ * "Browse Companies" directory. Only companies with a real name are shown.
+ */
+export async function getClientCompaniesList({
+  limit = 48,
+  offset = 0,
+  search,
+}: {
+  limit?: number;
+  offset?: number;
+  search?: string;
+}) {
+  const db = await getDb();
+  if (!db) return { companies: [], total: 0 };
+
+  const conditions = [
+    isNotNull(clientCompanies.name),
+    sql`${clientCompanies.name} != ''`,
+  ];
+
+  if (search) {
+    const q = `%${search}%`;
+    conditions.push(
+      or(
+        like(clientCompanies.name, q),
+        like(clientCompanies.locationAddress, q),
+        like(clientCompanies.description, q),
+      )!
+    );
+  }
+
+  const where = and(...conditions);
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(clientCompanies)
+    .where(where);
+
+  const companies = await db
+    .select({
+      id: clientCompanies.id,
+      name: clientCompanies.name,
+      logo: clientCompanies.logo,
+      website: clientCompanies.website,
+      description: clientCompanies.description,
+      locationAddress: clientCompanies.locationAddress,
+      locationLat: clientCompanies.locationLat,
+      locationLng: clientCompanies.locationLng,
+      transportReimbursed: clientCompanies.transportReimbursed,
+      transportDetails: clientCompanies.transportDetails,
+    })
+    .from(clientCompanies)
+    .where(where)
+    .orderBy(
+      sql`CASE WHEN ${clientCompanies.logo} IS NOT NULL AND ${clientCompanies.logo} != '' THEN 1 ELSE 0 END DESC`,
+      desc(clientCompanies.createdAt)
+    )
+    .limit(limit)
+    .offset(offset);
+
+  return { companies, total: Number(countRow?.count ?? 0) };
+}
+
 export async function getArtistAffiliations(userId: number) {
   return getMyAffiliations(userId);
 }

@@ -20,6 +20,7 @@ import CompanyPage from "./pages/dashboard/CompanyPage";
 import SubLists from "./pages/dashboard/SubLists";
 import Community from "./pages/dashboard/Community";
 import Benefits from "./pages/dashboard/Benefits";
+import BrowseCompanies from "./pages/dashboard/BrowseCompanies";
 import ArtistProfile from "./pages/dashboard/ArtistProfile";
 import PostJob from "./pages/PostJob";
 import Join from "./pages/Join";
@@ -138,6 +139,28 @@ function ArtistJobsRoute() {
   return (
     <DashboardLayout fullHeight>
       <Jobs inDashboard />
+    </DashboardLayout>
+  );
+}
+
+/**
+ * Browse Companies is an artist-only PRO feature — clients get redirected
+ * back to their dashboard instead of a page that doesn't apply to them.
+ */
+function BrowseCompaniesRoute() {
+  const { user, loading } = useAuth();
+  const isArtist = (user as any)?.userRole === "Artist";
+
+  if (loading) return <DashboardLayout><div /></DashboardLayout>;
+
+  if (!isArtist) {
+    window.location.replace("/app");
+    return null;
+  }
+
+  return (
+    <DashboardLayout>
+      <BrowseCompanies />
     </DashboardLayout>
   );
 }
@@ -299,6 +322,9 @@ function Router() {
       </Route>
       <Route path="/app/benefits">
         {() => <DashRoute component={Benefits} />}
+      </Route>
+      <Route path="/app/companies">
+        {() => <BrowseCompaniesRoute />}
       </Route>
 
       {/* Artist-only routes (rendered inside ArtistDashboard via URL matching) */}

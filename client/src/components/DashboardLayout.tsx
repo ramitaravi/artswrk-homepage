@@ -69,6 +69,7 @@ const ARTIST_CORE_NAV: NavItem[] = [
 
 const ARTIST_PREMIUM_NAV: NavItem[] = [
   { label: "PRO Jobs", icon: <Star size={18} />, href: "/app/pro-jobs", premium: true },
+  { label: "Browse Companies", icon: <Building2 size={18} />, href: "/app/companies", premium: true },
   { label: "Benefits", icon: <Gift size={18} />, href: "/app/benefits", premium: true },
 ];
 
