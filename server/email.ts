@@ -5,6 +5,31 @@ if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 }
 
+// ─── Dev/QA email redirect ──────────────────────────────────────────────────
+// Set EMAIL_REDIRECT_TO in .env (never in production) to silently reroute every
+// outgoing email to that one inbox instead of the real recipient — lets you Run
+// As a real user's account locally and actually trigger their emails without
+// spamming them. Original recipient is kept visible in the subject line. Only
+// ever active outside NODE_ENV=production, regardless of what's set.
+const EMAIL_REDIRECT_TO = process.env.NODE_ENV !== "production" ? process.env.EMAIL_REDIRECT_TO : undefined;
+if (EMAIL_REDIRECT_TO) {
+  console.warn(`[email] EMAIL_REDIRECT_TO is set — all outgoing email will be rerouted to ${EMAIL_REDIRECT_TO}`);
+  const originalSend = sgMail.send.bind(sgMail);
+  (sgMail as any).send = (data: any) => {
+    const redirectOne = (msg: any) => {
+      const realTo = msg.to;
+      return {
+        ...msg,
+        to: EMAIL_REDIRECT_TO,
+        cc: undefined,
+        bcc: undefined,
+        subject: `[to: ${typeof realTo === "string" ? realTo : JSON.stringify(realTo)}] ${msg.subject ?? ""}`,
+      };
+    };
+    return originalSend(Array.isArray(data) ? data.map(redirectOne) : redirectOne(data));
+  };
+}
+
 // ─── Template IDs ────────────────────────────────────────────────────────────
 // Pulled directly from the SendGrid account via the API — these are the real,
 // designed templates. Fields listed are each template's exact merge-field
