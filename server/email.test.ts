@@ -70,7 +70,7 @@ describe("email.ts", () => {
   });
 
   describe("sendJobPostedEmail", () => {
-    it("should send an HTML email with job details", async () => {
+    it("should send the job-posted dynamic template with the expected merge fields", async () => {
       const sgMail = await import("@sendgrid/mail");
       const result = await sendJobPostedEmail({
         to: "studio@artswrk.com",
@@ -87,11 +87,21 @@ describe("email.ts", () => {
       expect(sgMail.default.send).toHaveBeenCalledWith(
         expect.objectContaining({
           to: "studio@artswrk.com",
+          cc: "support@artswrk.com",
           from: expect.objectContaining({
             email: "contact@artswrk.com",
           }),
-          subject: expect.stringContaining("live"),
-          html: expect.stringContaining("Phyllis"),
+          templateId: SENDGRID_TEMPLATES.JOB_POSTED,
+          dynamicTemplateData: expect.objectContaining({
+            subject: expect.stringContaining("live"),
+            FirstName: "Phyllis",
+            Service: "Ballet Teacher",
+            Date: "Saturday, April 15",
+            Location: "New York, NY",
+            TransportReimbursed: "Yes",
+            Description: "Looking for a ballet teacher for Saturday class.",
+            joblink: "https://artswrk.com/jobs/123",
+          }),
         })
       );
     });
@@ -111,7 +121,9 @@ describe("email.ts", () => {
       });
       expect(sgMail.default.send).toHaveBeenCalledWith(
         expect.objectContaining({
-          html: expect.stringContaining("Reimbursed"),
+          dynamicTemplateData: expect.objectContaining({
+            TransportReimbursed: "Yes",
+          }),
         })
       );
     });
@@ -129,8 +141,10 @@ describe("email.ts", () => {
         jobLink: "https://artswrk.com/jobs/456",
         transportation: false,
       });
-      const callArg = vi.mocked(sgMail.default.send).mock.calls[0][0] as { html: string };
-      expect(callArg.html).not.toContain("Reimbursed");
+      const callArg = vi.mocked(sgMail.default.send).mock.calls[0][0] as {
+        dynamicTemplateData: { TransportReimbursed: string };
+      };
+      expect(callArg.dynamicTemplateData.TransportReimbursed).toBe("");
     });
   });
 });

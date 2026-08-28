@@ -778,3 +778,7 @@
 - [x] Preserve seamless looping behavior and responsive desktop/mobile layout
 - [x] Add or update automated tests for the marquee logo data and rendering
 - [x] Visually verify the homepage marquee and save a checkpoint
+
+## GitHub Sync Dependency Repair
+- [x] Install the rich-text editor dependencies introduced by the latest GitHub changes
+- [x] Verify the development preview, TypeScript, and tests after dependency installation
