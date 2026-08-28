@@ -382,7 +382,9 @@ export default function ArtistProfilePage() {
   const workTypes: string[] = (p.workTypes || [])
     .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i); // dedupe
   // ratingScore stored as integer ×10 (e.g. 50 = 5.0 stars)
-  const ratingDisplay = p.ratingScore ? p.ratingScore / 10 : 0;
+  // No real reviews system exists yet — show a full rating rather than an
+  // empty/broken-looking one until a real review system ships.
+  const ratingDisplay = p.ratingScore ? p.ratingScore / 10 : 5;
   const joinDate = p.bubbleCreatedAt || p.joinedAt || null;
 
   // Display name: "Ramita R." format
@@ -479,7 +481,7 @@ export default function ArtistProfilePage() {
 
               {/* Social links — always shown here (even empty) so you know
                   these fields exist; click a missing one to add it. */}
-              <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-100 mt-1">
+              <div className="flex flex-col gap-2.5 pt-3 border-t border-gray-100 mt-1">
                 {(() => {
                   const ig = normalizeInstagram(p.instagram);
                   return ig ? (
@@ -487,40 +489,49 @@ export default function ArtistProfilePage() {
                       href={ig.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs text-pink-500 hover:underline"
+                      className="flex items-center gap-1.5 text-xs text-pink-500 hover:underline"
                     >
                       <Instagram size={12} /> @{ig.handle}
                     </a>
                   ) : (
-                    <button onClick={() => setEditOpen(true)} className="flex items-center gap-1 text-xs text-gray-400 hover:underline">
+                    <button onClick={() => setEditOpen(true)} className="flex items-center gap-1.5 text-xs text-gray-400 hover:underline">
                       <Instagram size={12} /> + Add Instagram
                     </button>
                   );
                 })()}
+                {p.tiktok ? (
+                  <a href={p.tiktok.startsWith("http") ? p.tiktok : `https://tiktok.com/@${p.tiktok.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-gray-700 hover:underline">
+                    <ExternalLink size={12} /> TikTok
+                  </a>
+                ) : (
+                  <button onClick={() => setEditOpen(true)} className="flex items-center gap-1.5 text-xs text-gray-400 hover:underline">
+                    <ExternalLink size={12} /> + Add TikTok
+                  </button>
+                )}
                 {p.website ? (
-                  <a href={p.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-gray-500 hover:underline">
+                  <a href={p.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-gray-500 hover:underline">
                     <Globe size={12} /> Website
                   </a>
                 ) : (
-                  <button onClick={() => setEditOpen(true)} className="flex items-center gap-1 text-xs text-gray-400 hover:underline">
+                  <button onClick={() => setEditOpen(true)} className="flex items-center gap-1.5 text-xs text-gray-400 hover:underline">
                     <Globe size={12} /> + Add Website
                   </button>
                 )}
                 {p.youtube ? (
-                  <a href={p.youtube} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-red-500 hover:underline">
+                  <a href={p.youtube} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-red-500 hover:underline">
                     <Youtube size={12} /> YouTube
                   </a>
                 ) : (
-                  <button onClick={() => setEditOpen(true)} className="flex items-center gap-1 text-xs text-gray-400 hover:underline">
+                  <button onClick={() => setEditOpen(true)} className="flex items-center gap-1.5 text-xs text-gray-400 hover:underline">
                     <Youtube size={12} /> + Add YouTube
                   </button>
                 )}
                 {p.portfolio ? (
-                  <a href={p.portfolio} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-500 hover:underline">
+                  <a href={p.portfolio} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-blue-500 hover:underline">
                     <ExternalLink size={12} /> Portfolio
                   </a>
                 ) : (
-                  <button onClick={() => setEditOpen(true)} className="flex items-center gap-1 text-xs text-gray-400 hover:underline">
+                  <button onClick={() => setEditOpen(true)} className="flex items-center gap-1.5 text-xs text-gray-400 hover:underline">
                     <ExternalLink size={12} /> + Add Portfolio
                   </button>
                 )}

@@ -187,7 +187,7 @@ function AboutTab({ profile, userId }: { profile: any; userId: number }) {
       {(profile.instagram || profile.youtube || profile.tiktok || profile.website || profile.portfolio) && (
         <div>
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Links</h3>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-2">
             {profile.instagram && (
               <a href={profile.instagram.startsWith("http") ? profile.instagram : `https://instagram.com/${profile.instagram.replace("@","")}`}
                 target="_blank" rel="noopener noreferrer"
@@ -465,7 +465,9 @@ export default function ArtistProfile() {
   const workTypes: string[] = (Array.isArray(p.workTypes) ? p.workTypes : [])
     .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
 
-  const ratingDisplay = p.ratingScore ? p.ratingScore / 10 : 0;
+  // No real reviews system exists yet — show a full rating rather than an
+  // empty/broken-looking one until a real review system ships.
+  const ratingDisplay = p.ratingScore ? p.ratingScore / 10 : 5;
   const joinDate = p.bubbleCreatedAt || p.joinedAt || null;
 
   const TABS: { key: Tab; label: string }[] = [

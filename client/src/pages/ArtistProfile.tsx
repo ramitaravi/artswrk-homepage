@@ -298,7 +298,9 @@ export default function ArtistProfile() {
     ? p.workTypes.filter((v: string, i: number, a: string[]) => a.indexOf(v) === i)
     : [];
 
-  const ratingDisplay = p.ratingScore ? p.ratingScore / 10 : 0;
+  // No real reviews system exists yet — show a full rating rather than an
+  // empty/broken-looking one until a real review system ships.
+  const ratingDisplay = p.ratingScore ? p.ratingScore / 10 : 5;
   const joinDate = p.bubbleCreatedAt || p.joinedAt || null;
 
   const displayName = p.firstName
@@ -399,7 +401,7 @@ export default function ArtistProfile() {
                     visitors. For the owner, the row always shows (even fully
                     empty) so they know these fields exist and can add them. */}
                 {user && (isOwner || p.instagram || p.website || p.youtube || p.tiktok || p.portfolio) && (
-                  <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-100 mt-3">
+                  <div className="flex flex-col gap-2.5 pt-3 border-t border-gray-100 mt-3">
                     {(() => {
                       const ig = normalizeInstagram(p.instagram);
                       return ig ? (
@@ -407,40 +409,49 @@ export default function ArtistProfile() {
                           href={ig.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-xs text-pink-500 hover:underline"
+                          className="flex items-center gap-1.5 text-xs text-pink-500 hover:underline"
                         >
                           <Instagram size={12} /> @{ig.handle}
                         </a>
                       ) : isOwner ? (
-                        <a href="/app/profile" className="flex items-center gap-1 text-xs text-gray-400 hover:underline">
+                        <a href="/app/profile" className="flex items-center gap-1.5 text-xs text-gray-400 hover:underline">
                           <Instagram size={12} /> + Add Instagram
                         </a>
                       ) : null;
                     })()}
+                    {p.tiktok ? (
+                      <a href={p.tiktok.startsWith("http") ? p.tiktok : `https://tiktok.com/@${p.tiktok.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-gray-700 hover:underline">
+                        <ExternalLink size={12} /> TikTok
+                      </a>
+                    ) : isOwner ? (
+                      <a href="/app/profile" className="flex items-center gap-1.5 text-xs text-gray-400 hover:underline">
+                        <ExternalLink size={12} /> + Add TikTok
+                      </a>
+                    ) : null}
                     {p.website ? (
-                      <a href={p.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-gray-500 hover:underline">
+                      <a href={p.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-gray-500 hover:underline">
                         <Globe size={12} /> Website
                       </a>
                     ) : isOwner ? (
-                      <a href="/app/profile" className="flex items-center gap-1 text-xs text-gray-400 hover:underline">
+                      <a href="/app/profile" className="flex items-center gap-1.5 text-xs text-gray-400 hover:underline">
                         <Globe size={12} /> + Add Website
                       </a>
                     ) : null}
                     {p.youtube ? (
-                      <a href={p.youtube} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-red-500 hover:underline">
+                      <a href={p.youtube} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-red-500 hover:underline">
                         <Youtube size={12} /> YouTube
                       </a>
                     ) : isOwner ? (
-                      <a href="/app/profile" className="flex items-center gap-1 text-xs text-gray-400 hover:underline">
+                      <a href="/app/profile" className="flex items-center gap-1.5 text-xs text-gray-400 hover:underline">
                         <Youtube size={12} /> + Add YouTube
                       </a>
                     ) : null}
                     {p.portfolio ? (
-                      <a href={p.portfolio} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-500 hover:underline">
+                      <a href={p.portfolio} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-blue-500 hover:underline">
                         <ExternalLink size={12} /> Portfolio
                       </a>
                     ) : isOwner ? (
-                      <a href="/app/profile" className="flex items-center gap-1 text-xs text-gray-400 hover:underline">
+                      <a href="/app/profile" className="flex items-center gap-1.5 text-xs text-gray-400 hover:underline">
                         <ExternalLink size={12} /> + Add Portfolio
                       </a>
                     ) : null}
