@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import { BookingPeriod, ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, affiliations, artistResumes, benefits, bookingPeriods, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, masterServiceTypes, messages, payments, premiumJobInterestedArtists, premiumJobs, reimbursements, savedArtists, userAffiliations, users } from "../drizzle/schema";
@@ -2040,16 +2040,36 @@ export async function getAdminArtists({
   search,
   locationSearch,
   artistType,
+  serviceType,
   state,
   plan,
+  affiliationId,
+  onboardingStep,
+  missingProfilePicture,
+  createdFrom,
+  createdTo,
+  modifiedFrom,
+  modifiedTo,
+  sortBy = "createdAt",
+  sortDir = "desc",
   limit = 50,
   offset = 0,
 }: {
   search?: string;
   locationSearch?: string;
   artistType?: string;
+  serviceType?: string;
   state?: string;
   plan?: string;
+  affiliationId?: number;
+  onboardingStep?: number;
+  missingProfilePicture?: boolean;
+  createdFrom?: Date;
+  createdTo?: Date;
+  modifiedFrom?: Date;
+  modifiedTo?: Date;
+  sortBy?: "createdAt" | "updatedAt" | "name";
+  sortDir?: "asc" | "desc";
   limit?: number;
   offset?: number;
 }) {
@@ -2064,16 +2084,35 @@ export async function getAdminArtists({
       and(isNotNull(users.name), sql`${users.name} != ''`),
     )!,
   ];
-  if (search) conditions.push(or(like(users.name, `%${search}%`), like(users.firstName, `%${search}%`), like(users.lastName, `%${search}%`), like(users.email, `%${search}%`))!);
+  // Fuzzy search: name/email plus free-text credits ("Wicked", "Rockette", etc.)
+  if (search) conditions.push(or(
+    like(users.name, `%${search}%`),
+    like(users.firstName, `%${search}%`),
+    like(users.lastName, `%${search}%`),
+    like(users.email, `%${search}%`),
+    like(users.credits, `%${search}%`),
+  )!);
   if (locationSearch) conditions.push(like(users.location, `%${locationSearch}%`));
   if (artistType) conditions.push(like(users.masterArtistTypes, `%${artistType}%`));
+  if (serviceType) conditions.push(like(users.artistServices, `%${serviceType}%`));
   if (state) conditions.push(like(users.location, `%${state}%`));
   if (plan === "PRO") conditions.push(eq(users.artswrkPro, true));
   if (plan === "Basic") conditions.push(eq(users.artswrkBasic, true));
+  if (onboardingStep !== undefined) conditions.push(eq(users.onboardingStep, onboardingStep));
+  if (missingProfilePicture) conditions.push(or(isNull(users.profilePicture), eq(users.profilePicture, ""))!);
+  if (createdFrom) conditions.push(sql`${users.createdAt} >= ${createdFrom}`);
+  if (createdTo) conditions.push(sql`${users.createdAt} <= ${createdTo}`);
+  if (modifiedFrom) conditions.push(sql`${users.updatedAt} >= ${modifiedFrom}`);
+  if (modifiedTo) conditions.push(sql`${users.updatedAt} <= ${modifiedTo}`);
+  if (affiliationId) conditions.push(sql`${users.id} IN (SELECT artistUserId FROM user_affiliations WHERE affiliationId = ${affiliationId})`);
 
   const where = and(...conditions);
 
   const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(users).where(where);
+
+  const orderCol = sortBy === "updatedAt" ? users.updatedAt : sortBy === "name" ? users.name : users.createdAt;
+  const orderExpr = sortDir === "asc" ? asc(orderCol) : desc(orderCol);
+
   const artists = await db
     .select({
       id: users.id,
@@ -2089,16 +2128,47 @@ export async function getAdminArtists({
       artistServices: users.artistServices,
       artswrkPro: users.artswrkPro,
       artswrkBasic: users.artswrkBasic,
+      onboardingStep: users.onboardingStep,
       createdAt: users.createdAt,
+      updatedAt: users.updatedAt,
       bubbleCreatedAt: users.bubbleCreatedAt,
     })
     .from(users)
     .where(where)
-    .orderBy(desc(users.createdAt))
+    .orderBy(orderExpr)
     .limit(limit)
     .offset(offset);
 
   return { artists, total: Number(countRow?.count ?? 0) };
+}
+
+/** Bulk lookup: any users by their local DB ids (for admin bulk actions). */
+export async function getUsersByIds(ids: number[]) {
+  const db = await getDb();
+  if (!db || ids.length === 0) return [];
+  return db
+    .select({
+      id: users.id,
+      email: users.email,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      name: users.name,
+    })
+    .from(users)
+    .where(inArray(users.id, ids));
+}
+
+/** Tag an artist with an affiliation — no-op if already tagged. */
+export async function addArtistAffiliation(artistUserId: number, affiliationId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const existing = await db
+    .select({ id: userAffiliations.id })
+    .from(userAffiliations)
+    .where(and(eq(userAffiliations.artistUserId, artistUserId), eq(userAffiliations.affiliationId, affiliationId)))
+    .limit(1);
+  if (existing.length > 0) return;
+  await db.insert(userAffiliations).values({ artistUserId, affiliationId });
 }
 
 /** Admin: list all clients with search + filters */

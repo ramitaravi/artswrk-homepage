@@ -94,7 +94,7 @@ const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
 
 let _mapsScriptPromise: Promise<null> | null = null;
 
-function loadMapScript(): Promise<null> {
+export function loadMapScript(): Promise<null> {
   // Already loaded — resolve immediately
   if (typeof window !== 'undefined' && (window as any).google?.maps) {
     return Promise.resolve(null);

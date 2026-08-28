@@ -192,6 +192,26 @@ export async function getContactByEmail(
   }
 }
 
+/**
+ * Create-or-update a Brevo contact. Uses Brevo's own upsert semantics
+ * (updateEnabled: true) — safe to call for a contact that may already exist.
+ */
+export async function upsertContact(
+  email: string,
+  attributes: Record<string, string | number | boolean | null> = {},
+  listIds?: number[]
+): Promise<void> {
+  await brevoFetch<void>("/contacts", {
+    method: "POST",
+    body: JSON.stringify({
+      email,
+      attributes,
+      listIds,
+      updateEnabled: true,
+    }),
+  });
+}
+
 export async function getContactEmailHistory(
   email: string,
   limit = 20

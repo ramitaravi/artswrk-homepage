@@ -137,9 +137,30 @@ export const appRouter = router({
           await deletePasswordResetToken(input.token);
           throw new Error("This reset link has expired. Please request a new one.");
         }
+        // Was this the account's first real password (e.g. admin-created, never
+        // logged in)? If so, this is a "claim" rather than a forgot-password reset.
+        const userBefore = await getUserById(record.userId);
+        const isFirstClaim = !!userBefore?.passwordIsTemporary;
+
         const hash = await bcrypt.hash(input.password, SALT_ROUNDS);
         await setUserPassword(record.userId, hash, false);
         await deletePasswordResetToken(input.token);
+
+        if (isFirstClaim && userBefore?.email) {
+          (async () => {
+            try {
+              const { upsertContact } = await import("./brevo");
+              await upsertContact(userBefore.email!, {
+                FIRSTNAME: userBefore.firstName ?? "",
+                LASTNAME: userBefore.lastName ?? "",
+                USERROLE: userBefore.userRole ?? "",
+              });
+            } catch (err) {
+              console.error("[resetPassword] Brevo sync failed (non-fatal):", err instanceof Error ? err.message : err);
+            }
+          })();
+        }
+
         return { success: true };
       }),
 
@@ -262,8 +283,18 @@ export const appRouter = router({
         search: z.string().optional(),
         locationSearch: z.string().optional(),
         artistType: z.string().optional(),
+        serviceType: z.string().optional(),
         state: z.string().optional(),
         plan: z.string().optional(),
+        affiliationId: z.number().optional(),
+        onboardingStep: z.number().optional(),
+        missingProfilePicture: z.boolean().optional(),
+        createdFrom: z.coerce.date().optional(),
+        createdTo: z.coerce.date().optional(),
+        modifiedFrom: z.coerce.date().optional(),
+        modifiedTo: z.coerce.date().optional(),
+        sortBy: z.enum(["createdAt", "updatedAt", "name"]).default("createdAt"),
+        sortDir: z.enum(["asc", "desc"]).default("desc"),
         limit: z.number().min(1).max(200).default(50),
         offset: z.number().min(0).default(0),
       }))
@@ -342,6 +373,11 @@ export const appRouter = router({
         artswrkPro: z.boolean().default(false),
         artswrkBasic: z.boolean().default(false),
         sendWelcomeEmail: z.boolean().default(true),
+        /** Custom email subject/body (from the admin rich-text composer). Falls back
+         * to the fixed sendArtistWelcomeEmail template when either is omitted. */
+        welcomeEmailSubject: z.string().optional(),
+        welcomeEmailHtml: z.string().optional(),
+        origin: z.string().url().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
@@ -393,8 +429,34 @@ export const appRouter = router({
         const newId = (result as any).insertId as number;
 
         if (input.sendWelcomeEmail) {
-          sendArtistWelcomeEmail({ to: input.email, firstName: input.firstName })
-            .catch((err) => console.error("[Admin] Welcome email failed:", err.message));
+          (async () => {
+            try {
+              // Admin-created accounts get no real password (passwordIsTemporary
+              // stays true) — always generate a real claim link so "create your
+              // password" isn't just decorative copy in a custom email.
+              const origin = input.origin ?? process.env.VITE_APP_URL ?? "https://artswrk.com";
+              const token = crypto.randomBytes(32).toString("hex");
+              const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+              await createPasswordResetToken(newId, token, expiresAt);
+              const claimUrl = `${origin}/reset-password?token=${token}`;
+
+              if (input.welcomeEmailSubject && input.welcomeEmailHtml) {
+                const ctaBlock = `
+                  <div style="text-align:center;margin-top:28px">
+                    <a href="${claimUrl}" style="display:inline-block;background:linear-gradient(135deg,#FFBC5D,#F25722);color:#fff;font-size:15px;font-weight:800;text-decoration:none;padding:14px 36px;border-radius:100px">Create Your Password →</a>
+                  </div>`;
+                await sendSimpleEmail({
+                  to: input.email,
+                  subject: input.welcomeEmailSubject,
+                  html: `<div style="font-family:'Helvetica Neue',sans-serif;max-width:580px;margin:0 auto">${input.welcomeEmailHtml}${ctaBlock}</div>`,
+                });
+              } else {
+                await sendArtistWelcomeEmail({ to: input.email, firstName: input.firstName });
+              }
+            } catch (err) {
+              console.error("[Admin] Welcome email failed:", err instanceof Error ? err.message : err);
+            }
+          })();
         }
 
         return getUserById(newId);
@@ -409,6 +471,59 @@ export const appRouter = router({
         if (!artist?.email) throw new Error("Artist has no email address");
         await sendArtistWelcomeEmail({ to: artist.email, firstName: artist.firstName || artist.name?.split(" ")[0] || "there" });
         return { success: true };
+      }),
+
+    /** Bulk email a set of artists (or any user IDs) with admin-authored rich-text content. */
+    bulkEmailUsers: protectedProcedure
+      .input(z.object({
+        userIds: z.array(z.number()).min(1).max(500),
+        subject: z.string().min(1),
+        html: z.string().min(1),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getUsersByIds } = await import("./db");
+        const targets = await getUsersByIds(input.userIds);
+        const wrappedHtml = `<div style="font-family:'Helvetica Neue',sans-serif;max-width:580px;margin:0 auto">${input.html}</div>`;
+        let sent = 0;
+        let failed = 0;
+        for (const t of targets) {
+          if (!t.email) { failed++; continue; }
+          const ok = await sendSimpleEmail({ to: t.email, subject: input.subject, html: wrappedHtml });
+          if (ok) sent++; else failed++;
+        }
+        return { sent, failed, total: targets.length };
+      }),
+
+    /** Bulk-set plan flags (Basic/PRO) across a set of artists. */
+    bulkSetArtistPlan: protectedProcedure
+      .input(z.object({
+        artistIds: z.array(z.number()).min(1).max(500),
+        plan: z.enum(["free", "basic", "pro"]),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { setUserPlanFlags } = await import("./db");
+        const flags = input.plan === "pro"
+          ? { artswrkPro: true, artswrkBasic: false }
+          : input.plan === "basic"
+          ? { artswrkPro: false, artswrkBasic: true }
+          : { artswrkPro: false, artswrkBasic: false };
+        for (const id of input.artistIds) await setUserPlanFlags(id, flags);
+        return { updated: input.artistIds.length };
+      }),
+
+    /** Bulk-add an affiliation tag to a set of artists. */
+    bulkAddAffiliation: protectedProcedure
+      .input(z.object({
+        artistIds: z.array(z.number()).min(1).max(500),
+        affiliationId: z.number(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { addArtistAffiliation } = await import("./db");
+        for (const id of input.artistIds) await addArtistAffiliation(id, input.affiliationId);
+        return { updated: input.artistIds.length };
       }),
 
     /** All applications for a specific artist — admin only */

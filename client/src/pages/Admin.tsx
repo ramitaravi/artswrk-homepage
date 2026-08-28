@@ -16,10 +16,12 @@ import {
   AlertCircle, CheckCircle2, Eye, EyeOff, LogOut, Filter,
   MapPin, Clock, ArrowUpRight, UserCog, ArrowLeft, Sparkles, Globe, ExternalLink, Megaphone,
   Plus, Edit2, Mail, ChevronDown, ToggleLeft, ToggleRight, Instagram, Link as LinkIcon, Send, Copy, Loader2,
-  Gift, Trash2,
+  Gift, Trash2, LayoutGrid, List as ListIcon, Tag, SlidersHorizontal,
 } from "lucide-react";
 import { ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE } from "@shared/const";
 import { Link } from "wouter";
+import RichTextEditor from "@/components/RichTextEditor";
+import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type AdminSection = "dashboard" | "artists" | "clients" | "jobs" | "pro-jobs" | "enterprise-clients" | "bookings" | "admin-bookings" | "payments" | "subscriptions" | "benefits" | "emails" | "settings";
@@ -481,6 +483,10 @@ function AdminArtistForm({
   const [artswrkPro, setArtswrkPro] = useState<boolean>(!!initial?.artswrkPro);
   const [artswrkBasic, setArtswrkBasic] = useState<boolean>(!!initial?.artswrkBasic);
   const [sendWelcome, setSendWelcome] = useState(true);
+  const [welcomeSubject, setWelcomeSubject] = useState("Welcome to Artswrk! 🎉");
+  const [welcomeHtml, setWelcomeHtml] = useState(
+    `<p>Hey ${firstName || "there"},</p><p>The Artswrk Team here — so glad we connected!</p><p>Artswrk is the platform connecting artists to work. We added your account and you're just one step from being able to get booked. Below are your next steps:</p><ol><li><strong>Create your password:</strong> We added your email, so all you'll need to do is come up with a password and log in.</li><li><strong>Complete your profile:</strong> We added the basics for you but come back if you'd like to add more!</li><li><strong>Book work as you're available:</strong> Check out the job board for both direct and open-rate jobs, and set your availability so we can match you to opportunities as they come up.</li></ol><p>If you have any questions, don't hesitate to reach back out to this email.</p><p>Talk soon,<br/>Nick, Brittni &amp; Rosetta Ravi<br/>Co-Founders, Artswrk</p>`
+  );
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -488,7 +494,12 @@ function AdminArtistForm({
       firstName, lastName, email, pronouns, location, bio, website,
       instagram, tagline, profilePicture, masterArtistTypes: types,
       artistServices: services, masterStyles: styles, artswrkPro, artswrkBasic,
-      ...(isCreate ? { password: password || undefined, sendWelcomeEmail: sendWelcome } : {}),
+      ...(isCreate ? {
+        password: password || undefined,
+        sendWelcomeEmail: sendWelcome,
+        ...(sendWelcome ? { welcomeEmailSubject: welcomeSubject, welcomeEmailHtml: welcomeHtml } : {}),
+        origin: window.location.origin,
+      } : {}),
     });
   }
 
@@ -546,7 +557,9 @@ function AdminArtistForm({
           </div>
           <div>
             <label className={labelCls}>Location</label>
-            <input value={location} onChange={e => setLocation(e.target.value)} placeholder="New York, NY" className={inputCls} />
+            <div className="rounded-xl border border-gray-200 focus-within:border-[#F25722] transition-colors bg-white">
+              <LocationAutocompleteInput value={location} onChange={r => setLocation(r.query)} placeholder="New York, NY" icon={false} />
+            </div>
           </div>
         </div>
 
@@ -606,16 +619,28 @@ function AdminArtistForm({
 
       {/* Welcome email (create only) */}
       {isCreate && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
           <label className="flex items-center justify-between cursor-pointer">
             <div>
               <p className="text-sm font-semibold text-[#111]">Send welcome email</p>
-              <p className="text-xs text-gray-400 mt-0.5">Sends the Artswrk welcome email to this artist after creation</p>
+              <p className="text-xs text-gray-400 mt-0.5">A "Create Your Password" button is always appended, so the artist can log in no matter what you edit below.</p>
             </div>
             <button type="button" onClick={() => setSendWelcome(v => !v)} className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ml-4 ${sendWelcome ? "bg-[#F25722]" : "bg-gray-200"}`}>
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${sendWelcome ? "translate-x-4" : ""}`} />
             </button>
           </label>
+          {sendWelcome && (
+            <div className="space-y-3 pt-1">
+              <div>
+                <label className={labelCls}>Subject</label>
+                <input value={welcomeSubject} onChange={e => setWelcomeSubject(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Message</label>
+                <RichTextEditor value={welcomeHtml} onChange={setWelcomeHtml} minHeight={200} />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -994,17 +1019,41 @@ function AdminArtistDetail({ artistId, onBack, onEdit }: { artistId: number; onB
 }
 
 // ─── Artists Section ──────────────────────────────────────────────────────────
+const ONBOARDING_STAGES = [
+  { value: 0, label: "Not started" },
+  { value: 1, label: "Step 1" },
+  { value: 2, label: "Step 2" },
+  { value: 3, label: "Step 3" },
+  { value: 4, label: "Complete" },
+];
+
 function ArtistsSection() {
   type View = { mode: "list" } | { mode: "detail"; id: number } | { mode: "edit"; id: number } | { mode: "create" };
   const [view, setView] = useState<View>({ mode: "list" });
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
 
   const [search, setSearch] = useState("");
   const [locationSearch, setLocationSearch] = useState("");
   const [artistType, setArtistType] = useState("");
+  const [serviceType, setServiceType] = useState("");
   const [state, setState] = useState("");
   const [plan, setPlan] = useState("");
+  const [affiliationId, setAffiliationId] = useState<number | undefined>(undefined);
+  const [onboardingStep, setOnboardingStepFilter] = useState<number | undefined>(undefined);
+  const [missingProfilePicture, setMissingProfilePicture] = useState(false);
+  const [createdFrom, setCreatedFrom] = useState("");
+  const [createdTo, setCreatedTo] = useState("");
+  const [modifiedFrom, setModifiedFrom] = useState("");
+  const [modifiedTo, setModifiedTo] = useState("");
+  const [sortBy, setSortBy] = useState<"createdAt" | "updatedAt" | "name">("createdAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const LIMIT = 50;
+
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkEmailOpen, setBulkEmailOpen] = useState(false);
+  const [bulkTagOpen, setBulkTagOpen] = useState(false);
 
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [debouncedLocation, setDebouncedLocation] = useState("");
@@ -1019,11 +1068,23 @@ function ArtistsSection() {
     search: debouncedSearch || undefined,
     locationSearch: debouncedLocation || undefined,
     artistType: artistType || undefined,
+    serviceType: serviceType || undefined,
     state: state || undefined,
     plan: plan || undefined,
+    affiliationId,
+    onboardingStep,
+    missingProfilePicture: missingProfilePicture || undefined,
+    createdFrom: createdFrom ? new Date(createdFrom) : undefined,
+    createdTo: createdTo ? new Date(createdTo) : undefined,
+    modifiedFrom: modifiedFrom ? new Date(modifiedFrom) : undefined,
+    modifiedTo: modifiedTo ? new Date(modifiedTo) : undefined,
+    sortBy,
+    sortDir,
     limit: LIMIT,
     offset: (page - 1) * LIMIT,
   }, { enabled: view.mode === "list" });
+
+  const { data: affiliationsData } = trpc.artists.getAffiliations.useQuery();
 
   const utils = trpc.useUtils();
 
@@ -1043,6 +1104,52 @@ function ArtistsSection() {
     },
     onError: (e) => alert("Create failed: " + e.message),
   });
+
+  const bulkEmail = trpc.admin.bulkEmailUsers.useMutation({
+    onSuccess: (res) => {
+      alert(`Sent to ${res.sent} of ${res.total} artist${res.total !== 1 ? "s" : ""}.`);
+      setBulkEmailOpen(false);
+      setSelectedIds(new Set());
+    },
+    onError: (e) => alert("Bulk email failed: " + e.message),
+  });
+
+  const bulkTag = trpc.admin.bulkAddAffiliation.useMutation({
+    onSuccess: () => {
+      utils.admin.artists.invalidate();
+      setBulkTagOpen(false);
+      setSelectedIds(new Set());
+    },
+    onError: (e) => alert("Bulk tag failed: " + e.message),
+  });
+
+  const bulkPlan = trpc.admin.bulkSetArtistPlan.useMutation({
+    onSuccess: () => {
+      utils.admin.artists.invalidate();
+      setSelectedIds(new Set());
+    },
+    onError: (e) => alert("Bulk plan update failed: " + e.message),
+  });
+
+  function toggleSelect(id: number) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function toggleSelectAll() {
+    if (!data?.artists.length) return;
+    const allSelected = data.artists.every(a => selectedIds.has(a.id));
+    setSelectedIds(allSelected ? new Set() : new Set(data.artists.map(a => a.id)));
+  }
+  function resetFilters() {
+    setSearch(""); setLocationSearch(""); setArtistType(""); setServiceType("");
+    setState(""); setPlan(""); setAffiliationId(undefined); setOnboardingStepFilter(undefined);
+    setMissingProfilePicture(false); setCreatedFrom(""); setCreatedTo("");
+    setModifiedFrom(""); setModifiedTo(""); setPage(1);
+  }
+  const hasActiveFilters = !!(search || locationSearch || artistType || serviceType || state || plan || affiliationId || onboardingStep !== undefined || missingProfilePicture || createdFrom || createdTo || modifiedFrom || modifiedTo);
 
   const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
@@ -1100,126 +1207,406 @@ function ArtistsSection() {
   }
 
   // ── List view ──────────────────────────────────────────────────────────────
+  const allOnPageSelected = !!data?.artists.length && data.artists.every(a => selectedIds.has(a.id));
+
   return (
     <div className="space-y-5">
+      {bulkEmailOpen && (
+        <BulkEmailModal
+          count={selectedIds.size}
+          isSending={bulkEmail.isPending}
+          onClose={() => setBulkEmailOpen(false)}
+          onSend={(subject, html) => bulkEmail.mutate({ userIds: [...selectedIds], subject, html })}
+        />
+      )}
+      {bulkTagOpen && (
+        <BulkTagModal
+          affiliations={affiliationsData ?? []}
+          isSaving={bulkTag.isPending}
+          onClose={() => setBulkTagOpen(false)}
+          onSave={(affiliationId) => bulkTag.mutate({ artistIds: [...selectedIds], affiliationId })}
+        />
+      )}
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-black text-[#111]">All Artists ({data?.total?.toLocaleString() ?? "…"})</h1>
-        <button
-          onClick={() => setView({ mode: "create" })}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity"
-        >
-          <Plus size={15} /> Create Artist
-        </button>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-wrap gap-3">
-        <select value={artistType} onChange={e => { setArtistType(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
-          <option value="">Artist Type</option>
-          {MASTER_ARTIST_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <select value={state} onChange={e => { setState(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
-          <option value="">State</option>
-          {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select value={plan} onChange={e => { setPlan(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
-          <option value="">Plan</option>
-          <option value="Basic">Basic</option>
-          <option value="PRO">PRO</option>
-        </select>
-        <div className="flex items-center gap-2 flex-1 min-w-[180px] bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
-          <Search size={13} className="text-gray-400 flex-shrink-0" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search Artists..." className="bg-transparent text-xs text-[#111] placeholder-gray-400 focus:outline-none w-full" />
-        </div>
-        <div className="flex items-center gap-2 flex-1 min-w-[180px] bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
-          <MapPin size={13} className="text-gray-400 flex-shrink-0" />
-          <input value={locationSearch} onChange={e => setLocationSearch(e.target.value)} placeholder="Search Location..." className="bg-transparent text-xs text-[#111] placeholder-gray-400 focus:outline-none w-full" />
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-0.5 bg-gray-100 rounded-xl p-1">
+            <button onClick={() => setViewMode("list")} className={`p-1.5 rounded-lg transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-[#111]" : "text-gray-400 hover:text-gray-600"}`} title="List view">
+              <ListIcon size={15} />
+            </button>
+            <button onClick={() => setViewMode("grid")} className={`p-1.5 rounded-lg transition-colors ${viewMode === "grid" ? "bg-white shadow-sm text-[#111]" : "text-gray-400 hover:text-gray-600"}`} title="Grid view">
+              <LayoutGrid size={15} />
+            </button>
+          </div>
+          <button
+            onClick={() => setView({ mode: "create" })}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity"
+          >
+            <Plus size={15} /> Create Artist
+          </button>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Artist</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Location</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Types</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Plan</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Joined</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-xs">Loading…</td></tr>
-              ) : data?.artists.length === 0 ? (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-xs">No artists found</td></tr>
-              ) : data?.artists.map(a => {
-                const types = (() => { try { return JSON.parse(a.workTypes || "[]"); } catch { return []; } })();
-                return (
-                  <tr
-                    key={a.id}
-                    className="border-b border-gray-50 hover:bg-orange-50/40 transition-colors cursor-pointer"
-                    onClick={() => setView({ mode: "detail", id: a.id })}
-                  >
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-3">
-                        {a.profilePicture ? (
-                          <img src={a.profilePicture} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-xs font-black flex-shrink-0">
-                            {(displayName(a)[0] || "?").toUpperCase()}
+      {/* Bulk action toolbar — replaces filters while artists are selected */}
+      {selectedIds.size > 0 ? (
+        <div className="flex items-center justify-between bg-orange-50 border border-orange-100 rounded-2xl px-4 py-3">
+          <p className="text-sm font-semibold text-[#111]">{selectedIds.size} selected</p>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setBulkEmailOpen(true)} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-white border border-gray-200 hover:border-gray-300 transition-colors">
+              <Mail size={12} /> Email Selected
+            </button>
+            <button onClick={() => setBulkTagOpen(true)} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-white border border-gray-200 hover:border-gray-300 transition-colors">
+              <Tag size={12} /> Add Affiliation
+            </button>
+            <select
+              onChange={e => { if (e.target.value) { bulkPlan.mutate({ artistIds: [...selectedIds], plan: e.target.value as any }); e.target.value = ""; } }}
+              defaultValue=""
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white border border-gray-200 hover:border-gray-300 transition-colors cursor-pointer"
+            >
+              <option value="" disabled>Set Plan…</option>
+              <option value="free">Free</option>
+              <option value="basic">Basic</option>
+              <option value="pro">PRO</option>
+            </select>
+            <button onClick={() => setSelectedIds(new Set())} className="text-xs font-semibold text-gray-500 hover:text-[#111] px-2">
+              Clear
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+          {/* Primary filters */}
+          <div className="flex flex-wrap gap-3">
+            <select value={artistType} onChange={e => { setArtistType(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
+              <option value="">Artist Type</option>
+              {MASTER_ARTIST_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <select value={serviceType} onChange={e => { setServiceType(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
+              <option value="">Service Type</option>
+              {ARTIST_SERVICES.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <select value={state} onChange={e => { setState(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
+              <option value="">State</option>
+              {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <select value={plan} onChange={e => { setPlan(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
+              <option value="">Plan</option>
+              <option value="Basic">Basic</option>
+              <option value="PRO">PRO</option>
+            </select>
+            <select
+              value={affiliationId ?? ""}
+              onChange={e => { setAffiliationId(e.target.value ? Number(e.target.value) : undefined); setPage(1); }}
+              className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]"
+            >
+              <option value="">Affiliation</option>
+              {(affiliationsData ?? []).map((a: any) => <option key={a.id} value={a.id}>{a.display}</option>)}
+            </select>
+            <button
+              onClick={() => setMoreFiltersOpen(v => !v)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${moreFiltersOpen ? "bg-orange-50 border-orange-200 text-[#F25722]" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}
+            >
+              <SlidersHorizontal size={12} /> More Filters
+            </button>
+            {hasActiveFilters && (
+              <button onClick={resetFilters} className="flex items-center gap-1 text-xs font-semibold text-[#F25722] hover:opacity-70 px-2">
+                <X size={12} /> Reset
+              </button>
+            )}
+          </div>
+
+          {/* Search + location + sort */}
+          <div className="flex flex-wrap gap-3">
+            <div className="flex items-center gap-2 flex-1 min-w-[180px] bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
+              <Search size={13} className="text-gray-400 flex-shrink-0" />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, email, or credits (e.g. Wicked)…" className="bg-transparent text-xs text-[#111] placeholder-gray-400 focus:outline-none w-full" />
+            </div>
+            <div className="flex-1 min-w-[180px] bg-gray-50 rounded-xl border border-gray-200">
+              <LocationAutocompleteInput value={locationSearch} onChange={r => setLocationSearch(r.query)} placeholder="Search location…" className="text-xs" />
+            </div>
+            <select
+              value={`${sortBy}:${sortDir}`}
+              onChange={e => { const [by, dir] = e.target.value.split(":"); setSortBy(by as any); setSortDir(dir as any); }}
+              className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]"
+            >
+              <option value="createdAt:desc">Newest Created</option>
+              <option value="createdAt:asc">Oldest Created</option>
+              <option value="updatedAt:desc">Recently Modified</option>
+              <option value="name:asc">Name A–Z</option>
+              <option value="name:desc">Name Z–A</option>
+            </select>
+          </div>
+
+          {/* More filters (collapsible) */}
+          {moreFiltersOpen && (
+            <div className="flex flex-wrap items-end gap-4 pt-3 border-t border-gray-100">
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Onboarding Stage</label>
+                <select
+                  value={onboardingStep ?? ""}
+                  onChange={e => { setOnboardingStepFilter(e.target.value ? Number(e.target.value) : undefined); setPage(1); }}
+                  className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]"
+                >
+                  <option value="">Any</option>
+                  {ONBOARDING_STAGES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Created</label>
+                <div className="flex items-center gap-1.5">
+                  <input type="date" value={createdFrom} onChange={e => { setCreatedFrom(e.target.value); setPage(1); }} className="px-2.5 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]" />
+                  <span className="text-xs text-gray-400">to</span>
+                  <input type="date" value={createdTo} onChange={e => { setCreatedTo(e.target.value); setPage(1); }} className="px-2.5 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Modified</label>
+                <div className="flex items-center gap-1.5">
+                  <input type="date" value={modifiedFrom} onChange={e => { setModifiedFrom(e.target.value); setPage(1); }} className="px-2.5 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]" />
+                  <span className="text-xs text-gray-400">to</span>
+                  <input type="date" value={modifiedTo} onChange={e => { setModifiedTo(e.target.value); setPage(1); }} className="px-2.5 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]" />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-xs font-medium text-gray-600 cursor-pointer pb-2">
+                <input type="checkbox" checked={missingProfilePicture} onChange={e => { setMissingProfilePicture(e.target.checked); setPage(1); }} className="rounded border-gray-300 text-[#F25722] focus:ring-[#F25722]" />
+                Missing profile picture
+              </label>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Select all */}
+      {!!data?.artists.length && (
+        <label className="flex items-center gap-2 text-xs font-semibold text-gray-500 cursor-pointer px-1">
+          <input type="checkbox" checked={allOnPageSelected} onChange={toggleSelectAll} className="rounded border-gray-300 text-[#F25722] focus:ring-[#F25722]" />
+          Select all on page ({data.artists.length})
+        </label>
+      )}
+
+      {viewMode === "list" ? (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="w-10 px-4 py-3" />
+                  <th className="text-left px-2 py-3 text-xs font-semibold text-gray-500">Artist</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Location</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Types</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Plan</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Onboarding</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Joined</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr><td colSpan={8} className="px-5 py-10 text-center text-gray-400 text-xs">Loading…</td></tr>
+                ) : data?.artists.length === 0 ? (
+                  <tr><td colSpan={8} className="px-5 py-10 text-center text-gray-400 text-xs">No artists found</td></tr>
+                ) : data?.artists.map(a => {
+                  const types = (() => { try { return JSON.parse(a.workTypes || "[]"); } catch { return []; } })();
+                  const stage = ONBOARDING_STAGES.find(s => s.value === (a.onboardingStep ?? 0));
+                  return (
+                    <tr
+                      key={a.id}
+                      className={`border-b border-gray-50 hover:bg-orange-50/40 transition-colors cursor-pointer ${selectedIds.has(a.id) ? "bg-orange-50/60" : ""}`}
+                      onClick={() => setView({ mode: "detail", id: a.id })}
+                    >
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                        <input type="checkbox" checked={selectedIds.has(a.id)} onChange={() => toggleSelect(a.id)} className="rounded border-gray-300 text-[#F25722] focus:ring-[#F25722]" />
+                      </td>
+                      <td className="px-2 py-3">
+                        <div className="flex items-center gap-3">
+                          {a.profilePicture ? (
+                            <img src={a.profilePicture} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-xs font-black flex-shrink-0">
+                              {(displayName(a)[0] || "?").toUpperCase()}
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-semibold text-[#111] text-xs">{displayName(a)}</p>
+                            <p className="text-[10px] text-gray-400">{a.email || "—"}</p>
                           </div>
-                        )}
-                        <div>
-                          <p className="font-semibold text-[#111] text-xs">{displayName(a)}</p>
-                          <p className="text-[10px] text-gray-400">{a.email || "—"}</p>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-600">{a.location || "—"}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {types.slice(0, 2).map((t: string) => (
-                          <span key={t} className="text-[10px] px-1.5 py-0.5 rounded-full bg-pink-50 text-pink-600 font-medium">{t}</span>
-                        ))}
-                        {types.length > 2 && <span className="text-[10px] text-gray-400">+{types.length - 2}</span>}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {a.artswrkPro ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">PRO</span>
-                      ) : a.artswrkBasic ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Basic</span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-600">{a.location || "—"}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {types.slice(0, 2).map((t: string) => (
+                            <span key={t} className="text-[10px] px-1.5 py-0.5 rounded-full bg-pink-50 text-pink-600 font-medium">{t}</span>
+                          ))}
+                          {types.length > 2 && <span className="text-[10px] text-gray-400">+{types.length - 2}</span>}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {a.artswrkPro ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">PRO</span>
+                        ) : a.artswrkBasic ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Basic</span>
+                        ) : (
+                          <span className="text-[10px] text-gray-400">Free</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${stage?.value === 4 ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-500"}`}>
+                          {stage?.label ?? "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(a.bubbleCreatedAt || a.createdAt)}</td>
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => setView({ mode: "detail", id: a.id })}
+                            className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors"
+                          >
+                            <Eye size={11} /> View
+                          </button>
+                          <RunAsButton userId={a.id} userName={displayName(a)} userRole="Artist" />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {data && (
+            <div className="px-5 py-3">
+              <Pagination page={page} total={data.total} limit={LIMIT} onPage={setPage} />
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {isLoading ? (
+            <div className="text-center py-16 text-gray-400 text-sm">Loading…</div>
+          ) : data?.artists.length === 0 ? (
+            <div className="text-center py-16 text-gray-400 text-sm">No artists found</div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {data?.artists.map(a => {
+                const types = (() => { try { return JSON.parse(a.workTypes || "[]"); } catch { return []; } })();
+                const stage = ONBOARDING_STAGES.find(s => s.value === (a.onboardingStep ?? 0));
+                return (
+                  <div
+                    key={a.id}
+                    onClick={() => setView({ mode: "detail", id: a.id })}
+                    className={`relative bg-white rounded-2xl border shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-all ${selectedIds.has(a.id) ? "border-[#F25722]" : "border-gray-100"}`}
+                  >
+                    <div className="absolute top-2.5 left-2.5 z-10" onClick={e => e.stopPropagation()}>
+                      <input type="checkbox" checked={selectedIds.has(a.id)} onChange={() => toggleSelect(a.id)} className="rounded border-gray-300 text-[#F25722] focus:ring-[#F25722] w-4 h-4" />
+                    </div>
+                    <div className="aspect-square relative bg-gray-100">
+                      {a.profilePicture ? (
+                        <img src={a.profilePicture} alt="" className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-[10px] text-gray-400">Free</span>
+                        <div className="w-full h-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-2xl font-black">
+                          {(displayName(a)[0] || "?").toUpperCase()}
+                        </div>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(a.bubbleCreatedAt || a.createdAt)}</td>
-                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => setView({ mode: "detail", id: a.id })}
-                          className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors"
-                        >
-                          <Eye size={11} /> View
-                        </button>
-                        <RunAsButton userId={a.id} userName={displayName(a)} userRole="Artist" />
+                      {a.artswrkPro && <span className="absolute top-2.5 right-2.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/70 text-white">PRO</span>}
+                    </div>
+                    <div className="p-3">
+                      <p className="font-bold text-[#111] text-sm truncate">{displayName(a)}</p>
+                      {a.location && <p className="text-xs text-gray-400 truncate mt-0.5">{a.location}</p>}
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="flex flex-wrap gap-1">
+                          {types.slice(0, 1).map((t: string) => (
+                            <span key={t} className="text-[10px] px-1.5 py-0.5 rounded-full bg-pink-50 text-pink-600 font-medium">{t}</span>
+                          ))}
+                        </div>
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${stage?.value === 4 ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-500"}`}>
+                          {stage?.label ?? "—"}
+                        </span>
                       </div>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          )}
+          {data && <Pagination page={page} total={data.total} limit={LIMIT} onPage={setPage} />}
         </div>
-        {data && (
-          <div className="px-5 py-3">
-            <Pagination page={page} total={data.total} limit={LIMIT} onPage={setPage} />
+      )}
+    </div>
+  );
+}
+
+// ─── Bulk Email Modal ─────────────────────────────────────────────────────────
+function BulkEmailModal({ count, isSending, onClose, onSend }: {
+  count: number;
+  isSending: boolean;
+  onClose: () => void;
+  onSend: (subject: string, html: string) => void;
+}) {
+  const [subject, setSubject] = useState("");
+  const [html, setHtml] = useState("");
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
+          <div>
+            <h2 className="text-lg font-black text-[#111]">Send a bulk email</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Sending to {count} selected artist{count !== 1 ? "s" : ""}</p>
           </div>
-        )}
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"><X size={18} /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject…" className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#F25722]" />
+          <RichTextEditor value={html} onChange={setHtml} placeholder="Start typing your email…" minHeight={220} />
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button onClick={onClose} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
+            <button
+              onClick={() => onSend(subject, html)}
+              disabled={isSending || !subject.trim() || !html.trim()}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors disabled:opacity-50"
+            >
+              {isSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              Send Email
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Bulk Tag (Affiliation) Modal ─────────────────────────────────────────────
+function BulkTagModal({ affiliations, isSaving, onClose, onSave }: {
+  affiliations: { id: number; display: string }[];
+  isSaving: boolean;
+  onClose: () => void;
+  onSave: (affiliationId: number) => void;
+}) {
+  const [affiliationId, setAffiliationId] = useState<number | "">("");
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+        <h2 className="text-lg font-black text-[#111] mb-1">Add affiliation</h2>
+        <p className="text-xs text-gray-400 mb-4">Tags every selected artist with this affiliation.</p>
+        <select
+          value={affiliationId}
+          onChange={e => setAffiliationId(e.target.value ? Number(e.target.value) : "")}
+          className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] mb-5"
+        >
+          <option value="">Select affiliation…</option>
+          {affiliations.map(a => <option key={a.id} value={a.id}>{a.display}</option>)}
+        </select>
+        <div className="flex items-center justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
+          <button
+            onClick={() => affiliationId && onSave(affiliationId)}
+            disabled={isSaving || !affiliationId}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors disabled:opacity-50"
+          >
+            {isSaving ? <Loader2 size={14} className="animate-spin" /> : null}
+            Add Tag
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1371,7 +1758,9 @@ function AdminClientForm({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className={labelCls}>Location</label>
-            <input value={location} onChange={e => setLocation(e.target.value)} placeholder="New York, NY" className={inputCls} />
+            <div className="rounded-xl border border-gray-200 focus-within:border-[#F25722] transition-colors bg-white">
+              <LocationAutocompleteInput value={location} onChange={r => setLocation(r.query)} placeholder="New York, NY" icon={false} />
+            </div>
           </div>
           <div>
             <label className={labelCls}>Business or Individual</label>
