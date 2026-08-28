@@ -485,7 +485,7 @@ function AdminArtistForm({
   const [sendWelcome, setSendWelcome] = useState(true);
   const [welcomeSubject, setWelcomeSubject] = useState("Welcome to Artswrk! 🎉");
   const [welcomeHtml, setWelcomeHtml] = useState(
-    `<p>Hey ${firstName || "there"},</p><p>The Artswrk Team here — so glad we connected!</p><p>Artswrk is the platform connecting artists to work. We added your account and you're just one step from being able to get booked. Below are your next steps:</p><ol><li><strong>Create your password:</strong> We added your email, so all you'll need to do is come up with a password and log in.</li><li><strong>Complete your profile:</strong> We added the basics for you but come back if you'd like to add more!</li><li><strong>Book work as you're available:</strong> Check out the job board for both direct and open-rate jobs, and set your availability so we can match you to opportunities as they come up.</li></ol><p>If you have any questions, don't hesitate to reach back out to this email.</p><p>Talk soon,<br/>Nick, Brittni &amp; Rosetta Ravi<br/>Co-Founders, Artswrk</p>`
+    `<p>Hey ${firstName || "there"},</p><p>The Artswrk Team here — so glad we connected!</p><p>Artswrk is the platform connecting artists to work. So excited to get you on our roster!</p><p>We've added you to our email list, so you'll get regular job updates from us. Below are your next steps:</p><ol><li><strong>Create your password:</strong> Using your email address, click here to set a password and login.</li><li><strong>Complete your profile:</strong> We added key details for you, but we want to know more! Add your resume, bio, and anything else that will help you get booked.</li><li><strong>Submit to open jobs:</strong> Check out the jobs board and send in a submission if you are interested and available. Not seeing any for you just yet? No worries — we are adding new clients every single day and will email you new opportunities.</li><li><strong>Once you're booked:</strong> Artswrk handles all payments &amp; 1099s on behalf of you and the client, so you can focus on WRK.</li><li><strong>Join Artswrk PRO:</strong> To get first dibs on higher-paying jobs, plus access to our health insurance and sick pay partners, upgrade your account for $10.99/month or $110/year (2 months free) when signing up.</li></ol><p>If you have any questions, feel free to reply back to this email anytime. Artswrk is committed to innovating how you make money as an artist, and we are so thrilled to have you on the platform.</p><p>Talk soon,<br/>Nick Silverio &amp; Ramita Ravi<br/>Co-Founders, Artswrk</p>`
   );
 
   function handleSubmit(e: React.FormEvent) {
@@ -1107,7 +1107,7 @@ function ArtistsSection() {
 
   const bulkEmail = trpc.admin.bulkEmailUsers.useMutation({
     onSuccess: (res) => {
-      alert(`Sent to ${res.sent} of ${res.total} artist${res.total !== 1 ? "s" : ""}.`);
+      alert(`Sending to ${res.queued} of ${res.total} artist${res.total !== 1 ? "s" : ""}${res.skipped ? ` (${res.skipped} skipped — no email on file)` : ""}. Sends happen in the background.`);
       setBulkEmailOpen(false);
       setSelectedIds(new Set());
     },
@@ -1248,8 +1248,8 @@ function ArtistsSection() {
         </div>
       </div>
 
-      {/* Bulk action toolbar — replaces filters while artists are selected */}
-      {selectedIds.size > 0 ? (
+      {/* Bulk action toolbar — sits above the filters, doesn't replace them */}
+      {selectedIds.size > 0 && (
         <div className="flex items-center justify-between bg-orange-50 border border-orange-100 rounded-2xl px-4 py-3">
           <p className="text-sm font-semibold text-[#111]">{selectedIds.size} selected</p>
           <div className="flex items-center gap-2">
@@ -1274,8 +1274,9 @@ function ArtistsSection() {
             </button>
           </div>
         </div>
-      ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+      )}
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
           {/* Primary filters */}
           <div className="flex flex-wrap gap-3">
             <select value={artistType} onChange={e => { setArtistType(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
@@ -1374,15 +1375,41 @@ function ArtistsSection() {
               </label>
             </div>
           )}
-        </div>
-      )}
+      </div>
 
       {/* Select all */}
       {!!data?.artists.length && (
-        <label className="flex items-center gap-2 text-xs font-semibold text-gray-500 cursor-pointer px-1">
-          <input type="checkbox" checked={allOnPageSelected} onChange={toggleSelectAll} className="rounded border-gray-300 text-[#F25722] focus:ring-[#F25722]" />
-          Select all on page ({data.artists.length})
-        </label>
+        <div className="flex items-center gap-4 px-1">
+          <label className="flex items-center gap-2 text-xs font-semibold text-gray-500 cursor-pointer">
+            <input type="checkbox" checked={allOnPageSelected} onChange={toggleSelectAll} className="rounded border-gray-300 text-[#F25722] focus:ring-[#F25722]" />
+            Select all on page ({data.artists.length})
+          </label>
+          {data.total > data.artists.length && (
+            <button
+              onClick={async () => {
+                const ids = await utils.admin.artistIds.fetch({
+                  search: debouncedSearch || undefined,
+                  locationSearch: debouncedLocation || undefined,
+                  artistType: artistType || undefined,
+                  serviceType: serviceType || undefined,
+                  state: state || undefined,
+                  plan: plan || undefined,
+                  affiliationId,
+                  onboardingStep,
+                  missingProfilePicture: missingProfilePicture || undefined,
+                  createdFrom: createdFrom ? new Date(createdFrom) : undefined,
+                  createdTo: createdTo ? new Date(createdTo) : undefined,
+                  modifiedFrom: modifiedFrom ? new Date(modifiedFrom) : undefined,
+                  modifiedTo: modifiedTo ? new Date(modifiedTo) : undefined,
+                });
+                setSelectedIds(new Set(ids));
+              }}
+              className="text-xs font-semibold text-[#F25722] hover:opacity-70"
+            >
+              Select all {data.total.toLocaleString()} matching filters
+            </button>
+          )}
+        </div>
       )}
 
       {viewMode === "list" ? (

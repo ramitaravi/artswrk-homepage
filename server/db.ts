@@ -2036,6 +2036,64 @@ export async function getAdminOverviewStats() {
 }
 
 /** Admin: list all artists with search + filters */
+interface AdminArtistFilters {
+  search?: string;
+  locationSearch?: string;
+  artistType?: string;
+  serviceType?: string;
+  state?: string;
+  plan?: string;
+  affiliationId?: number;
+  onboardingStep?: number;
+  missingProfilePicture?: boolean;
+  createdFrom?: Date;
+  createdTo?: Date;
+  modifiedFrom?: Date;
+  modifiedTo?: Date;
+}
+
+function buildAdminArtistConditions(f: AdminArtistFilters) {
+  const conditions = [
+    eq(users.userRole, "Artist"),
+    // Only show artists with at least a name or firstName populated
+    or(
+      and(isNotNull(users.firstName), sql`${users.firstName} != ''`),
+      and(isNotNull(users.name), sql`${users.name} != ''`),
+    )!,
+  ];
+  // Fuzzy search: name/email plus free-text credits ("Wicked", "Rockette", etc.)
+  if (f.search) conditions.push(or(
+    like(users.name, `%${f.search}%`),
+    like(users.firstName, `%${f.search}%`),
+    like(users.lastName, `%${f.search}%`),
+    like(users.email, `%${f.search}%`),
+    like(users.credits, `%${f.search}%`),
+  )!);
+  if (f.locationSearch) conditions.push(like(users.location, `%${f.locationSearch}%`));
+  if (f.artistType) conditions.push(like(users.masterArtistTypes, `%${f.artistType}%`));
+  if (f.serviceType) conditions.push(like(users.artistServices, `%${f.serviceType}%`));
+  if (f.state) conditions.push(like(users.location, `%${f.state}%`));
+  if (f.plan === "PRO") conditions.push(eq(users.artswrkPro, true));
+  if (f.plan === "Basic") conditions.push(eq(users.artswrkBasic, true));
+  if (f.onboardingStep !== undefined) conditions.push(eq(users.onboardingStep, f.onboardingStep));
+  if (f.missingProfilePicture) conditions.push(or(isNull(users.profilePicture), eq(users.profilePicture, ""))!);
+  if (f.createdFrom) conditions.push(sql`${users.createdAt} >= ${f.createdFrom}`);
+  if (f.createdTo) conditions.push(sql`${users.createdAt} <= ${f.createdTo}`);
+  if (f.modifiedFrom) conditions.push(sql`${users.updatedAt} >= ${f.modifiedFrom}`);
+  if (f.modifiedTo) conditions.push(sql`${users.updatedAt} <= ${f.modifiedTo}`);
+  if (f.affiliationId) conditions.push(sql`${users.id} IN (SELECT artistUserId FROM user_affiliations WHERE affiliationId = ${f.affiliationId})`);
+  return conditions;
+}
+
+/** Lightweight: just the ids matching the current Artists admin filters (for "select all N matching"). */
+export async function getAdminArtistIds(filters: AdminArtistFilters, cap = 5000): Promise<number[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const where = and(...buildAdminArtistConditions(filters));
+  const rows = await db.select({ id: users.id }).from(users).where(where).limit(cap);
+  return rows.map(r => r.id);
+}
+
 export async function getAdminArtists({
   search,
   locationSearch,
@@ -2054,20 +2112,7 @@ export async function getAdminArtists({
   sortDir = "desc",
   limit = 50,
   offset = 0,
-}: {
-  search?: string;
-  locationSearch?: string;
-  artistType?: string;
-  serviceType?: string;
-  state?: string;
-  plan?: string;
-  affiliationId?: number;
-  onboardingStep?: number;
-  missingProfilePicture?: boolean;
-  createdFrom?: Date;
-  createdTo?: Date;
-  modifiedFrom?: Date;
-  modifiedTo?: Date;
+}: AdminArtistFilters & {
   sortBy?: "createdAt" | "updatedAt" | "name";
   sortDir?: "asc" | "desc";
   limit?: number;
@@ -2076,37 +2121,10 @@ export async function getAdminArtists({
   const db = await getDb();
   if (!db) return { artists: [], total: 0 };
 
-  const conditions = [
-    eq(users.userRole, "Artist"),
-    // Only show artists with at least a name or firstName populated
-    or(
-      and(isNotNull(users.firstName), sql`${users.firstName} != ''`),
-      and(isNotNull(users.name), sql`${users.name} != ''`),
-    )!,
-  ];
-  // Fuzzy search: name/email plus free-text credits ("Wicked", "Rockette", etc.)
-  if (search) conditions.push(or(
-    like(users.name, `%${search}%`),
-    like(users.firstName, `%${search}%`),
-    like(users.lastName, `%${search}%`),
-    like(users.email, `%${search}%`),
-    like(users.credits, `%${search}%`),
-  )!);
-  if (locationSearch) conditions.push(like(users.location, `%${locationSearch}%`));
-  if (artistType) conditions.push(like(users.masterArtistTypes, `%${artistType}%`));
-  if (serviceType) conditions.push(like(users.artistServices, `%${serviceType}%`));
-  if (state) conditions.push(like(users.location, `%${state}%`));
-  if (plan === "PRO") conditions.push(eq(users.artswrkPro, true));
-  if (plan === "Basic") conditions.push(eq(users.artswrkBasic, true));
-  if (onboardingStep !== undefined) conditions.push(eq(users.onboardingStep, onboardingStep));
-  if (missingProfilePicture) conditions.push(or(isNull(users.profilePicture), eq(users.profilePicture, ""))!);
-  if (createdFrom) conditions.push(sql`${users.createdAt} >= ${createdFrom}`);
-  if (createdTo) conditions.push(sql`${users.createdAt} <= ${createdTo}`);
-  if (modifiedFrom) conditions.push(sql`${users.updatedAt} >= ${modifiedFrom}`);
-  if (modifiedTo) conditions.push(sql`${users.updatedAt} <= ${modifiedTo}`);
-  if (affiliationId) conditions.push(sql`${users.id} IN (SELECT artistUserId FROM user_affiliations WHERE affiliationId = ${affiliationId})`);
-
-  const where = and(...conditions);
+  const where = and(...buildAdminArtistConditions({
+    search, locationSearch, artistType, serviceType, state, plan, affiliationId,
+    onboardingStep, missingProfilePicture, createdFrom, createdTo, modifiedFrom, modifiedTo,
+  }));
 
   const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(users).where(where);
 

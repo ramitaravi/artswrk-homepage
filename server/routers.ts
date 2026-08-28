@@ -303,6 +303,29 @@ export const appRouter = router({
         return getAdminArtists(input);
       }),
 
+    /** Just the ids matching the current Artists filters — powers "select all N matching". */
+    artistIds: protectedProcedure
+      .input(z.object({
+        search: z.string().optional(),
+        locationSearch: z.string().optional(),
+        artistType: z.string().optional(),
+        serviceType: z.string().optional(),
+        state: z.string().optional(),
+        plan: z.string().optional(),
+        affiliationId: z.number().optional(),
+        onboardingStep: z.number().optional(),
+        missingProfilePicture: z.boolean().optional(),
+        createdFrom: z.coerce.date().optional(),
+        createdTo: z.coerce.date().optional(),
+        modifiedFrom: z.coerce.date().optional(),
+        modifiedTo: z.coerce.date().optional(),
+      }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getAdminArtistIds } = await import("./db");
+        return getAdminArtistIds(input);
+      }),
+
     /** Get a single artist (full user row) by ID — admin only */
     getArtist: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -476,7 +499,7 @@ export const appRouter = router({
     /** Bulk email a set of artists (or any user IDs) with admin-authored rich-text content. */
     bulkEmailUsers: protectedProcedure
       .input(z.object({
-        userIds: z.array(z.number()).min(1).max(500),
+        userIds: z.array(z.number()).min(1).max(5000),
         subject: z.string().min(1),
         html: z.string().min(1),
       }))
@@ -485,20 +508,28 @@ export const appRouter = router({
         const { getUsersByIds } = await import("./db");
         const targets = await getUsersByIds(input.userIds);
         const wrappedHtml = `<div style="font-family:'Helvetica Neue',sans-serif;max-width:580px;margin:0 auto">${input.html}</div>`;
-        let sent = 0;
-        let failed = 0;
-        for (const t of targets) {
-          if (!t.email) { failed++; continue; }
-          const ok = await sendSimpleEmail({ to: t.email, subject: input.subject, html: wrappedHtml });
-          if (ok) sent++; else failed++;
-        }
-        return { sent, failed, total: targets.length };
+
+        // Fire-and-forget — sequentially awaiting hundreds/thousands of sends
+        // in-request would blow past any reasonable HTTP timeout.
+        (async () => {
+          for (const t of targets) {
+            if (!t.email) continue;
+            try {
+              await sendSimpleEmail({ to: t.email, subject: input.subject, html: wrappedHtml });
+            } catch (err) {
+              console.error(`[bulkEmailUsers] Failed to send to ${t.email}:`, err instanceof Error ? err.message : err);
+            }
+          }
+        })();
+
+        const withEmail = targets.filter(t => t.email).length;
+        return { queued: withEmail, skipped: targets.length - withEmail, total: targets.length };
       }),
 
     /** Bulk-set plan flags (Basic/PRO) across a set of artists. */
     bulkSetArtistPlan: protectedProcedure
       .input(z.object({
-        artistIds: z.array(z.number()).min(1).max(500),
+        artistIds: z.array(z.number()).min(1).max(5000),
         plan: z.enum(["free", "basic", "pro"]),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -516,7 +547,7 @@ export const appRouter = router({
     /** Bulk-add an affiliation tag to a set of artists. */
     bulkAddAffiliation: protectedProcedure
       .input(z.object({
-        artistIds: z.array(z.number()).min(1).max(500),
+        artistIds: z.array(z.number()).min(1).max(5000),
         affiliationId: z.number(),
       }))
       .mutation(async ({ input, ctx }) => {
