@@ -335,8 +335,25 @@ export async function getPublicJobsEnriched(
   }
 
   if (filters?.locationQuery) {
-    const escaped = filters.locationQuery.replace(/'/g, "''");
-    // Search both locationAddress AND description for the location query
+    // A full street address (e.g. an artist's own profile address, "123 Main
+    // St, New York, NY 10030, USA") almost never appears verbatim inside a
+    // job's city-level locationAddress/description — matching on the raw
+    // string returns nothing for any real address. Search on just the city
+    // instead. Already-short queries (a manually typed "New York, NY" or a
+    // single city name) pass through unchanged.
+    const extractCity = (raw: string): string => {
+      const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
+      if (parts.length <= 1) return raw;
+      const withoutCountry = /^(USA|United States)$/i.test(parts[parts.length - 1]) ? parts.slice(0, -1) : parts;
+      if (withoutCountry.length <= 1) return withoutCountry[0] ?? raw;
+      const last = withoutCountry[withoutCountry.length - 1];
+      const looksLikeStateZip = /^[A-Z]{2}\s*\d{0,6}$/i.test(last);
+      const cityIndex = looksLikeStateZip ? withoutCountry.length - 2 : withoutCountry.length - 1;
+      return withoutCountry[cityIndex] ?? raw;
+    };
+    const city = extractCity(filters.locationQuery);
+    const escaped = city.replace(/'/g, "''");
+    // Search both locationAddress AND description for the city
     whereClauses.push(`(j.locationAddress LIKE '%${escaped}%' OR j.description LIKE '%${escaped}%')`);
   }
 
