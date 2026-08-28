@@ -4106,7 +4106,7 @@ Fields to extract:
           jobId: input.jobId,
           stripeSessionId: input.sessionId,
           stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : undefined,
-          amountCents: session.amount_total ?? 3000,
+          amountCents: session.amount_total ?? 4000,
         });
         return { success: true };
       }),

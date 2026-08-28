@@ -3746,7 +3746,7 @@ export async function createClientJobUnlock(data: {
     jobId: data.jobId,
     stripeSessionId: data.stripeSessionId,
     stripePaymentIntentId: data.stripePaymentIntentId,
-    amountCents: data.amountCents ?? 3000,
+    amountCents: data.amountCents ?? 4000,
   });
 }
 
