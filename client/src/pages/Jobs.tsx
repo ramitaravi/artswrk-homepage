@@ -681,12 +681,12 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
           </div>
 
           {/* Tabs */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
             {TABS.map((t) => (
               <button
                 key={t.id}
                 onClick={() => { setTab(t.id); navigate(inDashboard ? (t.id === "pro" ? "/app/pro-jobs" : t.id === "near-me" ? "/app/jobs" : "/app/jobs?tab=" + t.id) : (t.id === "pro" ? "/pro" : t.id === "near-me" ? "/jobs" : "/jobs?tab=" + t.id)); }}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all flex-shrink-0 ${
                   tab === t.id
                     ? "bg-[#111] text-white"
                     : "text-gray-500 hover:text-[#111] hover:bg-gray-100"

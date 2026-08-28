@@ -279,12 +279,12 @@ function MyArtistsTab() {
   return (
     <div>
       {/* Filter pills */}
-      <div className="flex items-center gap-2 mb-6">
+      <div className="flex items-center gap-2 mb-6 overflow-x-auto scrollbar-hide">
         {filters.map(f => (
           <button
             key={f.id}
             onClick={() => setFilter(f.id)}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all border ${
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all border flex-shrink-0 ${
               filter === f.id
                 ? "bg-[#F25722] text-white border-[#F25722]"
                 : "bg-white text-gray-600 border-gray-200 hover:border-[#F25722] hover:text-[#F25722]"

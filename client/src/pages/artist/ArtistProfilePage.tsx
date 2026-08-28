@@ -559,12 +559,12 @@ export default function ArtistProfilePage() {
         {/* ── Right: Tabs ───────────────────────────────────────────────────── */}
         <div className="flex-1 min-w-0">
           {/* Tab bar */}
-          <div className="flex border-b border-gray-200 mb-6">
+          <div className="flex border-b border-gray-200 mb-6 overflow-x-auto scrollbar-hide">
             {(["about", "services", "reviews"] as Tab[]).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`pb-3 mr-8 text-sm font-medium capitalize transition-colors relative ${
+                className={`pb-3 mr-8 text-sm font-medium capitalize transition-colors relative flex-shrink-0 ${
                   activeTab === tab
                     ? "text-[#ec008c]"
                     : "text-gray-500 hover:text-gray-800"

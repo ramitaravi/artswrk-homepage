@@ -600,12 +600,12 @@ function ArtistsTab({ applicants, appsLoading }: { applicants: any[]; appsLoadin
   return (
     <div>
       {/* Filter pills */}
-      <div className="flex items-center gap-2 mb-6">
+      <div className="flex items-center gap-2 mb-6 overflow-x-auto scrollbar-hide">
         {filters.map(f => (
           <button
             key={f.id}
             onClick={() => setFilter(f.id)}
-            className={`px-4 py-1.5 rounded-full text-sm font-bold transition-colors ${
+            className={`px-4 py-1.5 rounded-full text-sm font-bold transition-colors flex-shrink-0 ${
               filter === f.id
                 ? "bg-[#111] text-white"
                 : "bg-white border border-gray-200 text-gray-500 hover:border-gray-300"

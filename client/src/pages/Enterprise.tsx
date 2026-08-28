@@ -1216,12 +1216,12 @@ function MasterView({
       </div>
 
       {/* Tab bar */}
-      <div className="flex items-center gap-0 border-b border-gray-200 mb-6">
+      <div className="flex items-center gap-0 border-b border-gray-200 mb-6 overflow-x-auto scrollbar-hide">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+            className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors flex-shrink-0 ${
               tab === t.id
                 ? "border-[#F25722] text-[#F25722]"
                 : "border-transparent text-gray-400 hover:text-gray-700"

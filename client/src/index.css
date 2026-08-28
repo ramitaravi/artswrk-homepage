@@ -156,6 +156,17 @@
     min-width: 0;
   }
 
+  /* Hides the scrollbar on a horizontally-scrolling row (pill filters, tab
+     bars) while keeping it scrollable — referenced across the site but never
+     actually defined until now, so it was a silent no-op everywhere. */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   @media (min-width: 640px) {
     .container {
       padding-left: 2rem;
