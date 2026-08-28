@@ -3342,6 +3342,114 @@ export async function getBenefits(audienceType: "Artist" | "Client") {
   });
 }
 
+/** Admin: paginated, searchable list of all benefits (no audience filtering). */
+export async function getBenefitsAdminList({
+  limit = 50,
+  offset = 0,
+  search,
+}: {
+  limit?: number;
+  offset?: number;
+  search?: string;
+}) {
+  const db = await getDb();
+  if (!db) return { benefits: [], total: 0 };
+
+  const conditions = search
+    ? [or(
+        like(benefits.companyName, `%${search}%`),
+        like(benefits.discountOffering, `%${search}%`),
+      )!]
+    : [];
+  const where = conditions.length ? and(...conditions) : undefined;
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(benefits)
+    .where(where);
+
+  const rows = await db
+    .select()
+    .from(benefits)
+    .where(where)
+    .orderBy(asc(benefits.companyName))
+    .limit(limit)
+    .offset(offset);
+
+  return { benefits: rows, total: Number(countRow?.count ?? 0) };
+}
+
+export async function getBenefitById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(benefits).where(eq(benefits.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export interface AdminBenefitInput {
+  companyName: string;
+  logoUrl?: string | null;
+  url?: string | null;
+  businessDescription?: string | null;
+  discountOffering?: string | null;
+  howToRedeem?: string | null;
+  contactName?: string | null;
+  contactEmail?: string | null;
+  audienceTypes?: string[];
+  businessTypes?: string[];
+  artistTypes?: string[];
+  categories?: string[];
+}
+
+function toJsonArrayOrNull(arr?: string[]): string | null {
+  return arr && arr.length ? JSON.stringify(arr) : null;
+}
+
+export async function createBenefit(input: AdminBenefitInput): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const result = await db.insert(benefits).values({
+    companyName: input.companyName,
+    logoUrl: input.logoUrl || null,
+    url: input.url || null,
+    businessDescription: input.businessDescription || null,
+    discountOffering: input.discountOffering || null,
+    howToRedeem: input.howToRedeem || null,
+    contactName: input.contactName || null,
+    contactEmail: input.contactEmail || null,
+    audienceTypes: toJsonArrayOrNull(input.audienceTypes),
+    businessTypes: toJsonArrayOrNull(input.businessTypes),
+    artistTypes: toJsonArrayOrNull(input.artistTypes),
+    categories: toJsonArrayOrNull(input.categories),
+  });
+  return (result as any).insertId as number;
+}
+
+export async function updateBenefit(id: number, input: AdminBenefitInput): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.update(benefits).set({
+    companyName: input.companyName,
+    logoUrl: input.logoUrl || null,
+    url: input.url || null,
+    businessDescription: input.businessDescription || null,
+    discountOffering: input.discountOffering || null,
+    howToRedeem: input.howToRedeem || null,
+    contactName: input.contactName || null,
+    contactEmail: input.contactEmail || null,
+    audienceTypes: toJsonArrayOrNull(input.audienceTypes),
+    businessTypes: toJsonArrayOrNull(input.businessTypes),
+    artistTypes: toJsonArrayOrNull(input.artistTypes),
+    categories: toJsonArrayOrNull(input.categories),
+  }).where(eq(benefits.id, id));
+}
+
+export async function deleteBenefit(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.delete(benefits).where(eq(benefits.id, id));
+}
+
 /**
  * Get an existing conversation between a client and artist, or create one.
  */

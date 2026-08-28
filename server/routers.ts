@@ -4429,6 +4429,82 @@ Fields to extract:
           })),
         };
       }),
+
+    /** Admin: paginated, searchable list of every benefit (no audience filter). */
+    adminList: protectedProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(100).default(50),
+        offset: z.number().min(0).default(0),
+        search: z.string().optional(),
+      }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getBenefitsAdminList } = await import("./db");
+        return getBenefitsAdminList({ limit: input.limit, offset: input.offset, search: input.search || undefined });
+      }),
+
+    adminGetById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getBenefitById } = await import("./db");
+        return getBenefitById(input.id);
+      }),
+
+    adminCreate: protectedProcedure
+      .input(z.object({
+        companyName: z.string().min(1).max(256),
+        logoUrl: z.string().max(1024).optional().nullable(),
+        url: z.string().max(1024).optional().nullable(),
+        businessDescription: z.string().max(2000).optional().nullable(),
+        discountOffering: z.string().max(500).optional().nullable(),
+        howToRedeem: z.string().max(2000).optional().nullable(),
+        contactName: z.string().max(256).optional().nullable(),
+        contactEmail: z.string().max(320).optional().nullable(),
+        audienceTypes: z.array(z.string()).optional(),
+        businessTypes: z.array(z.string()).optional(),
+        artistTypes: z.array(z.string()).optional(),
+        categories: z.array(z.string()).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { createBenefit } = await import("./db");
+        const id = await createBenefit(input);
+        return { id };
+      }),
+
+    adminUpdate: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        companyName: z.string().min(1).max(256),
+        logoUrl: z.string().max(1024).optional().nullable(),
+        url: z.string().max(1024).optional().nullable(),
+        businessDescription: z.string().max(2000).optional().nullable(),
+        discountOffering: z.string().max(500).optional().nullable(),
+        howToRedeem: z.string().max(2000).optional().nullable(),
+        contactName: z.string().max(256).optional().nullable(),
+        contactEmail: z.string().max(320).optional().nullable(),
+        audienceTypes: z.array(z.string()).optional(),
+        businessTypes: z.array(z.string()).optional(),
+        artistTypes: z.array(z.string()).optional(),
+        categories: z.array(z.string()).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { updateBenefit } = await import("./db");
+        const { id, ...data } = input;
+        await updateBenefit(id, data);
+        return { ok: true };
+      }),
+
+    adminDelete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { deleteBenefit } = await import("./db");
+        await deleteBenefit(input.id);
+        return { ok: true };
+      }),
   }),
 });
 

@@ -16,12 +16,13 @@ import {
   AlertCircle, CheckCircle2, Eye, EyeOff, LogOut, Filter,
   MapPin, Clock, ArrowUpRight, UserCog, ArrowLeft, Sparkles, Globe, ExternalLink, Megaphone,
   Plus, Edit2, Mail, ChevronDown, ToggleLeft, ToggleRight, Instagram, Link as LinkIcon, Send, Copy, Loader2,
+  Gift, Trash2,
 } from "lucide-react";
 import { ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE } from "@shared/const";
 import { Link } from "wouter";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type AdminSection = "dashboard" | "artists" | "clients" | "jobs" | "pro-jobs" | "enterprise-clients" | "bookings" | "admin-bookings" | "payments" | "subscriptions" | "emails" | "settings";
+type AdminSection = "dashboard" | "artists" | "clients" | "jobs" | "pro-jobs" | "enterprise-clients" | "bookings" | "admin-bookings" | "payments" | "subscriptions" | "benefits" | "emails" | "settings";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmt$(cents: number) {
@@ -52,6 +53,7 @@ const NAV_ITEMS: { id: AdminSection; label: string; icon: React.ReactNode }[] = 
   { id: "admin-bookings", label: "Admin Bookings", icon: <CalendarDays size={16} /> },
   { id: "payments", label: "Payments", icon: <CreditCard size={16} /> },
   { id: "subscriptions", label: "Subscriptions", icon: <TrendingUp size={16} /> },
+  { id: "benefits", label: "Benefits", icon: <Gift size={16} /> },
   { id: "emails", label: "Emails", icon: <Mail size={16} /> },
   { id: "settings", label: "Settings", icon: <Settings size={16} /> },
 ];
@@ -1231,6 +1233,12 @@ const HIRING_CATEGORIES = [
   "Fitness Instructor", "Event Performer", "Competition Coach",
 ];
 
+// Business-type classification for CLIENT accounts (studio/competition/school/misc) —
+// distinct from HIRING_CATEGORIES above, which is the artist-role list used when
+// editing what a JOB is hiring for. Mixing these up was a real bug: the client
+// edit form and filter dropdown were both reusing HIRING_CATEGORIES.
+const CLIENT_BUSINESS_TYPES = ["Dance Studio", "Dance Competition", "Music School", "Misc"];
+
 // ─── Admin Client Form ────────────────────────────────────────────────────────
 function AdminClientForm({
   initial,
@@ -1334,10 +1342,10 @@ function AdminClientForm({
         </div>
 
         <div>
-          <label className={labelCls}>Primary Hiring Category</label>
+          <label className={labelCls}>Business Type</label>
           <select value={hiringCategory} onChange={e => setHiringCategory(e.target.value)} className={inputCls}>
             <option value="">Select…</option>
-            {HIRING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            {CLIENT_BUSINESS_TYPES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
       </div>
@@ -1774,8 +1782,8 @@ function ClientsSection() {
       {/* Filters */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-wrap gap-3">
         <select value={hiringCategory} onChange={e => { setHiringCategory(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
-          <option value="">Hiring Category</option>
-          {HIRING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          <option value="">Business Type</option>
+          {CLIENT_BUSINESS_TYPES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <select value={state} onChange={e => { setState(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
           <option value="">State</option>
@@ -3374,6 +3382,335 @@ function ProJobsSection() {
   );
 }
 
+// ─── Benefits Section ────────────────────────────────────────────────────────
+type AdminBenefit = {
+  id: number;
+  companyName: string | null;
+  logoUrl: string | null;
+  url: string | null;
+  businessDescription: string | null;
+  discountOffering: string | null;
+  howToRedeem: string | null;
+  contactName: string | null;
+  contactEmail: string | null;
+  audienceTypes: string | null;
+  businessTypes: string | null;
+  artistTypes: string | null;
+  categories: string | null;
+  createdAt: Date | string | null;
+};
+
+function parseJsonArr(v?: string | null): string[] {
+  try { return JSON.parse(v || "[]") as string[]; } catch { return []; }
+}
+
+function csvToArr(v: string): string[] {
+  return v.split(",").map(s => s.trim()).filter(Boolean);
+}
+
+function BenefitFormModal({ benefit, onClose, onSaved }: { benefit?: AdminBenefit; onClose: () => void; onSaved: () => void }) {
+  const isCreate = !benefit;
+  const [companyName, setCompanyName] = useState(benefit?.companyName ?? "");
+  const [logoUrl, setLogoUrl] = useState(benefit?.logoUrl ?? "");
+  const [url, setUrl] = useState(benefit?.url ?? "");
+  const [businessDescription, setBusinessDescription] = useState(benefit?.businessDescription ?? "");
+  const [discountOffering, setDiscountOffering] = useState(benefit?.discountOffering ?? "");
+  const [howToRedeem, setHowToRedeem] = useState(benefit?.howToRedeem ?? "");
+  const [contactName, setContactName] = useState(benefit?.contactName ?? "");
+  const [contactEmail, setContactEmail] = useState(benefit?.contactEmail ?? "");
+  const [audienceTypes, setAudienceTypes] = useState(parseJsonArr(benefit?.audienceTypes).join(", "));
+  const [businessTypes, setBusinessTypes] = useState(parseJsonArr(benefit?.businessTypes).join(", "));
+  const [artistTypes, setArtistTypes] = useState(parseJsonArr(benefit?.artistTypes).join(", "));
+  const [categories, setCategories] = useState(parseJsonArr(benefit?.categories).join(", "));
+
+  const utils = trpc.useUtils();
+  const createMutation = trpc.benefits.adminCreate.useMutation({
+    onSuccess: () => { utils.benefits.adminList.invalidate(); onSaved(); },
+  });
+  const updateMutation = trpc.benefits.adminUpdate.useMutation({
+    onSuccess: () => { utils.benefits.adminList.invalidate(); onSaved(); },
+  });
+  const isSaving = createMutation.isPending || updateMutation.isPending;
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const data = {
+      companyName,
+      logoUrl: logoUrl || null,
+      url: url || null,
+      businessDescription: businessDescription || null,
+      discountOffering: discountOffering || null,
+      howToRedeem: howToRedeem || null,
+      contactName: contactName || null,
+      contactEmail: contactEmail || null,
+      audienceTypes: csvToArr(audienceTypes),
+      businessTypes: csvToArr(businessTypes),
+      artistTypes: csvToArr(artistTypes),
+      categories: csvToArr(categories),
+    };
+    if (isCreate) createMutation.mutate(data);
+    else updateMutation.mutate({ id: benefit.id, ...data });
+  }
+
+  const inputCls = "w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-400 focus:outline-none focus:border-[#F25722] transition-colors bg-white";
+  const labelCls = "block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
+          <h2 className="text-lg font-black text-[#111]">{isCreate ? "Add Benefit" : "Edit Benefit"}</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className={labelCls}>Company Name *</label>
+            <input value={companyName} onChange={e => setCompanyName(e.target.value)} required className={inputCls} placeholder="e.g. RecitalReady" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Logo URL</label>
+              <input value={logoUrl} onChange={e => setLogoUrl(e.target.value)} className={inputCls} placeholder="https://…" />
+            </div>
+            <div>
+              <label className={labelCls}>Website URL</label>
+              <input value={url} onChange={e => setUrl(e.target.value)} className={inputCls} placeholder="https://…" />
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>Business Description</label>
+            <textarea value={businessDescription} onChange={e => setBusinessDescription(e.target.value)} className={inputCls + " min-h-[70px]"} placeholder="What this company does…" />
+          </div>
+          <div>
+            <label className={labelCls}>Discount Offering</label>
+            <input value={discountOffering} onChange={e => setDiscountOffering(e.target.value)} className={inputCls} placeholder="e.g. 15% off annual subscription" />
+          </div>
+          <div>
+            <label className={labelCls}>How to Redeem</label>
+            <textarea value={howToRedeem} onChange={e => setHowToRedeem(e.target.value)} className={inputCls + " min-h-[60px]"} placeholder="Instructions for redeeming the offer…" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Contact Name</label>
+              <input value={contactName} onChange={e => setContactName(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Contact Email</label>
+              <input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} className={inputCls} />
+            </div>
+          </div>
+          <div className="pt-2 border-t border-gray-100" />
+          <div>
+            <label className={labelCls}>Audience (comma-separated: Artist, Client)</label>
+            <input value={audienceTypes} onChange={e => setAudienceTypes(e.target.value)} className={inputCls} placeholder="Artist, Client" />
+          </div>
+          <div>
+            <label className={labelCls}>Categories (comma-separated)</label>
+            <input value={categories} onChange={e => setCategories(e.target.value)} className={inputCls} placeholder="Software, Curriculum, Insurance…" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Business Types</label>
+              <input value={businessTypes} onChange={e => setBusinessTypes(e.target.value)} className={inputCls} placeholder="Dance Studio, Dance Competition…" />
+            </div>
+            <div>
+              <label className={labelCls}>Artist Types</label>
+              <input value={artistTypes} onChange={e => setArtistTypes(e.target.value)} className={inputCls} placeholder="Dance Educator…" />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+            <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving || !companyName.trim()}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors disabled:opacity-50"
+            >
+              {isSaving ? <Loader2 size={14} className="animate-spin" /> : null}
+              {isCreate ? "Add Benefit" : "Save Changes"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function BenefitsSection() {
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [editing, setEditing] = useState<AdminBenefit | null | undefined>(undefined); // undefined = closed, null = create
+  const [deleteTarget, setDeleteTarget] = useState<AdminBenefit | null>(null);
+  const LIMIT = 50;
+
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.benefits.adminList.useQuery({
+    limit: LIMIT,
+    offset: (page - 1) * LIMIT,
+    search: debouncedSearch || undefined,
+  });
+
+  const deleteMutation = trpc.benefits.adminDelete.useMutation({
+    onSuccess: () => { utils.benefits.adminList.invalidate(); setDeleteTarget(null); },
+  });
+
+  return (
+    <div className="space-y-5">
+      {editing !== undefined && (
+        <BenefitFormModal
+          benefit={editing ?? undefined}
+          onClose={() => setEditing(undefined)}
+          onSaved={() => setEditing(undefined)}
+        />
+      )}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDeleteTarget(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-black text-[#111] mb-2">Delete this benefit?</h3>
+            <p className="text-sm text-gray-500 mb-5">
+              "{deleteTarget.companyName}" will be permanently removed and will no longer show in any member's Benefits Hub. This can't be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setDeleteTarget(null)} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteMutation.mutate({ id: deleteTarget.id })}
+                disabled={deleteMutation.isPending}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-red-500 hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                {deleteMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-[#111]">
+            Benefits
+            <span className="ml-2 text-sm font-normal text-gray-400">({data?.total?.toLocaleString() ?? "…"} total)</span>
+          </h1>
+          <p className="text-sm text-gray-400 mt-0.5">Manage the partner discounts shown in members' Benefits Hub</p>
+        </div>
+        <button
+          onClick={() => setEditing(null)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors"
+        >
+          <Plus size={15} /> Add Benefit
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search benefits…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#F25722] bg-white"
+        />
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <th className="px-5 py-3">Benefit</th>
+                <th className="px-5 py-3">Categories</th>
+                <th className="px-5 py-3">Audience</th>
+                <th className="px-5 py-3">Created</th>
+                <th className="px-5 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr><td colSpan={5} className="px-5 py-10 text-center text-gray-400">Loading benefits…</td></tr>
+              ) : !data?.benefits?.length ? (
+                <tr><td colSpan={5} className="px-5 py-10 text-center text-gray-400">No benefits found.</td></tr>
+              ) : (
+                data.benefits.map((b: AdminBenefit) => {
+                  const logo = b.logoUrl?.startsWith("//") ? `https:${b.logoUrl}` : b.logoUrl;
+                  const cats = parseJsonArr(b.categories);
+                  const audience = parseJsonArr(b.audienceTypes);
+                  return (
+                    <tr key={b.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-3">
+                          {logo ? (
+                            <img src={logo} alt={b.companyName ?? ""} className="w-9 h-9 rounded-lg object-contain bg-gray-50 border border-gray-100 flex-shrink-0" />
+                          ) : (
+                            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-xs flex-shrink-0">
+                              {(b.companyName ?? "?")[0]?.toUpperCase()}
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="font-semibold text-[#111] truncate">{b.companyName}</p>
+                            {b.discountOffering && <p className="text-xs text-gray-400 truncate max-w-[220px]">{b.discountOffering}</p>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-xs text-gray-500">
+                        {cats.length ? cats.join(", ") : "—"}
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="flex gap-1 flex-wrap">
+                          {audience.length ? audience.map(a => (
+                            <span key={a} className="text-xs px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722] font-semibold">{a}</span>
+                          )) : <span className="text-xs text-gray-400">—</span>}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-xs text-gray-400">{fmtDate(b.createdAt)}</td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => setEditing(b)}
+                            className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-[#111] hover:border-gray-300 transition-colors"
+                            title="Edit"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          <button
+                            onClick={() => setDeleteTarget(b)}
+                            className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+        {data && <div className="px-5 py-3"><Pagination page={page} total={data.total} limit={LIMIT} onPage={setPage} /></div>}
+      </div>
+    </div>
+  );
+}
+
 // ─── Enterprise Clients Section ─────────────────────────────────────────────
 type EnterprisePlan = "on_demand" | "subscriber" | null;
 
@@ -3886,14 +4223,10 @@ function CreateEnterpriseModal({ onClose, onCreated }: { onClose: () => void; on
                 </select>
               </div>
               <div>
-                <label className={label}>Hiring category</label>
+                <label className={label}>Business Type</label>
                 <select value={form.hiringCategory} onChange={e => setForm(f => ({ ...f, hiringCategory: e.target.value }))} className={field}>
                   <option value="">None (set later)</option>
-                  <option value="Dance Competition">Dance Competition</option>
-                  <option value="Dance Studio">Dance Studio</option>
-                  <option value="Music School">Music School</option>
-                  <option value="Event Company">Event Company</option>
-                  <option value="Other">Other</option>
+                  {CLIENT_BUSINESS_TYPES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
             </div>
@@ -5143,6 +5476,7 @@ export default function Admin() {
           {section === "admin-bookings" && <AdminBookingsSection />}
           {section === "payments" && <PaymentsSection onViewBooking={goToBooking} initialDetailId={pendingPaymentId} />}
           {section === "subscriptions" && <SubscriptionsSection />}
+          {section === "benefits" && <BenefitsSection />}
           {section === "emails" && <EmailsSection />}
           {section === "settings" && <SettingsSection user={user} />}
         </div>
