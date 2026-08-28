@@ -12,7 +12,7 @@
  */
 
 import { useState } from "react";
-import { MapPin, Calendar, Share2, Star, ExternalLink, Instagram, Globe, Youtube } from "lucide-react";
+import { MapPin, Calendar, Share2, Star, ExternalLink, Instagram, Globe, Youtube, ImagePlus } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { formatLocation, normalizeInstagram } from "@/lib/utils";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -55,7 +55,7 @@ function StarRow({ rating, size = 16 }: { rating: number; size?: number }) {
 
 // ─── About Tab ────────────────────────────────────────────────────────────────
 
-function AboutTab({ profile }: { profile: any }) {
+function AboutTab({ profile, onAddMedia }: { profile: any; onAddMedia: () => void }) {
   // Server already returns these as parsed arrays — no need to re-parse
   const mediaPhotos: string[] = Array.isArray(profile.mediaPhotos) ? profile.mediaPhotos : [];
   const resumeFiles: { url: string; name: string }[] = Array.isArray(profile.resumeFiles) ? profile.resumeFiles : [];
@@ -64,9 +64,9 @@ function AboutTab({ profile }: { profile: any }) {
   return (
     <div className="space-y-8">
       {/* Media */}
-      {mediaPhotos.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-gray-800 mb-3">Media</h3>
+      <div>
+        <h3 className="text-sm font-semibold text-gray-800 mb-3">Media</h3>
+        {mediaPhotos.length > 0 ? (
           <div className="grid grid-cols-3 gap-3">
             {mediaPhotos.map((url, i) => (
               <div key={i} className="aspect-square rounded-xl overflow-hidden bg-gray-100">
@@ -74,8 +74,16 @@ function AboutTab({ profile }: { profile: any }) {
               </div>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <button
+            onClick={onAddMedia}
+            className="w-full flex flex-col items-center justify-center gap-2 py-8 rounded-xl border-2 border-dashed border-pink-200 text-sm text-gray-500 hover:border-pink-400 hover:bg-pink-50/50 transition-colors"
+          >
+            <ImagePlus size={20} className="text-pink-500" />
+            Add Media to my Artswrk Profile
+          </button>
+        )}
+      </div>
 
       {/* Resume */}
       {resumeFiles.length > 0 && (
@@ -590,7 +598,7 @@ export default function ArtistProfilePage() {
           </div>
 
           {/* Tab content */}
-          {activeTab === "about" && <AboutTab profile={p} />}
+          {activeTab === "about" && <AboutTab profile={p} onAddMedia={() => setEditOpen(true)} />}
           {activeTab === "services" && <ServicesTab />}
           {activeTab === "reviews" && <ReviewsTab />}
         </div>
