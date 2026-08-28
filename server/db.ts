@@ -3607,17 +3607,19 @@ export async function sendMessageToConversation({
 
 /**
  * Check if a client has unlocked a specific job (either via per-job payment or active subscription).
- * Active subscribers (clientSubscriptionId set) are always considered unlocked.
+ * Active subscribers are unlocked on every job — gated on clientPremium (the flag the revocation
+ * webhook actually maintains), not raw clientSubscriptionId presence. A canceled subscription from
+ * before the revocation webhook existed can leave clientSubscriptionId set with clientPremium already
+ * false; trusting the ID alone would leave that client unlocked forever.
  */
 export async function isClientJobUnlocked(clientUserId: number, jobId: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
-  // Check if user has an active subscription
   const userRows = await db.execute(
-    `SELECT clientSubscriptionId FROM users WHERE id = ${clientUserId} LIMIT 1`
+    `SELECT clientPremium, enterprise FROM users WHERE id = ${clientUserId} LIMIT 1`
   );
   const user = (userRows[0] as unknown as any[])[0];
-  if (user?.clientSubscriptionId) return true;
+  if (user?.clientPremium || user?.enterprise) return true;
   // Check per-job unlock
   const unlockRows = await db.execute(
     `SELECT id FROM client_job_unlocks WHERE clientUserId = ${clientUserId} AND jobId = ${jobId} LIMIT 1`
