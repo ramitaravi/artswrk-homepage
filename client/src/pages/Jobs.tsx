@@ -435,7 +435,6 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
   const [search, setSearch] = useState("");
   const [proSearch, setProSearch] = useState("");
   const [proCategory, setProCategory] = useState("");
-  const [proRemoteOnly, setProRemoteOnly] = useState(false);
   const [appSearch, setAppSearch] = useState("");
   const [locationFilter, setLocationFilter] = useState<LocationFilter>({ query: searchParams.get("location") ?? "" });
   const [artistType, setArtistType] = useState("");
@@ -619,11 +618,10 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
       );
     }
     if (proCategory) base = base.filter((j) => j.category === proCategory);
-    if (proRemoteOnly) base = base.filter((j) => j.workFromAnywhere);
     return base;
-  }, [proJobs, proSearch, proCategory, proRemoteOnly]);
+  }, [proJobs, proSearch, proCategory]);
 
-  const hasProFilters = !!(proSearch || proCategory || proRemoteOnly);
+  const hasProFilters = !!(proSearch || proCategory);
 
   // Fuzzy (substring) client-side search across both regular + PRO applications
   const filteredApplications = useMemo(() => {
@@ -650,7 +648,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
   const TABS: { id: Tab; label: string; count?: number }[] = [
     { id: "near-me", label: "Jobs Near Me", count: allJobs.length },
     { id: "pro", label: "PRO Jobs", count: proJobs.length },
-    { id: "applications", label: "Applications", count: isAuthenticated ? myApplications.length : undefined },
+    { id: "applications", label: "Applications", count: isAuthenticated ? myApplications.length + (rawProApplications?.length ?? 0) : undefined },
   ];
 
   return (
@@ -889,19 +887,9 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
                   <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 </div>
               )}
-              <button
-                onClick={() => setProRemoteOnly((v) => !v)}
-                className={`flex-shrink-0 flex items-center justify-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-lg border transition-colors whitespace-nowrap ${
-                  proRemoteOnly
-                    ? "bg-[#111] border-[#111] text-white"
-                    : "bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300"
-                }`}
-              >
-                Remote Only
-              </button>
               {hasProFilters && (
                 <button
-                  onClick={() => { setProSearch(""); setProCategory(""); setProRemoteOnly(false); }}
+                  onClick={() => { setProSearch(""); setProCategory(""); }}
                   className="flex items-center justify-center gap-1 text-xs font-semibold text-[#F25722] hover:text-[#d44a1a] transition-colors whitespace-nowrap px-2"
                 >
                   <X size={12} /> Reset
@@ -1011,22 +999,9 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
                   </div>
                 )}
 
-                {/* Regular job applications */}
-                {filteredApplications.length > 0 && (
-                  <div className="space-y-4">
-                    {filteredApplications.map((app) => (
-                      <ApplicationCard
-                        key={app.id}
-                        job={app}
-                        status={(app.status ?? "Interested") as AppStatus}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {/* PRO job applications */}
+                {/* PRO job applications — shown first */}
                 {filteredProApplications.length > 0 && (
-                  <div className="space-y-4">
+                  <div className="space-y-4 mb-8">
                     <h2 className="text-sm font-black text-[#111] flex items-center gap-1.5">
                       <Star size={13} className="text-yellow-500 fill-yellow-500" />
                       PRO Jobs ({filteredProApplications.length})
@@ -1050,6 +1025,22 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
                             {app.status === "Confirmed" ? "Confirmed" : app.status === "Declined" ? "Declined" : "Applied"}
                           </span>
                         }
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Regular (marketplace) job applications */}
+                {filteredApplications.length > 0 && (
+                  <div className="space-y-4">
+                    {filteredProApplications.length > 0 && (
+                      <h2 className="text-sm font-black text-[#111]">Marketplace Jobs ({filteredApplications.length})</h2>
+                    )}
+                    {filteredApplications.map((app) => (
+                      <ApplicationCard
+                        key={app.id}
+                        job={app}
+                        status={(app.status ?? "Interested") as AppStatus}
                       />
                     ))}
                   </div>

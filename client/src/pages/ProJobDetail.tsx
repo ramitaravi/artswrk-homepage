@@ -634,7 +634,7 @@ export default function ProJobDetail() {
                     )}
                   </div>
                 )}
-                <p className="text-xs text-green-600">The team will be in touch if you're a great fit. Track your application in your dashboard.</p>
+                <p className="text-xs text-green-600">Track your application in your dashboard.</p>
               </div>
             ) : !isAuthenticated ? (
               <InlineAuth
