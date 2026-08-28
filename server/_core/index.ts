@@ -58,7 +58,14 @@ async function revokeByCustomerId(customerId: string, productId: string | undefi
     return;
   }
   if (productId === STRIPE_PRODUCTS.ENTERPRISE_SUBSCRIPTION.productId) {
-    const res = await db.update(users).set({ enterpriseStripeSubscriptionId: null }).where(eq(users.enterpriseStripeCustomerId, customerId));
+    // Note: `enterprise` itself is left alone — it's an account-type flag
+    // (this account is a competition/enterprise client), not a live payment
+    // status. enterprisePlan is cleared too so the account doesn't sit in a
+    // misleading "subscriber" state with no subscription — access checks
+    // (isClientJobUnlocked, canClientMessageArtist, premiumJobs.getJobApplicants)
+    // all require enterpriseStripeSubscriptionId to be actually set, so this
+    // was already safe even before this line existed.
+    const res = await db.update(users).set({ enterpriseStripeSubscriptionId: null, enterprisePlan: null }).where(eq(users.enterpriseStripeCustomerId, customerId));
     if ((res as any).affectedRows) console.log(`[Webhook] Revoked enterprise subscription (${reason}) for customer ${customerId}`);
     return;
   }
@@ -87,6 +94,14 @@ async function updateByCustomerId(customerId: string, productId: string | undefi
   if (productId === STRIPE_PRODUCTS.ARTIST_BASIC.productId) {
     await db.update(users).set({ artswrkBasic: isActive }).where(eq(users.stripeCustomerId, customerId));
     console.log(`[Webhook] Updated artist Basic status to ${isActive} for customer ${customerId}`);
+    return;
+  }
+  if (productId === STRIPE_PRODUCTS.ENTERPRISE_SUBSCRIPTION.productId) {
+    // Only touch enterprisePlan — never clear enterpriseStripeSubscriptionId
+    // here (that would defeat the point of this being the non-destructive
+    // "status changed" mirror rather than the hard-revoke path above).
+    await db.update(users).set({ enterprisePlan: isActive ? "subscriber" : null }).where(eq(users.enterpriseStripeCustomerId, customerId));
+    console.log(`[Webhook] Updated enterprise subscriber status to ${isActive} for customer ${customerId}`);
     return;
   }
   // Client Premium: no product-ID disambiguation needed (see revokeByCustomerId).

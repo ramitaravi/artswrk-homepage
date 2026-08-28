@@ -2708,25 +2708,28 @@ Fields to extract:
     getJobApplicants: protectedProcedure
       .input(z.object({ jobId: z.number() }))
       .query(async ({ input, ctx }) => {
-        // Check if this is an on-demand enterprise client who hasn't unlocked this job
         const user = await getUserById(ctx.user.id);
-        const isOnDemand = user?.enterprise && user.enterprisePlan === "on_demand";
-        const isSubscriber = user?.enterprise && user.enterprisePlan === "subscriber";
-        // Admin and subscriber: full access. On-demand: check unlock. No plan: show count only.
         const isAdmin = ctx.user.openId === ENV.ownerOpenId || ctx.user.role === "admin";
+        const isOnDemand = !!user?.enterprise && user.enterprisePlan === "on_demand";
+        // `enterprisePlan === "subscriber"` is set once at activation and never
+        // cleared on cancellation — a real, currently-set subscription ID is
+        // the only reliable live signal that this subscriber is still paying.
+        const isActiveSubscriber = !!user?.enterprise && user.enterprisePlan === "subscriber" && !!(user as any).enterpriseStripeSubscriptionId;
 
-        if (!isAdmin && isOnDemand) {
-          const unlocked = await isJobUnlocked(ctx.user.id, input.jobId);
-          if (!unlocked) {
-            // Return count + partial preview (name + photo only) — frontend shows paywall
-            const raw = await getPremiumJobInterestedArtists(input.jobId);
-            const preview = (raw as any[]).map((ia: any) => ({
-              firstName: ia.artistFirstName || null,
-              lastName: ia.artistLastName ? ia.artistLastName.charAt(0) + "." : null,
-              profilePicture: ia.artistProfilePicture || null,
-            }));
-            return { applicants: [], preview, applicantCount: (raw as any[]).length, locked: true, plan: "on_demand" as const };
-          }
+        // Default-deny: only admin, an active subscriber, or an on-demand
+        // client who has specifically unlocked THIS job get full access.
+        // Everyone else — including a no-plan or lapsed enterprise account —
+        // gets the locked count + blurred preview, same as on-demand.
+        const hasFullAccess = isAdmin || isActiveSubscriber || (isOnDemand && await isJobUnlocked(ctx.user.id, input.jobId));
+
+        if (!hasFullAccess) {
+          const raw = await getPremiumJobInterestedArtists(input.jobId);
+          const preview = (raw as any[]).map((ia: any) => ({
+            firstName: ia.artistFirstName || null,
+            lastName: ia.artistLastName ? ia.artistLastName.charAt(0) + "." : null,
+            profilePicture: ia.artistProfilePicture || null,
+          }));
+          return { applicants: [], preview, applicantCount: (raw as any[]).length, locked: true, plan: (isOnDemand ? "on_demand" : null) as "on_demand" | null };
         }
 
         const raw = await getPremiumJobInterestedArtists(input.jobId);
@@ -2750,7 +2753,7 @@ Fields to extract:
           createdAt: ia.createdAt,
           artswrkPro: ia.artswrkPro,
         }));
-        return { applicants, applicantCount: applicants.length, locked: false, plan: (isOnDemand ? "on_demand" : isSubscriber ? "subscriber" : null) as "on_demand" | "subscriber" | null };
+        return { applicants, applicantCount: applicants.length, locked: false, plan: (isOnDemand ? "on_demand" : isActiveSubscriber ? "subscriber" : null) as "on_demand" | "subscriber" | null };
       }),
 
     /** Get client companies for this enterprise user */
@@ -2791,6 +2794,11 @@ Fields to extract:
         appUrl: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
+        const poster0 = await getUserById(ctx.user.id);
+        const isAdmin0 = ctx.user.openId === ENV.ownerOpenId || ctx.user.role === "admin";
+        if (!isAdmin0 && !(poster0 as any)?.enterprise) {
+          throw new Error("An Enterprise account is required to post PRO jobs.");
+        }
         const jobId = await createPremiumJob({
           serviceType: input.serviceType,
           company: input.company,
@@ -3069,6 +3077,18 @@ Fields to extract:
           .limit(1);
         if (!jobRow) throw new Error("Job not found");
         if (jobRow.createdByUserId !== ctx.user.id) throw new Error("Forbidden: not your job");
+
+        // Ownership alone used to be a safe proxy for "this job was paid for,"
+        // since only enterprise accounts could post one — postJob now enforces
+        // that directly, but confirming still needs its own check: an
+        // on-demand client must have actually unlocked THIS job, not just own it.
+        const confirmer = await getUserById(ctx.user.id);
+        const confirmerIsAdmin = ctx.user.openId === ENV.ownerOpenId || ctx.user.role === "admin";
+        const confirmerIsActiveSubscriber = !!(confirmer as any)?.enterprise && (confirmer as any)?.enterprisePlan === "subscriber" && !!(confirmer as any)?.enterpriseStripeSubscriptionId;
+        if (!confirmerIsAdmin && !confirmerIsActiveSubscriber) {
+          const unlocked = await isJobUnlocked(ctx.user.id, applicantRow.premiumJobId!);
+          if (!unlocked) throw new Error("Unlock this job before confirming an applicant.");
+        }
 
         // artistRateCents → dollars for storage (booking table uses integer dollars)
         const artistRateDollars = input.artistRateCents ? Math.round(input.artistRateCents / 100) : null;

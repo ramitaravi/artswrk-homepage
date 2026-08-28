@@ -3665,10 +3665,16 @@ export async function isClientJobUnlocked(clientUserId: number, jobId: number): 
   const db = await getDb();
   if (!db) return false;
   const userRows = await db.execute(
-    `SELECT clientPremium, enterprise FROM users WHERE id = ${clientUserId} LIMIT 1`
+    `SELECT clientPremium, enterprise, enterprisePlan, enterpriseStripeSubscriptionId FROM users WHERE id = ${clientUserId} LIMIT 1`
   );
   const user = (userRows[0] as unknown as any[])[0];
-  if (user?.clientPremium || user?.enterprise) return true;
+  if (user?.clientPremium) return true;
+  // `enterprise` alone is an account-type flag, set once at creation and never
+  // cleared — it is NOT a live payment-status signal. Only an active
+  // subscriber plan (a real, currently-set Stripe subscription ID) unlocks
+  // everything; a canceled/never-subscribed or on-demand enterprise account
+  // must still go through the per-job unlock check below.
+  if (user?.enterprise && user?.enterprisePlan === "subscriber" && user?.enterpriseStripeSubscriptionId) return true;
   // Check per-job unlock
   const unlockRows = await db.execute(
     `SELECT id FROM client_job_unlocks WHERE clientUserId = ${clientUserId} AND jobId = ${jobId} LIMIT 1`
@@ -3689,7 +3695,11 @@ export async function canClientMessageArtist(clientUserId: number, artistUserId:
   if (!db) return false;
   const user = await getUserById(clientUserId);
   if (!user) return false;
-  if ((user as any).clientPremium || (user as any).enterprise || user.role === "admin") return true;
+  const u = user as any;
+  if (u.clientPremium || user.role === "admin") return true;
+  // Same reasoning as isClientJobUnlocked — `enterprise` alone never expires,
+  // only an active subscriber plan should grant unconditional messaging.
+  if (u.enterprise && u.enterprisePlan === "subscriber" && u.enterpriseStripeSubscriptionId) return true;
 
   const jobRows = await db.execute(
     `SELECT ia.jobId AS jobId FROM interested_artists ia INNER JOIN jobs j ON j.id = ia.jobId WHERE ia.artistUserId = ${artistUserId} AND j.clientUserId = ${clientUserId}`
@@ -3699,12 +3709,18 @@ export async function canClientMessageArtist(clientUserId: number, artistUserId:
     if (await isClientJobUnlocked(clientUserId, jobId)) return true;
   }
 
-  // Premium jobs can only be created after an enterprise unlock/subscription in the first
-  // place, so any application on a premium job this client owns is already "paid for".
-  const premiumRows = await db.execute(
-    `SELECT pia.id AS id FROM premium_job_interested_artists pia INNER JOIN premium_jobs pj ON pj.id = pia.premiumJobId WHERE pia.artistUserId = ${artistUserId} AND pj.createdByUserId = ${clientUserId} LIMIT 1`
+  // Owning a premium job is NOT proof it's paid for — posting only requires
+  // an enterprise account, the $100 unlock is a separate action. Only count
+  // it if this specific job has actually been unlocked (matches the same
+  // check enterprise.confirmApplicant now uses).
+  const premiumJobRows = await db.execute(
+    `SELECT pia.premiumJobId AS jobId FROM premium_job_interested_artists pia INNER JOIN premium_jobs pj ON pj.id = pia.premiumJobId WHERE pia.artistUserId = ${artistUserId} AND pj.createdByUserId = ${clientUserId}`
   );
-  return (premiumRows[0] as unknown as any[]).length > 0;
+  const premiumJobIds: number[] = (premiumJobRows[0] as unknown as any[]).map((r: any) => r.jobId);
+  for (const jobId of premiumJobIds) {
+    if (await isJobUnlocked(clientUserId, jobId)) return true;
+  }
+  return false;
 }
 
 /**
