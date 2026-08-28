@@ -445,6 +445,20 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useWouterLocation();
 
+  // Auto-seed the location filter from the artist's own profile location
+  // (matches old-site behavior) — only when nothing's already been typed or
+  // passed via URL, so it never overwrites a manual selection.
+  const hasUrlLocation = !!searchParams.get("location");
+  const { data: myProfileForLocation } = trpc.artistProfile.getMyProfile.useQuery(undefined, {
+    enabled: isAuthenticated && !hasUrlLocation,
+  });
+  useEffect(() => {
+    if (!hasUrlLocation && !locationFilter.query && myProfileForLocation?.location) {
+      setLocationFilter({ query: myProfileForLocation.location });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myProfileForLocation?.location]);
+
   // Redirect clients away from the artist jobs page — they have their own dashboard
   useEffect(() => {
     if (user && (user as any).role === "client") {
