@@ -216,6 +216,10 @@ function DashboardTab({ user }: { user: any }) {
   const connectStripe = trpc.artistDashboard.createStripeConnectUrl.useMutation({
     onSuccess: ({ url }) => { window.location.href = url; },
   });
+  const manageStripe = trpc.artistDashboard.stripeLoginLink.useMutation({
+    onSuccess: ({ url }) => { window.open(url, "_blank"); },
+    onError: () => window.open("https://dashboard.stripe.com/", "_blank"),
+  });
 
   const { data: jobsFeed, isLoading: feedLoading } = trpc.artistDashboard.getJobsFeed.useQuery(
     { limit: 20, offset: 0, lat: coords?.lat, lng: coords?.lng },
@@ -290,7 +294,7 @@ function DashboardTab({ user }: { user: any }) {
               {nextBooking && (
                 <div
                   className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => window.location.href = "/app/bookings"}
+                  onClick={() => window.location.href = `/app/bookings?open=${nextBooking.id}`}
                 >
                   <Calendar size={16} className="text-[#ec008c] flex-shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
@@ -345,9 +349,19 @@ function DashboardTab({ user }: { user: any }) {
               <span className="text-sm font-semibold text-[#111]">Payouts</span>
             </div>
             {connectStatus?.connected ? (
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-green-600">
-                <CheckCircle2 size={13} /> Connected to Stripe
-              </div>
+              <>
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-green-600 mb-3">
+                  <CheckCircle2 size={13} /> Connected to Stripe
+                </div>
+                <button
+                  onClick={() => manageStripe.mutate()}
+                  disabled={manageStripe.isPending}
+                  className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-[#111] bg-gray-50 border border-gray-200 px-4 py-2.5 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-50"
+                >
+                  {manageStripe.isPending ? <Loader2 size={13} className="animate-spin" /> : null}
+                  Manage Connection
+                </button>
+              </>
             ) : (
               <>
                 <p className="text-xs text-gray-500 mb-3">Connect a Stripe account so you can get paid for bookings.</p>
@@ -1190,6 +1204,17 @@ function BookingsTab() {
   const confirmations = data ?? [];
   const [filter, setFilter] = useState<BookingFilter>("all");
   const [selected, setSelected] = useState<any | null>(null);
+  const search = useSearch();
+
+  // Deep-link support: /app/bookings?open=<bookingId> auto-opens that booking's
+  // detail view (used by the dashboard's "Upcoming booking" task).
+  useEffect(() => {
+    const openId = new URLSearchParams(search).get("open");
+    if (openId && confirmations.length > 0) {
+      const match = confirmations.find((b: any) => String(b.id) === openId);
+      if (match) setSelected(match);
+    }
+  }, [search, confirmations]);
 
   if (selected) return <BookingDetail booking={selected} onBack={() => setSelected(null)} />;
 

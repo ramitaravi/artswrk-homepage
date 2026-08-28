@@ -424,11 +424,10 @@ export default function ProJobDetail() {
   const j = job as any;
   // Some PRO jobs are configured to receive applications outside Artswrk
   // entirely (a link or an email address) instead of through the in-platform
-  // apply form — this was tracked on the record (applyDirect/applyLink/
-  // applyEmail) but never actually surfaced to artists here.
-  const externalApplyHref: string | null = j.applyDirect
-    ? (j.applyLink || (j.applyEmail ? `mailto:${j.applyEmail}` : null))
-    : null;
+  // apply form. The applyDirect flag itself is unreliable on Bubble-migrated
+  // records (many real link-out jobs have applyDirect=0 with applyLink still
+  // populated) — the presence of a real link/email is the actual signal.
+  const externalApplyHref: string | null = j.applyLink || (j.applyEmail ? `mailto:${j.applyEmail}` : null);
   const title = j.serviceType ?? "Open Position";
   const location = j.workFromAnywhere ? "Work From Anywhere" : (j.location ?? "Location TBD");
   const company = j.company ?? "Artswrk Client";
