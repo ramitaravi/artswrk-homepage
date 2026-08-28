@@ -15,10 +15,17 @@ type PlanTier = "free" | "basic" | "pro";
 const FREE_FEATURES = ["Free job notifications", "Sharable profile"];
 
 const BASIC_FEATURES = [
-  "Unlock Artswrk for 1 year",
-  "Apply to unlimited basic jobs",
+  "Apply to unlimited Artswrk jobs",
+  "~$200 average booking",
   "Get connected to $1000+ performing arts employers",
   "Get booked & earn digitally",
+];
+
+const PRO_FEATURES = [
+  "PRO jobs — $500+ per booking",
+  "Browse & message clients directly — real contact info, before anyone else sees it",
+  "Get seen first — priority placement to thousands of actively hiring studios",
+  "Thousands in partner discounts (Acrobatic Arts, Tap Roots, DanceCuts, and more)",
 ];
 
 function Check() {
@@ -62,15 +69,15 @@ export default function ArtistSettingsPlan() {
     } else if (currentPlan === "basic" && hasStripeCustomer) {
       createPortal.mutate({ origin: window.location.origin });
     } else {
-      createProCheckout.mutate({ interval: "month", origin: window.location.origin });
+      createProCheckout.mutate({ origin: window.location.origin });
     }
   }
 
-  const primaryLabel = currentPlan === "free" ? "Upgrade to PRO" : "Manage Subscription";
+  const primaryLabel = currentPlan === "free" ? "Unlock PRO" : "Manage Subscription";
 
   const basicPrice = pricingLoading ? "…" : pricingData?.basic?.annual?.dollars ?? "$30";
-  const proMonthly = pricingLoading ? "…" : pricingData?.pro?.monthly?.dollars ?? "$10.99";
   const proAnnual = pricingLoading ? "…" : pricingData?.pro?.annual?.dollars ?? "$110";
+  const trialDays = pricingData?.pro?.trialDays ?? 0;
 
   if (planLoading) {
     return (
@@ -101,7 +108,14 @@ export default function ArtistSettingsPlan() {
 
       {/* Basic */}
       <div className="py-6 border-b border-gray-100">
-        <h3 className="text-xl font-black text-[#111]">Artswrk Basic</h3>
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-xl font-black text-[#111]">Artswrk Basic</h3>
+          {currentPlan === "basic" && (
+            <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500 bg-gray-100 px-3 py-1 rounded-full flex-shrink-0">
+              Current Plan
+            </span>
+          )}
+        </div>
         <PricePill>{basicPrice}/year unlock</PricePill>
         <ul className="space-y-2">
           {BASIC_FEATURES.map((f) => (
@@ -116,21 +130,23 @@ export default function ArtistSettingsPlan() {
       <div className="py-6">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-xl font-black text-[#111]">Artswrk PRO</h3>
-          {currentPlan === "pro" && (
+          {currentPlan === "pro" ? (
             <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500 bg-gray-100 px-3 py-1 rounded-full flex-shrink-0">
               Current Plan
             </span>
-          )}
+          ) : trialDays > 0 ? (
+            <span className="text-[10px] font-bold uppercase tracking-wide text-white bg-[#ec008c] px-3 py-1 rounded-full flex-shrink-0">
+              {trialDays}-Day Free Trial
+            </span>
+          ) : null}
         </div>
-        <PricePill>{proMonthly}/month or {proAnnual}/year</PricePill>
+        <PricePill>{proAnnual}/year unlock</PricePill>
         <ul className="space-y-2">
-          <li className="flex items-start gap-2 text-[15px] text-[#111]"><Check /> Basic features plus…</li>
-          <li className="flex items-start gap-2 text-[15px] text-[#111]">
-            <Check /> Access <span className="font-bold text-[#ec008c]">Jobs PRO</span> – highest value jobs $500+ per booking
-          </li>
-          <li className="flex items-start gap-2 text-[15px] text-[#111]">
-            <Check /> Access <span className="font-bold text-[#ec008c]">Benefits PRO</span> – get access to our premium partners and benefits
-          </li>
+          {PRO_FEATURES.map((f) => (
+            <li key={f} className="flex items-start gap-2 text-[15px] text-[#111]">
+              <Check /> {f}
+            </li>
+          ))}
         </ul>
       </div>
 

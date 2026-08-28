@@ -92,25 +92,9 @@ describe("getArtistSubscriptionInfo helper", () => {
 describe("createArtistProCheckoutSession helper", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("returns a checkout URL and session ID for monthly billing", async () => {
-    vi.mocked(createArtistProCheckoutSession).mockResolvedValueOnce({
-      url: "https://checkout.stripe.com/test-monthly",
-      sessionId: "cs_test_monthly_123",
-    });
-
-    const result = await createArtistProCheckoutSession({
-      email: "artist@example.com",
-      userId: 42,
-      origin: "https://artswrk.com",
-      stripeCustomerId: null,
-      interval: "month",
-    });
-
-    expect(result.url).toContain("checkout.stripe.com");
-    expect(result.sessionId).toBe("cs_test_monthly_123");
-  });
-
-  it("returns a checkout URL and session ID for annual billing", async () => {
+  // PRO is annual-only as of the 2026-08-28 pricing rebuild — no interval
+  // param is accepted, checkout always uses ARTIST_PRO.annual.
+  it("returns a checkout URL and session ID for the annual PRO plan", async () => {
     vi.mocked(createArtistProCheckoutSession).mockResolvedValueOnce({
       url: "https://checkout.stripe.com/test-annual",
       sessionId: "cs_test_annual_456",
@@ -121,7 +105,6 @@ describe("createArtistProCheckoutSession helper", () => {
       userId: 42,
       origin: "https://artswrk.com",
       stripeCustomerId: null,
-      interval: "year",
     });
 
     expect(result.url).toContain("checkout.stripe.com");
@@ -149,25 +132,8 @@ describe("createArtistPortalSession helper", () => {
 describe("createArtistBasicCheckoutSession helper", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("returns a checkout URL and session ID for monthly Basic billing", async () => {
-    vi.mocked(createArtistBasicCheckoutSession).mockResolvedValueOnce({
-      url: "https://checkout.stripe.com/test-basic-monthly",
-      sessionId: "cs_test_basic_monthly_123",
-    });
-
-    const result = await createArtistBasicCheckoutSession({
-      email: "artist@example.com",
-      userId: 42,
-      origin: "https://artswrk.com",
-      stripeCustomerId: null,
-      interval: "month",
-    });
-
-    expect(result.url).toContain("checkout.stripe.com");
-    expect(result.sessionId).toBe("cs_test_basic_monthly_123");
-  });
-
-  it("returns a checkout URL and session ID for annual Basic billing", async () => {
+  // Basic has always been annual-only ($30/yr) — no interval param.
+  it("returns a checkout URL and session ID for the annual Basic plan", async () => {
     vi.mocked(createArtistBasicCheckoutSession).mockResolvedValueOnce({
       url: "https://checkout.stripe.com/test-basic-annual",
       sessionId: "cs_test_basic_annual_456",
@@ -178,7 +144,6 @@ describe("createArtistBasicCheckoutSession helper", () => {
       userId: 42,
       origin: "https://artswrk.com",
       stripeCustomerId: null,
-      interval: "year",
     });
 
     expect(result.url).toContain("checkout.stripe.com");

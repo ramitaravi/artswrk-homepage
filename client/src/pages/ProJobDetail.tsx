@@ -674,7 +674,6 @@ export default function ProJobDetail() {
                   </div>
                   <button
                     onClick={() => proCheckoutMutation.mutate({
-                      interval: "month",
                       origin: window.location.origin,
                       returnPath: jobUrl,
                     })}
@@ -735,7 +734,6 @@ export default function ProJobDetail() {
         ) : !isPro ? (
           <button
             onClick={() => proCheckoutMutation.mutate({
-              interval: "month",
               origin: window.location.origin,
               returnPath: jobUrl,
             })}

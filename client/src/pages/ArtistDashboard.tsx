@@ -1824,7 +1824,8 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
 
   // PRO upsell card for free and basic users
   if (!planLoading && !isPro) {
-    const proMonthlyPrice = pricingData?.pro?.monthly?.dollars ?? null;
+    const proAnnualPrice = pricingData?.pro?.annual?.dollars ?? null;
+    const proTrialDays = pricingData?.pro?.trialDays ?? 0;
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -1858,12 +1859,20 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 artist-grad-bg"
                 >
                   <Sparkles size={15} />
-                  {proMonthlyPrice ? `Upgrade to PRO — from ${proMonthlyPrice}/mo` : "Upgrade to PRO"}
+                  {proTrialDays > 0
+                    ? `Start ${proTrialDays}-Day Free Trial`
+                    : proAnnualPrice
+                      ? `Unlock PRO — ${proAnnualPrice}/yr`
+                      : "Unlock PRO"}
                   <ArrowRight size={14} />
                 </button>
               </div>
-              {proMonthlyPrice && (
-                <p className="text-xs text-gray-400 mt-2">Annual billing available — save ~20%</p>
+              {proAnnualPrice && (
+                <p className="text-xs text-gray-400 mt-2">
+                  {proTrialDays > 0
+                    ? `Then ${proAnnualPrice}/year — cancel anytime during your trial`
+                    : `${proAnnualPrice}/year unlock`}
+                </p>
               )}
             </div>
           </div>

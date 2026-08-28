@@ -46,47 +46,102 @@ export const STRIPE_PRODUCTS = {
     mode: "payment" as const,
   },
   /**
-   * Artist Basic subscription — uses existing Stripe product/prices.
-   * Monthly: price_1Plig7A91H1fWNkKnH5qb40M
-   * Annual:  price_1PligSA91H1fWNkK56t3L1lZ
+   * Artist Basic — annual-only unlock. $30/yr, unchanged in amount; the live
+   * price ID below was given fresh by Ramita on 2026-08-28 as part of the
+   * pricing rebuild (differs from the previously hardcoded fallback — trust
+   * this value, it's the current source of truth from Stripe).
+   * Verified via API against the DEV/test key on 2026-08-28: $30/yr, active. ✓
+   * LIVE value NOT independently verified — no live-mode key available here;
+   * double-check against the Stripe live dashboard before this ships.
    */
   ARTIST_BASIC: {
     productId: envOrLive("STRIPE_TEST_ARTIST_BASIC_PRODUCT_ID", "prod_Qcyd0J11o6fNHz"),
     name: "Artswrk Basic",
-    description: "Apply to all marketplace jobs and build your artist profile.",
+    description: "Apply to unlimited Artswrk jobs.",
     currency: "usd",
     mode: "subscription" as const,
-    monthly: {
+    annual: {
+      priceId: envOrLive("STRIPE_TEST_ARTIST_BASIC_ANNUAL_PRICE_ID", "price_1TW3qOA91H1fWNkK1nxKUvgR"),
+      interval: "year" as const,
+    },
+    /** Not offered at checkout anymore — kept only so admin reporting
+     * (admin.subscriptions) can still see existing grandfathered monthly
+     * subscribers. Never reference this for a new checkout. */
+    legacyMonthly: {
       priceId: envOrLive("STRIPE_TEST_ARTIST_BASIC_MONTHLY_PRICE_ID", "price_1Plig7A91H1fWNkKnH5qb40M"),
       interval: "month" as const,
     },
-    annual: {
-      priceId: envOrLive("STRIPE_TEST_ARTIST_BASIC_ANNUAL_PRICE_ID", "price_1PligSA91H1fWNkK56t3L1lZ"),
-      interval: "year" as const,
-    },
   },
   /**
-   * Artist PRO subscription — uses existing Stripe product/prices.
-   * Monthly: price_1O7U0HA91H1fWNkKa9wA0v6X ($X/mo)
-   * Annual:  price_1O7Ts6A91H1fWNkKVlYhqdAi ($X/yr)
+   * Artist PRO — annual-only unlock, $110/yr. The $10.99/mo plan is
+   * discontinued for new signups as of 2026-08-28 — existing monthly
+   * subscribers are grandfathered (their Stripe subscription is untouched;
+   * no code path forces a migration), they just won't see a monthly option
+   * if they ever come back to subscribe again after canceling.
+   * Verified via API against the DEV/test key on 2026-08-28: $110/yr, active. ✓
+   * LIVE value matches what was already hardcoded here before today — unchanged.
    */
   ARTIST_PRO: {
     productId: envOrLive("STRIPE_TEST_ARTIST_PRO_PRODUCT_ID", "prod_OvKXdVHLUpHLCn"),
     name: "Artswrk PRO",
-    description: "PRO jobs, priority placement, profile boost, and advanced analytics.",
+    description: "PRO jobs ($500+ bookings), direct client messaging, priority placement, and partner discounts.",
     currency: "usd",
     mode: "subscription" as const,
-    monthly: {
-      priceId: envOrLive("STRIPE_TEST_ARTIST_PRO_MONTHLY_PRICE_ID", "price_1O7U0HA91H1fWNkKa9wA0v6X"),
-      // Payment Links are also mode-specific — no test-mode link was created, so this
-      // stays live-only; the dynamic Checkout Session path (priceId above) is what
-      // actually gets used in test mode.
-      paymentLinkId: "plink_1OKZtSA91H1fWNkKgr12Dkow",
-      interval: "month" as const,
-    },
     annual: {
       priceId: envOrLive("STRIPE_TEST_ARTIST_PRO_ANNUAL_PRICE_ID", "price_1O7Ts6A91H1fWNkKVlYhqdAi"),
       paymentLinkId: "plink_1RJFokA91H1fWNkKYbrlxLUH",
+      interval: "year" as const,
+      /** Free trial length in days. 0/undefined = no trial. Set here so both
+       * checkout creation and the "your trial ends soon" reminder email read
+       * the same source of truth. */
+      trialPeriodDays: 7,
+    },
+    /** Not offered at checkout anymore — kept only so admin reporting
+     * (admin.subscriptions) can still see existing grandfathered monthly
+     * subscribers. Never reference this for a new checkout. */
+    legacyMonthly: {
+      priceId: envOrLive("STRIPE_TEST_ARTIST_PRO_MONTHLY_PRICE_ID", "price_1O7U0HA91H1fWNkKa9wA0v6X"),
+      paymentLinkId: "plink_1OKZtSA91H1fWNkKgr12Dkow",
+      interval: "month" as const,
+    },
+  },
+  /**
+   * Client on-demand job unlock — $40/job, up from $30. Previously this had
+   * NO real Stripe Price object at all — every purchase minted a fresh
+   * one-off product via inline price_data. Now uses a real, trackable price.
+   * Verified via API against the DEV/test key on 2026-08-28: $40 one-time, active. ✓
+   */
+  CLIENT_JOB_UNLOCK: {
+    productId: undefined as string | undefined,
+    priceId: envOrLive("STRIPE_TEST_CLIENT_JOB_UNLOCK_PRICE_ID", "price_1U9Xp0A91H1fWNkK8maYo0vu"),
+    name: "Artswrk Job Unlock",
+    description: "Unlock all applicants for this job — no recurring charge.",
+    amount: 4000, // $40 in cents (price_data fallback only — priceId above is what's actually used)
+    currency: "usd",
+    mode: "payment" as const,
+  },
+  /**
+   * Client Premium subscription — $65/mo or $650/yr, up from $50/$500.
+   * Previously this had NO real Stripe Price object either — same
+   * price_data-every-time pattern as the job unlock above. Now uses real,
+   * trackable prices.
+   * Verified via API against the DEV/test key on 2026-08-28: $65/mo and
+   * $650/yr, both active. ✓
+   */
+  CLIENT_PREMIUM: {
+    productId: undefined as string | undefined,
+    name: "Artswrk Premium",
+    description: "Unlimited applicant unlocks for all your jobs.",
+    currency: "usd",
+    mode: "subscription" as const,
+    monthly: {
+      priceId: envOrLive("STRIPE_TEST_CLIENT_PREMIUM_MONTHLY_PRICE_ID", "price_1U9XllA91H1fWNkKpfoRcNHt"),
+      amount: 6500, // $65/mo in cents (price_data fallback only)
+      interval: "month" as const,
+    },
+    annual: {
+      priceId: envOrLive("STRIPE_TEST_CLIENT_PREMIUM_ANNUAL_PRICE_ID", "price_1U9XmUA91H1fWNkKWASXTggj"),
+      amount: 65000, // $650/yr in cents (price_data fallback only)
       interval: "year" as const,
     },
   },
@@ -106,11 +161,20 @@ export const STRIPE_PRODUCTS = {
     mode: "payment" as const,
   },
   /**
-   * Enterprise Subscription — $250/mo or $2500/yr (50% off $500/$5000).
+   * Enterprise Subscription — LIST price $500/mo or $5,000/yr as of
+   * 2026-08-28 (up from $250/$2,500). The 50%-off "OG" discount is applied
+   * via a Stripe Promotion Code at checkout (allow_promotion_codes), not a
+   * separate lower price — existing customers' subscriptions stay on the OLD
+   * $250/$2,500 price object untouched, so this change costs them nothing.
    * Product: prod_Tmmk8mzn4uw8G8
-   * Price IDs must be created in the Stripe dashboard for this product.
-   * Monthly: create a $250/month recurring price → set ENTERPRISE_SUB_MONTHLY_PRICE_ID
-   * Annual:  create a $2500/year  recurring price → set ENTERPRISE_SUB_ANNUAL_PRICE_ID
+   *
+   * ⚠️ KNOWN GAP, confirmed via the Stripe API on 2026-08-28: the existing
+   * TEST-mode prices (env STRIPE_TEST_ENTERPRISE_SUB_MONTHLY_PRICE_ID /
+   * _ANNUAL_PRICE_ID) are still $250/mo and $2,500/yr — the OLD amounts.
+   * No test-mode $500/$5,000 prices exist yet. Until new test prices are
+   * created and those env vars updated, local/dev checkout for this tier
+   * will test the OLD pricing even though live now points at the new
+   * amounts. Do not treat dev testing of this tier as validating live.
    */
   ENTERPRISE_SUBSCRIPTION: {
     productId: envOrLive("STRIPE_TEST_ENTERPRISE_SUBSCRIPTION_PRODUCT_ID", "prod_Tmmk8mzn4uw8G8"),
@@ -119,13 +183,13 @@ export const STRIPE_PRODUCTS = {
     currency: "usd",
     mode: "subscription" as const,
     monthly: {
-      priceId: envOrLive("STRIPE_TEST_ENTERPRISE_SUB_MONTHLY_PRICE_ID", process.env.ENTERPRISE_SUB_MONTHLY_PRICE_ID ?? ""),
-      amount: 25000, // $250 in cents (fallback for price_data)
+      priceId: envOrLive("STRIPE_TEST_ENTERPRISE_SUB_MONTHLY_PRICE_ID", "price_1SpDBOA91H1fWNkKcTd35SHv"),
+      amount: 50000, // $500 in cents (price_data fallback only)
       interval: "month" as const,
     },
     annual: {
-      priceId: envOrLive("STRIPE_TEST_ENTERPRISE_SUB_ANNUAL_PRICE_ID", process.env.ENTERPRISE_SUB_ANNUAL_PRICE_ID ?? ""),
-      amount: 250000, // $2500 in cents (fallback for price_data)
+      priceId: envOrLive("STRIPE_TEST_ENTERPRISE_SUB_ANNUAL_PRICE_ID", "price_1SpDB0A91H1fWNkKIZKyxi6P"),
+      amount: 500000, // $5,000 in cents (price_data fallback only)
       interval: "year" as const,
     },
   },

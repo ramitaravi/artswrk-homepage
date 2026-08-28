@@ -951,9 +951,9 @@ export const appRouter = router({
 
       // Fetch all subscriptions for each of our 4 price IDs in parallel
       const [bmRes, baRes, pmRes, paRes] = await Promise.all([
-        stripe.subscriptions.list({ price: STRIPE_PRODUCTS.ARTIST_BASIC.monthly.priceId, status: "all", limit: 100, expand: ["data.customer"] }),
+        stripe.subscriptions.list({ price: STRIPE_PRODUCTS.ARTIST_BASIC.legacyMonthly.priceId, status: "all", limit: 100, expand: ["data.customer"] }),
         stripe.subscriptions.list({ price: STRIPE_PRODUCTS.ARTIST_BASIC.annual.priceId,  status: "all", limit: 100, expand: ["data.customer"] }),
-        stripe.subscriptions.list({ price: STRIPE_PRODUCTS.ARTIST_PRO.monthly.priceId,   status: "all", limit: 100, expand: ["data.customer"] }),
+        stripe.subscriptions.list({ price: STRIPE_PRODUCTS.ARTIST_PRO.legacyMonthly.priceId,   status: "all", limit: 100, expand: ["data.customer"] }),
         stripe.subscriptions.list({ price: STRIPE_PRODUCTS.ARTIST_PRO.annual.priceId,    status: "all", limit: 100, expand: ["data.customer"] }),
       ]);
 
@@ -3821,32 +3821,29 @@ Fields to extract:
         }
       }
 
-      const [basicMonthly, basicAnnual, proMonthly, proAnnual] = await Promise.all([
-        fetchPrice(STRIPE_PRODUCTS.ARTIST_BASIC.monthly.priceId),
+      // Annual-only for both plans as of 2026-08-28 — monthly is no longer
+      // offered to new signups, so it's intentionally not fetched here.
+      const [basicAnnual, proAnnual] = await Promise.all([
         fetchPrice(STRIPE_PRODUCTS.ARTIST_BASIC.annual.priceId),
-        fetchPrice(STRIPE_PRODUCTS.ARTIST_PRO.monthly.priceId),
         fetchPrice(STRIPE_PRODUCTS.ARTIST_PRO.annual.priceId),
       ]);
 
       return {
         basic: {
-          monthly: basicMonthly,
           annual: basicAnnual,
         },
         pro: {
-          monthly: proMonthly,
           annual: proAnnual,
+          trialDays: STRIPE_PRODUCTS.ARTIST_PRO.annual.trialPeriodDays ?? 0,
         },
       };
     }),
 
     /**
-     * Create a Stripe Checkout session for the artist Basic plan.
-     * interval: 'month' | 'year'
+     * Create a Stripe Checkout session for the artist Basic plan — annual-only ($30/yr).
      */
     createBasicCheckout: protectedProcedure
       .input(z.object({
-        interval: z.enum(["month", "year"]),
         origin: z.string().url(),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -3856,18 +3853,16 @@ Fields to extract:
           userId: ctx.user.id,
           origin: input.origin,
           stripeCustomerId: info?.stripeCustomerId ?? null,
-          interval: input.interval,
         });
         return { url, sessionId };
       }),
 
     /**
-     * Create a Stripe Checkout session for the artist PRO plan.
-     * interval: 'month' | 'year'
+     * Create a Stripe Checkout session for the artist PRO plan — annual-only,
+     * includes the free trial (see STRIPE_PRODUCTS.ARTIST_PRO.annual.trialPeriodDays).
      */
     createProCheckout: protectedProcedure
       .input(z.object({
-        interval: z.enum(["month", "year"]),
         origin: z.string().url(),
         returnPath: z.string().optional(),
       }))
@@ -3878,7 +3873,6 @@ Fields to extract:
           userId: ctx.user.id,
           origin: input.origin,
           stripeCustomerId: info?.stripeCustomerId ?? null,
-          interval: input.interval,
           returnPath: input.returnPath,
         });
         return { url, sessionId };

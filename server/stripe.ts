@@ -197,14 +197,16 @@ export async function createBoostCheckoutSession(
  * Uses the existing Stripe product/price IDs.
  */
 export async function createArtistProCheckoutSession(
-  opts: CreateCheckoutOptions & { interval: "month" | "year"; returnPath?: string }
+  opts: CreateCheckoutOptions & { returnPath?: string }
 ): Promise<{ url: string; sessionId: string }> {
   const stripe = getStripe();
   const { ARTIST_PRO } = await import("./stripe-products").then(m => ({ ARTIST_PRO: m.STRIPE_PRODUCTS.ARTIST_PRO }));
 
-  const priceId = opts.interval === "year"
-    ? ARTIST_PRO.annual.priceId
-    : ARTIST_PRO.monthly.priceId;
+  // Annual-only as of 2026-08-28 — the $10.99/mo plan is discontinued for
+  // new signups. Existing monthly subscribers are grandfathered and
+  // untouched (ARTIST_PRO.legacyMonthly still exists for admin reporting,
+  // but no new checkout should ever reference it).
+  const priceId = ARTIST_PRO.annual.priceId;
 
   const successPath = opts.returnPath ?? "/app";
   const separator = successPath.includes("?") ? "&" : "?";
@@ -212,6 +214,9 @@ export async function createArtistProCheckoutSession(
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
+    subscription_data: ARTIST_PRO.annual.trialPeriodDays
+      ? { trial_period_days: ARTIST_PRO.annual.trialPeriodDays }
+      : undefined,
     success_url: `${opts.origin}${successPath}${separator}plan=pro&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${opts.origin}/app/settings?cancelled=1`,
     allow_promotion_codes: true,
@@ -220,7 +225,7 @@ export async function createArtistProCheckoutSession(
       user_id: opts.userId?.toString() ?? "",
       customer_email: opts.email ?? "",
       type: "artist_pro_subscription",
-      interval: opts.interval,
+      interval: "year",
     },
   };
 
@@ -238,14 +243,15 @@ export async function createArtistProCheckoutSession(
  * Create a Stripe Checkout Session for an artist Basic subscription.
  */
 export async function createArtistBasicCheckoutSession(
-  opts: CreateCheckoutOptions & { interval: "month" | "year" }
+  opts: CreateCheckoutOptions
 ): Promise<{ url: string; sessionId: string }> {
   const stripe = getStripe();
   const { ARTIST_BASIC } = await import("./stripe-products").then(m => ({ ARTIST_BASIC: m.STRIPE_PRODUCTS.ARTIST_BASIC }));
 
-  const priceId = opts.interval === "year"
-    ? ARTIST_BASIC.annual.priceId
-    : ARTIST_BASIC.monthly.priceId;
+  // Annual-only — Basic has only ever had one real price offered on Bubble
+  // ($30/yr); ARTIST_BASIC.legacyMonthly exists only for admin reporting on
+  // old grandfathered accounts, never for a new checkout.
+  const priceId = ARTIST_BASIC.annual.priceId;
 
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode: "subscription",
@@ -258,7 +264,7 @@ export async function createArtistBasicCheckoutSession(
       user_id: opts.userId?.toString() ?? "",
       customer_email: opts.email ?? "",
       type: "artist_basic_subscription",
-      interval: opts.interval,
+      interval: "year",
     },
   };
 
@@ -396,23 +402,28 @@ export async function createClientJobUnlockCheckoutSession(
   opts: CreateCheckoutOptions & { jobId: number; jobTitle?: string }
 ): Promise<{ url: string; sessionId: string }> {
   const stripe = getStripe();
-  const sessionParams: Stripe.Checkout.SessionCreateParams = {
-    mode: "payment",
-    line_items: [
-      {
+  const plan = STRIPE_PRODUCTS.CLIENT_JOB_UNLOCK;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lineItem: any = plan.priceId
+    ? { price: plan.priceId, quantity: 1 }
+    : {
         price_data: {
-          currency: "usd",
-          unit_amount: 3000, // $30
+          currency: plan.currency,
+          unit_amount: plan.amount,
           product_data: {
-            name: "Artswrk Job Unlock",
+            name: plan.name,
             description: opts.jobTitle
               ? `One-time unlock for: ${opts.jobTitle}`
-              : "Unlock all applicants for this job — no recurring charge",
+              : plan.description,
           },
         },
         quantity: 1,
-      },
-    ],
+      };
+
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
+    mode: "payment",
+    line_items: [lineItem],
     success_url: `${opts.origin}/app/jobs/${opts.jobId}?unlock_success=1&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${opts.origin}/app/jobs/${opts.jobId}`,
     allow_promotion_codes: true,
@@ -444,25 +455,30 @@ export async function createClientSubscriptionCheckoutSession(
   const interval = opts.interval ?? "month";
   const isAnnual = interval === "year";
   const returnJobPath = opts.jobId ? `/app/jobs/${opts.jobId}` : "/app/jobs";
+  const plan = STRIPE_PRODUCTS.CLIENT_PREMIUM;
+  const tier = isAnnual ? plan.annual : plan.monthly;
 
-  const sessionParams: Stripe.Checkout.SessionCreateParams = {
-    mode: "subscription",
-    line_items: [
-      {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lineItem: any = tier.priceId
+    ? { price: tier.priceId, quantity: 1 }
+    : {
         price_data: {
-          currency: "usd",
-          unit_amount: isAnnual ? 50000 : 5000, // $500/yr or $50/mo in cents
+          currency: plan.currency,
+          unit_amount: tier.amount,
           recurring: { interval },
           product_data: {
-            name: "Artswrk Premium",
+            name: plan.name,
             description: isAnnual
-              ? "Unlimited applicant unlocks for all your jobs — Annual plan (save 2 months)"
-              : "Unlimited applicant unlocks for all your jobs — Monthly plan",
+              ? `${plan.description} — Annual plan`
+              : `${plan.description} — Monthly plan`,
           },
         },
         quantity: 1,
-      },
-    ],
+      };
+
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
+    mode: "subscription",
+    line_items: [lineItem],
     success_url: `${opts.origin}${returnJobPath}?subscribed=1&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${opts.origin}${returnJobPath}`,
     allow_promotion_codes: true,
