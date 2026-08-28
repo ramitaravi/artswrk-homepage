@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, count } from "drizzle-orm";
+import { eq, count, desc } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { users, artistReviews, artistServiceCategories, artistResumes, bookings } from "../drizzle/schema";
@@ -96,7 +96,16 @@ export const artistProfileRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database unavailable");
-      const [user] = await db.select().from(users).where(eq(users.slug, input.slug)).limit(1);
+      // Duplicate Bubble-migrated rows can share a slug — no ordering here meant
+      // whichever row the DB happened to return first won, fully nondeterministic.
+      // Prefer the real migrated row over an empty later duplicate, same
+      // tiebreak as getUserByEmail/getUserByBubbleId.
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.slug, input.slug))
+        .orderBy(desc(users.bubbleSourcePresent), desc(users.updatedAt), desc(users.id))
+        .limit(1);
       if (!user) throw new Error("Profile not found");
       const bookingCountResult = await db.select({ value: count() }).from(bookings).where(eq(bookings.artistUserId, user.id));
       const liveBookingCount = bookingCountResult[0]?.value ?? 0;
