@@ -3626,6 +3626,37 @@ export async function isClientJobUnlocked(clientUserId: number, jobId: number): 
 }
 
 /**
+ * Whether a client is allowed to open a NEW conversation with a given artist.
+ * Premium/Enterprise clients can message anyone. Free/on-demand clients can only
+ * message an artist who has applied to a job of theirs that they've actually
+ * unlocked (regular job unlock, or a premium job they created as enterprise) —
+ * otherwise messaging would be a free backdoor around the applicant-unlock paywall.
+ * Existing conversations are never revoked by this check (only gates starting new ones).
+ */
+export async function canClientMessageArtist(clientUserId: number, artistUserId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const user = await getUserById(clientUserId);
+  if (!user) return false;
+  if ((user as any).clientPremium || (user as any).enterprise || user.role === "admin") return true;
+
+  const jobRows = await db.execute(
+    `SELECT ia.jobId AS jobId FROM interested_artists ia INNER JOIN jobs j ON j.id = ia.jobId WHERE ia.artistUserId = ${artistUserId} AND j.clientUserId = ${clientUserId}`
+  );
+  const jobIds: number[] = (jobRows[0] as unknown as any[]).map((r: any) => r.jobId);
+  for (const jobId of jobIds) {
+    if (await isClientJobUnlocked(clientUserId, jobId)) return true;
+  }
+
+  // Premium jobs can only be created after an enterprise unlock/subscription in the first
+  // place, so any application on a premium job this client owns is already "paid for".
+  const premiumRows = await db.execute(
+    `SELECT pia.id AS id FROM premium_job_interested_artists pia INNER JOIN premium_jobs pj ON pj.id = pia.premiumJobId WHERE pia.artistUserId = ${artistUserId} AND pj.createdByUserId = ${clientUserId} LIMIT 1`
+  );
+  return (premiumRows[0] as unknown as any[]).length > 0;
+}
+
+/**
  * Record a per-job unlock after successful Stripe payment.
  */
 export async function createClientJobUnlock(data: {
