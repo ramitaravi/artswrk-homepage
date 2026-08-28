@@ -6,6 +6,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import { useAuth } from "@/_core/hooks/useAuth";
 import {
   MapPin, Clock, Sparkles, CheckCircle2, Users, ArrowRight,
   Zap, ChevronDown, Star, Building2, Trophy, Music4,
@@ -971,6 +972,15 @@ function Footer() {
 
 // ─── Main Export ───────────────────────────────────────────────────────────────
 export default function Home() {
+  const { isAuthenticated } = useAuth();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (isAuthenticated) navigate("/app");
+  }, [isAuthenticated, navigate]);
+
+  if (isAuthenticated) return null;
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
