@@ -1233,11 +1233,13 @@ const HIRING_CATEGORIES = [
   "Fitness Instructor", "Event Performer", "Competition Coach",
 ];
 
-// Business-type classification for CLIENT accounts (studio/competition/school/misc) —
+// Business-type classification for CLIENT accounts (studio/competition/school/etc.) —
 // distinct from HIRING_CATEGORIES above, which is the artist-role list used when
 // editing what a JOB is hiring for. Mixing these up was a real bug: the client
 // edit form and filter dropdown were both reusing HIRING_CATEGORIES.
-const CLIENT_BUSINESS_TYPES = ["Dance Studio", "Dance Competition", "Music School", "Misc"];
+// Matches BUSINESS_TYPES in ClientOnboarding.tsx (the public signup picker) — keep
+// both in sync if this list ever changes.
+export const CLIENT_BUSINESS_TYPES = ["Dance Studio", "Dance Competition", "Music School", "Event Company", "Other"] as const;
 
 // ─── Admin Client Form ────────────────────────────────────────────────────────
 function AdminClientForm({
@@ -1711,7 +1713,7 @@ function ClientsSection() {
     search: debouncedSearch || undefined,
     companySearch: debouncedCompany || undefined,
     locationSearch: debouncedLocation || undefined,
-    hiringCategory: hiringCategory || undefined,
+    hiringCategory: (hiringCategory || undefined) as any,
     state: state || undefined,
     plan: plan || undefined,
     businessType: businessType || undefined,
@@ -3746,7 +3748,16 @@ function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; 
   const [expandedJobId, setExpandedJobId] = useState<number | null>(null);
   const [localPlan, setLocalPlan] = useState<EnterprisePlan>(client.enterprisePlan ?? null);
   const [localInterval, setLocalInterval] = useState<"month" | "year" | null>(client.enterpriseSubInterval ?? null);
+  const [localHiringCategory, setLocalHiringCategory] = useState(client.hiringCategory ?? "");
   const utils = trpc.useUtils();
+
+  const updateClient = trpc.admin.updateClient.useMutation({
+    onSuccess: () => utils.admin.enterpriseClients.invalidate(),
+  });
+  function handleHiringCategoryChange(value: string) {
+    setLocalHiringCategory(value);
+    updateClient.mutate({ id: client.id, hiringCategory: (value || undefined) as any });
+  }
 
   const { data: jobsData, isLoading } = trpc.admin.premiumJobs.useQuery({
     clientUserId: client.id,
@@ -3809,10 +3820,15 @@ function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; 
           <div className="flex-1 min-w-0">
             <h2 className="text-xl font-black text-[#111] truncate">{companyName}</h2>
             <p className="text-sm text-gray-500">{client.email}</p>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {client.hiringCategory && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-orange-50 text-[#F25722] font-semibold">{client.hiringCategory}</span>
-              )}
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <select
+                value={localHiringCategory}
+                onChange={e => handleHiringCategoryChange(e.target.value)}
+                className="text-xs px-2 py-1 rounded-full bg-orange-50 text-[#F25722] font-semibold border-none focus:outline-none focus:ring-1 focus:ring-[#F25722] cursor-pointer"
+              >
+                <option value="">Set business type…</option>
+                {CLIENT_BUSINESS_TYPES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
               {client.location && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 flex items-center gap-1">
                   <MapPin size={10} /> {client.location}
@@ -4132,7 +4148,7 @@ function CreateEnterpriseModal({ onClose, onCreated }: { onClose: () => void; on
       firstName: form.firstName.trim() || undefined,
       lastName: form.lastName.trim() || undefined,
       plan: form.plan || undefined,
-      hiringCategory: form.hiringCategory || undefined,
+      hiringCategory: (form.hiringCategory || undefined) as any,
       businessOrIndividual: form.businessOrIndividual,
       logoUrl: logoUrl || undefined,
     });

@@ -235,7 +235,7 @@ export default function Join() {
   // Client: biz type → details
   async function handleBizType(type: string) {
     setBizType(type);
-    try { await onboardingMutation.mutateAsync({ hiringCategory: type, onboardingStep: 2 }); } catch {}
+    try { await onboardingMutation.mutateAsync({ hiringCategory: type as any, onboardingStep: 2 }); } catch {}
     setStage("client-details");
   }
 

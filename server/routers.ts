@@ -22,6 +22,17 @@ import { applyCheckoutSessionCompleted } from "./checkoutEffects";
 
 const SALT_ROUNDS = 12;
 
+/**
+ * Business-type classification for CLIENT accounts. Matches
+ * BUSINESS_TYPES in client/src/pages/ClientOnboarding.tsx (the public
+ * signup picker) and CLIENT_BUSINESS_TYPES in client/src/pages/Admin.tsx —
+ * keep all three in sync if this list ever changes. Not enforced as a hard
+ * DB-level enum (stays varchar) so the Bubble sync can't be broken by a
+ * value outside this list — enforced here at the write layer instead.
+ */
+const CLIENT_HIRING_CATEGORIES = ["Dance Studio", "Dance Competition", "Music School", "Event Company", "Other"] as const;
+const clientHiringCategorySchema = z.enum(CLIENT_HIRING_CATEGORIES).optional();
+
 export const appRouter = router({
   system: systemRouter,
   acquisition: acquisitionRouter,
@@ -445,7 +456,7 @@ export const appRouter = router({
         instagram: z.string().optional(),
         profilePicture: z.string().optional(),
         businessOrIndividual: z.string().optional(),
-        hiringCategory: z.string().optional(),
+        hiringCategory: clientHiringCategorySchema,
         clientPremium: z.boolean().optional(),
         enterprise: z.boolean().optional(),
       }))
@@ -473,7 +484,7 @@ export const appRouter = router({
         website: z.string().optional(),
         profilePicture: z.string().optional(),
         businessOrIndividual: z.string().optional(),
-        hiringCategory: z.string().optional(),
+        hiringCategory: clientHiringCategorySchema,
         clientPremium: z.boolean().default(false),
         enterprise: z.boolean().default(false),
       }))
@@ -526,7 +537,7 @@ export const appRouter = router({
         firstName: z.string().optional(),
         lastName: z.string().optional(),
         plan: z.enum(["on_demand", "subscriber"]).optional(),
-        hiringCategory: z.string().optional(),
+        hiringCategory: clientHiringCategorySchema,
         businessOrIndividual: z.enum(["Business", "Individual"]).optional(),
         logoUrl: z.string().optional(),
       }))
@@ -694,7 +705,7 @@ export const appRouter = router({
         search: z.string().optional(),
         companySearch: z.string().optional(),
         locationSearch: z.string().optional(),
-        hiringCategory: z.string().optional(),
+        hiringCategory: clientHiringCategorySchema,
         state: z.string().optional(),
         plan: z.string().optional(),
         businessType: z.string().optional(),
@@ -2224,7 +2235,7 @@ Fields to extract:
     updateOnboarding: protectedProcedure
       .input(z.object({
         businessOrIndividual: z.string().optional(),
-        hiringCategory: z.string().optional(),
+        hiringCategory: clientHiringCategorySchema,
         clientCompanyName: z.string().optional(),
         location: z.string().optional(),
         website: z.string().optional(),
