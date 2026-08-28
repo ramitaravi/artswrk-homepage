@@ -634,7 +634,7 @@ export default function ProJobDetail() {
                     {appliedSummary?.message && (
                       <div className="flex items-start gap-2 text-xs text-green-700">
                         <span className="font-semibold flex-shrink-0 mt-0.5">Message:</span>
-                        <span className="line-clamp-3 text-green-700 leading-relaxed">{appliedSummary.message}</span>
+                        <span className="text-green-700 leading-relaxed whitespace-pre-wrap">{appliedSummary.message}</span>
                       </div>
                     )}
                   </div>

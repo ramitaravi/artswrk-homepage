@@ -232,8 +232,8 @@ function DashboardTab({ user }: { user: any }) {
   const appliedProJobIds = new Set((proApplications as any[] ?? []).map((a: any) => a.premiumJobId).filter(Boolean));
 
   const nearbyJobs = jobsFeed ?? [];
-  // If fewer than 2 nearby jobs, show PRO jobs in the main jobs section instead
-  const showProJobsAsPrimary = !feedLoading && nearbyJobs.length < 2;
+  // If fewer than 5 nearby (location × artist type) jobs, show PRO jobs in the main jobs section instead
+  const showProJobsAsPrimary = !feedLoading && nearbyJobs.length < 5;
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 items-start">
