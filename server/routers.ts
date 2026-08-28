@@ -1397,6 +1397,9 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
+        if (!(user as any).artswrkBasic && !(user as any).artswrkPro) {
+          throw new Error("Upgrade to Artswrk Basic or PRO to apply to jobs.");
+        }
         const id = await applyToJob({
           jobId: input.jobId,
           artistUserId: user.id,
@@ -1543,18 +1546,6 @@ export const appRouter = router({
         return getApplicantStatsByClientId(user.id);
       }),
 
-    /**
-     * Get applicants for a specific job (by local job ID).
-     */
-    byJob: protectedProcedure
-      .input(z.object({
-        jobId: z.number(),
-        limit: z.number().min(1).max(100).default(50),
-        offset: z.number().min(0).default(0),
-      }))
-      .query(async ({ input }) => {
-        return getApplicantsByJobId(input.jobId, input.limit, input.offset);
-      }),
   }),
 
   // ── Bookings ────────────────────────────────────────────────────────────────
@@ -3169,8 +3160,16 @@ Fields to extract:
     /** Get PRO jobs feed for artist dashboard */
     getProJobsFeed: publicProcedure
       .input(z.object({ limit: z.number().min(1).max(100).default(20), offset: z.number().min(0).default(0) }))
-      .query(async ({ input }) => {
-        return getArtistProJobsFeed(input.limit, input.offset);
+      .query(async ({ input, ctx }) => {
+        const jobs = await getArtistProJobsFeed(input.limit, input.offset);
+        // PRO job details (company, budget, full description) are enterprise-paid
+        // content — only show them to a logged-in PRO artist. Everyone else gets
+        // the same teaser treatment individual PRO job pages already use
+        // ("Company hidden · Join to see").
+        const viewer = ctx.user ? await getUserById(ctx.user.id) : null;
+        const isPro = !!(viewer as any)?.artswrkPro;
+        if (isPro) return jobs;
+        return jobs.map(j => ({ ...j, company: null, logo: null, budget: null, description: null, locked: true }));
       }),
     /** Get PRO job applications for the logged-in artist */
     getProApplications: protectedProcedure
@@ -3196,6 +3195,10 @@ Fields to extract:
         rate: z.string().max(100).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
+        const applicant = await getUserById(ctx.user.id);
+        if (!applicant?.artswrkPro) {
+          throw new Error("Upgrade to Artswrk PRO to apply to PRO jobs.");
+        }
         const { getDb } = await import('./db');
         const dbConn = await getDb();
         if (!dbConn) throw new Error('DB unavailable');
@@ -4570,7 +4573,12 @@ Fields to extract:
   benefits: router({
     list: protectedProcedure
       .input(z.object({ audienceType: z.enum(["Artist", "Client"]) }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
+        const viewer = await getUserById(ctx.user.id);
+        const eligible = input.audienceType === "Artist"
+          ? !!(viewer as any)?.artswrkPro
+          : !!((viewer as any)?.clientPremium || (viewer as any)?.enterprise);
+        if (!eligible) return { locked: true as const, benefits: [] };
         const rows = await getBenefits(input.audienceType);
         return {
           benefits: rows.map((b) => ({
