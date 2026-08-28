@@ -338,6 +338,17 @@ function Router() {
         {() => <AppRoute clientComponent={Settings} />}
       </Route>
 
+      {/* /subscribe/basic and /subscribe/pro are referenced as upgrade CTAs
+          (Jobs.tsx paywall + banner) but never had a matching route — real
+          checkout lives in the Settings > Subscription tab, which already
+          defaults to showing it. */}
+      <Route path="/subscribe/basic">
+        {() => { window.location.replace("/app/settings"); return null; }}
+      </Route>
+      <Route path="/subscribe/pro">
+        {() => { window.location.replace("/app/settings"); return null; }}
+      </Route>
+
       {/* Legacy redirects — old /dashboard/* paths → /app/* */}
       <Route path="/dashboard">
         {() => { window.location.replace("/app"); return null; }}
