@@ -137,7 +137,11 @@ async function main() {
     await conn.commit();
     const report = { appliedAt: new Date().toISOString(), planned, validation };
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const outputPath = `/home/ubuntu/artswrk-backups/benefits-sync-${timestamp}.json`;
+    const backupDir = fs.existsSync("/home/ubuntu/artswrk-backups")
+      ? "/home/ubuntu/artswrk-backups"
+      : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".backups");
+    fs.mkdirSync(backupDir, { recursive: true });
+    const outputPath = path.join(backupDir, `benefits-sync-${timestamp}.json`);
     fs.writeFileSync(outputPath, JSON.stringify(report, null, 2));
     console.log(JSON.stringify(report, null, 2));
     console.log(`REPORT=${outputPath}`);

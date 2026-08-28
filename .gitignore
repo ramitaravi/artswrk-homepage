@@ -112,3 +112,6 @@ temp/
 
 # Claude Code local state (session worktrees may contain copies of .env)
 .claude/
+
+# Local sync-script backup reports (only used when not on the original server)
+.backups/
