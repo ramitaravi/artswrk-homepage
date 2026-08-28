@@ -169,23 +169,23 @@ export async function sendPasswordResetEmail({
 // ─── Typed helper: Application Confirmation (to artist) ─────────────────────
 /**
  * Sent to the artist who just applied.
- * NOTE: While not live, all emails are redirected to ramitaravi.94@gmail.com.
  */
 export async function sendApplicationConfirmationEmail({
+  to,
   artistName,
   jobTitle,
   jobLocation,
   jobRate,
   jobUrl,
 }: {
+  to: string;
   artistName: string;
   jobTitle: string;
   jobLocation: string;
   jobRate: string;
   jobUrl: string;
 }): Promise<boolean> {
-  // ⚠️  PRE-LAUNCH: always send to test inbox, never to the real artist email
-  const TO = "ramitaravi.94@gmail.com";
+  const TO = to;
 
   const html = `
     <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;">

@@ -1431,13 +1431,16 @@ export const appRouter = router({
             const clientDashboardUrl = `${origin}/app/jobs/${job.id}`;
 
             const emailTasks: Promise<boolean>[] = [
-              sendApplicationConfirmationEmail({
-                artistName: user.firstName ?? user.name ?? "Artist",
-                jobTitle,
-                jobLocation,
-                jobRate,
-                jobUrl,
-              }),
+              user.email
+                ? sendApplicationConfirmationEmail({
+                    to: user.email,
+                    artistName: user.firstName ?? user.name ?? "Artist",
+                    jobTitle,
+                    jobLocation,
+                    jobRate,
+                    jobUrl,
+                  })
+                : Promise.resolve(false),
             ];
 
             const clientUser = job.clientUserId ? await getUserById(job.clientUserId) : null;
