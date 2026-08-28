@@ -3845,6 +3845,7 @@ Fields to extract:
     createBasicCheckout: protectedProcedure
       .input(z.object({
         origin: z.string().url(),
+        returnPath: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const info = await getArtistSubscriptionInfo(ctx.user.id);
@@ -3853,6 +3854,7 @@ Fields to extract:
           userId: ctx.user.id,
           origin: input.origin,
           stripeCustomerId: info?.stripeCustomerId ?? null,
+          returnPath: input.returnPath,
         });
         return { url, sessionId };
       }),

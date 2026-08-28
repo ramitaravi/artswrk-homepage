@@ -10,8 +10,9 @@ import { useEffect, useMemo } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import {
   MapPin, Calendar, DollarSign, ArrowLeft,
-  Loader2, AlertCircle, CheckCircle2, FileText, ExternalLink,
+  Loader2, AlertCircle, CheckCircle2, FileText, ExternalLink, Lock, Sparkles,
 } from "lucide-react";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { formatLocation, getJobTitle } from "@/lib/utils";
@@ -93,6 +94,21 @@ export default function JobDetail() {
   const isBasic = !!(user as any)?.artswrkBasic;
   const isPro = !!(user as any)?.artswrkPro;
   const canApply = isBasic || isPro;
+
+  const { data: pricingData } = trpc.artistSubscription.getPricing.useQuery(undefined, { enabled: !canApply });
+  const basicPrice = pricingData?.basic?.annual?.dollars ?? "$30";
+  const proPrice = pricingData?.pro?.annual?.dollars ?? "$110";
+  const trialDays = pricingData?.pro?.trialDays ?? 0;
+
+  const createBasicCheckout = trpc.artistSubscription.createBasicCheckout.useMutation({
+    onSuccess: ({ url }) => window.open(url, "_blank"),
+    onError: (err) => toast.error("Checkout failed", { description: err.message }),
+  });
+  const createProCheckout = trpc.artistSubscription.createProCheckout.useMutation({
+    onSuccess: ({ url }) => window.open(url, "_blank"),
+    onError: (err) => toast.error("Checkout failed", { description: err.message }),
+  });
+  const unlockBusy = createBasicCheckout.isPending || createProCheckout.isPending;
 
   const rawSlug = params.jobSlug ?? params.locationSlug ?? "";
   const jobId = extractIdFromSlug(rawSlug);
@@ -216,15 +232,45 @@ export default function JobDetail() {
       onNotFound={(email) => { window.location.href = `/join?next=${encodeURIComponent(jobUrl)}&email=${encodeURIComponent(email)}`; }}
     />
   ) : !canApply ? (
-    <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-      <p className="text-base font-black text-[#111] mb-1">Artswrk Basic</p>
-      <p className="text-xs text-gray-400 mb-4">Subscribe to apply to jobs on Artswrk.</p>
-      <a
-        href="/app/settings"
-        className="block w-full text-center py-3 rounded-xl text-sm font-bold text-white bg-[#F25722] hover:opacity-90 transition-opacity"
-      >
-        Subscribe to apply →
-      </a>
+    <div className="rounded-2xl overflow-hidden border border-pink-100 shadow-sm">
+      <div className="artist-grad-bg px-5 py-4">
+        <p className="text-white font-black text-sm flex items-center gap-1.5"><Lock size={13} /> Unlock to apply</p>
+        <p className="text-white/80 text-xs mt-0.5">Choose a plan to send your application.</p>
+      </div>
+      <div className="bg-white p-3.5 space-y-2.5">
+        <button
+          onClick={() => createBasicCheckout.mutate({ origin: window.location.origin, returnPath: jobUrl })}
+          disabled={unlockBusy}
+          className="w-full text-left rounded-xl border border-gray-100 hover:border-pink-200 hover:bg-pink-50/30 transition-colors p-3.5 disabled:opacity-60"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-bold text-[#111]">Artswrk Basic</span>
+            <span className="text-sm font-black text-[#ec008c] flex-shrink-0">{basicPrice}/yr</span>
+          </div>
+          <p className="text-xs text-gray-400 mt-0.5">Apply to unlimited Artswrk jobs</p>
+        </button>
+        <button
+          onClick={() => createProCheckout.mutate({ origin: window.location.origin, returnPath: jobUrl })}
+          disabled={unlockBusy}
+          className="relative w-full text-left rounded-xl border-2 border-[#ec008c] bg-pink-50/50 p-3.5 disabled:opacity-60"
+        >
+          {trialDays > 0 && (
+            <span className="absolute -top-2.5 right-3 text-[9px] font-bold uppercase tracking-wide text-white artist-grad-bg px-2 py-0.5 rounded-full">
+              {trialDays}-Day Free Trial
+            </span>
+          )}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-bold text-[#111] flex items-center gap-1"><Sparkles size={12} className="text-[#ec008c]" /> Artswrk PRO</span>
+            <span className="text-sm font-black text-[#ec008c] flex-shrink-0">{proPrice}/yr</span>
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">PRO jobs, partner discounts &amp; more</p>
+        </button>
+        {(createBasicCheckout.isPending || createProCheckout.isPending) && (
+          <p className="flex items-center justify-center gap-1.5 text-xs text-gray-400 pt-1">
+            <Loader2 size={12} className="animate-spin" /> Opening checkout…
+          </p>
+        )}
+      </div>
     </div>
   ) : applied ? (
     // The full application summary further down the page is the single
@@ -236,7 +282,7 @@ export default function JobDetail() {
       <p className="text-xs text-gray-400 mb-4">Send your application in seconds.</p>
       <Link
         href={applyUrl}
-        className="block w-full text-center py-3 rounded-xl text-sm font-bold text-white bg-[#F25722] hover:opacity-90 transition-opacity"
+        className="artist-grad-bg block w-full text-center py-3 rounded-xl text-sm font-bold text-white hover:opacity-90 transition-opacity"
       >
         Apply Now →
       </Link>
@@ -409,17 +455,19 @@ export default function JobDetail() {
           <a
             href="#"
             onClick={(e) => { e.preventDefault(); document.querySelector<HTMLInputElement>("input[type=email]")?.focus(); }}
-            className="flex-shrink-0 px-5 py-3 rounded-xl text-sm font-bold text-white bg-[#F25722] hover:opacity-90 transition-opacity"
+            className="artist-grad-bg flex-shrink-0 px-5 py-3 rounded-xl text-sm font-bold text-white hover:opacity-90 transition-opacity"
           >
             Sign up to apply
           </a>
         ) : !canApply ? (
-          <a
-            href="/app/settings"
-            className="flex-shrink-0 px-5 py-3 rounded-xl text-sm font-bold text-white bg-[#F25722] hover:opacity-90 transition-opacity"
+          <button
+            onClick={() => createBasicCheckout.mutate({ origin: window.location.origin, returnPath: jobUrl })}
+            disabled={unlockBusy}
+            className="artist-grad-bg flex-shrink-0 flex items-center gap-1.5 px-5 py-3 rounded-xl text-sm font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-60"
           >
-            Subscribe →
-          </a>
+            {unlockBusy ? <Loader2 size={14} className="animate-spin" /> : <Lock size={13} />}
+            Unlock {basicPrice}/yr
+          </button>
         ) : applied ? (
           <span className="flex items-center gap-1.5 text-sm font-semibold text-green-600">
             <CheckCircle2 size={16} /> Applied!
@@ -427,7 +475,7 @@ export default function JobDetail() {
         ) : (
           <Link
             href={applyUrl}
-            className="flex-shrink-0 px-5 py-3 rounded-xl text-sm font-bold text-white bg-[#F25722] hover:opacity-90 transition-opacity"
+            className="artist-grad-bg flex-shrink-0 px-5 py-3 rounded-xl text-sm font-bold text-white hover:opacity-90 transition-opacity"
           >
             Apply Now →
           </Link>

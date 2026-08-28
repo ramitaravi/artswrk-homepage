@@ -438,6 +438,10 @@ export default function ProJobDetail() {
   const isRealEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) && !v.trim().toLowerCase().endsWith("@artswrk.com");
   const hasRealApplyEmail = !!j.applyEmail && isRealEmail(j.applyEmail);
   const externalApplyHref: string | null = j.applyLink || (hasRealApplyEmail ? `mailto:${j.applyEmail}` : null);
+  // The external link is a real off-platform apply target — it must never be
+  // reachable before the artist has actually unlocked PRO, or they get the
+  // full benefit of a PRO job (the employer's real contact) for free.
+  const canExternalApply = isAuthenticated && isPro && !!externalApplyHref;
   const title = j.serviceType ?? "Open Position";
   const location = j.workFromAnywhere ? "Work From Anywhere" : (j.location ?? "Location TBD");
   const company = j.company ?? "Artswrk Client";
@@ -530,9 +534,9 @@ export default function ProJobDetail() {
 
           {/* ── Action buttons / Applied summary chip ── */}
           <div className="flex items-center gap-3 mb-8 flex-wrap">
-            {externalApplyHref ? (
+            {canExternalApply ? (
               <a
-                href={externalApplyHref}
+                href={externalApplyHref!}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-[#111] hover:opacity-80 transition-opacity"
@@ -580,9 +584,10 @@ export default function ProJobDetail() {
             </div>
           )}
 
-          {/* ── Inline apply section — only for jobs that apply through Artswrk;
-              external-apply jobs already sent the artist off-site above ── */}
-          {!externalApplyHref && (
+          {/* ── Inline apply section — only for jobs that apply through Artswrk,
+              or for an external-apply job the artist hasn't unlocked PRO for yet
+              (the unlock gate itself renders inside this block) ── */}
+          {!canExternalApply && (
           <div ref={applyRef} className="mt-10 pt-8 border-t border-gray-100 scroll-mt-20">
             <h2 className="text-xl font-black text-[#111] mb-1">
               {applied ? "Application submitted" : "Apply for this role"}
@@ -711,9 +716,9 @@ export default function ProJobDetail() {
           <p className="text-xs text-gray-400 truncate">{location}</p>
         </div>
 
-        {externalApplyHref ? (
+        {canExternalApply ? (
           <a
-            href={externalApplyHref}
+            href={externalApplyHref!}
             target="_blank"
             rel="noopener noreferrer"
             className="flex-shrink-0 flex items-center gap-1.5 px-6 py-3 rounded-2xl text-sm font-bold text-white bg-[#111] hover:opacity-80 transition-opacity"
@@ -738,7 +743,7 @@ export default function ProJobDetail() {
               returnPath: jobUrl,
             })}
             disabled={proCheckoutMutation.isPending}
-            className="flex-shrink-0 px-6 py-3 rounded-2xl text-sm font-bold text-white bg-[#111] hover:opacity-80 transition-opacity disabled:opacity-50 flex items-center gap-2"
+            className="artist-grad-bg flex-shrink-0 px-6 py-3 rounded-2xl text-sm font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
           >
             {proCheckoutMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : "🔒"}
             Unlock PRO

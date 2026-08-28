@@ -243,7 +243,7 @@ export async function createArtistProCheckoutSession(
  * Create a Stripe Checkout Session for an artist Basic subscription.
  */
 export async function createArtistBasicCheckoutSession(
-  opts: CreateCheckoutOptions
+  opts: CreateCheckoutOptions & { returnPath?: string }
 ): Promise<{ url: string; sessionId: string }> {
   const stripe = getStripe();
   const { ARTIST_BASIC } = await import("./stripe-products").then(m => ({ ARTIST_BASIC: m.STRIPE_PRODUCTS.ARTIST_BASIC }));
@@ -253,10 +253,13 @@ export async function createArtistBasicCheckoutSession(
   // old grandfathered accounts, never for a new checkout.
   const priceId = ARTIST_BASIC.annual.priceId;
 
+  const successPath = opts.returnPath ?? "/app";
+  const separator = successPath.includes("?") ? "&" : "?";
+
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${opts.origin}/app?plan=basic&session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${opts.origin}${successPath}${separator}plan=basic&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${opts.origin}/app/settings?cancelled=1`,
     allow_promotion_codes: true,
     client_reference_id: opts.userId?.toString(),
