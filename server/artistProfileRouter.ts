@@ -98,6 +98,8 @@ export const artistProfileRouter = router({
       if (!db) throw new Error("Database unavailable");
       const [user] = await db.select().from(users).where(eq(users.slug, input.slug)).limit(1);
       if (!user) throw new Error("Profile not found");
+      const bookingCountResult = await db.select({ value: count() }).from(bookings).where(eq(bookings.artistUserId, user.id));
+      const liveBookingCount = bookingCountResult[0]?.value ?? 0;
       return {
         id: user.id,
         name: user.name || "",
@@ -109,7 +111,7 @@ export const artistProfileRouter = router({
         location: user.location || "",
         profilePicture: user.profilePicture || "",
         isPro: user.artswrkPro ?? false,
-        bookingCount: user.bookingCount ?? 0,
+        bookingCount: liveBookingCount || user.bookingCount || 0,
         ratingScore: user.ratingScore ?? 0,
         reviewCount: user.reviewCount ?? 0,
         workTypes: parseJsonArray(user.workTypes),
@@ -193,13 +195,14 @@ export const artistProfileRouter = router({
       const db = await getDb();
       if (!db) throw new Error("Database unavailable");
 
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, input.userId))
-        .limit(1);
+      const [[user], bookingCountResult] = await Promise.all([
+        db.select().from(users).where(eq(users.id, input.userId)).limit(1),
+        db.select({ value: count() }).from(bookings).where(eq(bookings.artistUserId, input.userId)),
+      ]);
 
       if (!user) throw new Error("Profile not found");
+
+      const liveBookingCount = bookingCountResult[0]?.value ?? 0;
 
       return {
         id: user.id,
@@ -212,7 +215,7 @@ export const artistProfileRouter = router({
         location: user.location || "",
         profilePicture: user.profilePicture || "",
         isPro: user.artswrkPro ?? false,
-        bookingCount: user.bookingCount ?? 0,
+        bookingCount: liveBookingCount || user.bookingCount || 0,
         ratingScore: user.ratingScore ?? 0,
         reviewCount: user.reviewCount ?? 0,
         workTypes: parseJsonArray(user.workTypes),
