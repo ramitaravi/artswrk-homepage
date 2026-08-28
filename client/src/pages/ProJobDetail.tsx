@@ -427,7 +427,12 @@ export default function ProJobDetail() {
   // apply form. The applyDirect flag itself is unreliable on Bubble-migrated
   // records (many real link-out jobs have applyDirect=0 with applyLink still
   // populated) — the presence of a real link/email is the actual signal.
-  const externalApplyHref: string | null = j.applyLink || (j.applyEmail ? `mailto:${j.applyEmail}` : null);
+  // "contact@artswrk.com" specifically is a migration placeholder, not a real
+  // employer address — jobs with only that value (no real link/email) are
+  // genuinely in-platform, and treating them as external hides the in-platform
+  // apply state entirely, including any application the artist already submitted.
+  const hasRealApplyEmail = !!j.applyEmail && j.applyEmail.toLowerCase() !== "contact@artswrk.com";
+  const externalApplyHref: string | null = j.applyLink || (hasRealApplyEmail ? `mailto:${j.applyEmail}` : null);
   const title = j.serviceType ?? "Open Position";
   const location = j.workFromAnywhere ? "Work From Anywhere" : (j.location ?? "Location TBD");
   const company = j.company ?? "Artswrk Client";
