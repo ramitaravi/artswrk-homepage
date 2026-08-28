@@ -484,7 +484,7 @@ export default function EditProfilePage({ onClose, initialTab = "about" }: EditP
                     value={about.tiktok}
                     onChange={e => setAbout(prev => prev ? { ...prev, tiktok: e.target.value } : prev)}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-400 transition-colors"
-                    placeholder="@yourhandle"
+                    placeholder="@yourhandle or full tiktok.com link"
                   />
                 </div>
                 <div>

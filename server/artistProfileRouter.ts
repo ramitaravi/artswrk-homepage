@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { eq, count, desc } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getDb } from "./db";
+import { getDb, normalizeSocialLink } from "./db";
 import { users, artistReviews, artistServiceCategories, artistResumes, bookings } from "../drizzle/schema";
 
 // ─── Helper: parse JSON array safely ──────────────────────────────────────────
@@ -422,11 +422,11 @@ export const artistProfileRouter = router({
         updateData.mediaPhotos = JSON.stringify(input.mediaPhotos);
       if (input.resumeFiles !== undefined)
         updateData.resumeFiles = JSON.stringify(input.resumeFiles);
-      if (input.instagram !== undefined) updateData.instagram = input.instagram;
-      if (input.tiktok !== undefined) updateData.tiktok = input.tiktok;
-      if (input.youtube !== undefined) updateData.youtube = input.youtube;
-      if (input.website !== undefined) updateData.website = input.website;
-      if (input.portfolio !== undefined) updateData.portfolio = input.portfolio;
+      if (input.instagram !== undefined) updateData.instagram = normalizeSocialLink(input.instagram, "instagram");
+      if (input.tiktok !== undefined) updateData.tiktok = normalizeSocialLink(input.tiktok, "tiktok");
+      if (input.youtube !== undefined) updateData.youtube = normalizeSocialLink(input.youtube, "youtube");
+      if (input.website !== undefined) updateData.website = normalizeSocialLink(input.website, "website");
+      if (input.portfolio !== undefined) updateData.portfolio = normalizeSocialLink(input.portfolio, "portfolio");
       if (input.phoneNumber !== undefined) updateData.phoneNumber = input.phoneNumber;
 
       // Update combined name if first/last changed

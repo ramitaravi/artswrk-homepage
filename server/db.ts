@@ -26,6 +26,38 @@ function utcIsoSql(column: string): string {
   return `DATE_FORMAT(${column}, '%Y-%m-%dT%H:%i:%s.000Z')`;
 }
 
+/**
+ * Normalize a social/web link a user typed into a real, clickable URL before
+ * it's stored — instead of blocking the save with a format error. Accepts
+ * whatever people naturally type (a bare handle, "@handle", "www.site.com",
+ * a full URL) and returns a real https:// URL, or the trimmed input
+ * unchanged if it doesn't look like anything we can safely turn into one
+ * (kept as-is rather than mangled into a broken link).
+ *
+ * Exported so a one-time backfill script can run this exact same logic
+ * against existing un-normalized rows, not just new saves.
+ */
+export function normalizeSocialLink(raw: string, platform: "instagram" | "tiktok" | "youtube" | "website" | "portfolio"): string {
+  const value = raw.trim();
+  if (!value) return value;
+
+  if (platform === "instagram" || platform === "tiktok") {
+    // Already a real URL — leave it alone.
+    if (/^https?:\/\//i.test(value)) return value;
+    // A bare handle, with or without a leading @ — build the real profile URL.
+    // Instagram URLs are instagram.com/handle; TikTok's are tiktok.com/@handle.
+    const handle = value.replace(/^@/, "").trim();
+    if (!/^[\w.]+$/.test(handle)) return value; // doesn't look like a handle — leave untouched
+    return platform === "instagram" ? `https://instagram.com/${handle}` : `https://www.tiktok.com/@${handle}`;
+  }
+
+  // website / portfolio / youtube: generic URLs
+  if (/^https?:\/\//i.test(value)) return value;
+  // Looks like a bare domain (has a dot, no spaces) — add the scheme.
+  if (/^[\w.-]+\.[a-z]{2,}(\/.*)?$/i.test(value)) return `https://${value}`;
+  return value; // not URL-shaped — leave untouched rather than guess
+}
+
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
