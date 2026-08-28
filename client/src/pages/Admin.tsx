@@ -42,20 +42,51 @@ function displayName(row: { name?: string | null; firstName?: string | null; las
 }
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
-const NAV_ITEMS: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
-  { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={16} /> },
-  { id: "artists", label: "Artists", icon: <Users size={16} /> },
-  { id: "clients", label: "Clients", icon: <Building2 size={16} /> },
-  { id: "jobs", label: "Jobs", icon: <Briefcase size={16} /> },
-  { id: "pro-jobs", label: "PRO Jobs", icon: <Sparkles size={16} /> },
-  { id: "enterprise-clients", label: "Enterprise Clients", icon: <Building2 size={16} /> },
-  { id: "bookings", label: "Bookings", icon: <BookOpen size={16} /> },
-  { id: "admin-bookings", label: "Admin Bookings", icon: <CalendarDays size={16} /> },
-  { id: "payments", label: "Payments", icon: <CreditCard size={16} /> },
-  { id: "subscriptions", label: "Subscriptions", icon: <TrendingUp size={16} /> },
-  { id: "benefits", label: "Benefits", icon: <Gift size={16} /> },
-  { id: "emails", label: "Emails", icon: <Mail size={16} /> },
-  { id: "settings", label: "Settings", icon: <Settings size={16} /> },
+// Grouped nav: a group with no `items` is a single leaf link; a group with
+// `items` renders as a small-caps section label above its own leaf links —
+// mirrors the "DATABASE" section pattern from the reference design.
+type NavLeaf = { id: AdminSection; label: string; icon: React.ReactNode };
+type NavGroup = { label?: string; icon?: React.ReactNode; leaf?: NavLeaf; items?: NavLeaf[] };
+
+const NAV_GROUPS: NavGroup[] = [
+  { leaf: { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={16} /> } },
+  {
+    label: "Users",
+    items: [
+      { id: "artists", label: "Artists", icon: <Users size={16} /> },
+      { id: "clients", label: "Clients", icon: <Building2 size={16} /> },
+      { id: "enterprise-clients", label: "Enterprise", icon: <Building2 size={16} /> },
+    ],
+  },
+  {
+    label: "Jobs",
+    items: [
+      { id: "jobs", label: "Basic", icon: <Briefcase size={16} /> },
+      { id: "pro-jobs", label: "PRO", icon: <Sparkles size={16} /> },
+    ],
+  },
+  {
+    label: "Bookings",
+    items: [
+      { id: "bookings", label: "All Bookings", icon: <BookOpen size={16} /> },
+      { id: "admin-bookings", label: "Admin Bookings", icon: <CalendarDays size={16} /> },
+    ],
+  },
+  {
+    label: "Payments",
+    items: [
+      { id: "payments", label: "All Payments", icon: <CreditCard size={16} /> },
+      { id: "subscriptions", label: "Subscriptions", icon: <TrendingUp size={16} /> },
+    ],
+  },
+  { leaf: { id: "benefits", label: "Benefits", icon: <Gift size={16} /> } },
+  {
+    label: "Settings",
+    items: [
+      { id: "settings", label: "General", icon: <Settings size={16} /> },
+      { id: "emails", label: "Emails", icon: <Mail size={16} /> },
+    ],
+  },
 ];
 
 function Sidebar({ active, onSelect, collapsed, onToggle }: {
@@ -65,50 +96,59 @@ function Sidebar({ active, onSelect, collapsed, onToggle }: {
   onToggle: () => void;
 }) {
   return (
-    <aside className={`flex flex-col bg-[#111] text-white transition-all duration-200 ${collapsed ? "w-14" : "w-56"} min-h-screen flex-shrink-0`}>
+    <aside className={`flex flex-col bg-white border-r border-gray-100 transition-all duration-200 ${collapsed ? "w-14" : "w-60"} min-h-screen flex-shrink-0`}>
       {/* Logo + toggle */}
-      <div className="flex items-center justify-between px-3 py-4 border-b border-white/10">
+      <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
         {!collapsed && (
           <div className="flex items-center gap-1.5">
             <span className="font-black text-lg tracking-tight hirer-grad-text">ARTS</span>
-            <span className="font-black text-lg tracking-tight bg-white text-[#111] px-1 py-0.5 rounded text-xs">WRK</span>
-            <span className="text-[10px] text-white/40 ml-1 font-semibold uppercase tracking-wider">Admin</span>
+            <span className="font-black text-lg tracking-tight bg-[#111] text-white px-1 py-0.5 rounded text-xs">WRK</span>
+            <span className="text-[10px] text-gray-400 ml-1 font-semibold uppercase tracking-wider border border-gray-200 rounded-full px-1.5 py-0.5">Admin</span>
           </div>
         )}
-        <button onClick={onToggle} className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors ml-auto">
+        <button onClick={onToggle} className="p-1.5 rounded-lg text-gray-400 hover:text-[#111] hover:bg-gray-50 transition-colors ml-auto">
           {collapsed ? <Menu size={16} /> : <X size={16} />}
         </button>
       </div>
 
-      {/* Nav items */}
-      <nav className="flex-1 py-3 space-y-0.5 px-2">
-        {NAV_ITEMS.map(item => (
-          <button
-            key={item.id}
-            onClick={() => onSelect(item.id)}
-            className={`w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-              active === item.id
-                ? "bg-white/15 text-white"
-                : "text-white/50 hover:text-white hover:bg-white/8"
-            }`}
-          >
-            <span className="flex-shrink-0">{item.icon}</span>
-            {!collapsed && <span>{item.label}</span>}
-          </button>
+      {/* Nav groups */}
+      <nav className="flex-1 py-4 px-3 space-y-4 overflow-y-auto">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label ?? group.leaf!.id}>
+            {!collapsed && group.label && (
+              <p className="px-2.5 mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">{group.label}</p>
+            )}
+            <div className="space-y-0.5">
+              {(group.leaf ? [group.leaf] : group.items!).map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => onSelect(item.id)}
+                  className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-sm font-medium transition-colors ${
+                    active === item.id
+                      ? "bg-orange-50 text-[#F25722]"
+                      : "text-gray-500 hover:text-[#111] hover:bg-gray-50"
+                  }`}
+                >
+                  <span className="flex-shrink-0">{item.icon}</span>
+                  {!collapsed && <span>{item.label}</span>}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 
       {/* Bottom: links to other dashboards */}
       {!collapsed && (
-        <div className="p-3 border-t border-white/10 space-y-1">
+        <div className="p-3 border-t border-gray-100 space-y-0.5">
           <Link href="/leads" className="block">
-            <button className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-white/40 hover:text-white hover:bg-white/10 transition-colors">
+            <button className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-gray-400 hover:text-[#111] hover:bg-gray-50 transition-colors">
               <ArrowUpRight size={13} />
               Leads Dashboard
             </button>
           </Link>
           <Link href="/app" className="block">
-            <button className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-white/40 hover:text-white hover:bg-white/10 transition-colors">
+            <button className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-gray-400 hover:text-[#111] hover:bg-gray-50 transition-colors">
               <ArrowUpRight size={13} />
               App Dashboard
             </button>
