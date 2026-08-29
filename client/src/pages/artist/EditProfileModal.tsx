@@ -11,8 +11,8 @@ import { toast } from "sonner";
 // ─── Artist Type definitions ──────────────────────────────────────────────────
 
 const ARTIST_TYPES = [
-  { name: "Dance Educator", subServices: ["Competition Choreography", "Substitute Teacher", "Recurring Classes", "Private Lessons", "Master Classes", "Event Choreography"] },
-  { name: "Dance Adjudicator", subServices: ["Dance Competition Judge"] },
+  { name: "Dance Educator", subServices: ["Competition Choreography", "Substitute Teacher", "Weekly Teacher", "Private Lessons", "Master Classes", "Event Choreography"] },
+  { name: "Dance Competition Staff", subServices: ["Judge", "Tabulator", "Emcee", "Backstage Staff", "Merch", "Awards", "Registration", "Stage Manager", "Crew", "Event Director"] },
   { name: "Photographer", subServices: ["Event Photography", "Headshots", "Studio Photography", "On-Location Photography"] },
   { name: "Videographer", subServices: ["Event Videography", "Music Videos", "Promotional Videos", "Reels/Social Content"] },
   { name: "Acting Coach", subServices: ["Scene Study", "Audition Prep", "Cold Reading", "On-Camera Coaching"] },
