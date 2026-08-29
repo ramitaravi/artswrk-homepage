@@ -115,3 +115,7 @@ temp/
 
 # Local sync-script backup reports (only used when not on the original server)
 .backups/
+
+# Resumability log for the geocode backfill script — machine-local run state,
+# not something to commit.
+scripts/_geocode_backfill_failed.json

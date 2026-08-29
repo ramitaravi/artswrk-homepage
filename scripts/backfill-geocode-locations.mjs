@@ -8,10 +8,15 @@
  * locationPlaceId columns to exist first. Running this before then will
  * fail outright (columns don't exist).
  *
+ * Run with `npx tsx scripts/backfill-geocode-locations.mjs` — it does a
+ * dynamic import of server/location.ts (real .ts, not compiled), which
+ * plain `node` can't resolve.
+ *
  * Resumable by design: only selects rows WHERE the new lat column IS NULL
- * AND the text address IS NOT NULL, so a re-run (after a crash, a rate
- * limit, or just stopping it) picks up exactly where it left off — never
- * reprocesses a row that already succeeded.
+ * AND the text address IS NOT NULL, excluding anything already logged as a
+ * failure (see below) directly in the SQL — so a re-run (after a crash, a
+ * rate limit, or just stopping it) picks up exactly where it left off,
+ * without ever getting stuck re-fetching the same already-failed page.
  *
  * Rate-limited: geocoding runs through the Forge proxy (server/location.ts
  * -> geocodeLocation), since the browser Places key is referrer-restricted
@@ -21,6 +26,9 @@
 import mysql from "mysql2/promise";
 import dotenv from "dotenv";
 import fs from "fs";
+// Must run before the dynamic import below — server/location.ts reads
+// ENV at module-load time, so DATABASE_URL/keys need to already be in
+// process.env before that import executes. Easy to break by reordering.
 dotenv.config();
 
 // Failures are tracked here, NOT by writing a sentinel into locationLat/Lng —
@@ -69,25 +77,34 @@ for (const { table, addressCol, idCol, hasCountry } of TABLES) {
   const [[{ total }]] = await conn.execute(
     `SELECT COUNT(*) AS total FROM ${table} WHERE locationLat IS NULL AND ${addressCol} IS NOT NULL AND ${addressCol} != ''`
   );
-  console.log(`${total} rows need geocoding (includes ${[...failedIds].filter((k) => k.startsWith(`${table}:`)).length} already-failed, which will be skipped)`);
+  const failedForTable = [...failedIds]
+    .filter((k) => k.startsWith(`${table}:`))
+    .map((k) => Number(k.split(":")[1]));
+  console.log(`${total} rows need geocoding (${failedForTable.length} already logged as failed, excluded from the query below so the window always advances)`);
 
   let processed = 0, geocoded = 0, failed = 0;
 
   while (true) {
+    // Excluding failures in SQL (not by filtering the JS result) is the
+    // whole fix: a row whose geocode failed keeps locationLat NULL forever,
+    // so without this NOT IN, the same already-failed rows would keep
+    // filling every page and the loop would stop the moment 50+ rows in a
+    // table had failed — even with thousands of untried rows still sitting
+    // past that point. ORDER BY makes the window deterministic across
+    // iterations; without it LIMIT's ordering isn't guaranteed stable.
+    const notIn = failedForTable.length
+      ? `AND ${idCol} NOT IN (${failedForTable.map(() => "?").join(",")})`
+      : "";
     const [rows] = await conn.execute(
       `SELECT ${idCol} AS id, ${addressCol} AS address FROM ${table}
-       WHERE locationLat IS NULL AND ${addressCol} IS NOT NULL AND ${addressCol} != ''
-       LIMIT ${BATCH_SIZE}`
+       WHERE locationLat IS NULL AND ${addressCol} IS NOT NULL AND ${addressCol} != '' ${notIn}
+       ORDER BY ${idCol}
+       LIMIT ${BATCH_SIZE}`,
+      failedForTable
     );
-    const pending = rows.filter((r) => !failedIds.has(`${table}:${r.id}`));
     if (rows.length === 0) break;
-    if (pending.length === 0) {
-      // Every row left in this window already failed before — nothing new to try.
-      console.log(`\n  Remaining rows all previously failed (see ${FAILED_LOG_PATH.pathname}) — stopping this table.`);
-      break;
-    }
 
-    for (const row of pending) {
+    for (const row of rows) {
       const result = await geocodeLocation(row.address);
       if (result && result.lat != null && result.lng != null) {
         const cols = {
@@ -106,6 +123,10 @@ for (const { table, addressCol, idCol, hasCountry } of TABLES) {
       } else {
         failedIds.add(`${table}:${row.id}`);
         saveFailedIds(failedIds);
+        // Also push into this run's exclusion list — without this, the very
+        // next page's query wouldn't know about a failure from a few rows
+        // ago and would fetch it right back into the window.
+        failedForTable.push(row.id);
         failed++;
       }
       processed++;
