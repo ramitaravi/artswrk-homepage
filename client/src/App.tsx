@@ -101,10 +101,14 @@ function AppRoute({ clientComponent: ClientComponent = Overview }: { clientCompo
     );
   }
 
-  // Enterprise users belong on /enterprise, not the regular dashboard
+  // Enterprise accounts see the Enterprise dashboard right at /app, same as
+  // everyone else — no more bouncing to a separate /enterprise URL. Rendered
+  // unwrapped (no DashboardLayout) since Enterprise manages its own full-page
+  // chrome, same as it always has at the standalone /enterprise route (which
+  // still exists too, untouched — Enterprise's own internal navigation to
+  // /enterprise/:jobId for job deep-links still resolves correctly there).
   if (isEnterprise) {
-    window.location.replace("/enterprise");
-    return null;
+    return <Enterprise />;
   }
 
   return (
