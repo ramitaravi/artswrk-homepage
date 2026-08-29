@@ -418,8 +418,19 @@ export const artistProfileRouter = router({
         updateData.masterArtistTypes = JSON.stringify(input.masterArtistTypes);
       if (input.masterStyles !== undefined)
         updateData.masterStyles = JSON.stringify(input.masterStyles);
-      if (input.mediaPhotos !== undefined)
+      if (input.mediaPhotos !== undefined) {
+        if (input.mediaPhotos.length > 3) {
+          const [current] = await db
+            .select({ planTier: users.planTier })
+            .from(users)
+            .where(eq(users.id, ctx.user.id))
+            .limit(1);
+          if (current?.planTier !== "artist_pro") {
+            throw new Error("Upgrade to Artswrk PRO to upload more than 3 photos.");
+          }
+        }
         updateData.mediaPhotos = JSON.stringify(input.mediaPhotos);
+      }
       if (input.resumeFiles !== undefined)
         updateData.resumeFiles = JSON.stringify(input.resumeFiles);
       if (input.instagram !== undefined) updateData.instagram = normalizeSocialLink(input.instagram, "instagram");

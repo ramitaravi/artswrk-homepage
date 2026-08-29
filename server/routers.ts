@@ -6,7 +6,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail, sendArtistBookingConfirmedEmail, sendClientBookingConfirmedEmail, sendClientPayArtistEmail } from "./email";
 import crypto from "crypto";
@@ -1815,6 +1815,11 @@ export const appRouter = router({
           if (!allowed) {
             throw new Error("Unlock this artist's job (or upgrade to Premium) to message them.");
           }
+        } else {
+          const allowed = await canArtistMessageClient(artistUserId, clientUserId);
+          if (!allowed) {
+            throw new Error("Apply to one of this client's jobs (or upgrade to PRO) to message them.");
+          }
         }
 
         const convo = await getOrCreateConversation(clientUserId, artistUserId);
@@ -1850,11 +1855,37 @@ export const appRouter = router({
   artists: router({
     /**
      * Get a single artist by their local DB id.
+     * Full profile (bio, socials, contact-adjacent fields) is only for the
+     * artist themselves, an admin, or a subscribed client (client_premium /
+     * enterprise_subscription) — everyone else (logged out, on-demand
+     * client/enterprise, another artist) gets a locked preview: name, photo,
+     * location only, with an upgrade prompt to unlock the rest.
      */
-    getById: protectedProcedure
+    getById: publicProcedure
       .input(z.object({ artistId: z.number() }))
-      .query(async ({ input }) => {
-        return getArtistById(input.artistId);
+      .query(async ({ input, ctx }) => {
+        const artist = await getArtistById(input.artistId);
+        if (!artist) return null;
+
+        const viewerId = ctx.user?.id;
+        let hasFullAccess = false;
+        if (viewerId) {
+          if (viewerId === input.artistId) hasFullAccess = true;
+          else {
+            const viewer = await getUserById(viewerId);
+            const v = viewer as any;
+            hasFullAccess = viewer?.role === "admin"
+              || v?.planTier === "client_premium"
+              || v?.planTier === "enterprise_subscription";
+          }
+        }
+
+        if (hasFullAccess) return { ...artist, locked: false as const };
+
+        const { bio, pronouns, artistDisciplines, artistServices, masterArtistTypes, masterStyles,
+          artistExperiences, portfolio, website, instagram, tiktok, youtube, videos, credits,
+          ...preview } = artist as any;
+        return { ...preview, locked: true as const };
       }),
 
     /**

@@ -3778,6 +3778,33 @@ export async function canClientMessageArtist(clientUserId: number, artistUserId:
 }
 
 /**
+ * Whether an artist is allowed to start a NEW conversation with a given
+ * client. Free artists can't message anyone; Basic artists can only message
+ * a client whose job they've actually applied to (regular or PRO); PRO
+ * artists can message anyone. Existing conversations are never revoked by
+ * this check (only gates starting new ones) — mirrors canClientMessageArtist.
+ */
+export async function canArtistMessageClient(artistUserId: number, clientUserId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const artist = await getUserById(artistUserId);
+  if (!artist) return false;
+  const a = artist as any;
+  if (artist.role === "admin" || a.planTier === "artist_pro") return true;
+  if (a.planTier !== "artist_basic") return false;
+
+  const jobRows = await db.execute(
+    `SELECT 1 FROM interested_artists ia INNER JOIN jobs j ON j.id = ia.jobId WHERE ia.artistUserId = ${artistUserId} AND j.clientUserId = ${clientUserId} LIMIT 1`
+  );
+  if ((jobRows[0] as unknown as any[]).length > 0) return true;
+
+  const premiumJobRows = await db.execute(
+    `SELECT 1 FROM premium_job_interested_artists pia INNER JOIN premium_jobs pj ON pj.id = pia.premiumJobId WHERE pia.artistUserId = ${artistUserId} AND pj.createdByUserId = ${clientUserId} LIMIT 1`
+  );
+  return (premiumJobRows[0] as unknown as any[]).length > 0;
+}
+
+/**
  * Record a per-job unlock after successful Stripe payment.
  */
 export async function createClientJobUnlock(data: {
