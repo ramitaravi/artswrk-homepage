@@ -1,0 +1,51 @@
+Priority,Old URL pattern,Example old URL,Redirects to,How it resolves,If the lookup finds nothing,Notes
+P0,/book/<bubbleId>,/book/1659533883431x527826980339748400,/book/<slug>,301 after lookup: users.bubbleId -> users.slug,/browse,"~2,762 indexed artist profiles. Looks up users.bubbleId, 301s to the artist's slug."
+P0,/app?tab=jobs,/app?tab=jobs,/app/jobs,301 (static),—,
+P0,/app?tab=requests,/app?tab=requests,/app/jobs,301 (static),—,Old Bubble job requests.
+P0,/app?tab=bookings,/app?tab=bookings,/app/bookings,301 (static),—,
+P0,/app?tab=payment,/app?tab=payment,/app/payments,301 (static),—,Singular spelling — this is the one in the live 'Artswrk Wallet' payout email.
+P0,/app?tab=payments,/app?tab=payments,/app/payments,301 (static),—,"Plural spelling, also covered."
+P0,/app?tab=messages,/app?tab=messages,/app/messages,301 (static),—,
+P0,/app?tab=profile,/app?tab=profile,/app/profile,301 (static),—,
+P0,/app?tab=benefits,/app?tab=benefits,/app/benefits,301 (static),—,
+P0,/app?tab=settings,/app?tab=settings,/app/settings,301 (static),—,Not in the sheet; covered anyway.
+P0,/app?tab=artists,/app?tab=artists,/app/artists,301 (static),—,Not in the sheet; covered anyway.
+P0,/app?tab=company,/app?tab=company,/app/company,301 (static),—,Not in the sheet; covered anyway.
+P0,/app?tab=lists,/app?tab=lists,/app/lists,301 (static),—,Not in the sheet; covered anyway.
+P0,/app?tab=community,/app?tab=community,/app/community,301 (static),—,Not in the sheet; covered anyway.
+P0,/app?tab=companies,/app?tab=companies,/app/companies,301 (static),—,Not in the sheet; covered anyway.
+P0,/pro?uid=<bubble job id>,/pro?uid=1659533883431x527826980339748400,/pro/<serviceType>-<id>,301 after lookup: premium_jobs.bubbleId (falls back to the other table),/pro,"Every marketing 'Apply Here' CTA. Tries premium_jobs first, then jobs."
+P0,/jobs?uid=<bubble job id>,/jobs?uid=1659533883431x527826980339748400,/jobs/<slug>,301 after lookup: jobs.bubbleId (falls back to the other table),/jobs,"Jobs Drop campaign CTAs. Tries jobs first, then premium_jobs."
+P1,/universities,/universities,/,301 (static),—,"DECISION: redirect to homepage for now, rebuild the pages later."
+P1,/universities/<slug>,/universities/nyu,/,301 (static),—,All 66 slugs (70 sitemap URLs).
+P1,/<artist-handle>,/ramitaravi,/book/<slug>,301 after lookup: users.slug,(real 404),Root vanity URLs — the top current 404s. Only fires on a segment that isn't a real route.
+P1,/reset_pw,/reset_pw,/forgot-password,301 (static),—,Old Bubble password-reset links.
+P2,/benefits,/benefits,/app/benefits,301 (static),—,Live links in the artist payout + 'Welcome to Artswrk PRO' emails.
+P2,/blog,/blog,/,301 (static),—,No equivalent — closest parent.
+P2,/partners,/partners,/,301 (static),—,No equivalent — closest parent.
+P2,/map,/map,/,301 (static),—,No equivalent — closest parent.
+P2,/contact,/contact,/,301 (static),—,No equivalent — closest parent.
+P2,/pricing,/pricing,/join,301 (static),—,
+P2,/dance-schools,/dance-schools,/dance-studios,301 (static),—,Folded into the dance-studios page.
+P2,/dance-educators,/dance-educators,/dance-studios,301 (static),—,Folded into the dance-studios page.
+P2,/network,/network,/app/community,301 (static),—,2022 'New connection request' email CTA.
+P2,/PRO (any casing),/PRO,/pro,301 (static),—,Seen in marketing. First path segment is lower-cased.
+P2,/null/<slug>,/null/ramitaravi,/book/<slug>,301 after lookup: users.slug,/browse,38 recent hits — an undefined value interpolated into a URL.
+P2,/null/<real route>,/null/jobs,/jobs,301 (static),—,Same bug in front of a route that does exist.
+P2,/?action=join,/?action=join,/join,301 (static),—,Old homepage query link.
+P2,/?section=artist,/?section=artist,/browse,301 (static),—,Old homepage query link.
+OK,/signup,/signup,/join,301 (static),—,Was client-side only; now a server 301 for SEO.
+OK,/dashboard,/dashboard,/app,301 (static),—,Was client-side only; now a server 301 for SEO.
+OK,/dashboard/<rest>,/dashboard/messages,/app/messages,301 (static),—,Path is preserved through the move to /app.
+OK,/artist-dashboard,/artist-dashboard,/app,301 (static),—,Was client-side only; now a server 301 for SEO.
+P3,/artists/<slug>,/artists/ramitaravi,/book/<slug>,301 after lookup: users.slug,/browse,Stray external typo — the real route is /book/<slug>.
+P3,/prro,/prro,/pro,301 (static),—,Stray external typo.
+P3,/artswrk.com/<path>,/artswrk.com/terms,/terms,301 (static),—,External link that glued the domain into the path.
+P3,/version-test/<real route>,/version-test/jobs,/jobs,301 (static),—,"Old Bubble staging prefix, stripped."
+P3,/version-test/reset_pw,/version-test/reset_pw,/forgot-password,301 (static),—,2022 email-confirmation / reset links.
+P3,/version-test/<anything else>,/version-test/whatever,/book/<slug>,301 after lookup: users.slug,/,Falls back to the homepage rather than 404ing.
+—,url3751.artswrk.com,url3751.artswrk.com,(untouched),"SendGrid click-tracking CNAME — DNS, not code",—,MUST keep resolving through the DNS migration or every link in every historical email dies.
+—,/book/<slug>,/book/ramita-ravi,(no redirect),Already a real route,—,Slug-based profiles work as-is; only ID-based ones needed a fallback.
+—,Existing routes,"/jobs, /pro, /browse, /join, /login, /terms, /privacy-policy, /about, /admin-dashboard, /enterprise, /",(no redirect),Already real routes,—,Unchanged from the old site.
+P3,Any unknown route,/some-junk-url,(no redirect),Now returns a real HTTP 404 instead of 200,—,"Was a soft 404: every unknown URL returned 200 + the NotFound page, which told crawlers junk URLs were real pages."
+P3,Legacy subdomains,"api.artswrk.com, shop.artswrk.com",(unreviewed),"DNS decision, not code",—,Still needs a fate decision.

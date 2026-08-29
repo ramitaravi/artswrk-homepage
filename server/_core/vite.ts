@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
+import { pathnameFromUrl, statusForPath } from "../redirects";
 
 export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
@@ -39,7 +40,10 @@ export async function setupVite(app: Express, server: Server) {
         `src="/src/main.tsx?v=${nanoid()}"`
       );
       const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      // Unknown routes get a real 404 status, not a 200 with the NotFound
+      // component painted over it — a soft 404 tells crawlers the junk URL is
+      // a real page and makes crawl audits unusable. Same HTML either way.
+      res.status(statusForPath(pathnameFromUrl(url))).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
@@ -61,7 +65,8 @@ export function serveStatic(app: Express) {
   app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  app.use("*", (req, res) => {
+    // See the note in setupVite: real 404 status for routes that don't exist.
+    res.status(statusForPath(pathnameFromUrl(req.originalUrl))).sendFile(path.resolve(distPath, "index.html"));
   });
 }
