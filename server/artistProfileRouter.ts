@@ -197,10 +197,20 @@ export const artistProfileRouter = router({
         .filter(c => c.subServices.length > 0);
     }),
 
-  /** Get a public profile by user ID */
+  /**
+   * Get a public profile by user ID — this is the query behind the in-app
+   * client "view artist" page (/app/artists/:id), NOT the artist's own
+   * shareable public profile (that's getProfileBySlug, at /book/:slug,
+   * which stays fully open — an artist wants their socials visible there).
+   * Here, socials/contact/bio are only for an admin, a subscribed client
+   * (client_premium / enterprise_subscription), or the artist themselves —
+   * an on-demand client, logged-out visitor, or another artist gets a
+   * locked preview with `locked: true` so the frontend can render a
+   * "Subscribe to connect" CTA instead of a real profile.
+   */
   getPublicProfile: publicProcedure
     .input(z.object({ userId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new Error("Database unavailable");
 
@@ -213,6 +223,18 @@ export const artistProfileRouter = router({
 
       const liveBookingCount = bookingCountResult[0]?.value ?? 0;
 
+      const viewerId = ctx.user?.id;
+      let hasFullAccess = false;
+      if (viewerId) {
+        if (viewerId === input.userId) hasFullAccess = true;
+        else {
+          const [viewer] = await db.select({ role: users.role, planTier: users.planTier }).from(users).where(eq(users.id, viewerId)).limit(1);
+          hasFullAccess = viewer?.role === "admin"
+            || viewer?.planTier === "client_premium"
+            || viewer?.planTier === "enterprise_subscription";
+        }
+      }
+
       return {
         id: user.id,
         name: user.name || "",
@@ -220,7 +242,7 @@ export const artistProfileRouter = router({
         lastName: user.lastName || "",
         pronouns: user.pronouns || "",
         tagline: user.tagline || "",
-        bio: user.bio || "",
+        bio: hasFullAccess ? (user.bio || "") : "",
         location: user.location || "",
         profilePicture: user.profilePicture || "",
         isPro: user.artswrkPro ?? false,
@@ -232,17 +254,18 @@ export const artistProfileRouter = router({
         artistServices: parseJsonArray(user.artistServices),
         masterArtistTypes: parseJsonArray(user.masterArtistTypes),
         masterStyles: parseJsonArray(user.masterStyles),
-        mediaPhotos: parseJsonArray(user.mediaPhotos),
-        resumeFiles: parseResumeFiles(user.resumeFiles),
-        resumes: parseJsonArray(user.resumes),
-        videos: parseJsonArray(user.videos),
-        instagram: user.instagram || "",
-        tiktok: user.tiktok || "",
-        youtube: user.youtube || "",
-        website: user.website || "",
-        portfolio: user.portfolio || "",
+        mediaPhotos: hasFullAccess ? parseJsonArray(user.mediaPhotos) : [],
+        resumeFiles: hasFullAccess ? parseResumeFiles(user.resumeFiles) : [],
+        resumes: hasFullAccess ? parseJsonArray(user.resumes) : [],
+        videos: hasFullAccess ? parseJsonArray(user.videos) : [],
+        instagram: hasFullAccess ? (user.instagram || "") : "",
+        tiktok: hasFullAccess ? (user.tiktok || "") : "",
+        youtube: hasFullAccess ? (user.youtube || "") : "",
+        website: hasFullAccess ? (user.website || "") : "",
+        portfolio: hasFullAccess ? (user.portfolio || "") : "",
         joinedAt: user.createdAt,
         bubbleCreatedAt: user.bubbleCreatedAt,
+        locked: !hasFullAccess,
       };
     }),
 

@@ -9,10 +9,12 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Search, Users, ChevronRight, Loader2,
-  Heart, ArrowRight, CalendarCheck,
+  Heart, ArrowRight, CalendarCheck, Lock, Sparkles,
 } from "lucide-react";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { formatLocation } from "@/lib/utils";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -376,6 +378,29 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
   const [page, setPage] = useState(0);
   const [, navigate] = useLocation();
 
+  const { user } = useAuth();
+  const planTier = (user as any)?.planTier;
+  const canConnect = planTier === "client_premium" || planTier === "enterprise_subscription";
+
+  const subscribeCheckout = trpc.clientJobs.createSubscriptionCheckout.useMutation({
+    onSuccess: (data) => {
+      if (data.url) {
+        window.open(data.url, "_blank");
+        toast.success("Redirecting to Artswrk Premium checkout…");
+      }
+    },
+    onError: (err) => toast.error("Checkout failed", { description: err.message }),
+  });
+
+  function handleArtistClick(artistId: number) {
+    if (canConnect) {
+      navigate(`/app/artists/${artistId}`);
+    } else {
+      toast("Subscribe to Premium to view full profiles and connect with artists.");
+      subscribeCheckout.mutate({ interval: "month", origin: window.location.origin });
+    }
+  }
+
   const PAGE_SIZE = 48;
 
   const { data: affiliations } = trpc.artists.getAffiliations.useQuery();
@@ -403,6 +428,30 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
       <div className="flex-1 min-w-0">
         {/* Featured strip — only when no active filters */}
         {!search && !roleFilter && !affiliationFilter && <FeaturedStrip />}
+
+        {/* Subscribe CTA — on-demand clients can browse but can't view full
+            profiles or connect with artists until they subscribe */}
+        {!canConnect && (
+          <div className="flex items-center justify-between gap-4 mb-4 px-5 py-4 rounded-2xl bg-gradient-to-r from-[#111] to-[#2a2a2a]">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
+                <Sparkles size={16} className="text-[#FFBC5D]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-white">Subscribe to connect with these artists</p>
+                <p className="text-xs text-white/60">Premium unlocks full profiles, contact info, and direct messaging.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => subscribeCheckout.mutate({ interval: "month", origin: window.location.origin })}
+              disabled={subscribeCheckout.isPending}
+              className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-bold text-[#111] bg-white hover:bg-gray-100 transition-colors disabled:opacity-60 flex items-center gap-1.5"
+            >
+              {subscribeCheckout.isPending && <Loader2 size={13} className="animate-spin" />}
+              Subscribe
+            </button>
+          </div>
+        )}
 
         {/* Header row */}
         <div className="flex items-center justify-between mb-4">
@@ -540,12 +589,12 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
               return (
                 <div key={a.id}
                   className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-lg transition-all group cursor-pointer"
-                  onClick={() => navigate(`/app/artists/${a.id}`)}
+                  onClick={() => handleArtistClick(a.id)}
                 >
                   <div className="aspect-[3/4] relative overflow-hidden bg-gray-100">
                     {a.profilePicture ? (
                       <img src={a.profilePicture} alt={displayName}
-                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                        className={`w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500 ${!canConnect ? "blur-[2px]" : ""}`}
                         onError={(e) => {
                           const el = e.currentTarget;
                           el.style.display = "none";
@@ -563,6 +612,12 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
                     {a.artswrkPro && (
                       <div className="absolute top-2.5 right-2.5">
                         <span className="bg-black/75 backdrop-blur-sm text-white text-[10px] font-black px-2 py-0.5 rounded-full tracking-wide">PRO</span>
+                      </div>
+                    )}
+                    {!canConnect && (
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2.5 py-2 flex items-center gap-1">
+                        <Lock size={11} className="text-white flex-shrink-0" />
+                        <span className="text-[10px] font-bold text-white">Subscribe to connect</span>
                       </div>
                     )}
                   </div>
@@ -589,7 +644,7 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
               return (
                 <div key={a.id}
                   className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer group"
-                  onClick={() => navigate(`/app/artists/${a.id}`)}
+                  onClick={() => handleArtistClick(a.id)}
                 >
                   <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100">
                     {a.profilePicture ? (
@@ -621,7 +676,13 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
                       {primaryType}
                     </span>
                   )}
-                  <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-500 flex-shrink-0 transition-colors" />
+                  {canConnect ? (
+                    <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-500 flex-shrink-0 transition-colors" />
+                  ) : (
+                    <span className="flex-shrink-0 flex items-center gap-1 text-[11px] font-bold text-gray-400 group-hover:text-[#ec008c] transition-colors">
+                      <Lock size={11} /> Subscribe
+                    </span>
+                  )}
                 </div>
               );
             })}

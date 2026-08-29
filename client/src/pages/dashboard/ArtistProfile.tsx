@@ -10,8 +10,9 @@ import {
   ArrowLeft, Instagram, Globe, Youtube, ExternalLink,
   Loader2, AlertCircle, MapPin, Calendar, CheckCircle2, XCircle,
   DollarSign, MessageSquare, Briefcase, Star, ChevronRight,
-  Share2,
+  Share2, Lock, Sparkles,
 } from "lucide-react";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { formatLocation } from "@/lib/utils";
 
@@ -419,6 +420,16 @@ export default function ArtistProfile() {
     { enabled: artistId > 0 }
   );
 
+  const subscribeCheckout = trpc.clientJobs.createSubscriptionCheckout.useMutation({
+    onSuccess: (data) => {
+      if (data.url) {
+        window.open(data.url, "_blank");
+        toast.success("Redirecting to Artswrk Premium checkout…");
+      }
+    },
+    onError: (err) => toast.error("Checkout failed", { description: err.message }),
+  });
+
   const handleShare = () => {
     const url = window.location.href;
     if (navigator.share) navigator.share({ title: profile?.name ?? "Artist Profile", url });
@@ -453,6 +464,39 @@ export default function ArtistProfile() {
       <Link href="/app/artists" className="text-sm text-[#F25722] font-semibold hover:underline">← Back to Artists</Link>
     </div>
   );
+
+  if ((profile as any).locked) {
+    const lp = profile as any;
+    const lockedName = lp.firstName
+      ? `${lp.firstName}${lp.lastName ? " " + lp.lastName[0] + "." : ""}`.trim()
+      : lp.name || "This artist";
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[500px] gap-4 px-6 text-center">
+        <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gray-100 flex items-center justify-center">
+          {lp.profilePicture ? (
+            <img src={lp.profilePicture} alt={lockedName} className="w-full h-full object-cover blur-[3px]" />
+          ) : (
+            <Lock size={22} className="text-gray-400" />
+          )}
+        </div>
+        <div>
+          <p className="text-lg font-black text-[#111]">{lockedName}'s full profile is locked</p>
+          <p className="text-sm text-gray-500 mt-1 max-w-sm">
+            Subscribe to Artswrk Premium to view bios, social links, and contact info — and message artists directly.
+          </p>
+        </div>
+        <button
+          onClick={() => subscribeCheckout.mutate({ interval: "month", origin: window.location.origin })}
+          disabled={subscribeCheckout.isPending}
+          className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white bg-[#111] hover:opacity-90 transition-opacity disabled:opacity-60"
+        >
+          {subscribeCheckout.isPending ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+          Subscribe to connect
+        </button>
+        <Link href="/app/artists" className="text-sm text-gray-400 font-semibold hover:text-[#111]">← Back to Artists</Link>
+      </div>
+    );
+  }
 
   const p = profile as any;
   const displayName = p.firstName
