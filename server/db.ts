@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import { BookingPeriod, ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, affiliations, artistResumes, benefits, bookingPeriods, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, masterServiceTypes, messages, payments, premiumJobInterestedArtists, premiumJobs, reimbursements, savedArtists, userAffiliations, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { extractCity, DEFAULT_RADIUS_MILES } from "../shared/location";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -372,27 +373,21 @@ export async function getPublicJobsEnriched(
     whereClauses.push(`j.bubbleArtistTypeId = '${escaped}'`);
   }
 
-  if (filters?.locationQuery) {
-    // A full street address (e.g. an artist's own profile address, "123 Main
-    // St, New York, NY 10030, USA") almost never appears verbatim inside a
-    // job's city-level locationAddress/description — matching on the raw
-    // string returns nothing for any real address. Search on just the city
-    // instead. Already-short queries (a manually typed "New York, NY" or a
-    // single city name) pass through unchanged.
-    const extractCity = (raw: string): string => {
-      const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
-      if (parts.length <= 1) return raw;
-      const withoutCountry = /^(USA|United States)$/i.test(parts[parts.length - 1]) ? parts.slice(0, -1) : parts;
-      if (withoutCountry.length <= 1) return withoutCountry[0] ?? raw;
-      const last = withoutCountry[withoutCountry.length - 1];
-      const looksLikeStateZip = /^[A-Z]{2}\s*\d{0,6}$/i.test(last);
-      const cityIndex = looksLikeStateZip ? withoutCountry.length - 2 : withoutCountry.length - 1;
-      return withoutCountry[cityIndex] ?? raw;
-    };
+  // Text location match. `extractCity` is shared with the artist search and the
+  // client, so "123 Main St, New York, NY 10030, USA" and "New York, NY" both
+  // reduce to the same city term. Matches the structured locationCity column
+  // first, then the raw address/description for rows without one.
+  //
+  // Skipped entirely when coordinates are present: the radius filter below is
+  // strictly better, and AND-ing a city string on top of it would drop every
+  // nearby job in a neighbouring town.
+  const hasCoords = filters?.locationLat !== undefined && filters?.locationLng !== undefined;
+  if (filters?.locationQuery && !hasCoords) {
     const city = extractCity(filters.locationQuery);
     const escaped = city.replace(/'/g, "''");
-    // Search both locationAddress AND description for the city
-    whereClauses.push(`(j.locationAddress LIKE '%${escaped}%' OR j.description LIKE '%${escaped}%')`);
+    whereClauses.push(
+      `(j.locationCity LIKE '%${escaped}%' OR j.locationAddress LIKE '%${escaped}%' OR j.description LIKE '%${escaped}%')`
+    );
   }
 
   // Haversine distance filter when lat/lng provided
@@ -400,10 +395,26 @@ export async function getPublicJobsEnriched(
   if (filters?.locationLat !== undefined && filters?.locationLng !== undefined) {
     const lat = filters.locationLat;
     const lng = filters.locationLng;
-    const radius = filters.radiusMiles ?? 50;
-    distanceSelect = `, (3959 * acos(cos(radians(${lat})) * cos(radians(CAST(j.locationLat AS DECIMAL(10,6)))) * cos(radians(CAST(j.locationLng AS DECIMAL(10,6))) - radians(${lng})) + sin(radians(${lat})) * sin(radians(CAST(j.locationLat AS DECIMAL(10,6)))))) AS distanceMiles`;
-    whereClauses.push(`j.locationLat IS NOT NULL AND j.locationLng IS NOT NULL`);
-    whereClauses.push(`(3959 * acos(cos(radians(${lat})) * cos(radians(CAST(j.locationLat AS DECIMAL(10,6)))) * cos(radians(CAST(j.locationLng AS DECIMAL(10,6))) - radians(${lng})) + sin(radians(${lat})) * sin(radians(CAST(j.locationLat AS DECIMAL(10,6)))))) <= ${radius}`);
+    const radius = filters.radiusMiles ?? DEFAULT_RADIUS_MILES;
+    // LEAST(1, …) guards acos against floating-point drift past 1.0 for a
+    // point that coincides exactly with the search centre, which returns NULL.
+    const haversine = `(3959 * acos(LEAST(1, cos(radians(${lat})) * cos(radians(CAST(j.locationLat AS DECIMAL(10,6)))) * cos(radians(CAST(j.locationLng AS DECIMAL(10,6))) - radians(${lng})) + sin(radians(${lat})) * sin(radians(CAST(j.locationLat AS DECIMAL(10,6)))))))`;
+    distanceSelect = `, ${haversine} AS distanceMiles`;
+
+    const withinRadius = `(j.locationLat IS NOT NULL AND j.locationLng IS NOT NULL AND ${haversine} <= ${radius})`;
+
+    // Jobs posted before Places capture (and migrated Bubble rows) have no
+    // coordinates. Excluding them outright would empty the board for anyone
+    // searching a location, so they fall back to a city-text match until the
+    // geocode backfill fills them in.
+    const cityTerm = extractCity(filters.locationQuery ?? "").replace(/'/g, "''");
+    if (cityTerm) {
+      whereClauses.push(
+        `(${withinRadius} OR ((j.locationLat IS NULL OR j.locationLng IS NULL) AND (j.locationCity LIKE '%${cityTerm}%' OR j.locationAddress LIKE '%${cityTerm}%' OR j.description LIKE '%${cityTerm}%')))`
+      );
+    } else {
+      whereClauses.push(withinRadius);
+    }
   }
 
   const whereSQL = whereClauses.join(' AND ');
@@ -1554,6 +1565,10 @@ export interface CreateJobInput {
   locationAddress?: string;
   locationLat?: string;
   locationLng?: string;
+  /** Structured Google Places data behind the address, for city/state filtering. */
+  locationCity?: string | null;
+  locationState?: string | null;
+  locationPlaceId?: string | null;
   dateType?: string;
   startDate?: Date;
   endDate?: Date;
@@ -1586,6 +1601,9 @@ export async function createJob(input: CreateJobInput) {
       locationAddress: input.locationAddress,
       locationLat: input.locationLat,
       locationLng: input.locationLng,
+      locationCity: input.locationCity,
+      locationState: input.locationState,
+      locationPlaceId: input.locationPlaceId,
       dateType: input.dateType ?? "Single Date",
       startDate: input.startDate,
       endDate: input.endDate,
@@ -1708,6 +1726,13 @@ export async function updateUserOnboarding(userId: number, data: {
   hiringCategory?: string;
   clientCompanyName?: string;
   location?: string;
+  /** Structured Google Places data resolved from `location`. */
+  locationLat?: string | null;
+  locationLng?: string | null;
+  locationCity?: string | null;
+  locationState?: string | null;
+  locationCountry?: string | null;
+  locationPlaceId?: string | null;
   website?: string;
   phoneNumber?: string;
   onboardingStep?: number;
@@ -1729,18 +1754,26 @@ export async function updateUserOnboarding(userId: number, data: {
   if (data.hiringCategory !== undefined) updateData.hiringCategory = data.hiringCategory;
   if (data.clientCompanyName !== undefined) updateData.clientCompanyName = data.clientCompanyName;
   if (data.location !== undefined) updateData.location = data.location;
+  if (data.locationLat !== undefined) updateData.locationLat = data.locationLat;
+  if (data.locationLng !== undefined) updateData.locationLng = data.locationLng;
+  if (data.locationCity !== undefined) updateData.locationCity = data.locationCity;
+  if (data.locationState !== undefined) updateData.locationState = data.locationState;
+  if (data.locationCountry !== undefined) updateData.locationCountry = data.locationCountry;
+  if (data.locationPlaceId !== undefined) updateData.locationPlaceId = data.locationPlaceId;
   if (data.website !== undefined) updateData.website = data.website;
   if (data.phoneNumber !== undefined) updateData.phoneNumber = data.phoneNumber;
   if (data.onboardingStep !== undefined) updateData.onboardingStep = data.onboardingStep;
   if (data.userSignedUp !== undefined) updateData.userSignedUp = data.userSignedUp;
   if (data.userRole !== undefined) updateData.userRole = data.userRole;
 
-  // A hiring client whose business type is an event company or dance
-  // competition gets auto-promoted to Enterprise right here at onboarding —
-  // no admin step needed. Only fires for Client onboarding (never overrides
-  // an Artist's role), and only on the way IN (never downgrades someone who
-  // was manually made Enterprise by an admin for some other reason).
-  const isAutoEnterpriseCategory = data.hiringCategory === "Dance Competition" || data.hiringCategory === "Event Company";
+  // A hiring client gets auto-promoted to Enterprise right here at
+  // onboarding based on business type — no admin step needed. Only Dance
+  // Studio and Music School stay regular Client; everything else (Dance
+  // Competition, Event Company, Other, etc.) is Enterprise. Only fires for
+  // Client onboarding (never overrides an Artist's role), and only on the
+  // way IN (never downgrades someone manually made Enterprise for another reason).
+  const NON_ENTERPRISE_CATEGORIES = new Set(["Dance Studio", "Music School"]);
+  const isAutoEnterpriseCategory = !!data.hiringCategory && !NON_ENTERPRISE_CATEGORIES.has(data.hiringCategory);
   if (data.userRole === "Client" && isAutoEnterpriseCategory) {
     updateData.enterprise = true;
     updateData.planTier = "enterprise_on_demand";
@@ -1813,12 +1846,22 @@ export async function getArtistsList({
   search,
   artistType,
   affiliationId,
+  locationQuery,
+  locationLat,
+  locationLng,
+  radiusMiles,
 }: {
   limit?: number;
   offset?: number;
   search?: string;
   artistType?: string;
   affiliationId?: number;
+  /** Free-text location (city name or full formatted address). */
+  locationQuery?: string;
+  /** Coordinates from Google Places — enables true radius filtering. */
+  locationLat?: number;
+  locationLng?: number;
+  radiusMiles?: number;
 }) {
   const db = await getDb();
   if (!db) return { artists: [], total: 0 };
@@ -1842,6 +1885,44 @@ export async function getArtistsList({
         like(users.slug, q),
         like(users.location, q),
       )!
+    );
+  }
+
+  // ── Location ───────────────────────────────────────────────────────────────
+  // Coordinates (from a Places selection) give a real radius search. Artists
+  // whose coordinates aren't captured yet — migrated Bubble rows, profiles
+  // saved before Places autocomplete — would silently vanish from every
+  // location search, so they still match on city text. Once the geocode
+  // backfill has run, the text arm only catches genuinely un-geocodable rows.
+  if (locationLat !== undefined && locationLng !== undefined) {
+    const radius = radiusMiles ?? DEFAULT_RADIUS_MILES;
+    const withinRadius = sql`(
+      ${users.locationLat} IS NOT NULL AND ${users.locationLng} IS NOT NULL
+      AND (3959 * acos(LEAST(1, cos(radians(${locationLat}))
+        * cos(radians(CAST(${users.locationLat} AS DECIMAL(10,6))))
+        * cos(radians(CAST(${users.locationLng} AS DECIMAL(10,6))) - radians(${locationLng}))
+        + sin(radians(${locationLat}))
+        * sin(radians(CAST(${users.locationLat} AS DECIMAL(10,6))))))) <= ${radius}
+    )`;
+
+    if (locationQuery) {
+      const cityLike = `%${extractCity(locationQuery)}%`;
+      conditions.push(
+        or(
+          withinRadius,
+          and(
+            sql`(${users.locationLat} IS NULL OR ${users.locationLng} IS NULL)`,
+            or(like(users.location, cityLike), like(users.locationCity, cityLike))!
+          )!
+        )!
+      );
+    } else {
+      conditions.push(withinRadius);
+    }
+  } else if (locationQuery) {
+    const cityLike = `%${extractCity(locationQuery)}%`;
+    conditions.push(
+      or(like(users.location, cityLike), like(users.locationCity, cityLike))!
     );
   }
 
@@ -3966,6 +4047,12 @@ export async function createClientCompany(data: {
   name: string;
   logo?: string | null;
   locationAddress?: string | null;
+  /** Structured Google Places data resolved from locationAddress. */
+  locationLat?: string | null;
+  locationLng?: string | null;
+  locationCity?: string | null;
+  locationState?: string | null;
+  locationPlaceId?: string | null;
   website?: string | null;
   description?: string | null;
 }): Promise<number> {
@@ -3978,12 +4065,22 @@ export async function createClientCompany(data: {
     name: data.name,
     logo: data.logo ?? null,
     locationAddress: data.locationAddress ?? null,
+    locationLat: data.locationLat ?? null,
+    locationLng: data.locationLng ?? null,
+    locationCity: data.locationCity ?? null,
+    locationState: data.locationState ?? null,
+    locationPlaceId: data.locationPlaceId ?? null,
     website: data.website ?? null,
     description: data.description ?? null,
   }).onDuplicateKeyUpdate({
     set: {
       logo: data.logo ?? null,
       locationAddress: data.locationAddress ?? null,
+      locationLat: data.locationLat ?? null,
+      locationLng: data.locationLng ?? null,
+      locationCity: data.locationCity ?? null,
+      locationState: data.locationState ?? null,
+      locationPlaceId: data.locationPlaceId ?? null,
       website: data.website ?? null,
       description: data.description ?? null,
     }
@@ -4016,6 +4113,12 @@ export async function createBookingFromApplicant(data: {
   startDate?: Date | null;
   endDate?: Date | null;
   locationAddress?: string | null;
+  /** Structured Google Places data resolved from locationAddress. */
+  locationLat?: string | null;
+  locationLng?: string | null;
+  locationCity?: string | null;
+  locationState?: string | null;
+  locationPlaceId?: string | null;
   description?: string | null;
 }): Promise<number> {
   const db = await getDb();
@@ -4033,6 +4136,11 @@ export async function createBookingFromApplicant(data: {
     startDate: data.startDate ?? null,
     endDate: data.endDate ?? null,
     locationAddress: data.locationAddress ?? null,
+    locationLat: data.locationLat ?? null,
+    locationLng: data.locationLng ?? null,
+    locationCity: data.locationCity ?? null,
+    locationState: data.locationState ?? null,
+    locationPlaceId: data.locationPlaceId ?? null,
     description: data.description ?? null,
     externalPayment: data.paymentMethod === "direct",
   });
@@ -4767,6 +4875,12 @@ export async function upsertClientCompany(ownerUserId: number, data: {
   logo?: string | null;
   website?: string | null;
   locationAddress?: string | null;
+  /** Structured Google Places data resolved from locationAddress. */
+  locationLat?: string | null;
+  locationLng?: string | null;
+  locationCity?: string | null;
+  locationState?: string | null;
+  locationPlaceId?: string | null;
 }): Promise<void> {
   const db = await getDb();
   if (!db) return;
@@ -4782,6 +4896,11 @@ export async function upsertClientCompany(ownerUserId: number, data: {
     if (data.logo !== undefined) updateData.logo = data.logo;
     if (data.website !== undefined) updateData.website = data.website;
     if (data.locationAddress !== undefined) updateData.locationAddress = data.locationAddress;
+    if (data.locationLat !== undefined) updateData.locationLat = data.locationLat;
+    if (data.locationLng !== undefined) updateData.locationLng = data.locationLng;
+    if (data.locationCity !== undefined) updateData.locationCity = data.locationCity;
+    if (data.locationState !== undefined) updateData.locationState = data.locationState;
+    if (data.locationPlaceId !== undefined) updateData.locationPlaceId = data.locationPlaceId;
     if (Object.keys(updateData).length > 0) {
       await db.update(clientCompanies).set(updateData).where(eq(clientCompanies.ownerUserId, ownerUserId));
     }
@@ -4793,6 +4912,11 @@ export async function upsertClientCompany(ownerUserId: number, data: {
       logo: data.logo ?? null,
       website: data.website ?? null,
       locationAddress: data.locationAddress ?? null,
+      locationLat: data.locationLat ?? null,
+      locationLng: data.locationLng ?? null,
+      locationCity: data.locationCity ?? null,
+      locationState: data.locationState ?? null,
+      locationPlaceId: data.locationPlaceId ?? null,
     });
   }
 }
@@ -4806,6 +4930,12 @@ export async function updateClientCompanyById(
     logo?: string | null;
     website?: string | null;
     locationAddress?: string | null;
+    /** Structured Google Places data resolved from locationAddress. */
+    locationLat?: string | null;
+    locationLng?: string | null;
+    locationCity?: string | null;
+    locationState?: string | null;
+    locationPlaceId?: string | null;
     transportReimbursed?: boolean | null;
     transportDetails?: string | null;
   }
@@ -4818,6 +4948,11 @@ export async function updateClientCompanyById(
   if (data.logo !== undefined) updateData.logo = data.logo;
   if (data.website !== undefined) updateData.website = data.website;
   if (data.locationAddress !== undefined) updateData.locationAddress = data.locationAddress;
+  if (data.locationLat !== undefined) updateData.locationLat = data.locationLat;
+  if (data.locationLng !== undefined) updateData.locationLng = data.locationLng;
+  if (data.locationCity !== undefined) updateData.locationCity = data.locationCity;
+  if (data.locationState !== undefined) updateData.locationState = data.locationState;
+  if (data.locationPlaceId !== undefined) updateData.locationPlaceId = data.locationPlaceId;
   if (data.transportReimbursed !== undefined) updateData.transportReimbursed = data.transportReimbursed;
   if (data.transportDetails !== undefined) updateData.transportDetails = data.transportDetails;
   if (Object.keys(updateData).length > 0) {

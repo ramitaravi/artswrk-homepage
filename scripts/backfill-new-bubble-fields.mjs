@@ -10,7 +10,8 @@ import { parse } from "csv-parse/sync";
 dotenv.config();
 
 function truthy(v) {
-  return v === "true" || v === "yes" || v === "1" || v === true;
+  const s = String(v ?? "").trim().toLowerCase();
+  return s === "true" || s === "yes" || s === "1";
 }
 
 const raw = fs.readFileSync("/Users/ramitaravi/Downloads/Artswrk Clients - Clean Pull Aug 28 - bubble_users_FULL_export.csv", "utf-8");
