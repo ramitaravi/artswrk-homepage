@@ -1629,7 +1629,10 @@ export async function saveClientSubscriptionId(userId: number, subscriptionId: s
   if (!db) throw new Error("Database not available");
   await db
     .update(users)
-    .set({ clientSubscriptionId: subscriptionId, clientPremium: true })
+    .set({
+      clientSubscriptionId: subscriptionId, clientPremium: true,
+      planTier: "client_premium", stripeSubscriptionId: subscriptionId,
+    })
     .where(eq(users.id, userId));
 }
 
@@ -3322,14 +3325,20 @@ export async function saveArtistStripeCustomerId(userId: number, stripeCustomerI
 export async function saveArtistProSubscription(userId: number, subscriptionId: string): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(users).set({ artswrkPro: true, artistStripeProductId: subscriptionId }).where(eq(users.id, userId));
+  await db.update(users).set({
+    artswrkPro: true, artistStripeProductId: subscriptionId,
+    planTier: "artist_pro", stripeSubscriptionId: subscriptionId,
+  }).where(eq(users.id, userId));
 }
 
 /** Cancel artist PRO subscription (mark artswrkPro = false) */
 export async function cancelArtistProSubscription(userId: number): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(users).set({ artswrkPro: false, artistStripeProductId: null }).where(eq(users.id, userId));
+  await db.update(users).set({
+    artswrkPro: false, artistStripeProductId: null,
+    planTier: "artist_free", stripeSubscriptionId: null, stripePriceId: null,
+  }).where(eq(users.id, userId));
 }
 
 /** Get artist subscription fields for plan management */
@@ -3364,7 +3373,10 @@ export async function getArtistSubscriptionInfo(userId: number): Promise<{
 export async function saveArtistBasicSubscription(userId: number, subscriptionId: string): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(users).set({ artswrkBasic: true, artistStripeProductId: subscriptionId }).where(eq(users.id, userId));
+  await db.update(users).set({
+    artswrkBasic: true, artistStripeProductId: subscriptionId,
+    planTier: "artist_basic", stripeSubscriptionId: subscriptionId,
+  }).where(eq(users.id, userId));
 }
 
 // ── Enterprise Billing ────────────────────────────────────────────────────────
@@ -3402,6 +3414,7 @@ export async function saveEnterpriseSubscription(userId: number, subscriptionId:
     enterpriseStripeSubscriptionId: subscriptionId,
     enterprisePlan: "subscriber",
     ...(interval ? { enterpriseSubInterval: interval } : {}),
+    planTier: "enterprise_subscription", stripeSubscriptionId: subscriptionId,
   }).where(eq(users.id, userId));
 }
 
@@ -3409,7 +3422,10 @@ export async function saveEnterpriseSubscription(userId: number, subscriptionId:
 export async function cancelEnterpriseSubscription(userId: number): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(users).set({ enterpriseStripeSubscriptionId: null }).where(eq(users.id, userId));
+  await db.update(users).set({
+    enterpriseStripeSubscriptionId: null,
+    planTier: "enterprise_on_demand", stripeSubscriptionId: null, stripePriceId: null,
+  }).where(eq(users.id, userId));
 }
 
 /** Get enterprise billing fields for a user */

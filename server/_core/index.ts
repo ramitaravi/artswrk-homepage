@@ -48,12 +48,18 @@ async function revokeByCustomerId(customerId: string, productId: string | undefi
   const { STRIPE_PRODUCTS } = await import("../stripe-products");
 
   if (productId === STRIPE_PRODUCTS.ARTIST_PRO.productId) {
-    const res = await db.update(users).set({ artswrkPro: false, artistStripeProductId: null }).where(eq(users.stripeCustomerId, customerId));
+    const res = await db.update(users).set({
+      artswrkPro: false, artistStripeProductId: null,
+      planTier: "artist_free", stripeSubscriptionId: null, stripePriceId: null,
+    }).where(eq(users.stripeCustomerId, customerId));
     if ((res as any).affectedRows) console.log(`[Webhook] Revoked artist PRO (${reason}) for customer ${customerId}`);
     return;
   }
   if (productId === STRIPE_PRODUCTS.ARTIST_BASIC.productId) {
-    const res = await db.update(users).set({ artswrkBasic: false, artistStripeProductId: null }).where(eq(users.stripeCustomerId, customerId));
+    const res = await db.update(users).set({
+      artswrkBasic: false, artistStripeProductId: null,
+      planTier: "artist_free", stripeSubscriptionId: null, stripePriceId: null,
+    }).where(eq(users.stripeCustomerId, customerId));
     if ((res as any).affectedRows) console.log(`[Webhook] Revoked artist Basic (${reason}) for customer ${customerId}`);
     return;
   }
@@ -65,7 +71,10 @@ async function revokeByCustomerId(customerId: string, productId: string | undefi
     // (isClientJobUnlocked, canClientMessageArtist, premiumJobs.getJobApplicants)
     // all require enterpriseStripeSubscriptionId to be actually set, so this
     // was already safe even before this line existed.
-    const res = await db.update(users).set({ enterpriseStripeSubscriptionId: null, enterprisePlan: null }).where(eq(users.enterpriseStripeCustomerId, customerId));
+    const res = await db.update(users).set({
+      enterpriseStripeSubscriptionId: null, enterprisePlan: null,
+      planTier: "enterprise_on_demand", stripeSubscriptionId: null, stripePriceId: null,
+    }).where(eq(users.enterpriseStripeCustomerId, customerId));
     if ((res as any).affectedRows) console.log(`[Webhook] Revoked enterprise subscription (${reason}) for customer ${customerId}`);
     return;
   }
@@ -73,7 +82,10 @@ async function revokeByCustomerId(customerId: string, productId: string | undefi
   // so no product-ID check is needed — just match on the customer ID directly.
   // This also covers the legacy checkout path, which mints a fresh one-off
   // Stripe product per purchase and so can never be matched by product ID.
-  const clientRes = await db.update(users).set({ clientPremium: false, clientSubscriptionId: null }).where(eq(users.clientStripeCustomerId, customerId));
+  const clientRes = await db.update(users).set({
+    clientPremium: false, clientSubscriptionId: null,
+    planTier: "client_on_demand", stripeSubscriptionId: null, stripePriceId: null,
+  }).where(eq(users.clientStripeCustomerId, customerId));
   if ((clientRes as any).affectedRows) console.log(`[Webhook] Revoked client Premium (${reason}) for customer ${customerId}`);
 }
 
@@ -87,12 +99,18 @@ async function updateByCustomerId(customerId: string, productId: string | undefi
   const { STRIPE_PRODUCTS } = await import("../stripe-products");
 
   if (productId === STRIPE_PRODUCTS.ARTIST_PRO.productId) {
-    await db.update(users).set({ artswrkPro: isActive }).where(eq(users.stripeCustomerId, customerId));
+    await db.update(users).set({
+      artswrkPro: isActive,
+      planTier: isActive ? "artist_pro" : "artist_free",
+    }).where(eq(users.stripeCustomerId, customerId));
     console.log(`[Webhook] Updated artist PRO status to ${isActive} for customer ${customerId}`);
     return;
   }
   if (productId === STRIPE_PRODUCTS.ARTIST_BASIC.productId) {
-    await db.update(users).set({ artswrkBasic: isActive }).where(eq(users.stripeCustomerId, customerId));
+    await db.update(users).set({
+      artswrkBasic: isActive,
+      planTier: isActive ? "artist_basic" : "artist_free",
+    }).where(eq(users.stripeCustomerId, customerId));
     console.log(`[Webhook] Updated artist Basic status to ${isActive} for customer ${customerId}`);
     return;
   }
@@ -100,12 +118,18 @@ async function updateByCustomerId(customerId: string, productId: string | undefi
     // Only touch enterprisePlan — never clear enterpriseStripeSubscriptionId
     // here (that would defeat the point of this being the non-destructive
     // "status changed" mirror rather than the hard-revoke path above).
-    await db.update(users).set({ enterprisePlan: isActive ? "subscriber" : null }).where(eq(users.enterpriseStripeCustomerId, customerId));
+    await db.update(users).set({
+      enterprisePlan: isActive ? "subscriber" : null,
+      planTier: isActive ? "enterprise_subscription" : "enterprise_on_demand",
+    }).where(eq(users.enterpriseStripeCustomerId, customerId));
     console.log(`[Webhook] Updated enterprise subscriber status to ${isActive} for customer ${customerId}`);
     return;
   }
   // Client Premium: no product-ID disambiguation needed (see revokeByCustomerId).
-  const clientRes = await db.update(users).set({ clientPremium: isActive }).where(eq(users.clientStripeCustomerId, customerId));
+  const clientRes = await db.update(users).set({
+    clientPremium: isActive,
+    planTier: isActive ? "client_premium" : "client_on_demand",
+  }).where(eq(users.clientStripeCustomerId, customerId));
   if ((clientRes as any).affectedRows) console.log(`[Webhook] Updated client Premium status to ${isActive} for customer ${customerId}`);
 }
 

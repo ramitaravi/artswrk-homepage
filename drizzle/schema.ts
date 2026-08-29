@@ -121,6 +121,24 @@ export const users = mysqlTable("users", {
   /** Billing interval for subscriber plan — set when subscription is activated */
   enterpriseSubInterval: mysqlEnum("enterpriseSubInterval", ["month", "year"]),
 
+  // ── Plan tier (single source of truth for gating — replaces artswrkPro,
+  // artswrkBasic, clientPremium, enterprise, enterprisePlan once every read
+  // site has migrated over; those fields are kept, untouched, until then) ──
+  planTier: mysqlEnum("planTier", [
+    "artist_free", "artist_basic", "artist_pro",
+    "client_on_demand", "client_premium",
+    "enterprise_on_demand", "enterprise_subscription",
+  ]),
+  /** The current active Stripe subscription, if any — replaces
+   * artistStripeProductId (misleadingly named, but that's what it holds),
+   * clientSubscriptionId, and enterpriseStripeSubscriptionId. Null for any
+   * non-subscription tier (artist_free, client_on_demand, enterprise_on_demand). */
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 64 }),
+  /** Which exact Stripe Price the active subscription is on — new; nothing
+   * stored this before. Lets you tell a legacy monthly PRO subscriber apart
+   * from a new annual one without checking Stripe directly. */
+  stripePriceId: varchar("stripePriceId", { length: 64 }),
+
   // ── Onboarding ─────────────────────────────────────────────────────────────
   onboardingStep: int("onboardingStep").default(0),
   userSignedUp: boolean("userSignedUp").default(false),
