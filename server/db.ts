@@ -1407,7 +1407,37 @@ export async function getArtistById(artistId: number) {
   if (!db) return null;
 
   const [artist] = await db
-    .select()
+    .select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      name: users.name,
+      slug: users.slug,
+      profilePicture: users.profilePicture,
+      bio: users.bio,
+      pronouns: users.pronouns,
+      artistDisciplines: users.artistDisciplines,
+      artistServices: users.artistServices,
+      masterArtistTypes: users.masterArtistTypes,
+      masterStyles: users.masterStyles,
+      artistExperiences: users.artistExperiences,
+      location: users.location,
+      portfolio: users.portfolio,
+      website: users.website,
+      instagram: users.instagram,
+      tiktok: users.tiktok,
+      youtube: users.youtube,
+      videos: users.videos,
+      artswrkPro: users.artswrkPro,
+      artswrkBasic: users.artswrkBasic,
+      mediaPhotos: users.mediaPhotos,
+      bookingCount: users.bookingCount,
+      ratingScore: users.ratingScore,
+      reviewCount: users.reviewCount,
+      workTypes: users.workTypes,
+      tagline: users.tagline,
+      credits: users.credits,
+    })
     .from(users)
     .where(eq(users.id, artistId))
     .limit(1);
