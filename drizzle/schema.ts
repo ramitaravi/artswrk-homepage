@@ -41,7 +41,14 @@ export const users = mysqlTable("users", {
 
   // ── User Role / Type ───────────────────────────────────────────────────────
   /** "Client" (hirer) or "Artist" */
-  userRole: mysqlEnum("userRole", ["Client", "Artist", "Admin"]),
+  /** "Admin" removed from this enum 2026-08-29 — never actually assigned
+   * anywhere in the app (zero hits), admin permission is handled entirely by
+   * the separate `role` field. Enterprise accounts still share userRole
+   * "Client" (layered with the separate `enterprise` boolean) rather than
+   * having their own value — splitting that out is a bigger, deliberately
+   * deferred change (would require auditing every userRole === "Client"
+   * check across the app to add Enterprise back in). */
+  userRole: mysqlEnum("userRole", ["Client", "Artist"]),
   optionAvailability: varchar("optionAvailability", { length: 64 }),
 
   // ── Client (Hirer) Fields ──────────────────────────────────────────────────
@@ -53,8 +60,6 @@ export const users = mysqlTable("users", {
 
   // ── Artist Fields ──────────────────────────────────────────────────────────
   stripeCustomerId: varchar("stripeCustomerId", { length: 64 }),
-  /** Stripe Connect account ID (e.g. acct_xxx) for artist payout dashboard */
-  stripeConnectAccountId: varchar("stripeConnectAccountId", { length: 64 }),
   /** Short bio / about text */
   bio: text("bio"),
   /** Pronouns (e.g. "She/her", "They/them") */
@@ -193,20 +198,19 @@ export const users = mysqlTable("users", {
   credits: text("credits"),
 
   // ── Artist Stripe Connect ─────────────────────────────────────────────────
-  /** Stripe Connect account ID for artist payouts (e.g. acct_1PKkRm...) */
+  /** Stripe Connect account ID for artist payouts (e.g. acct_1PKkRm...) — the
+   * real, live field (544 populated, actively read for payouts). */
   artistStripeAccountId: varchar("artistStripeAccountId", { length: 64 }),
-  /** Connect account type (e.g. "standard", "express") — from Bubble's
-   * "Artist Stripe Account Type", not previously captured. */
-  artistStripeAccountType: varchar("artistStripeAccountType", { length: 32 }),
   /** OAuth return code from Stripe Connect onboarding flow */
   artistStripeReturnCode: varchar("artistStripeReturnCode", { length: 256 }),
-  /** Legacy field, name is misleading — this is Connect/payout-related, NOT
-   * tied to any subscription (confirmed 2026-08-29). Kept for existing data;
-   * stripeProductId below is the clean go-forward field for the same concept. */
+  /** Stripe product ID tied to the artist's Connect account — Connect/payout
+   * related, NOT tied to any subscription (confirmed 2026-08-29). The real,
+   * live field (536 populated, actively read). stripeProductId and
+   * stripeConnectAccountId (dead duplicates from the Bubble migration, never
+   * written by live code) and artistStripeAccountType (mislabeled — held a
+   * raw account id, not a type; zero live references) were removed
+   * 2026-08-29 after confirming 0 divergence from this field. */
   artistStripeProductId: varchar("artistStripeProductId", { length: 64 }),
-  /** Stripe product ID for the artist's connected account — from Bubble's
-   * "Stripe product ID", mapped 1:1. Connect-related, not subscription-related. */
-  stripeProductId: varchar("stripeProductId", { length: 64 }),
   /** When the artist's Stripe Connect account was created */
   artistStripeDateCreated: timestamp("artistStripeDateCreated"),
 

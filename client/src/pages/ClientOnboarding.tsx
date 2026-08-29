@@ -24,28 +24,9 @@ import {
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-
-// ─── Google Maps script loader (uses Manus proxy) ──────────────────────────────
-const _FORGE_BASE_URL = (import.meta.env.VITE_FRONTEND_FORGE_API_URL as string) || "https://forge.butterfly-effect.dev";
-const _MAPS_PROXY_URL = `${_FORGE_BASE_URL}/v1/maps/proxy`;
-const _MAPS_API_KEY = import.meta.env.VITE_FRONTEND_FORGE_API_KEY as string;
-let _mapsScriptPromise: Promise<null> | null = null;
-
-function ensureMapsLoaded(): Promise<null> {
-  if (typeof window !== "undefined" && (window as any).google?.maps) return Promise.resolve(null);
-  if (_mapsScriptPromise) return _mapsScriptPromise;
-  _mapsScriptPromise = new Promise<null>((resolve, reject) => {
-    if ((window as any).google?.maps) { resolve(null); return; }
-    const script = document.createElement("script");
-    script.src = `${_MAPS_PROXY_URL}/maps/api/js?key=${_MAPS_API_KEY}&v=weekly&libraries=places`;
-    script.async = true;
-    script.crossOrigin = "anonymous";
-    script.onload = () => resolve(null);
-    script.onerror = () => { _mapsScriptPromise = null; reject(new Error("Failed to load Google Maps")); };
-    document.head.appendChild(script);
-  });
-  return _mapsScriptPromise;
-}
+import { loadPlacesLibrary } from "@/components/Map";
+import { parseAddressComponents } from "@shared/location";
+import { toLocationData, type LocationDataPayload } from "@/hooks/useLocationField";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 type OnboardingStep = 1 | 2 | 3 | 4 | 5;
@@ -58,6 +39,7 @@ interface FormState {
   website: string;
   phoneNumber: string;
   placeId: string;
+  locationData?: LocationDataPayload;
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -95,33 +77,59 @@ function PlacesInput({
 }: {
   value: string;
   onChange: (v: string) => void;
-  onPlaceSelected: (p: { name: string; address: string; website: string; phone: string; placeId: string }) => void;
+  onPlaceSelected: (p: {
+    name: string;
+    address: string;
+    website: string;
+    phone: string;
+    placeId: string;
+    /** Real place data for the studio's address — coordinates, city, state. */
+    locationData?: LocationDataPayload;
+  }) => void;
   placeholder?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const acRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const [mapsLoaded, setMapsLoaded] = useState(false);
+  const [placesLib, setPlacesLib] = useState<typeof google.maps.places | null>(null);
 
   useEffect(() => {
     // Trigger the actual script load via the Manus proxy
-    ensureMapsLoaded()
-      .then(() => setMapsLoaded(true))
+    // Keep the library object rather than reading google.maps.places later —
+    // under loading=async that namespace populates after importLibrary resolves.
+    loadPlacesLibrary()
+      .then((places) => setPlacesLib(places ?? null))
       .catch((err) => console.error("Maps load error:", err));
   }, []);
 
   useEffect(() => {
-    if (!mapsLoaded || !inputRef.current || acRef.current) return;
-    acRef.current = new google.maps.places.Autocomplete(inputRef.current, {
+    if (!placesLib || !inputRef.current || acRef.current) return;
+    acRef.current = new placesLib.Autocomplete(inputRef.current, {
       types: ["establishment"],
-      fields: ["name", "formatted_address", "website", "formatted_phone_number", "place_id"],
+      // geometry + address_components are what make the saved studio address
+      // filterable; without them we'd store a string and nothing else.
+      fields: ["name", "formatted_address", "website", "formatted_phone_number", "place_id", "geometry.location", "address_components"],
     });
     acRef.current.addListener("place_changed", () => {
       const p = acRef.current!.getPlace();
       if (!p.name) return;
-      onPlaceSelected({ name: p.name, address: p.formatted_address || "", website: p.website || "", phone: p.formatted_phone_number || "", placeId: p.place_id || "" });
+      const place = parseAddressComponents({
+        formatted: p.formatted_address || "",
+        placeId: p.place_id,
+        lat: p.geometry?.location?.lat(),
+        lng: p.geometry?.location?.lng(),
+        components: p.address_components as any,
+      });
+      onPlaceSelected({
+        name: p.name,
+        address: p.formatted_address || "",
+        website: p.website || "",
+        phone: p.formatted_phone_number || "",
+        placeId: p.place_id || "",
+        locationData: toLocationData(place),
+      });
       onChange(p.name);
     });
-  }, [mapsLoaded]);
+  }, [placesLib]);
 
   return (
     <div className="relative">
@@ -129,7 +137,7 @@ function PlacesInput({
       <input ref={inputRef} type="text" value={value} onChange={e => onChange(e.target.value)}
         placeholder={placeholder || "Search for your studio..."}
         className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-300 focus:outline-none focus:border-[#FFBC5D] transition-all" />
-      {!mapsLoaded && value.length > 0 && (
+      {!placesLib && value.length > 0 && (
         <p className="text-xs text-gray-400 mt-1 pl-1">Loading location search…</p>
       )}
     </div>
@@ -327,6 +335,7 @@ export default function ClientOnboarding() {
       await save({
         clientCompanyName: form.clientCompanyName,
         location: form.location,
+        locationData: form.locationData,
         website: form.website,
         phoneNumber: form.phoneNumber,
         onboardingStep: 4,
@@ -336,6 +345,7 @@ export default function ClientOnboarding() {
         await addCompany.mutateAsync({
           name: form.clientCompanyName,
           locationAddress: form.location || undefined,
+          locationData: form.locationData,
           website: form.website || undefined,
         });
       } catch {
@@ -547,6 +557,7 @@ export default function ClientOnboarding() {
                           website: place.website,
                           phoneNumber: place.phone,
                           placeId: place.placeId,
+                          locationData: place.locationData,
                         }))}
                         placeholder="Search for your studio on Google..."
                       />

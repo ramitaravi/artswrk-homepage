@@ -6,7 +6,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, normalizeSocialLink } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail, sendArtistBookingConfirmedEmail, sendClientBookingConfirmedEmail, sendClientPayArtistEmail } from "./email";
 import crypto from "crypto";
@@ -18,6 +18,7 @@ import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import { z } from "zod";
 import { leadsRouter } from "./routers/leads";
+import { buildLocationColumns, buildLocationColumnsNoCountry, resolveJobLocation, resolvePremiumJobLocation, locationInputSchema } from "./location";
 import { applyCheckoutSessionCompleted } from "./checkoutEffects";
 
 const SALT_ROUNDS = 12;
@@ -331,7 +332,18 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .query(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
-        return getUserById(input.id);
+        const user = await getUserById(input.id);
+        if (!user) return user;
+        // masterArtistTypes/masterServiceType/masterStyles store Bubble-matching
+        // ids — resolve to names here so the admin picker can show current
+        // selections (and so re-saving them doesn't write names back into an
+        // id-keyed column).
+        const [masterArtistTypeNames, masterServiceTypeNames, masterStyleNames] = await Promise.all([
+          resolveMasterArtistTypeNames(user.masterArtistTypes ? JSON.parse(user.masterArtistTypes as string) : []),
+          resolveMasterServiceTypeNames(user.masterServiceType ? JSON.parse(user.masterServiceType as string) : []),
+          resolveMasterStyleTypeNames(user.masterStyles ? JSON.parse(user.masterStyles as string) : []),
+        ]);
+        return { ...user, masterArtistTypeNames, masterServiceTypeNames, masterStyleNames };
       }),
 
     /** Update artist fields — admin only */
@@ -342,16 +354,21 @@ export const appRouter = router({
         lastName: z.string().optional(),
         email: z.string().email().optional(),
         pronouns: z.string().optional(),
+        phoneNumber: z.string().optional(),
         location: z.string().optional(),
         bio: z.string().optional(),
         website: z.string().optional(),
         instagram: z.string().optional(),
         tiktok: z.string().optional(),
         youtube: z.string().optional(),
+        portfolio: z.string().optional(),
         profilePicture: z.string().optional(),
+        // Display-name arrays from the admin picker — resolved to ids below,
+        // matching how the live artist-facing save path stores them.
         masterArtistTypes: z.array(z.string()).optional(),
-        artistServices: z.array(z.string()).optional(),
+        masterServiceType: z.array(z.string()).optional(),
         masterStyles: z.array(z.string()).optional(),
+        artistDisciplines: z.array(z.string()).optional(),
         tagline: z.string().optional(),
         credits: z.string().optional(),
         artswrkPro: z.boolean().optional(),
@@ -361,17 +378,28 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
-        const { id, masterArtistTypes, artistServices, masterStyles, ...rest } = input;
+        const { id, masterArtistTypes, masterServiceType, masterStyles, artistDisciplines, website, instagram, tiktok, youtube, portfolio, ...rest } = input;
         const { getDb } = await import("./db");
         const { users: usersTable } = await import("../drizzle/schema");
         const { eq } = await import("drizzle-orm");
         const db = await getDb();
         if (!db) throw new Error("DB unavailable");
+        const [artistTypeIds, serviceTypeIds, styleIds] = await Promise.all([
+          masterArtistTypes !== undefined ? resolveMasterArtistTypeIds(masterArtistTypes) : undefined,
+          masterServiceType !== undefined ? resolveMasterServiceTypeIds(masterServiceType) : undefined,
+          masterStyles !== undefined ? resolveMasterStyleTypeIds(masterStyles) : undefined,
+        ]);
         await db.update(usersTable).set({
           ...rest,
-          ...(masterArtistTypes !== undefined ? { masterArtistTypes: JSON.stringify(masterArtistTypes) } : {}),
-          ...(artistServices !== undefined ? { artistServices: JSON.stringify(artistServices) } : {}),
-          ...(masterStyles !== undefined ? { masterStyles: JSON.stringify(masterStyles) } : {}),
+          ...(website !== undefined ? { website: normalizeSocialLink(website, "website") } : {}),
+          ...(instagram !== undefined ? { instagram: normalizeSocialLink(instagram, "instagram") } : {}),
+          ...(tiktok !== undefined ? { tiktok: normalizeSocialLink(tiktok, "tiktok") } : {}),
+          ...(youtube !== undefined ? { youtube: normalizeSocialLink(youtube, "youtube") } : {}),
+          ...(portfolio !== undefined ? { portfolio: normalizeSocialLink(portfolio, "portfolio") } : {}),
+          ...(artistTypeIds !== undefined ? { masterArtistTypes: JSON.stringify(artistTypeIds) } : {}),
+          ...(serviceTypeIds !== undefined ? { masterServiceType: JSON.stringify(serviceTypeIds) } : {}),
+          ...(styleIds !== undefined ? { masterStyles: JSON.stringify(styleIds) } : {}),
+          ...(artistDisciplines !== undefined ? { artistDisciplines: JSON.stringify(artistDisciplines) } : {}),
         }).where(eq(usersTable.id, id));
         return getUserById(id);
       }),
@@ -384,13 +412,17 @@ export const appRouter = router({
         lastName: z.string().min(1),
         password: z.string().min(8).optional(),
         pronouns: z.string().optional(),
+        phoneNumber: z.string().optional(),
         location: z.string().optional(),
         bio: z.string().optional(),
         website: z.string().optional(),
         instagram: z.string().optional(),
+        tiktok: z.string().optional(),
+        youtube: z.string().optional(),
+        portfolio: z.string().optional(),
         profilePicture: z.string().optional(),
         masterArtistTypes: z.array(z.string()).default([]),
-        artistServices: z.array(z.string()).default([]),
+        masterServiceType: z.array(z.string()).default([]),
         masterStyles: z.array(z.string()).default([]),
         tagline: z.string().optional(),
         artswrkPro: z.boolean().default(false),
@@ -418,6 +450,11 @@ export const appRouter = router({
 
         // Slug from name
         const slug = `${input.firstName}-${input.lastName}`.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+        const [artistTypeIds, serviceTypeIds, styleIds] = await Promise.all([
+          resolveMasterArtistTypeIds(input.masterArtistTypes),
+          resolveMasterServiceTypeIds(input.masterServiceType),
+          resolveMasterStyleTypeIds(input.masterStyles),
+        ]);
 
         const values: any = {
           openId,
@@ -428,14 +465,18 @@ export const appRouter = router({
           slug,
           userRole: "Artist" as const,
           pronouns: input.pronouns ?? null,
+          phoneNumber: input.phoneNumber ?? null,
           location: input.location ?? null,
           bio: input.bio ?? null,
-          website: input.website ?? null,
-          instagram: input.instagram ?? null,
+          website: input.website ? normalizeSocialLink(input.website, "website") : null,
+          instagram: input.instagram ? normalizeSocialLink(input.instagram, "instagram") : null,
+          tiktok: input.tiktok ? normalizeSocialLink(input.tiktok, "tiktok") : null,
+          youtube: input.youtube ? normalizeSocialLink(input.youtube, "youtube") : null,
+          portfolio: input.portfolio ? normalizeSocialLink(input.portfolio, "portfolio") : null,
           profilePicture: input.profilePicture ?? null,
-          masterArtistTypes: input.masterArtistTypes.length ? JSON.stringify(input.masterArtistTypes) : null,
-          artistServices: input.artistServices.length ? JSON.stringify(input.artistServices) : null,
-          masterStyles: input.masterStyles.length ? JSON.stringify(input.masterStyles) : null,
+          masterArtistTypes: artistTypeIds.length ? JSON.stringify(artistTypeIds) : null,
+          masterServiceType: serviceTypeIds.length ? JSON.stringify(serviceTypeIds) : null,
+          masterStyles: styleIds.length ? JSON.stringify(styleIds) : null,
           tagline: input.tagline ?? null,
           artswrkPro: input.artswrkPro,
           artswrkBasic: input.artswrkBasic,
@@ -446,6 +487,12 @@ export const appRouter = router({
               : "artist_free" as const,
           userSignedUp: true,
           onboardingStep: 4,
+          // Every account created from this admin form is, by definition,
+          // admin-added — tag it so support/reporting can tell these apart
+          // from real self-signups, matching the Bubble-sourced meaning of
+          // this field.
+          addedByAdmin: true,
+          source: "Admin",
         };
 
         if (input.password) {
@@ -601,25 +648,48 @@ export const appRouter = router({
         firstName: z.string().optional(),
         lastName: z.string().optional(),
         email: z.string().email().optional(),
+        phoneNumber: z.string().optional(),
         clientCompanyName: z.string().optional(),
         location: z.string().optional(),
         website: z.string().optional(),
         instagram: z.string().optional(),
+        tiktok: z.string().optional(),
+        youtube: z.string().optional(),
+        portfolio: z.string().optional(),
         profilePicture: z.string().optional(),
         businessOrIndividual: z.string().optional(),
         hiringCategory: clientHiringCategorySchema,
+        /** Real, Bubble-sourced business category — Dance Studio / Dance
+         * Competition / Music School / Event Company / Other. Drives
+         * Enterprise auto-detection (see updateUserOnboarding in db.ts). */
+        businessType: clientHiringCategorySchema,
         clientPremium: z.boolean().optional(),
         enterprise: z.boolean().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
-        const { id, ...rest } = input;
+        const { id, website, instagram, tiktok, youtube, portfolio, enterprise, clientPremium, ...rest } = input;
         const { getDb } = await import("./db");
         const { users: usersTable } = await import("../drizzle/schema");
         const { eq } = await import("drizzle-orm");
         const db = await getDb();
         if (!db) throw new Error("DB unavailable");
-        await db.update(usersTable).set(rest).where(eq(usersTable.id, id));
+        await db.update(usersTable).set({
+          ...rest,
+          ...(enterprise !== undefined ? { enterprise } : {}),
+          ...(clientPremium !== undefined ? { clientPremium } : {}),
+          // Keep planTier in sync with the toggles — these were previously
+          // cosmetic (the toggle flipped but nothing gated on it read this
+          // column), since access checks now key off planTier.
+          ...(enterprise !== undefined || clientPremium !== undefined
+            ? { planTier: enterprise ? "enterprise_on_demand" as const : clientPremium ? "client_premium" as const : "client_on_demand" as const }
+            : {}),
+          ...(website !== undefined ? { website: normalizeSocialLink(website, "website") } : {}),
+          ...(instagram !== undefined ? { instagram: normalizeSocialLink(instagram, "instagram") } : {}),
+          ...(tiktok !== undefined ? { tiktok: normalizeSocialLink(tiktok, "tiktok") } : {}),
+          ...(youtube !== undefined ? { youtube: normalizeSocialLink(youtube, "youtube") } : {}),
+          ...(portfolio !== undefined ? { portfolio: normalizeSocialLink(portfolio, "portfolio") } : {}),
+        }).where(eq(usersTable.id, id));
         return getUserById(id);
       }),
 
@@ -630,12 +700,18 @@ export const appRouter = router({
         firstName: z.string().min(1),
         lastName: z.string().min(1),
         password: z.string().min(8).optional(),
+        phoneNumber: z.string().optional(),
         clientCompanyName: z.string().optional(),
         location: z.string().optional(),
         website: z.string().optional(),
+        instagram: z.string().optional(),
+        tiktok: z.string().optional(),
+        youtube: z.string().optional(),
+        portfolio: z.string().optional(),
         profilePicture: z.string().optional(),
         businessOrIndividual: z.string().optional(),
         hiringCategory: clientHiringCategorySchema,
+        businessType: clientHiringCategorySchema,
         clientPremium: z.boolean().default(false),
         enterprise: z.boolean().default(false),
       }))
@@ -657,12 +733,18 @@ export const appRouter = router({
           name: `${input.firstName} ${input.lastName}`,
           slug,
           userRole: "Client" as const,
+          phoneNumber: input.phoneNumber ?? null,
           clientCompanyName: input.clientCompanyName ?? null,
           location: input.location ?? null,
-          website: input.website ?? null,
+          website: input.website ? normalizeSocialLink(input.website, "website") : null,
+          instagram: input.instagram ? normalizeSocialLink(input.instagram, "instagram") : null,
+          tiktok: input.tiktok ? normalizeSocialLink(input.tiktok, "tiktok") : null,
+          youtube: input.youtube ? normalizeSocialLink(input.youtube, "youtube") : null,
+          portfolio: input.portfolio ? normalizeSocialLink(input.portfolio, "portfolio") : null,
           profilePicture: input.profilePicture ?? null,
           businessOrIndividual: input.businessOrIndividual ?? null,
           hiringCategory: input.hiringCategory ?? null,
+          businessType: input.businessType ?? null,
           clientPremium: input.clientPremium,
           enterprise: input.enterprise,
           planTier: input.enterprise
@@ -672,6 +754,8 @@ export const appRouter = router({
               : "client_on_demand" as const,
           userSignedUp: true,
           onboardingStep: 4,
+          addedByAdmin: true,
+          source: "Admin",
         };
         if (input.password) {
           values.passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
@@ -694,6 +778,7 @@ export const appRouter = router({
         lastName: z.string().optional(),
         plan: z.enum(["on_demand", "subscriber"]).optional(),
         hiringCategory: clientHiringCategorySchema,
+        businessType: clientHiringCategorySchema,
         businessOrIndividual: z.enum(["Business", "Individual"]).optional(),
         logoUrl: z.string().optional(),
       }))
@@ -729,11 +814,14 @@ export const appRouter = router({
           // (without a real subscription ID) was never enough for full access.
           planTier: "enterprise_on_demand" as const,
           hiringCategory: input.hiringCategory ?? null,
+          businessType: input.businessType ?? null,
           businessOrIndividual: input.businessOrIndividual ?? "Business",
           profilePicture: input.logoUrl ?? null,
           enterpriseLogoUrl: input.logoUrl ?? null,
           userSignedUp: true,
           onboardingStep: 4,
+          addedByAdmin: true,
+          source: "Admin",
         } as any);
 
         // Look up by email to get the real DB id — more reliable than parsing insertId
@@ -792,6 +880,8 @@ export const appRouter = router({
         description: z.string().optional(),
         requestStatus: z.string().optional(),
         locationAddress: z.string().optional(),
+        /** Structured Google Places data for the address above. */
+        locationData: locationInputSchema,
         hiringCategory: z.string().optional(),
         artistHourlyRate: z.number().nullable().optional(),
         clientHourlyRate: z.number().nullable().optional(),
@@ -799,9 +889,12 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
-        const { id, ...fields } = input;
+        const { id, locationData, ...fields } = input;
         const { updateAdminJob, getAdminJobById } = await import("./db");
-        await updateAdminJob(id, fields);
+        const location = input.locationAddress !== undefined
+          ? await resolveJobLocation({ locationAddress: input.locationAddress, locationData })
+          : {};
+        await updateAdminJob(id, { ...fields, ...location });
         return getAdminJobById(id);
       }),
 
@@ -843,6 +936,8 @@ export const appRouter = router({
         description: z.string().optional(),
         budget: z.string().optional(),
         location: z.string().optional(),
+        /** Structured Google Places data for `location`. */
+        locationData: locationInputSchema,
         status: z.string().optional(),
         workFromAnywhere: z.boolean().optional(),
         featured: z.boolean().optional(),
@@ -853,9 +948,12 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
-        const { id, ...fields } = input;
+        const { id, locationData, ...fields } = input;
         const { updateAdminProJob, getPremiumJobById } = await import("./db");
-        await updateAdminProJob(id, fields);
+        const location = input.location !== undefined
+          ? await resolvePremiumJobLocation({ location: input.location, locationData })
+          : {};
+        await updateAdminProJob(id, { ...fields, ...location });
         return getPremiumJobById(id);
       }),
 
@@ -1930,6 +2028,12 @@ export const appRouter = router({
         search: z.string().optional(),
         artistType: z.string().optional(),
         affiliationId: z.number().optional(),
+        /** Location text from the Places field — city-matched. */
+        locationQuery: z.string().optional(),
+        /** Coordinates of the selected place — enables true radius search. */
+        locationLat: z.number().optional(),
+        locationLng: z.number().optional(),
+        radiusMiles: z.number().min(1).max(1000).optional(),
       }))
       .query(async ({ input }) => {
         return getArtistsList({
@@ -1938,6 +2042,10 @@ export const appRouter = router({
           search: input.search || undefined,
           artistType: input.artistType || undefined,
           affiliationId: input.affiliationId || undefined,
+          locationQuery: input.locationQuery || undefined,
+          locationLat: input.locationLat,
+          locationLng: input.locationLng,
+          radiusMiles: input.radiusMiles,
         });
       }),
 
@@ -1947,6 +2055,14 @@ export const appRouter = router({
 
     getMasterServiceTypes: publicProcedure.query(async () => {
       return getAllMasterServiceTypes();
+    }),
+
+    getMasterArtistTypes: publicProcedure.query(async () => {
+      return getAllMasterArtistTypes();
+    }),
+
+    getMasterStyleTypes: publicProcedure.query(async () => {
+      return getAllMasterStyleTypes();
     }),
 
     /**
@@ -2135,6 +2251,8 @@ Fields to extract:
         locationAddress: z.string().optional(),
         locationLat: z.string().optional(),
         locationLng: z.string().optional(),
+        /** Structured Google Places data for the address above. */
+        locationData: locationInputSchema,
         dateType: z.enum(["Single Date", "Weekly", "Multiple Dates", "Dates Flexible", "Ongoing", "Recurring"]).default("Single Date"),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
@@ -2152,15 +2270,21 @@ Fields to extract:
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
+        // Resolve the address into real place data (coordinates + city/state)
+        // so the job is findable by radius, not just by matching text.
+        const jobLocation = await resolveJobLocation(input);
         const job = await createJob({
           clientUserId: user.id,
           clientCompanyId: input.companyId,
           clientEmail: user.email ?? undefined,
           title: input.title,
           description: input.description,
-          locationAddress: input.locationAddress,
-          locationLat: input.locationLat,
-          locationLng: input.locationLng,
+          locationAddress: jobLocation.locationAddress ?? undefined,
+          locationLat: jobLocation.locationLat ?? undefined,
+          locationLng: jobLocation.locationLng ?? undefined,
+          locationCity: jobLocation.locationCity,
+          locationState: jobLocation.locationState,
+          locationPlaceId: jobLocation.locationPlaceId,
           dateType: input.dateType,
           startDate: input.startDate ? new Date(input.startDate) : undefined,
           endDate: input.endDate ? new Date(input.endDate) : undefined,
@@ -2211,6 +2335,8 @@ Fields to extract:
         locationAddress: z.string().optional(),
         locationLat: z.string().optional(),
         locationLng: z.string().optional(),
+        /** Structured Google Places data for the address above. */
+        locationData: locationInputSchema,
         dateType: z.enum(["Single Date", "Weekly", "Multiple Dates", "Dates Flexible", "Ongoing", "Recurring"]).default("Single Date"),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
@@ -2232,15 +2358,21 @@ Fields to extract:
         if (!user) throw new Error("User not found");
 
         // Create the job in "Pending Payment" status
+        // Resolve the address into real place data (coordinates + city/state)
+        // so the job is findable by radius, not just by matching text.
+        const jobLocation = await resolveJobLocation(input);
         const job = await createJob({
           clientUserId: user.id,
           clientCompanyId: input.companyId,
           clientEmail: user.email ?? undefined,
           title: input.title,
           description: input.description,
-          locationAddress: input.locationAddress,
-          locationLat: input.locationLat,
-          locationLng: input.locationLng,
+          locationAddress: jobLocation.locationAddress ?? undefined,
+          locationLat: jobLocation.locationLat ?? undefined,
+          locationLng: jobLocation.locationLng ?? undefined,
+          locationCity: jobLocation.locationCity,
+          locationState: jobLocation.locationState,
+          locationPlaceId: jobLocation.locationPlaceId,
           dateType: input.dateType,
           startDate: input.startDate ? new Date(input.startDate) : undefined,
           endDate: input.endDate ? new Date(input.endDate) : undefined,
@@ -2322,6 +2454,8 @@ Fields to extract:
         name: z.string().min(1),
         logo: z.string().optional(),
         locationAddress: z.string().optional(),
+        /** Structured Google Places data for the address above. */
+        locationData: locationInputSchema,
         website: z.string().optional(),
         description: z.string().optional(),
       }))
@@ -2332,7 +2466,7 @@ Fields to extract:
           ownerUserId: user.id,
           name: input.name,
           logo: input.logo ?? null,
-          locationAddress: input.locationAddress ?? null,
+          ...(await resolveJobLocation(input)),
           website: input.website ?? null,
           description: input.description ?? null,
         });
@@ -2436,16 +2570,26 @@ Fields to extract:
         hiringCategory: clientHiringCategorySchema,
         clientCompanyName: z.string().optional(),
         location: z.string().optional(),
+        /** Structured Google Places data for `location`. */
+        locationData: locationInputSchema,
         website: z.string().optional(),
         phoneNumber: z.string().optional(),
         onboardingStep: z.number().optional(),
         userSignedUp: z.boolean().optional(),
-        userRole: z.enum(["Artist", "Client", "Admin"]).optional(),
+        userRole: z.enum(["Artist", "Client"]).optional(),
+        /** Lightweight artist-signup flows (ArtistJoin, Join) collect this
+         * on their "what do you do" step — was previously collected in the
+         * UI and silently discarded since this schema didn't accept it. */
+        masterArtistTypes: z.array(z.string()).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
-        await updateUserOnboarding(user.id, input);
+        const { locationData, ...rest } = input;
+        const location = input.location !== undefined
+          ? await buildLocationColumns(input.location, locationData)
+          : {};
+        await updateUserOnboarding(user.id, { ...rest, ...location } as any);
         return { success: true };
       }),
 
@@ -2457,8 +2601,15 @@ Fields to extract:
       if (!user) throw new Error("User not found");
       return {
         onboardingStep: user.onboardingStep ?? 0,
-        masterArtistTypes: user.masterArtistTypes ? JSON.parse(user.masterArtistTypes as string) : [],
-        artistServices: user.artistServices ? JSON.parse(user.artistServices as string) : [],
+        // Stored as Bubble-matching IDs; resolved back to names here so the
+        // checkbox UI (which compares against literal labels) can pre-check
+        // the artist's existing selections when resuming onboarding.
+        masterArtistTypes: user.masterArtistTypes
+          ? await resolveMasterArtistTypeNames(JSON.parse(user.masterArtistTypes as string))
+          : [],
+        masterServiceType: user.masterServiceType
+          ? await resolveMasterServiceTypeNames(JSON.parse(user.masterServiceType as string))
+          : [],
         bio: user.bio ?? null,
         location: user.location ?? null,
         phoneNumber: user.phoneNumber ?? null,
@@ -2478,9 +2629,11 @@ Fields to extract:
     updateArtistOnboarding: protectedProcedure
       .input(z.object({
         masterArtistTypes: z.array(z.string()).optional(),
-        artistServices: z.array(z.string()).optional(),
+        masterServiceType: z.array(z.string()).optional(),
         bio: z.string().optional(),
         location: z.string().optional(),
+        /** Structured Google Places data for `location`. */
+        locationData: locationInputSchema,
         phoneNumber: z.string().optional(),
         instagram: z.string().optional(),
         tiktok: z.string().optional(),
@@ -2488,13 +2641,20 @@ Fields to extract:
         profilePicture: z.string().optional(),
         onboardingStep: z.number().optional(),
         userSignedUp: z.boolean().optional(),
-        userRole: z.enum(["Artist", "Client", "Admin"]).optional(),
+        userRole: z.enum(["Artist", "Client"]).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
         const wasSignedUp = user.userSignedUp;
-        await updateUserOnboarding(user.id, input);
+        const { locationData, ...rest } = input;
+        // Onboarding is where most artists set their location for the first
+        // time — capture the coordinates here or "artists near me" never sees
+        // them. Untouched when this step didn't include a location.
+        const location = input.location !== undefined
+          ? await buildLocationColumns(input.location, locationData)
+          : {};
+        await updateUserOnboarding(user.id, { ...rest, ...location } as any);
         // Send welcome email on first completion
         if (input.userSignedUp && !wasSignedUp && user.email) {
           sendArtistWelcomeEmail({
@@ -2537,6 +2697,8 @@ Fields to extract:
         pronouns: z.string().optional(),
         phoneNumber: z.string().optional(),
         location: z.string().optional(),
+        /** Real Google Places data behind `location` — powers radius filtering. */
+        locationData: locationInputSchema,
       }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
@@ -2552,7 +2714,9 @@ Fields to extract:
         if (input.firstName !== undefined && input.lastName !== undefined) updateData.name = [input.firstName, input.lastName].filter(Boolean).join(" ");
         if (input.pronouns !== undefined) updateData.pronouns = input.pronouns;
         if (input.phoneNumber !== undefined) updateData.phoneNumber = input.phoneNumber;
-        if (input.location !== undefined) updateData.location = input.location;
+        if (input.location !== undefined) {
+          Object.assign(updateData, await buildLocationColumns(input.location, input.locationData));
+        }
         await db.update(usersTable).set(updateData as any).where(eq(usersTable.id, user.id));
         return { success: true };
       }),
@@ -2836,6 +3000,8 @@ Fields to extract:
         logo: z.string().optional(),
         category: z.string().optional(),
         location: z.string().optional(),
+        /** Structured Google Places data for `location`. */
+        locationData: locationInputSchema,
         budget: z.string().optional(),
         workFromAnywhere: z.boolean().default(false),
         description: z.string().optional(),
@@ -2856,7 +3022,9 @@ Fields to extract:
           company: input.company,
           logo: input.logo || null,
           category: input.category || null,
-          location: input.location || null,
+          // Real coordinates so PRO jobs show up in radius search alongside
+          // regular jobs, rather than only matching on city text.
+          ...(await resolvePremiumJobLocation(input)),
           budget: input.budget || null,
           workFromAnywhere: input.workFromAnywhere === true,
           description: input.description || null,
@@ -2902,6 +3070,8 @@ Fields to extract:
         company: z.string().optional(),
         category: z.string().optional(),
         location: z.string().optional(),
+        /** Structured Google Places data for `location`. */
+        locationData: locationInputSchema,
         workFromAnywhere: z.boolean().optional(),
         budget: z.string().optional(),
         description: z.string().optional(),
@@ -2931,7 +3101,9 @@ Fields to extract:
         if (fields.serviceType !== undefined) patch.serviceType = fields.serviceType;
         if (fields.company !== undefined) patch.company = fields.company;
         if (fields.category !== undefined) patch.category = fields.category;
-        if (fields.location !== undefined) patch.location = fields.location || null;
+        if (fields.location !== undefined) {
+          Object.assign(patch, await resolvePremiumJobLocation(fields));
+        }
         if (fields.workFromAnywhere !== undefined) patch.workFromAnywhere = fields.workFromAnywhere;
         if (fields.budget !== undefined) patch.budget = fields.budget || null;
         if (fields.description !== undefined) patch.description = fields.description || null;
@@ -3104,6 +3276,8 @@ Fields to extract:
         startDate: z.string().optional(),              // ISO date string
         endDate: z.string().optional(),
         locationAddress: z.string().optional(),
+        /** Structured Google Places data for the address above. */
+        locationData: locationInputSchema,
         notes: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -3159,7 +3333,12 @@ Fields to extract:
           clientRate: clientRateDollars,
           startDate: input.startDate ? new Date(input.startDate) : null,
           endDate: input.endDate ? new Date(input.endDate) : null,
-          locationAddress: input.locationAddress ?? jobRow.location ?? null,
+          ...(await resolveJobLocation({
+            locationAddress: input.locationAddress ?? jobRow.location,
+            locationLat: input.locationAddress ? undefined : jobRow.locationLat,
+            locationLng: input.locationAddress ? undefined : jobRow.locationLng,
+            locationData: input.locationData,
+          })),
           description: [jobRow.description, input.notes].filter(Boolean).join("\n\n---\n\n") || null,
         });
 
@@ -4207,6 +4386,8 @@ Fields to extract:
         startDate: z.string().optional(),
         endDate: z.string().optional(),
         locationAddress: z.string().optional(),
+        /** Structured Google Places data for the address above. */
+        locationData: locationInputSchema,
         notes: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -4235,7 +4416,12 @@ Fields to extract:
           clientRate: clientRateDollars,
           startDate: input.startDate ? new Date(input.startDate) : (applicant.startDate ?? null),
           endDate: input.endDate ? new Date(input.endDate) : (applicant.endDate ?? null),
-          locationAddress: input.locationAddress ?? job.locationAddress ?? null,
+          ...(await resolveJobLocation({
+            locationAddress: input.locationAddress ?? job.locationAddress,
+            locationLat: input.locationAddress ? undefined : job.locationLat,
+            locationLng: input.locationAddress ? undefined : job.locationLng,
+            locationData: input.locationData,
+          })),
           description: [job.description, input.notes].filter(Boolean).join("\n\n---\n\n") || null,
         });
         if (input.hours && bookingId) {
@@ -4335,12 +4521,15 @@ Fields to extract:
         isRecurring: z.boolean().default(false),
         recurringCadence: z.enum(["weekly", "biweekly", "monthly", "quarterly"]).optional(),
         locationAddress: z.string().optional(),
+        /** Structured Google Places data for the address above. */
+        locationData: locationInputSchema,
         description: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden");
         const bookingId = await createAdminBooking({
           ...input,
+          ...(await resolveJobLocation(input)),
           startDate: new Date(input.startDate),
           endDate: new Date(input.endDate),
         });
@@ -4574,11 +4763,19 @@ Fields to extract:
         logo: z.string().max(1024).optional().nullable(),
         website: z.string().max(512).optional().nullable(),
         locationAddress: z.string().max(512).optional().nullable(),
+        /** Structured Google Places data for the address above. */
+        locationData: locationInputSchema,
       }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
-        await upsertClientCompany(user.id, input);
+        const { locationData, ...rest } = input;
+        // Only touch location columns when the form actually sent an address —
+        // otherwise an unrelated edit would wipe the company's coordinates.
+        const location = input.locationAddress !== undefined
+          ? await resolveJobLocation({ locationAddress: input.locationAddress, locationData })
+          : {};
+        await upsertClientCompany(user.id, { ...rest, ...location });
         return { ok: true };
       }),
 
@@ -4622,12 +4819,17 @@ Fields to extract:
         locationAddress: z.string().max(512).optional().nullable(),
         transportReimbursed: z.boolean().optional().nullable(),
         transportDetails: z.string().max(500).optional().nullable(),
+        /** Structured Google Places data for the address above. */
+        locationData: locationInputSchema,
       }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
-        const { id, ...data } = input;
-        await updateClientCompanyById(id, user.id, data);
+        const { id, locationData, ...data } = input;
+        const location = input.locationAddress !== undefined
+          ? await resolveJobLocation({ locationAddress: input.locationAddress, locationData })
+          : {};
+        await updateClientCompanyById(id, user.id, { ...data, ...location });
         return { ok: true };
       }),
 
@@ -4649,6 +4851,12 @@ Fields to extract:
         limit: z.number().min(1).max(100).default(48),
         offset: z.number().min(0).default(0),
         search: z.string().optional(),
+        /** Location text from the Places field — city-matched. */
+        locationQuery: z.string().optional(),
+        /** Coordinates of the selected place — enables true radius search. */
+        locationLat: z.number().optional(),
+        locationLng: z.number().optional(),
+        radiusMiles: z.number().min(1).max(1000).optional(),
       }))
       .query(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
@@ -4660,6 +4868,10 @@ Fields to extract:
           limit: input.limit,
           offset: input.offset,
           search: input.search || undefined,
+          locationQuery: input.locationQuery || undefined,
+          locationLat: input.locationLat,
+          locationLng: input.locationLng,
+          radiusMiles: input.radiusMiles,
         });
         return { locked: false as const, ...result };
       }),

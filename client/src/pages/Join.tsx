@@ -17,9 +17,8 @@ import Navbar from "@/components/Navbar";
 
 // ─── Shared constants ──────────────────────────────────────────────────────────
 const ARTIST_TYPES = [
-  "Dance Teacher", "Choreographer", "Substitute Teacher", "Competition Coach",
-  "Yoga Instructor", "Pilates Instructor", "Fitness Instructor", "Vocal Coach",
-  "Music Teacher", "Photographer", "Videographer", "Event Performer",
+  "Dance Educator", "Dance Competition Staff", "Photographer", "Videographer",
+  "Acting Coach", "Vocal Coach", "Music Teacher", "Side Jobs",
 ];
 
 const BUSINESS_TYPES = [
@@ -218,7 +217,7 @@ export default function Join() {
 
   async function handleArtistTypesDone() {
     setBusy(true);
-    try { await onboardingMutation.mutateAsync({ onboardingStep: 2 }); } catch {}
+    try { await onboardingMutation.mutateAsync({ masterArtistTypes: artistTypes, onboardingStep: 2 }); } catch {}
     setBusy(false);
     setStage("artist-plan");
   }

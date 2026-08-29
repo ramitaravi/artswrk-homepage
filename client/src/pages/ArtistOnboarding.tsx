@@ -16,15 +16,30 @@ import Navbar from "@/components/Navbar";
 import {
   CheckCircle2, ArrowRight, ArrowLeft, ChevronDown, ChevronUp,
   Camera, MapPin, Phone, Instagram, Youtube, Plus, X, Mail,
-  Zap, Star, Music, Trophy, Camera as CameraIcon, Video,
-  Mic, BookOpen, Users, Dumbbell
+  Zap, Star, Music, Camera as CameraIcon, Video,
+  Mic, BookOpen, Users, Dumbbell, Briefcase
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
+import { useLocationField, type LocationDataPayload } from "@/hooks/useLocationField";
+import { parseAddressComponents, type PlaceLocation } from "@shared/location";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Step = 1 | 2 | 3 | 4;
+
+/** Step 2's payload — the profile fields, plus the real place behind `location`. */
+interface ProfileStepData {
+  profilePicture?: string;
+  location: string;
+  locationData?: LocationDataPayload;
+  phoneNumber: string;
+  bio: string;
+  instagram: string;
+  tiktok: string;
+  youtube: string;
+}
 
 interface ArtistTypeEntry {
   name: string;
@@ -42,35 +57,28 @@ const ARTIST_TYPES: ArtistTypeEntry[] = [
     emoji: "🩰",
     icon: Music,
     color: "from-orange-400 to-amber-400",
-    services: ["Recurring Classes", "Substitute Teacher", "Master Classes", "Private Lessons", "Competition Choreography", "Event Choreography"],
-  },
-  {
-    name: "Dance Adjudicator",
-    emoji: "🏆",
-    icon: Trophy,
-    color: "from-pink-500 to-rose-400",
-    services: ["Dance Competition Judge"],
+    services: ["Weekly Teacher", "Substitute Teacher", "Master Classes", "Private Lessons", "Competition Choreography", "Event Choreography"],
   },
   {
     name: "Dance Competition Staff",
     emoji: "🎤",
     icon: Mic,
     color: "from-violet-500 to-purple-400",
-    services: ["Dance Competition Judge", "Tabulator", "Emcee / Announcer", "Backstage Manager", "General Staff"],
+    services: ["Judge", "Tabulator", "Emcee", "Backstage Staff", "Merch", "Awards", "Registration", "Stage Manager", "Crew", "Event Director"],
   },
   {
     name: "Photographer",
     emoji: "📸",
     icon: CameraIcon,
     color: "from-blue-500 to-cyan-400",
-    services: ["Photoshoot", "Corporate Photography", "Event Photography", "Headshots"],
+    services: ["Photoshoot", "Corporate Photography", "Event Photography", "Headshots", "Competition Photography"],
   },
   {
     name: "Videographer",
     emoji: "🎥",
     icon: Video,
     color: "from-indigo-500 to-blue-400",
-    services: ["Videoshoot", "Corporate Videography", "Event Videography", "Video Editing"],
+    services: ["Videoshoot", "Corporate Videography", "Event Videography", "Video Editing", "Competition Videography"],
   },
   {
     name: "Acting Coach",
@@ -94,25 +102,15 @@ const ARTIST_TYPES: ArtistTypeEntry[] = [
     services: ["Guitar", "Piano Teacher", "Violin Teacher", "Voice Teacher", "Percussion Teacher", "Saxophone Teacher", "Woodwind Teacher", "Cello"],
   },
   {
-    name: "Yoga Instructor",
-    emoji: "🧘",
-    icon: Dumbbell,
-    color: "from-lime-500 to-green-400",
-    services: ["Yoga Classes", "Private Yoga Sessions", "Corporate Yoga"],
-  },
-  {
-    name: "Pilates Instructor",
-    emoji: "🤸",
-    icon: Dumbbell,
-    color: "from-sky-500 to-blue-400",
-    services: ["Mat Pilates", "Reformer Pilates", "Private Pilates Sessions"],
-  },
-  {
-    name: "Event Performers",
-    emoji: "✨",
-    icon: Star,
-    color: "from-amber-500 to-yellow-400",
-    services: ["Live Performance", "Corporate Entertainment", "Private Events"],
+    name: "Side Jobs",
+    emoji: "💼",
+    icon: Briefcase,
+    color: "from-slate-500 to-gray-400",
+    services: [
+      "Front Desk", "Retail", "Marketing", "Graphic Designer", "Catering",
+      "Copywriter", "Executive Assistant / Admin", "Fitness", "Content Creator",
+      "Social Media Manager", "Customer Service", "Sales", "Data Entry", "Event Performers",
+    ],
   },
 ];
 
@@ -342,12 +340,12 @@ function Step2Profile({
   uploadPicture,
 }: {
   initial: { profilePicture?: string | null; location?: string | null; phoneNumber?: string | null; bio?: string | null; instagram?: string | null; tiktok?: string | null; youtube?: string | null };
-  onNext: (data: { profilePicture?: string; location: string; phoneNumber: string; bio: string; instagram: string; tiktok: string; youtube: string }) => void;
-  onBack: (data: { profilePicture?: string; location: string; phoneNumber: string; bio: string; instagram: string; tiktok: string; youtube: string }) => void;
+  onNext: (data: ProfileStepData) => void;
+  onBack: (data: ProfileStepData) => void;
   uploadPicture: (base64: string, contentType: string) => Promise<string>;
 }) {
   const [profilePicture, setProfilePicture] = useState(initial.profilePicture ?? "");
-  const [location, setLocation] = useState(initial.location ?? "");
+  const location = useLocationField(initial.location);
   const [phoneNumber, setPhoneNumber] = useState(initial.phoneNumber ?? "");
   const [bio, setBio] = useState(initial.bio ?? "");
   const [instagram, setInstagram] = useState(initial.instagram ?? "");
@@ -356,39 +354,16 @@ function Step2Profile({
   const [uploading, setUploading] = useState(false);
   const [locating, setLocating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const locationInputRef = useRef<HTMLInputElement>(null);
-  const acRef = useRef<any>(null);
-  const [mapsLoaded, setMapsLoaded] = useState(false);
 
-  // Wait for Google Maps to be available
-  useEffect(() => {
-    const check = () => {
-      if ((window as any).google?.maps?.places) { setMapsLoaded(true); return true; }
-      return false;
-    };
-    if (check()) return;
-    const iv = setInterval(() => { if (check()) clearInterval(iv); }, 300);
-    return () => clearInterval(iv);
-  }, []);
-
-  // Attach Places Autocomplete once Maps is ready
-  useEffect(() => {
-    if (!mapsLoaded || !locationInputRef.current || acRef.current) return;
-    acRef.current = new (window as any).google.maps.places.Autocomplete(locationInputRef.current, {
-      types: ["(cities)"],
-      fields: ["address_components", "formatted_address", "name"],
+  // Artists are shown as "City, ST, Country" rather than Google's full
+  // formatted address — keep that label, keep the coordinates behind it.
+  function handleLocationPicked(place: PlaceLocation) {
+    if (!place.city) { location.setPlace(place); return; }
+    location.setPlace({
+      ...place,
+      formatted: [place.city, place.stateCode, place.country].filter(Boolean).join(", "),
     });
-    acRef.current.addListener("place_changed", () => {
-      const place = acRef.current.getPlace();
-      const components = place.address_components || [];
-      const city = components.find((c: any) => c.types.includes("locality"))?.long_name
-        || components.find((c: any) => c.types.includes("sublocality"))?.long_name
-        || place.name || "";
-      const state = components.find((c: any) => c.types.includes("administrative_area_level_1"))?.short_name || "";
-      const country = components.find((c: any) => c.types.includes("country"))?.long_name || "";
-      setLocation([city, state, country].filter(Boolean).join(", "));
-    });
-  }, [mapsLoaded]);
+  }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -418,11 +393,16 @@ function Step2Profile({
           const geocoder = new (window as any).google.maps.Geocoder();
           geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results: any[], status: string) => {
             if (status === "OK" && results[0]) {
-              const components = results[0].address_components;
-              const city = components.find((c: any) => c.types.includes("locality"))?.long_name;
-              const state = components.find((c: any) => c.types.includes("administrative_area_level_1"))?.short_name;
-              const country = components.find((c: any) => c.types.includes("country"))?.long_name;
-              setLocation([city, state, country].filter(Boolean).join(", "));
+              // Keep the device's own coordinates — they're more precise than
+              // the geocoded place's centroid.
+              const place = parseAddressComponents({
+                formatted: results[0].formatted_address ?? "",
+                placeId: results[0].place_id,
+                lat: latitude,
+                lng: longitude,
+                components: results[0].address_components,
+              });
+              handleLocationPicked(place);
             }
             setLocating(false);
           });
@@ -434,8 +414,13 @@ function Step2Profile({
     );
   }
 
-  const canContinue = location.trim().length > 0;
-  const currentData = { profilePicture: profilePicture || undefined, location, phoneNumber, bio, instagram, tiktok, youtube };
+  const canContinue = location.value.trim().length > 0;
+  const currentData = {
+    profilePicture: profilePicture || undefined,
+    location: location.value,
+    locationData: location.locationData,
+    phoneNumber, bio, instagram, tiktok, youtube,
+  };
 
   return (
     <div>
@@ -488,13 +473,12 @@ function Step2Profile({
           <div className="relative flex gap-2">
             <div className="relative flex-1">
               <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
-              <input
-                ref={locationInputRef}
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
+              <LocationAutocompleteInput
+                value={location.value}
+                onChange={handleLocationPicked}
                 placeholder="City, State"
-                className={INPUT_CLS}
+                icon={false}
+                inputClassName={INPUT_CLS}
               />
             </div>
             <button
@@ -880,10 +864,9 @@ export default function ArtistOnboarding() {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
   // Step 2
-  const [profileData, setProfileData] = useState<{
-    profilePicture?: string; location: string; phoneNumber: string;
-    bio: string; instagram: string; tiktok: string; youtube: string;
-  }>({ location: "", phoneNumber: "", bio: "", instagram: "", tiktok: "", youtube: "" });
+  const [profileData, setProfileData] = useState<ProfileStepData>(
+    { location: "", phoneNumber: "", bio: "", instagram: "", tiktok: "", youtube: "" }
+  );
 
   // Step 4
   const [interval, setInterval] = useState<"monthly" | "annual">("monthly");
@@ -915,7 +898,7 @@ export default function ArtistOnboarding() {
     if (!statusQuery.data) return;
     const data = statusQuery.data;
     if (data.masterArtistTypes?.length) setSelectedTypes(data.masterArtistTypes);
-    if (data.artistServices?.length) setSelectedServices(data.artistServices);
+    if (data.masterServiceType?.length) setSelectedServices(data.masterServiceType);
     setProfileData({
       profilePicture: data.profilePicture ?? undefined,
       location: data.location ?? "",
@@ -973,7 +956,7 @@ export default function ArtistOnboarding() {
     // Always confirm userRole = "Artist" here in case the join step was bypassed
     await updateOnboarding.mutateAsync({
       masterArtistTypes: selectedTypes,
-      artistServices: selectedServices,
+      masterServiceType: selectedServices,
       onboardingStep: 2,
       userRole: "Artist",
     });
@@ -988,7 +971,7 @@ export default function ArtistOnboarding() {
     updateOnboarding.mutate({
       ...currentData,
       masterArtistTypes: selectedTypes,
-      artistServices: selectedServices,
+      masterServiceType: selectedServices,
       onboardingStep: 1,
     });
     setStep(1);

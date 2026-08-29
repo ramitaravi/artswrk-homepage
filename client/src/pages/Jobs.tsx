@@ -17,6 +17,8 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { toJobUrl } from "./JobDetail";
 import { toProJobUrl } from "./ProJobDetail";
 import SharedNavbar from "@/components/Navbar";
+import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
+import { DEFAULT_RADIUS_MILES, RADIUS_OPTIONS } from "@shared/location";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -439,8 +441,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
   const [locationFilter, setLocationFilter] = useState<LocationFilter>({ query: searchParams.get("location") ?? "" });
   const [artistType, setArtistType] = useState("");
   const [serviceType, setServiceType] = useState("");
-  const locationInputRef = useRef<HTMLInputElement>(null);
-  const placesAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const [radiusMiles, setRadiusMiles] = useState<number>(DEFAULT_RADIUS_MILES);
 
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useWouterLocation();
@@ -454,7 +455,13 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
   });
   useEffect(() => {
     if (!hasUrlLocation && !locationFilter.query && myProfileForLocation?.location) {
-      setLocationFilter({ query: myProfileForLocation.location });
+      // The profile now stores real coordinates, so seeding the filter gives a
+      // true radius search instead of a city-name text match.
+      setLocationFilter({
+        query: myProfileForLocation.location,
+        lat: myProfileForLocation.locationLat ?? undefined,
+        lng: myProfileForLocation.locationLng ?? undefined,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myProfileForLocation?.location]);
@@ -465,30 +472,6 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
       navigate("/app");
     }
   }, [user, navigate]);
-
-  // Google Places Autocomplete for the location input
-  useEffect(() => {
-    if (!locationInputRef.current || typeof google === "undefined") return;
-    if (placesAutocompleteRef.current) return; // already initialised
-    try {
-      const autocomplete = new google.maps.places.Autocomplete(locationInputRef.current, {
-        types: ["(cities)"],
-        fields: ["geometry", "formatted_address"],
-      });
-      autocomplete.addListener("place_changed", () => {
-        const place = autocomplete.getPlace();
-        if (place.geometry?.location) {
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-          const query = place.formatted_address ?? locationInputRef.current?.value ?? "";
-          setLocationFilter({ query, lat, lng });
-        }
-      });
-      placesAutocompleteRef.current = autocomplete;
-    } catch {
-      // Google Maps not yet loaded — will retry on next render
-    }
-  });
 
   const [paywallOpen, setPaywallOpen] = useState(false);
 
@@ -508,8 +491,11 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
     serviceType: serviceType || undefined,
     locationLat: locationFilter.lat,
     locationLng: locationFilter.lng,
-    locationQuery: !locationFilter.lat && locationFilter.query ? locationFilter.query : undefined,
-  }), [artistType, serviceType, locationFilter.lat, locationFilter.lng, locationFilter.query]);
+    // Sent alongside the coordinates, not instead of them: the server uses it
+    // to keep jobs that have no coordinates yet in the results.
+    locationQuery: locationFilter.query || undefined,
+    radiusMiles: locationFilter.lat ? radiusMiles : undefined,
+  }), [artistType, serviceType, locationFilter.lat, locationFilter.lng, locationFilter.query, radiusMiles]);
 
   const { data: rawJobs, isLoading: jobsLoading } = trpc.jobs.publicListEnriched.useQuery(filterInput);
   const { data: rawProJobs, isLoading: proJobsLoading } = trpc.artistDashboard.getProJobsFeed.useQuery({ limit: 50 });
@@ -747,16 +733,30 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
                 />
               </div>
               <div className="relative flex-1">
-                <MapPin size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  ref={locationInputRef}
-                  type="text"
-                  placeholder="City, State..."
+                <LocationAutocompleteInput
                   value={locationFilter.query}
-                  onChange={(e) => setLocationFilter({ query: e.target.value })}
-                  className="w-full pl-8 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] focus:bg-white transition-all"
+                  onChange={(place) =>
+                    setLocationFilter({ query: place.formatted, lat: place.lat, lng: place.lng })
+                  }
+                  placeholder="City, State..."
+                  inputClassName="w-full pl-8 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] focus:bg-white transition-all"
                 />
               </div>
+              {/* Radius only means something once a real place is selected. */}
+              {locationFilter.lat !== undefined && (
+                <div className="relative sm:w-32 flex-shrink-0">
+                  <select
+                    value={radiusMiles}
+                    onChange={(e) => setRadiusMiles(Number(e.target.value))}
+                    className="w-full appearance-none pl-3 pr-7 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#F25722] text-gray-600 cursor-pointer"
+                  >
+                    {RADIUS_OPTIONS.map((r) => (
+                      <option key={r} value={r}>Within {r} mi</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+              )}
               <div className="relative sm:w-44 flex-shrink-0">
                 <select
                   value={artistType}
@@ -790,6 +790,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
                   onClick={() => {
                     setSearch("");
                     setLocationFilter({ query: "" });
+                    setRadiusMiles(DEFAULT_RADIUS_MILES);
                     setArtistType("");
                     setServiceType("");
                   }}

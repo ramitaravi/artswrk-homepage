@@ -383,11 +383,11 @@ export default function ArtistProfilePage() {
   // Use merged profile (Bubble live data wins where available)
   const p = (activeProfile ?? profile) as any;
 
-  // Server returns these as parsed arrays already. p.masterArtistTypes holds
-  // raw Bubble internal IDs (e.g. "1652795286947x398019932738813950"), not
-  // display names — deliberately excluded. p.workTypes is the pre-resolved,
-  // human-readable equivalent already synced for display.
-  const workTypes: string[] = (p.workTypes || [])
+  // p.masterArtistTypeNames/masterServiceTypeNames are resolved server-side
+  // from masterArtistTypes/masterServiceType (the Bubble-matching, ID-keyed
+  // source of truth) via the master_artist_types/master_service_types
+  // lookup tables — workTypes/artistServices are no longer used for display.
+  const workTypes: string[] = [...(p.masterArtistTypeNames || []), ...(p.masterServiceTypeNames || [])]
     .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i); // dedupe
   // ratingScore stored as integer ×10 (e.g. 50 = 5.0 stars)
   // No real reviews system exists yet — show a full rating rather than an

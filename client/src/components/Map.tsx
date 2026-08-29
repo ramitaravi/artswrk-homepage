@@ -86,18 +86,74 @@ declare global {
   }
 }
 
-const API_KEY = import.meta.env.VITE_FRONTEND_FORGE_API_KEY;
+/**
+ * Maps/Places script source.
+ *
+ * Preferred: our own Google Cloud key (VITE_GOOGLE_MAPS_API_KEY) hitting
+ * maps.googleapis.com directly. Requires "Maps JavaScript API" + "Places API"
+ * enabled on the project and an HTTP-referrer restriction for our domains.
+ *
+ * Fallback: the Forge maps proxy the template shipped with, so environments
+ * without a Google key of their own keep working unchanged.
+ */
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const FORGE_API_KEY = import.meta.env.VITE_FRONTEND_FORGE_API_KEY;
 const FORGE_BASE_URL =
   import.meta.env.VITE_FRONTEND_FORGE_API_URL ||
   "https://forge.butterfly-effect.dev";
 const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
 
+const MAPS_ORIGIN = GOOGLE_MAPS_API_KEY ? "https://maps.googleapis.com" : MAPS_PROXY_URL;
+const API_KEY = GOOGLE_MAPS_API_KEY || FORGE_API_KEY;
+
+/** True when a real Google Places key is configured (vs. the proxy fallback). */
+export const usingOwnGoogleKey = !!GOOGLE_MAPS_API_KEY;
+
+const MAPS_LIBRARIES = ['marker', 'places', 'geocoding', 'geometry'] as const;
+
 let _mapsScriptPromise: Promise<null> | null = null;
 
+/**
+ * Resolve once Maps AND every library we use are actually usable.
+ *
+ * Deliberately NOT using `loading=async`: with it, `script.onload` can fire
+ * before `google.maps` exists at all, leaving nothing to await and no way to
+ * tell "not ready yet" from "ready with nothing in it" — a Places Autocomplete
+ * built at that moment silently binds to nothing. Without it, `onload` means
+ * the libraries named in the URL are loaded, which is the guarantee we need.
+ *
+ * `importLibrary` is still awaited when present, so this stays correct if the
+ * loading mode ever changes.
+ */
+async function whenLibrariesReady(): Promise<null> {
+  const maps = (window as any).google?.maps;
+  if (maps?.importLibrary) {
+    await Promise.all(MAPS_LIBRARIES.map((lib) => maps.importLibrary(lib)));
+  }
+  return null;
+}
+
+/**
+ * Resolve the Places library object itself.
+ *
+ * Under `loading=async`, `importLibrary("places")` resolves with the library
+ * BEFORE the legacy `google.maps.places` namespace is populated — reading that
+ * namespace right after awaiting is a race that intermittently sees undefined.
+ * Callers should construct from what this returns, never from the global.
+ */
+export async function loadPlacesLibrary(): Promise<typeof google.maps.places> {
+  await loadMapScript();
+  const maps = (window as any).google?.maps;
+  if (maps?.importLibrary) {
+    return (await maps.importLibrary("places")) as typeof google.maps.places;
+  }
+  return maps?.places;
+}
+
 export function loadMapScript(): Promise<null> {
-  // Already loaded — resolve immediately
+  // Already loaded — but still wait on the libraries, for the same reason.
   if (typeof window !== 'undefined' && (window as any).google?.maps) {
-    return Promise.resolve(null);
+    return whenLibrariesReady();
   }
   // Already loading — return the same promise (singleton)
   if (_mapsScriptPromise) return _mapsScriptPromise;
@@ -106,7 +162,7 @@ export function loadMapScript(): Promise<null> {
     // Double-check in case it loaded between the checks above and now
     if ((window as any).google?.maps) { resolve(null); return; }
     const script = document.createElement('script');
-    script.src = `${MAPS_PROXY_URL}/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry`;
+    script.src = `${MAPS_ORIGIN}/maps/api/js?key=${API_KEY}&v=weekly&libraries=${MAPS_LIBRARIES.join(',')}`;
     script.async = true;
     script.crossOrigin = 'anonymous';
     script.onload = () => resolve(null);
@@ -116,7 +172,8 @@ export function loadMapScript(): Promise<null> {
       reject(new Error('Failed to load Google Maps'));
     };
     document.head.appendChild(script);
-  });
+  }).then(whenLibrariesReady);
+
   return _mapsScriptPromise;
 }
 

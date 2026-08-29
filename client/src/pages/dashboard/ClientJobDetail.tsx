@@ -26,6 +26,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import BoostJobModal from "@/components/BoostJobModal";
+import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
+import { useLocationField } from "@/hooks/useLocationField";
 
 // ─── Boost Performance Bar ────────────────────────────────────────────────────
 
@@ -820,7 +822,7 @@ function ConfirmModal({
       ? toDateInput(applicant.startDate ?? job?.startDate)
       : toDateInput(applicant.endDate ?? job?.endDate)
   );
-  const [locationAddress, setLocationAddress] = useState(job?.locationAddress || job?.location || "");
+  const location = useLocationField(job?.locationAddress || job?.location || "");
   const [notes, setNotes] = useState(job?.description || "");
   // Everything below defaults to a compact, already-filled-in summary — this
   // is meant to feel like confirming details that are already right, not
@@ -924,7 +926,7 @@ function ConfirmModal({
                   </div>
                   <div className="flex justify-between gap-4">
                     <span className="text-xs text-gray-400 w-20 flex-shrink-0">Location</span>
-                    <span className="text-sm font-semibold text-[#111] text-right">{locationAddress || "Not set"}</span>
+                    <span className="text-sm font-semibold text-[#111] text-right">{location.value || "Not set"}</span>
                   </div>
                 </>
               )}
@@ -998,9 +1000,14 @@ function ConfirmModal({
               {/* Location */}
               <div>
                 <label className={labelCls}>Location</label>
-                <input value={locationAddress} onChange={(e) => setLocationAddress(e.target.value)}
+                <LocationAutocompleteInput
+                  value={location.value}
+                  onChange={location.onChange}
+                  kind="any"
                   placeholder="City, State or address"
-                  className={fieldCls} />
+                  icon={false}
+                  inputClassName={fieldCls}
+                />
               </div>
 
               <button type="button" onClick={() => setDetailsEditing(false)} className="text-xs font-semibold text-gray-500 hover:text-[#111]">
@@ -1068,7 +1075,8 @@ function ConfirmModal({
                 hours: hours ? parseFloat(hours) : undefined,
                 startDate: startDate || undefined,
                 endDate: endDate || undefined,
-                locationAddress: locationAddress || undefined,
+                locationAddress: location.value || undefined,
+                locationData: location.locationData,
                 notes: notes || undefined,
               });
             }}

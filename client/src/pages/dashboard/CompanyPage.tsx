@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
+import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
+import { toLocationData, type LocationDataPayload } from "@/hooks/useLocationField";
 
 function fixUrl(url?: string | null): string | null {
   if (!url) return null;
@@ -38,6 +40,7 @@ export default function CompanyPage() {
     logo: "",
     website: "",
     locationAddress: "",
+    locationData: undefined as LocationDataPayload | undefined,
   });
 
   useEffect(() => {
@@ -48,6 +51,7 @@ export default function CompanyPage() {
         logo: fixUrl(data.company?.logo || data.owner.profilePicture) || "",
         website: data.company?.website || data.owner.website || "",
         locationAddress: data.company?.locationAddress || data.owner.location || "",
+        locationData: undefined,
       });
     }
   }, [data]);
@@ -59,6 +63,7 @@ export default function CompanyPage() {
       logo: form.logo || null,
       website: form.website || null,
       locationAddress: form.locationAddress || null,
+      locationData: form.locationData,
     });
   };
 
@@ -247,11 +252,20 @@ export default function CompanyPage() {
                 {editing ? (
                   <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 focus-within:border-[#FFBC5D] transition-colors">
                     <MapPin size={14} className="text-gray-400 flex-shrink-0" />
-                    <input
+                    <LocationAutocompleteInput
                       value={form.locationAddress}
-                      onChange={(e) => setForm(f => ({ ...f, locationAddress: e.target.value }))}
+                      onChange={(place) =>
+                        setForm(f => ({
+                          ...f,
+                          locationAddress: place.formatted,
+                          locationData: toLocationData(place),
+                        }))
+                      }
+                      kind="any"
                       placeholder="Studio location"
-                      className="flex-1 text-sm text-gray-700 focus:outline-none bg-transparent"
+                      icon={false}
+                      className="flex-1"
+                      inputClassName="w-full text-sm text-gray-700 focus:outline-none bg-transparent"
                     />
                   </div>
                 ) : displayLocation ? (

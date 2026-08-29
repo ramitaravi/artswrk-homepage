@@ -11,6 +11,8 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import CompanyManager from "@/components/CompanyManager";
+import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
+import { useLocationField } from "@/hooks/useLocationField";
 
 type Tab = "profile" | "account" | "subscription" | "help";
 
@@ -64,7 +66,7 @@ function ProfileTab() {
   const [lastName, setLastName] = useState("");
   const [pronouns, setPronouns] = useState("");
   const [phone, setPhone] = useState("");
-  const [location, setLocation] = useState("");
+  const location = useLocationField();
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -74,7 +76,7 @@ function ProfileTab() {
       setLastName(artswrkUser.lastName ?? "");
       setPronouns((artswrkUser as any).pronouns ?? "");
       setPhone((artswrkUser as any).phoneNumber ?? "");
-      setLocation((artswrkUser as any).location ?? "");
+      location.reset((artswrkUser as any).location);
     }
   }, [artswrkUser]);
 
@@ -157,7 +159,13 @@ function ProfileTab() {
         </div>
         <div>
           <label className={labelCls}>Location</label>
-          <input className={fieldCls} value={location} onChange={e => setLocation(e.target.value)} placeholder="City, State" />
+          <LocationAutocompleteInput
+            value={location.value}
+            onChange={location.onChange}
+            placeholder="City, State"
+            icon={false}
+            inputClassName={fieldCls}
+          />
         </div>
       </div>
 
@@ -171,7 +179,7 @@ function ProfileTab() {
 
       {/* Save */}
       <button
-        onClick={() => saveProfile.mutate({ firstName, lastName, pronouns, phoneNumber: phone, location })}
+        onClick={() => saveProfile.mutate({ firstName, lastName, pronouns, phoneNumber: phone, location: location.value, locationData: location.locationData })}
         disabled={saveProfile.isPending}
         className="w-full py-3.5 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
       >

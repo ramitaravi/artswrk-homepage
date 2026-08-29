@@ -9,6 +9,8 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
+import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
+import { useLocationField, toLocationData, type LocationDataPayload } from "@/hooks/useLocationField";
 import SharedNavbar from "@/components/Navbar";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -72,6 +74,8 @@ interface FormData {
   studioName: string;
   selectedCompanyId: number | null;
   locationAddress: string;
+  /** Real place data behind locationAddress, when picked from Places. */
+  locationData?: LocationDataPayload;
   dateType: DateType;
   startDate: string;
   endDate: string;
@@ -398,7 +402,7 @@ function Step2({
   // ── Add Company inline form ──
   const [showAddCompany, setShowAddCompany] = useState(false);
   const [newCompanyName, setNewCompanyName] = useState("");
-  const [newCompanyLocation, setNewCompanyLocation] = useState("");
+  const newCompanyLocation = useLocationField();
   const addCompanyMutation = trpc.postJob.addCompany.useMutation({
     onSuccess: (data) => {
       const newCompany = data.companies.find((c: { id: number; name: string; locationAddress: string | null; transportReimbursed: boolean | null; transportDetails: string | null }) => c.id === data.newCompanyId);
@@ -412,7 +416,7 @@ function Step2({
       }
       setShowAddCompany(false);
       setNewCompanyName("");
-      setNewCompanyLocation("");
+      newCompanyLocation.reset();
       companiesQuery.refetch();
       toast.success("Company added!");
     },
@@ -457,6 +461,7 @@ function Step2({
       title: form.title || undefined,
       description: form.description,
       locationAddress: form.locationAddress || undefined,
+      locationData: form.locationData,
       dateType: form.dateType as any,
       startDate: localDatetimeInputToISO(form.startDate),
       endDate: localDatetimeInputToISO(form.endDate),
@@ -600,12 +605,23 @@ function Step2({
                     </button>
                   </div>
                   <Input value={newCompanyName} onChange={(e) => setNewCompanyName(e.target.value)} placeholder="Company / Studio name" className="border-gray-200 text-sm" autoFocus />
-                  <Input value={newCompanyLocation} onChange={(e) => setNewCompanyLocation(e.target.value)} placeholder="City, State (optional)" className="border-gray-200 text-sm" />
+                  <LocationAutocompleteInput
+                    value={newCompanyLocation.value}
+                    onChange={newCompanyLocation.onChange}
+                    kind="any"
+                    placeholder="City, State (optional)"
+                    icon={false}
+                    inputClassName="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus:border-[#F25722]"
+                  />
                   <Button
                     size="sm"
                     onClick={() => {
                       if (!newCompanyName.trim()) { toast.error("Company name is required"); return; }
-                      addCompanyMutation.mutate({ name: newCompanyName.trim(), locationAddress: newCompanyLocation.trim() || undefined });
+                      addCompanyMutation.mutate({
+                        name: newCompanyName.trim(),
+                        locationAddress: newCompanyLocation.value.trim() || undefined,
+                        locationData: newCompanyLocation.locationData,
+                      });
                     }}
                     disabled={addCompanyMutation.isPending}
                     className="hirer-grad-bg border-0 hover:opacity-90 text-xs"
@@ -639,11 +655,21 @@ function Step2({
             <MapPin size={11} className="inline mr-1" />
             Location {!isValid.location && <span className="text-red-400 normal-case font-normal ml-1">· required</span>}
           </label>
-          <Input
+          <LocationAutocompleteInput
             value={form.locationAddress}
-            onChange={(e) => set("locationAddress", e.target.value)}
+            onChange={(place) =>
+              setForm((f) => ({
+                ...f,
+                locationAddress: place.formatted,
+                locationData: toLocationData(place),
+              }))
+            }
+            // A job can be a city, a street address or a named studio — let
+            // Google match all three rather than restricting to cities.
+            kind="any"
             placeholder="City, State or full address"
-            className={`focus:border-[#F25722] ${!isValid.location ? "border-red-200" : "border-gray-200"}`}
+            icon={false}
+            inputClassName={`flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none md:text-sm focus:border-[#F25722] ${!isValid.location ? "border-red-200" : "border-gray-200"}`}
           />
           {/* Location conflict flag */}
           {locationConflict && selectedCompany?.locationAddress && (
@@ -1221,6 +1247,7 @@ function Step3({
       title: form.title || undefined,
       description: form.description,
       locationAddress: form.locationAddress || undefined,
+      locationData: form.locationData,
       dateType: form.dateType as "Single Date" | "Weekly" | "Multiple Dates" | "Dates Flexible" | "Ongoing" | "Recurring",
       startDate: localDatetimeInputToISO(form.startDate),
       endDate: localDatetimeInputToISO(form.endDate),

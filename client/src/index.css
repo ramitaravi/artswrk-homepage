@@ -285,3 +285,40 @@
     transform: translateY(0);
   }
 }
+
+/* ── Google Places Autocomplete dropdown ────────────────────────────────────
+   Google appends `.pac-container` to <body>, outside our React tree, with a
+   z-index of 1000 — below Radix dialogs/sheets (z-50 in a new stacking
+   context), so the suggestions render *behind* any modal that contains a
+   location field. Lift it above everything and match the site's type. */
+.pac-container {
+  z-index: 10000 !important;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.12), 0 8px 10px -6px rgb(0 0 0 / 0.08);
+  font-family: 'Poppins', sans-serif;
+  margin-top: 2px;
+  padding: 0.25rem 0;
+}
+
+.pac-item {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+  color: #4b5563;
+  border-top: none;
+  cursor: pointer;
+}
+
+.pac-item:hover,
+.pac-item-selected {
+  background-color: #fdf3ef;
+}
+
+.pac-item-query {
+  font-size: 0.8125rem;
+  color: #111827;
+}
+
+.pac-icon {
+  margin-top: 3px;
+}

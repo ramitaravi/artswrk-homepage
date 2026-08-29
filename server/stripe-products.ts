@@ -2,7 +2,7 @@
  * Artswrk Stripe Products
  * Centralised product/price definitions for job posting payments.
  *
- * ONE_TIME_POST  – $30 single job post
+ * ONE_TIME_POST  – posting a job is free (was $30, corrected 2026-08-29 per Ramita)
  * SUBSCRIPTION   – Monthly PRO subscription (Subscribe & Save)
  * BOOST          – Dynamic pricing: dailyBudget × durationDays
  */
@@ -18,11 +18,16 @@ function envOrLive(testEnvVar: string, liveValue: string): string {
 }
 
 export const STRIPE_PRODUCTS = {
-  /** One-time $30 job post fee */
+  /** Posting a job is free (corrected 2026-08-29 per Ramita — was $30).
+   * NOTE: server/routers.ts's createAndCheckout mutation still routes every
+   * non-subscription post through this as a real Stripe Checkout session —
+   * a $0 session works in Stripe but is an odd UX for something free. Left
+   * as-is pending confirmation on whether the checkout step should be
+   * skipped entirely for a free post rather than just charging $0. */
   ONE_TIME_POST: {
     name: "Artswrk Job Post",
     description: "Post a single job to 5,000+ artists in the Artswrk network.",
-    amount: 3000, // cents
+    amount: 0, // cents — free
     currency: "usd",
     mode: "payment" as const,
   },
@@ -106,10 +111,9 @@ export const STRIPE_PRODUCTS = {
     },
   },
   /**
-   * Client on-demand job unlock — $40/job, up from $30. Previously this had
-   * NO real Stripe Price object at all — every purchase minted a fresh
-   * one-off product via inline price_data. Now uses a real, trackable price.
-   * Verified via API against the DEV/test key on 2026-08-28: $40 one-time, active. ✓
+   * Client on-demand job unlock — $40/job. Confirmed correct by Ramita
+   * 2026-08-29 (a deliberate price increase, not a bug) — reverted my
+   * earlier mistaken "fix" to $30 back to $40.
    */
   CLIENT_JOB_UNLOCK: {
     productId: undefined as string | undefined,

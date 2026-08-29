@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { eq, count, desc } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getDb, normalizeSocialLink } from "./db";
+import { getDb, normalizeSocialLink, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames } from "./db";
 import { users, artistReviews, artistServiceCategories, artistResumes, bookings } from "../drizzle/schema";
+import { buildLocationColumns, locationInputSchema } from "./location";
 
 // ─── Helper: parse JSON array safely ──────────────────────────────────────────
 function parseJsonArray(val: string | null | undefined): string[] {
@@ -53,6 +54,10 @@ export const artistProfileRouter = router({
     if (!user) throw new Error("User not found");
 
     const liveBookingCount = bookingCountResult[0]?.value ?? 0;
+    const [masterArtistTypeNames, masterServiceTypeNames] = await Promise.all([
+      resolveMasterArtistTypeNames(parseJsonArray(user.masterArtistTypes)),
+      resolveMasterServiceTypeNames(parseJsonArray(user.masterServiceType)),
+    ]);
 
     return {
       id: user.id,
@@ -63,14 +68,21 @@ export const artistProfileRouter = router({
       tagline: user.tagline || "",
       bio: user.bio || "",
       location: user.location || "",
+      // Real coordinates behind the label, so the client can seed a radius
+      // search (jobs near me) instead of a city-name text match.
+      locationLat: user.locationLat ? Number(user.locationLat) : null,
+      locationLng: user.locationLng ? Number(user.locationLng) : null,
       profilePicture: user.profilePicture || "",
       isPro: user.artswrkPro ?? false,
       bookingCount: liveBookingCount || user.bookingCount || 0,
       ratingScore: user.ratingScore ?? 0,
       reviewCount: user.reviewCount ?? 0,
-      workTypes: parseJsonArray(user.workTypes),
+      // Display names resolved from masterArtistTypes/masterServiceType (the
+      // Bubble-matching, ID-keyed source of truth) — workTypes/artistServices
+      // are no longer used for display.
+      masterArtistTypeNames,
+      masterServiceTypeNames,
       artistDisciplines: parseJsonArray(user.artistDisciplines),
-      artistServices: parseJsonArray(user.artistServices),
       masterArtistTypes: parseJsonArray(user.masterArtistTypes),
       masterStyles: parseJsonArray(user.masterStyles),
       mediaPhotos: parseJsonArray(user.mediaPhotos),
@@ -109,6 +121,10 @@ export const artistProfileRouter = router({
       if (!user) throw new Error("Profile not found");
       const bookingCountResult = await db.select({ value: count() }).from(bookings).where(eq(bookings.artistUserId, user.id));
       const liveBookingCount = bookingCountResult[0]?.value ?? 0;
+      const [masterArtistTypeNames, masterServiceTypeNames] = await Promise.all([
+        resolveMasterArtistTypeNames(parseJsonArray(user.masterArtistTypes)),
+        resolveMasterServiceTypeNames(parseJsonArray(user.masterServiceType)),
+      ]);
       return {
         id: user.id,
         name: user.name || "",
@@ -123,9 +139,9 @@ export const artistProfileRouter = router({
         bookingCount: liveBookingCount || user.bookingCount || 0,
         ratingScore: user.ratingScore ?? 0,
         reviewCount: user.reviewCount ?? 0,
-        workTypes: parseJsonArray(user.workTypes),
+        masterArtistTypeNames,
+        masterServiceTypeNames,
         artistDisciplines: parseJsonArray(user.artistDisciplines),
-        artistServices: parseJsonArray(user.artistServices),
         masterArtistTypes: parseJsonArray(user.masterArtistTypes),
         masterStyles: parseJsonArray(user.masterStyles),
         mediaPhotos: parseJsonArray(user.mediaPhotos),
@@ -235,6 +251,11 @@ export const artistProfileRouter = router({
         }
       }
 
+      const [masterArtistTypeNames, masterServiceTypeNames] = await Promise.all([
+        resolveMasterArtistTypeNames(parseJsonArray(user.masterArtistTypes)),
+        resolveMasterServiceTypeNames(parseJsonArray(user.masterServiceType)),
+      ]);
+
       return {
         id: user.id,
         name: user.name || "",
@@ -249,9 +270,9 @@ export const artistProfileRouter = router({
         bookingCount: liveBookingCount || user.bookingCount || 0,
         ratingScore: user.ratingScore ?? 0,
         reviewCount: user.reviewCount ?? 0,
-        workTypes: parseJsonArray(user.workTypes),
+        masterArtistTypeNames,
+        masterServiceTypeNames,
         artistDisciplines: parseJsonArray(user.artistDisciplines),
-        artistServices: parseJsonArray(user.artistServices),
         masterArtistTypes: parseJsonArray(user.masterArtistTypes),
         masterStyles: parseJsonArray(user.masterStyles),
         mediaPhotos: hasFullAccess ? parseJsonArray(user.mediaPhotos) : [],
@@ -396,6 +417,8 @@ export const artistProfileRouter = router({
         tagline: z.string().max(256).optional(),
         bio: z.string().optional(),
         location: z.string().max(256).optional(),
+        /** Real Google Places data behind `location` — powers radius filtering. */
+        locationData: locationInputSchema,
         profilePicture: z.string().optional(),
         workTypes: z.array(z.string()).optional(),
         artistDisciplines: z.array(z.string()).optional(),
@@ -428,7 +451,12 @@ export const artistProfileRouter = router({
       if (input.pronouns !== undefined) updateData.pronouns = input.pronouns;
       if (input.tagline !== undefined) updateData.tagline = input.tagline;
       if (input.bio !== undefined) updateData.bio = input.bio;
-      if (input.location !== undefined) updateData.location = input.location;
+      if (input.location !== undefined) {
+        // Store the structured place alongside the label so "artists near me"
+        // has coordinates to filter on. Falls back to geocoding when the
+        // artist typed a location instead of picking a suggestion.
+        Object.assign(updateData, await buildLocationColumns(input.location, input.locationData));
+      }
       if (input.profilePicture !== undefined)
         updateData.profilePicture = input.profilePicture;
       if (input.workTypes !== undefined)

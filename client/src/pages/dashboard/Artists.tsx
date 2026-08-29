@@ -9,12 +9,14 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Search, Users, ChevronRight, Loader2,
-  Heart, ArrowRight, CalendarCheck, Lock, Sparkles,
+  Heart, ArrowRight, CalendarCheck, Lock, Sparkles, MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { formatLocation } from "@/lib/utils";
 import { useAuth } from "@/_core/hooks/useAuth";
+import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
+import { DEFAULT_RADIUS_MILES, RADIUS_OPTIONS } from "@shared/location";
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -333,9 +335,7 @@ function FeaturedStrip() {
             } catch { return null; }
           })();
           const photo = fixUrl(firstPhoto) || fixUrl(a.profilePicture);
-          const primaryType = (() => {
-            try { return JSON.parse(a.workTypes ?? "[]")[0] ?? ""; } catch { return ""; }
-          })();
+          const primaryType = a.typeNames?.[0] ?? "";
           return (
             <div
               key={a.id}
@@ -376,6 +376,10 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
   const [affiliationFilter, setAffiliationFilter] = useState<number | undefined>();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [page, setPage] = useState(0);
+  // Location is its own filter rather than part of the free-text search: only a
+  // real Places selection carries the coordinates a radius search needs.
+  const [locationFilter, setLocationFilter] = useState<{ query: string; lat?: number; lng?: number }>({ query: "" });
+  const [radiusMiles, setRadiusMiles] = useState<number>(DEFAULT_RADIUS_MILES);
   const [, navigate] = useLocation();
 
   const { user } = useAuth();
@@ -412,6 +416,10 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
     search: search || undefined,
     artistType: roleFilter || undefined,
     affiliationId: affiliationFilter,
+    locationQuery: locationFilter.query || undefined,
+    locationLat: locationFilter.lat,
+    locationLng: locationFilter.lng,
+    radiusMiles: locationFilter.lat ? radiusMiles : undefined,
   });
 
   const artists = data?.artists ?? [];
@@ -421,13 +429,17 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
   const handleSearch = (v: string) => { setSearch(v); setPage(0); };
   const handleRole = (r: string) => { setRoleFilter(r); setPage(0); };
   const handleAffiliation = (id: number | undefined) => { setAffiliationFilter(id); setPage(0); };
+  const handleLocation = (place: { formatted: string; lat?: number; lng?: number }) => {
+    setLocationFilter({ query: place.formatted, lat: place.lat, lng: place.lng });
+    setPage(0);
+  };
 
   return (
     <div className="flex gap-6">
       {/* Main content */}
       <div className="flex-1 min-w-0">
         {/* Featured strip — only when no active filters */}
-        {!search && !roleFilter && !affiliationFilter && <FeaturedStrip />}
+        {!search && !roleFilter && !affiliationFilter && !locationFilter.query && <FeaturedStrip />}
 
         {/* Subscribe CTA — on-demand clients can browse but can't view full
             profiles or connect with artists until they subscribe */}
@@ -485,15 +497,39 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="relative mb-4">
-          <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Search artists by name or location..."
-            className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-gray-200 text-sm text-[#111] placeholder-gray-400 focus:outline-none focus:border-[#FFBC5D] transition-all bg-white shadow-sm"
-          />
+        {/* Search + location */}
+        <div className="flex flex-col sm:flex-row gap-2 mb-4">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Search artists by name..."
+              className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-gray-200 text-sm text-[#111] placeholder-gray-400 focus:outline-none focus:border-[#FFBC5D] transition-all bg-white shadow-sm"
+            />
+          </div>
+          <div className="relative flex-1">
+            <MapPin size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
+            <LocationAutocompleteInput
+              value={locationFilter.query}
+              onChange={handleLocation}
+              placeholder="Anywhere"
+              icon={false}
+              inputClassName="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-gray-200 text-sm text-[#111] placeholder-gray-400 focus:outline-none focus:border-[#FFBC5D] transition-all bg-white shadow-sm"
+            />
+          </div>
+          {/* Radius only means something once a real place is selected. */}
+          {locationFilter.lat !== undefined && (
+            <select
+              value={radiusMiles}
+              onChange={(e) => { setRadiusMiles(Number(e.target.value)); setPage(0); }}
+              className="sm:w-36 flex-shrink-0 px-3 py-3.5 rounded-2xl border border-gray-200 text-sm text-gray-600 bg-white shadow-sm focus:outline-none focus:border-[#FFBC5D] cursor-pointer"
+            >
+              {RADIUS_OPTIONS.map((r) => (
+                <option key={r} value={r}>Within {r} mi</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Affiliation chips */}
@@ -583,9 +619,7 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4">
             {artists.map((a) => {
               const displayName = getDisplayName(a.firstName, a.lastName, a.name);
-              const primaryType = (() => {
-                try { return JSON.parse(a.workTypes ?? "[]")[0] ?? ""; } catch { return ""; }
-              })();
+              const primaryType = a.typeNames?.[0] ?? "";
               return (
                 <div key={a.id}
                   className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-lg transition-all group cursor-pointer"
@@ -638,9 +672,7 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-100 overflow-hidden">
             {artists.map((a) => {
               const displayName = getDisplayName(a.firstName, a.lastName, a.name);
-              const primaryType = (() => {
-                try { return JSON.parse(a.workTypes ?? "[]")[0] ?? ""; } catch { return ""; }
-              })();
+              const primaryType = a.typeNames?.[0] ?? "";
               return (
                 <div key={a.id}
                   className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer group"

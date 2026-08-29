@@ -12,4 +12,8 @@ export const ENV = {
   stripeConnectClientId: process.env.STRIPE_CONNECT_CLIENT_ID ?? "",
   sendgridApiKey: process.env.SENDGRID_API_KEY ?? "",
   brevoApiKey: process.env.BREVO_API_KEY ?? "",
+  /** Server-side Google key for Geocoding. Empty => fall back to the Forge
+   *  maps proxy. Cannot be the browser key: Google rejects referrer-restricted
+   *  keys on the REST APIs. */
+  googleMapsServerApiKey: process.env.GOOGLE_MAPS_SERVER_API_KEY ?? "",
 };

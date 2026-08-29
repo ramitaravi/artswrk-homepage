@@ -290,13 +290,14 @@ export default function ArtistProfile() {
   // Owner detection: logged-in user's slug matches this profile's slug
   const isOwner = !!(user && p.slug && (user as any).slug === p.slug);
 
-  // NOTE: p.masterArtistTypes holds raw Bubble internal IDs (e.g.
-  // "1652795286947x398019932738813950"), not display names — deliberately
-  // excluded here. p.workTypes is the pre-resolved, human-readable
-  // equivalent already synced for display.
-  const workTypes: string[] = Array.isArray(p.workTypes)
-    ? p.workTypes.filter((v: string, i: number, a: string[]) => a.indexOf(v) === i)
-    : [];
+  // p.masterArtistTypeNames/masterServiceTypeNames are resolved server-side
+  // from masterArtistTypes/masterServiceType (the Bubble-matching, ID-keyed
+  // source of truth) via the master_artist_types/master_service_types
+  // lookup tables — workTypes/artistServices are no longer used for display.
+  const workTypes: string[] = [
+    ...(Array.isArray(p.masterArtistTypeNames) ? p.masterArtistTypeNames : []),
+    ...(Array.isArray(p.masterServiceTypeNames) ? p.masterServiceTypeNames : []),
+  ].filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
 
   // No real reviews system exists yet — show a full rating rather than an
   // empty/broken-looking one until a real review system ships.

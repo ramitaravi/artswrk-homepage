@@ -8,6 +8,8 @@ import { useRef, useState } from "react";
 import { Building2, Camera, Check, Loader2, MapPin, Pencil, Plus, X } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
+import { useLocationField, toLocationData, type LocationDataPayload } from "@/hooks/useLocationField";
 
 function fixUrl(url?: string | null): string | null {
   if (!url) return null;
@@ -33,6 +35,7 @@ function CompanyEditForm({ company, onSaved, onCancel }: { company: Company; onS
     logo: company.logo ?? "",
     website: company.website ?? "",
     locationAddress: company.locationAddress ?? "",
+    locationData: undefined as LocationDataPayload | undefined,
     transportReimbursed: company.transportReimbursed ?? false,
     transportDetails: company.transportDetails ?? "",
   });
@@ -85,11 +88,20 @@ function CompanyEditForm({ company, onSaved, onCancel }: { company: Company; onS
         placeholder="Company name"
         className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:border-[#F25722]"
       />
-      <input
+      <LocationAutocompleteInput
         value={form.locationAddress}
-        onChange={(e) => setForm((f) => ({ ...f, locationAddress: e.target.value }))}
+        onChange={(place) =>
+          setForm((f) => ({
+            ...f,
+            locationAddress: place.formatted,
+            locationData: toLocationData(place),
+          }))
+        }
+        // Studios are usually a named venue or a street address, not a city.
+        kind="any"
         placeholder="Location"
-        className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:border-[#F25722]"
+        icon={false}
+        inputClassName="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:border-[#F25722]"
       />
       <input
         value={form.website}
@@ -143,7 +155,7 @@ function CompanyEditForm({ company, onSaved, onCancel }: { company: Company; onS
 
 function AddCompanyForm({ onAdded, onCancel }: { onAdded: () => void; onCancel: () => void }) {
   const [name, setName] = useState("");
-  const [locationAddress, setLocationAddress] = useState("");
+  const location = useLocationField();
   const addCompany = trpc.postJob.addCompany.useMutation({
     onSuccess: () => { toast.success("Company added!"); onAdded(); },
     onError: (e) => toast.error(e.message || "Failed to add company"),
@@ -158,18 +170,24 @@ function AddCompanyForm({ onAdded, onCancel }: { onAdded: () => void; onCancel: 
         autoFocus
         className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:border-[#F25722]"
       />
-      <input
-        value={locationAddress}
-        onChange={(e) => setLocationAddress(e.target.value)}
+      <LocationAutocompleteInput
+        value={location.value}
+        onChange={location.onChange}
+        kind="any"
         placeholder="Location"
-        className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:border-[#F25722]"
+        icon={false}
+        inputClassName="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:border-[#F25722]"
       />
       <div className="flex items-center justify-end gap-2 pt-1">
         <button onClick={onCancel} className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold text-gray-500 hover:bg-gray-100 transition-colors">
           <X size={13} /> Cancel
         </button>
         <button
-          onClick={() => addCompany.mutate({ name, locationAddress: locationAddress || undefined })}
+          onClick={() => addCompany.mutate({
+            name,
+            locationAddress: location.value || undefined,
+            locationData: location.locationData,
+          })}
           disabled={addCompany.isPending || !name.trim()}
           className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity disabled:opacity-60"
         >

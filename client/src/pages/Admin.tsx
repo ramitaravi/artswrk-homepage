@@ -22,6 +22,7 @@ import { ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE } from "@shared/
 import { Link } from "wouter";
 import RichTextEditor from "@/components/RichTextEditor";
 import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
+import { useLocationField } from "@/hooks/useLocationField";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type AdminSection = "dashboard" | "artists" | "clients" | "jobs" | "pro-jobs" | "enterprise-clients" | "bookings" | "admin-bookings" | "payments" | "subscriptions" | "benefits" | "emails" | "settings";
@@ -402,24 +403,6 @@ function DashboardSection() {
   );
 }
 
-// ─── Artist constants ─────────────────────────────────────────────────────────
-const MASTER_ARTIST_TYPES = [
-  "Dance Teacher", "Choreographer", "Substitute Teacher", "Competition Coach",
-  "Yoga Instructor", "Pilates Instructor", "Fitness Instructor", "Vocal Coach",
-  "Music Teacher", "Photographer", "Videographer", "Event Performer",
-  "Dance Educator", "Dance Adjudicator", "Acting Coach", "Side Jobs",
-];
-const ARTIST_SERVICES = [
-  "Private Lessons", "Group Classes", "Workshops", "Masterclasses",
-  "Audition Coaching", "Competition Prep", "Choreography", "Performance",
-  "Adjudication", "Photography", "Videography", "Event Coverage",
-];
-const MASTER_STYLES = [
-  "Ballet", "Contemporary", "Jazz", "Hip Hop", "Tap", "Lyrical", "Modern",
-  "Ballroom", "Latin", "Salsa", "Swing", "Breakdancing", "Acrobatics",
-  "Musical Theatre", "Commercial", "K-Pop", "Afrobeats",
-];
-
 // ─── Multi-select chip picker ─────────────────────────────────────────────────
 function ChipPicker({ label, options, selected, onChange }: {
   label: string;
@@ -464,22 +447,31 @@ function AdminArtistForm({
   onCancel: () => void;
   isCreate?: boolean;
 }) {
-  const parseArr = (v?: string | null) => { try { return JSON.parse(v || "[]") as string[]; } catch { return []; } };
+  // masterArtistTypeNames/masterServiceTypeNames/masterStyleNames are resolved
+  // server-side by admin.getArtist (ids -> names) — the raw masterArtistTypes/
+  // masterServiceType/masterStyles columns hold Bubble-matching ids, never names.
+  const { data: masterArtistTypeOptions = [] } = trpc.artists.getMasterArtistTypes.useQuery();
+  const { data: masterServiceTypeOptions = [] } = trpc.artists.getMasterServiceTypes.useQuery();
+  const { data: masterStyleOptions = [] } = trpc.artists.getMasterStyleTypes.useQuery();
 
   const [firstName, setFirstName] = useState(initial?.firstName ?? "");
   const [lastName, setLastName] = useState(initial?.lastName ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
   const [password, setPassword] = useState("");
   const [pronouns, setPronouns] = useState(initial?.pronouns ?? "");
+  const [phoneNumber, setPhoneNumber] = useState(initial?.phoneNumber ?? "");
   const [location, setLocation] = useState(initial?.location ?? "");
   const [bio, setBio] = useState(initial?.bio ?? "");
   const [website, setWebsite] = useState(initial?.website ?? "");
   const [instagram, setInstagram] = useState(initial?.instagram ?? "");
+  const [tiktok, setTiktok] = useState(initial?.tiktok ?? "");
+  const [youtube, setYoutube] = useState(initial?.youtube ?? "");
+  const [portfolio, setPortfolio] = useState(initial?.portfolio ?? "");
   const [tagline, setTagline] = useState(initial?.tagline ?? "");
   const [profilePicture, setProfilePicture] = useState(initial?.profilePicture ?? "");
-  const [types, setTypes] = useState<string[]>(parseArr(initial?.masterArtistTypes));
-  const [services, setServices] = useState<string[]>(parseArr(initial?.artistServices));
-  const [styles, setStyles] = useState<string[]>(parseArr(initial?.masterStyles));
+  const [types, setTypes] = useState<string[]>(initial?.masterArtistTypeNames ?? []);
+  const [services, setServices] = useState<string[]>(initial?.masterServiceTypeNames ?? []);
+  const [styles, setStyles] = useState<string[]>(initial?.masterStyleNames ?? []);
   const [artswrkPro, setArtswrkPro] = useState<boolean>(!!initial?.artswrkPro);
   const [artswrkBasic, setArtswrkBasic] = useState<boolean>(!!initial?.artswrkBasic);
   const [sendWelcome, setSendWelcome] = useState(true);
@@ -491,9 +483,9 @@ function AdminArtistForm({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     onSave({
-      firstName, lastName, email, pronouns, location, bio, website,
-      instagram, tagline, profilePicture, masterArtistTypes: types,
-      artistServices: services, masterStyles: styles, artswrkPro, artswrkBasic,
+      firstName, lastName, email, pronouns, phoneNumber, location, bio, website,
+      instagram, tiktok, youtube, portfolio, tagline, profilePicture, masterArtistTypes: types,
+      masterServiceType: services, masterStyles: styles, artswrkPro, artswrkBasic,
       ...(isCreate ? {
         password: password || undefined,
         sendWelcomeEmail: sendWelcome,
@@ -558,7 +550,7 @@ function AdminArtistForm({
           <div>
             <label className={labelCls}>Location</label>
             <div className="rounded-xl border border-gray-200 focus-within:border-[#F25722] transition-colors bg-white">
-              <LocationAutocompleteInput value={location} onChange={r => setLocation(r.query)} placeholder="New York, NY" icon={false} />
+              <LocationAutocompleteInput value={location} onChange={r => setLocation(r.formatted)} placeholder="New York, NY" icon={false} />
             </div>
           </div>
         </div>
@@ -577,14 +569,18 @@ function AdminArtistForm({
       {/* Specialties */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
         <h3 className="text-sm font-black text-[#111] uppercase tracking-wider">Specialties</h3>
-        <ChipPicker label="Artist Types" options={MASTER_ARTIST_TYPES} selected={types} onChange={setTypes} />
-        <ChipPicker label="Services" options={ARTIST_SERVICES} selected={services} onChange={setServices} />
-        <ChipPicker label="Styles" options={MASTER_STYLES} selected={styles} onChange={setStyles} />
+        <ChipPicker label="Artist Types" options={masterArtistTypeOptions.map(t => t.name)} selected={types} onChange={setTypes} />
+        <ChipPicker label="Services" options={masterServiceTypeOptions.map(t => t.name)} selected={services} onChange={setServices} />
+        <ChipPicker label="Styles" options={masterStyleOptions.map(t => t.name)} selected={styles} onChange={setStyles} />
       </div>
 
       {/* Social & Web */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
         <h3 className="text-sm font-black text-[#111] uppercase tracking-wider">Social & Web</h3>
+        <div>
+          <label className={labelCls}>Phone Number</label>
+          <input value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="(555) 123-4567" className={inputCls} />
+        </div>
         <div>
           <label className={labelCls}>Website</label>
           <input value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://janedoe.com" className={inputCls} />
@@ -595,6 +591,18 @@ function AdminArtistForm({
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
             <input value={instagram} onChange={e => setInstagram(e.target.value.replace("@", ""))} placeholder="janedoe" className={`${inputCls} pl-8`} />
           </div>
+        </div>
+        <div>
+          <label className={labelCls}>TikTok</label>
+          <input value={tiktok} onChange={e => setTiktok(e.target.value)} placeholder="@janedoe or full URL" className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>YouTube</label>
+          <input value={youtube} onChange={e => setYoutube(e.target.value)} placeholder="Channel URL" className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Portfolio</label>
+          <input value={portfolio} onChange={e => setPortfolio(e.target.value)} placeholder="https://portfolio.com" className={inputCls} />
         </div>
       </div>
 
@@ -834,9 +842,9 @@ function AdminArtistDetail({ artistId, onBack, onEdit }: { artistId: number; onB
   if (!artist) return <div className="text-center py-24 text-gray-400 text-sm">Artist not found</div>;
 
   const name = displayName(artist);
-  const types = parseArr(artist.workTypes);
-  const services = parseArr(artist.artistServices);
-  const styles = parseArr(artist.masterStyles);
+  const types = artist.masterArtistTypeNames ?? [];
+  const services = artist.masterServiceTypeNames ?? [];
+  const styles = artist.masterStyleNames ?? [];
 
   const TABS = [
     { id: "overview" as const, label: "Overview" },
@@ -1032,6 +1040,9 @@ function ArtistsSection() {
   const [view, setView] = useState<View>({ mode: "list" });
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
+
+  const { data: filterArtistTypeOptions = [] } = trpc.artists.getMasterArtistTypes.useQuery();
+  const { data: filterServiceTypeOptions = [] } = trpc.artists.getMasterServiceTypes.useQuery();
 
   const [search, setSearch] = useState("");
   const [locationSearch, setLocationSearch] = useState("");
@@ -1281,11 +1292,11 @@ function ArtistsSection() {
           <div className="flex flex-wrap gap-3">
             <select value={artistType} onChange={e => { setArtistType(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
               <option value="">Artist Type</option>
-              {MASTER_ARTIST_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              {filterArtistTypeOptions.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
             </select>
             <select value={serviceType} onChange={e => { setServiceType(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
               <option value="">Service Type</option>
-              {ARTIST_SERVICES.map(t => <option key={t} value={t}>{t}</option>)}
+              {filterServiceTypeOptions.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
             </select>
             <select value={state} onChange={e => { setState(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
               <option value="">State</option>
@@ -1324,7 +1335,7 @@ function ArtistsSection() {
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, email, or credits (e.g. Wicked)…" className="bg-transparent text-xs text-[#111] placeholder-gray-400 focus:outline-none w-full" />
             </div>
             <div className="flex-1 min-w-[180px] bg-gray-50 rounded-xl border border-gray-200">
-              <LocationAutocompleteInput value={locationSearch} onChange={r => setLocationSearch(r.query)} placeholder="Search location…" className="text-xs" />
+              <LocationAutocompleteInput value={locationSearch} onChange={r => setLocationSearch(r.formatted)} placeholder="Search location…" className="text-xs" />
             </div>
             <select
               value={`${sortBy}:${sortDir}`}
@@ -1434,7 +1445,7 @@ function ArtistsSection() {
                 ) : data?.artists.length === 0 ? (
                   <tr><td colSpan={8} className="px-5 py-10 text-center text-gray-400 text-xs">No artists found</td></tr>
                 ) : data?.artists.map(a => {
-                  const types = (() => { try { return JSON.parse(a.workTypes || "[]"); } catch { return []; } })();
+                  const types = a.typeNames ?? [];
                   const stage = ONBOARDING_STAGES.find(s => s.value === (a.onboardingStep ?? 0));
                   return (
                     <tr
@@ -1516,7 +1527,7 @@ function ArtistsSection() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {data?.artists.map(a => {
-                const types = (() => { try { return JSON.parse(a.workTypes || "[]"); } catch { return []; } })();
+                const types = a.typeNames ?? [];
                 const stage = ONBOARDING_STAGES.find(s => s.value === (a.onboardingStep ?? 0));
                 return (
                   <div
@@ -1711,21 +1722,29 @@ function AdminClientForm({
   const [lastName, setLastName] = useState(initial?.lastName ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
   const [password, setPassword] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState(initial?.phoneNumber ?? "");
   const [clientCompanyName, setClientCompanyName] = useState(initial?.clientCompanyName ?? "");
   const [location, setLocation] = useState(initial?.location ?? "");
   const [website, setWebsite] = useState(initial?.website ?? "");
   const [instagram, setInstagram] = useState(initial?.instagram ?? "");
+  const [tiktok, setTiktok] = useState(initial?.tiktok ?? "");
+  const [youtube, setYoutube] = useState(initial?.youtube ?? "");
+  const [portfolio, setPortfolio] = useState(initial?.portfolio ?? "");
   const [profilePicture, setProfilePicture] = useState(initial?.profilePicture ?? "");
   const [businessOrIndividual, setBusinessOrIndividual] = useState(initial?.businessOrIndividual ?? "");
-  const [hiringCategory, setHiringCategory] = useState(initial?.hiringCategory ?? "");
+  // businessType is the real, Bubble-sourced business category (974 populated
+  // clients) — drives Enterprise auto-detection. hiringCategory is a
+  // separate, much sparser field kept for backward compat, still saved but
+  // no longer the primary signal.
+  const [businessType, setBusinessType] = useState(initial?.businessType ?? "");
   const [clientPremium, setClientPremium] = useState<boolean>(!!initial?.clientPremium);
   const [enterprise, setEnterprise] = useState<boolean>(!!initial?.enterprise);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     onSave({
-      firstName, lastName, email, clientCompanyName, location, website,
-      instagram, profilePicture, businessOrIndividual, hiringCategory,
+      firstName, lastName, email, phoneNumber, clientCompanyName, location, website,
+      instagram, tiktok, youtube, portfolio, profilePicture, businessOrIndividual, businessType,
       clientPremium, enterprise,
       ...(isCreate ? { password: password || undefined } : {}),
     });
@@ -1786,7 +1805,7 @@ function AdminClientForm({
           <div>
             <label className={labelCls}>Location</label>
             <div className="rounded-xl border border-gray-200 focus-within:border-[#F25722] transition-colors bg-white">
-              <LocationAutocompleteInput value={location} onChange={r => setLocation(r.query)} placeholder="New York, NY" icon={false} />
+              <LocationAutocompleteInput value={location} onChange={r => setLocation(r.formatted)} placeholder="New York, NY" icon={false} />
             </div>
           </div>
           <div>
@@ -1801,16 +1820,21 @@ function AdminClientForm({
 
         <div>
           <label className={labelCls}>Business Type</label>
-          <select value={hiringCategory} onChange={e => setHiringCategory(e.target.value)} className={inputCls}>
+          <select value={businessType} onChange={e => setBusinessType(e.target.value)} className={inputCls}>
             <option value="">Select…</option>
             {CLIENT_BUSINESS_TYPES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
+          <p className="text-xs text-gray-400 mt-1">Everything except Dance Studio and Music School is automatically Enterprise.</p>
         </div>
       </div>
 
       {/* Social & Web */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
         <h3 className="text-sm font-black text-[#111] uppercase tracking-wider">Social & Web</h3>
+        <div>
+          <label className={labelCls}>Phone Number</label>
+          <input value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="(555) 123-4567" className={inputCls} />
+        </div>
         <div>
           <label className={labelCls}>Website</label>
           <input value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://company.com" className={inputCls} />
@@ -1821,6 +1845,18 @@ function AdminClientForm({
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
             <input value={instagram} onChange={e => setInstagram(e.target.value.replace("@", ""))} placeholder="company" className={`${inputCls} pl-8`} />
           </div>
+        </div>
+        <div>
+          <label className={labelCls}>TikTok</label>
+          <input value={tiktok} onChange={e => setTiktok(e.target.value)} placeholder="@company or full URL" className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>YouTube</label>
+          <input value={youtube} onChange={e => setYoutube(e.target.value)} placeholder="Channel URL" className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Portfolio</label>
+          <input value={portfolio} onChange={e => setPortfolio(e.target.value)} placeholder="https://portfolio.com" className={inputCls} />
         </div>
       </div>
 
@@ -2267,7 +2303,7 @@ function ClientsSection() {
         </div>
         <div className="flex items-center gap-2 flex-1 min-w-[150px] bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
           <MapPin size={13} className="text-gray-400 flex-shrink-0" />
-          <input value={locationSearch} onChange={e => setLocationSearch(e.target.value)} placeholder="Search Location..." className="bg-transparent text-xs text-[#111] placeholder-gray-400 focus:outline-none w-full" />
+          <LocationAutocompleteInput value={locationSearch} onChange={r => setLocationSearch(r.formatted)} placeholder="Search Location..." icon={false} className="w-full" inputClassName="bg-transparent text-xs text-[#111] placeholder-gray-400 focus:outline-none w-full" />
         </div>
       </div>
 
@@ -2590,7 +2626,7 @@ function AdminJobEditWrapper({ jobId, onBack, onSave, isSaving }: { jobId: numbe
   const { data: job, isLoading } = trpc.admin.getJob.useQuery({ id: jobId });
   const [description, setDescription] = useState("");
   const [requestStatus, setRequestStatus] = useState("");
-  const [locationAddress, setLocationAddress] = useState("");
+  const location = useLocationField();
   const [hiringCategory, setHiringCategory] = useState("");
   const [clientHourlyRate, setClientHourlyRate] = useState("");
   const [artistHourlyRate, setArtistHourlyRate] = useState("");
@@ -2600,7 +2636,7 @@ function AdminJobEditWrapper({ jobId, onBack, onSave, isSaving }: { jobId: numbe
     if (job) {
       setDescription(job.description || "");
       setRequestStatus(job.requestStatus || "");
-      setLocationAddress(job.locationAddress || "");
+      location.reset(job.locationAddress);
       setHiringCategory(job.hiringCategory || "");
       setClientHourlyRate(job.clientHourlyRate ? String(job.clientHourlyRate) : "");
       setArtistHourlyRate(job.artistHourlyRate ? String(job.artistHourlyRate) : "");
@@ -2622,7 +2658,7 @@ function AdminJobEditWrapper({ jobId, onBack, onSave, isSaving }: { jobId: numbe
         <span className="text-[#111] font-semibold">Edit</span>
       </div>
       <h1 className="text-2xl font-black text-[#111]">Edit Job #{jobId}</h1>
-      <form onSubmit={e => { e.preventDefault(); onSave({ description, requestStatus, locationAddress, hiringCategory, clientHourlyRate: clientHourlyRate ? Number(clientHourlyRate) : null, artistHourlyRate: artistHourlyRate ? Number(artistHourlyRate) : null, openRate }); }} className="space-y-5">
+      <form onSubmit={e => { e.preventDefault(); onSave({ description, requestStatus, locationAddress: location.value, locationData: location.locationData, hiringCategory, clientHourlyRate: clientHourlyRate ? Number(clientHourlyRate) : null, artistHourlyRate: artistHourlyRate ? Number(artistHourlyRate) : null, openRate }); }} className="space-y-5">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
           <div><label className={labelCls}>Description</label><textarea value={description} onChange={e => setDescription(e.target.value)} rows={5} className={`${inputCls} resize-none`} /></div>
           <div className="grid grid-cols-2 gap-4">
@@ -2632,7 +2668,7 @@ function AdminJobEditWrapper({ jobId, onBack, onSave, isSaving }: { jobId: numbe
                 {JOB_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-            <div><label className={labelCls}>Location</label><input value={locationAddress} onChange={e => setLocationAddress(e.target.value)} placeholder="City, State" className={inputCls} /></div>
+            <div><label className={labelCls}>Location</label><LocationAutocompleteInput value={location.value} onChange={location.onChange} kind="any" placeholder="City, State" icon={false} inputClassName={inputCls} /></div>
           </div>
           <div><label className={labelCls}>Hiring Category</label>
             <select value={hiringCategory} onChange={e => setHiringCategory(e.target.value)} className={inputCls}>
@@ -2728,7 +2764,7 @@ function JobsSection() {
         </div>
         <div className="flex items-center gap-2 flex-1 min-w-[150px] bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
           <MapPin size={13} className="text-gray-400 flex-shrink-0" />
-          <input value={locationSearch} onChange={e => setLocationSearch(e.target.value)} placeholder="Search location…" className="bg-transparent text-xs text-[#111] placeholder-gray-400 focus:outline-none w-full" />
+          <LocationAutocompleteInput value={locationSearch} onChange={r => setLocationSearch(r.formatted)} placeholder="Search location…" icon={false} className="w-full" inputClassName="bg-transparent text-xs text-[#111] placeholder-gray-400 focus:outline-none w-full" />
         </div>
       </div>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -3584,7 +3620,7 @@ function AdminProJobEditWrapper({ jobId, onBack, onSave, isSaving }: {
   const [category, setCategory] = useState("");
   const [budget, setBudget] = useState("");
   const [description, setDescription] = useState("");
-  const [location, setLocation] = useState("");
+  const proLocation = useLocationField();
   const [status, setStatus] = useState("");
   const [workFromAnywhere, setWorkFromAnywhere] = useState(false);
   const [featured, setFeatured] = useState(false);
@@ -3600,7 +3636,7 @@ function AdminProJobEditWrapper({ jobId, onBack, onSave, isSaving }: {
     setCategory(job.category ?? "");
     setBudget(job.budget ?? "");
     setDescription(job.description ?? "");
-    setLocation(job.location ?? "");
+    proLocation.reset(job.location);
     setStatus(job.status ?? "");
     setWorkFromAnywhere(job.workFromAnywhere ?? false);
     setFeatured(job.featured ?? false);
@@ -3638,7 +3674,7 @@ function AdminProJobEditWrapper({ jobId, onBack, onSave, isSaving }: {
         <span className="text-[#111] font-semibold">Edit</span>
       </div>
       <h1 className="text-2xl font-black text-[#111]">Edit PRO Job #{jobId}</h1>
-      <form onSubmit={e => { e.preventDefault(); onSave({ company, serviceType, category, budget, description, location, status, workFromAnywhere, featured, applyDirect, applyEmail, applyLink, tag }); }} className="space-y-5">
+      <form onSubmit={e => { e.preventDefault(); onSave({ company, serviceType, category, budget, description, location: proLocation.value, locationData: proLocation.locationData, status, workFromAnywhere, featured, applyDirect, applyEmail, applyLink, tag }); }} className="space-y-5">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
           <h3 className="text-sm font-bold text-gray-700">Job Details</h3>
           <div className="grid grid-cols-2 gap-4">
@@ -3663,7 +3699,7 @@ function AdminProJobEditWrapper({ jobId, onBack, onSave, isSaving }: {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className={labelCls}>Budget</label><input value={budget} onChange={e => setBudget(e.target.value)} placeholder="e.g. $500–$1,000/day" className={inputCls} /></div>
-            <div><label className={labelCls}>Location</label><input value={location} onChange={e => setLocation(e.target.value)} placeholder="City, State" className={inputCls} /></div>
+            <div><label className={labelCls}>Location</label><LocationAutocompleteInput value={proLocation.value} onChange={proLocation.onChange} kind="any" placeholder="City, State" icon={false} inputClassName={inputCls} /></div>
           </div>
           <div><label className={labelCls}>Description</label><textarea value={description} onChange={e => setDescription(e.target.value)} rows={6} className={`${inputCls} resize-none`} /></div>
           <div><label className={labelCls}>Tag</label><input value={tag} onChange={e => setTag(e.target.value)} placeholder="Optional tag" className={inputCls} /></div>
@@ -4186,6 +4222,7 @@ type EnterpriseClient = {
   enterprisePlan?: EnterprisePlan;
   enterpriseSubInterval?: "month" | "year" | null;
   hiringCategory: string | null;
+  businessType: string | null;
   website: string | null;
   instagram: string | null;
   bubbleId: string | null;
@@ -4204,15 +4241,15 @@ function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; 
   const [expandedJobId, setExpandedJobId] = useState<number | null>(null);
   const [localPlan, setLocalPlan] = useState<EnterprisePlan>(client.enterprisePlan ?? null);
   const [localInterval, setLocalInterval] = useState<"month" | "year" | null>(client.enterpriseSubInterval ?? null);
-  const [localHiringCategory, setLocalHiringCategory] = useState(client.hiringCategory ?? "");
+  const [localBusinessType, setLocalBusinessType] = useState(client.businessType ?? "");
   const utils = trpc.useUtils();
 
   const updateClient = trpc.admin.updateClient.useMutation({
     onSuccess: () => utils.admin.enterpriseClients.invalidate(),
   });
-  function handleHiringCategoryChange(value: string) {
-    setLocalHiringCategory(value);
-    updateClient.mutate({ id: client.id, hiringCategory: (value || undefined) as any });
+  function handleBusinessTypeChange(value: string) {
+    setLocalBusinessType(value);
+    updateClient.mutate({ id: client.id, businessType: (value || undefined) as any });
   }
 
   const { data: jobsData, isLoading } = trpc.admin.premiumJobs.useQuery({
@@ -4278,8 +4315,8 @@ function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; 
             <p className="text-sm text-gray-500">{client.email}</p>
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <select
-                value={localHiringCategory}
-                onChange={e => handleHiringCategoryChange(e.target.value)}
+                value={localBusinessType}
+                onChange={e => handleBusinessTypeChange(e.target.value)}
                 className="text-xs px-2 py-1 rounded-full bg-orange-50 text-[#F25722] font-semibold border-none focus:outline-none focus:ring-1 focus:ring-[#F25722] cursor-pointer"
               >
                 <option value="">Set business type…</option>
@@ -4548,7 +4585,7 @@ function CreateEnterpriseModal({ onClose, onCreated }: { onClose: () => void; on
     firstName: "",
     lastName: "",
     plan: "" as "" | "on_demand" | "subscriber",
-    hiringCategory: "",
+    businessType: "",
     businessOrIndividual: "Business" as "Business" | "Individual",
   });
   const [logoUrl, setLogoUrl] = useState<string>("");
@@ -4604,7 +4641,7 @@ function CreateEnterpriseModal({ onClose, onCreated }: { onClose: () => void; on
       firstName: form.firstName.trim() || undefined,
       lastName: form.lastName.trim() || undefined,
       plan: form.plan || undefined,
-      hiringCategory: (form.hiringCategory || undefined) as any,
+      businessType: (form.businessType || undefined) as any,
       businessOrIndividual: form.businessOrIndividual,
       logoUrl: logoUrl || undefined,
     });
@@ -4696,7 +4733,7 @@ function CreateEnterpriseModal({ onClose, onCreated }: { onClose: () => void; on
               </div>
               <div>
                 <label className={label}>Business Type</label>
-                <select value={form.hiringCategory} onChange={e => setForm(f => ({ ...f, hiringCategory: e.target.value }))} className={field}>
+                <select value={form.businessType} onChange={e => setForm(f => ({ ...f, businessType: e.target.value }))} className={field}>
                   <option value="">None (set later)</option>
                   {CLIENT_BUSINESS_TYPES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
@@ -5596,7 +5633,7 @@ function AdminBookingCreateForm({ onBack, onCreated }: { onBack: () => void; onC
   const [endDate, setEndDate] = useState("");
   const [isRecurring, setIsRecurring] = useState(false);
   const [cadence, setCadence] = useState<"weekly" | "biweekly" | "monthly" | "quarterly">("monthly");
-  const [location, setLocation] = useState("");
+  const bookingLocation = useLocationField();
   const [description, setDescription] = useState("");
 
   const [debouncedArtist, setDebouncedArtist] = useState("");
@@ -5628,7 +5665,8 @@ function AdminBookingCreateForm({ onBack, onCreated }: { onBack: () => void; onC
       endDate,
       isRecurring,
       recurringCadence: isRecurring ? cadence : undefined,
-      locationAddress: location || undefined,
+      locationAddress: bookingLocation.value || undefined,
+      locationData: bookingLocation.locationData,
       description: description || undefined,
     });
   }
@@ -5774,7 +5812,7 @@ function AdminBookingCreateForm({ onBack, onCreated }: { onBack: () => void; onC
 
         <div>
           <label className={labelCls}>Location (optional)</label>
-          <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Studio address or city" className={inputCls} />
+          <LocationAutocompleteInput value={bookingLocation.value} onChange={bookingLocation.onChange} kind="any" placeholder="Studio address or city" icon={false} inputClassName={inputCls} />
         </div>
 
         <div>

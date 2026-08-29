@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, isNotNull, isNull, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
-import { BookingPeriod, ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, affiliations, artistResumes, benefits, bookingPeriods, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, masterServiceTypes, messages, payments, premiumJobInterestedArtists, premiumJobs, reimbursements, savedArtists, userAffiliations, users } from "../drizzle/schema";
+import { BookingPeriod, ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, affiliations, artistResumes, benefits, bookingPeriods, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, masterArtistTypes, masterServiceTypes, masterStyleTypes, messages, payments, premiumJobInterestedArtists, premiumJobs, reimbursements, savedArtists, userAffiliations, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { extractCity, DEFAULT_RADIUS_MILES } from "../shared/location";
 
@@ -1721,9 +1721,90 @@ export async function setUserPlanFlags(
   await db.update(users).set(flags).where(eq(users.id, userId));
 }
 
+/**
+ * Resolve human-readable master_artist_types/master_service_types names to
+ * the identifier stored on users.masterArtistTypes/masterServiceType —
+ * bubbleId for rows sourced from Bubble, or the local numeric id (as a
+ * string) for entries added directly in this app that have no bubbleId.
+ * This is what makes the stored value match Bubble's own ID-keyed format
+ * instead of the free-text names workTypes/artistServices used to store.
+ */
+export async function resolveMasterArtistTypeIds(names: string[]): Promise<string[]> {
+  if (!names.length) return [];
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.select().from(masterArtistTypes).where(inArray(masterArtistTypes.name, names));
+  return rows.map((r) => r.bubbleId ?? String(r.id));
+}
+
+export async function resolveMasterArtistTypeNames(ids: string[]): Promise<string[]> {
+  if (!ids.length) return [];
+  const db = await getDb();
+  if (!db) return [];
+  const numericIds = ids.map((i) => Number(i)).filter((n) => Number.isFinite(n));
+  const conditions = [inArray(masterArtistTypes.bubbleId, ids)];
+  if (numericIds.length) conditions.push(inArray(masterArtistTypes.id, numericIds));
+  const rows = await db.select().from(masterArtistTypes).where(or(...conditions));
+  return rows.map((r) => r.name);
+}
+
+export async function resolveMasterServiceTypeIds(names: string[]): Promise<string[]> {
+  if (!names.length) return [];
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.select().from(masterServiceTypes).where(inArray(masterServiceTypes.name, names));
+  return rows.map((r) => r.bubbleId ?? String(r.id));
+}
+
+export async function resolveMasterServiceTypeNames(ids: string[]): Promise<string[]> {
+  if (!ids.length) return [];
+  const db = await getDb();
+  if (!db) return [];
+  const numericIds = ids.map((i) => Number(i)).filter((n) => Number.isFinite(n));
+  const conditions = [inArray(masterServiceTypes.bubbleId, ids)];
+  if (numericIds.length) conditions.push(inArray(masterServiceTypes.id, numericIds));
+  const rows = await db.select().from(masterServiceTypes).where(or(...conditions));
+  return rows.map((r) => r.name);
+}
+
+export async function resolveMasterStyleTypeIds(names: string[]): Promise<string[]> {
+  if (!names.length) return [];
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.select().from(masterStyleTypes).where(inArray(masterStyleTypes.name, names));
+  return rows.map((r) => r.bubbleId ?? String(r.id));
+}
+
+export async function resolveMasterStyleTypeNames(ids: string[]): Promise<string[]> {
+  if (!ids.length) return [];
+  const db = await getDb();
+  if (!db) return [];
+  const numericIds = ids.map((i) => Number(i)).filter((n) => Number.isFinite(n));
+  const conditions = [inArray(masterStyleTypes.bubbleId, ids)];
+  if (numericIds.length) conditions.push(inArray(masterStyleTypes.id, numericIds));
+  const rows = await db.select().from(masterStyleTypes).where(or(...conditions));
+  return rows.map((r) => r.name);
+}
+
+export async function getAllMasterArtistTypes() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ id: masterArtistTypes.id, name: masterArtistTypes.name }).from(masterArtistTypes).orderBy(masterArtistTypes.name);
+}
+
+export async function getAllMasterStyleTypes() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ id: masterStyleTypes.id, name: masterStyleTypes.name }).from(masterStyleTypes).orderBy(masterStyleTypes.name);
+}
+
 export async function updateUserOnboarding(userId: number, data: {
   businessOrIndividual?: string;
   hiringCategory?: string;
+  /** Client business category — Dance Studio / Dance Competition / Music
+   * School / Event Company / Other. The real, Bubble-sourced field (974
+   * populated rows); drives Enterprise auto-detection below. */
+  businessType?: string;
   clientCompanyName?: string;
   location?: string;
   /** Structured Google Places data resolved from `location`. */
@@ -1737,10 +1818,10 @@ export async function updateUserOnboarding(userId: number, data: {
   phoneNumber?: string;
   onboardingStep?: number;
   userSignedUp?: boolean;
-  userRole?: "Artist" | "Client" | "Admin";
+  userRole?: "Artist" | "Client";
   // Artist-specific
   masterArtistTypes?: string[];
-  artistServices?: string[];
+  masterServiceType?: string[];
   bio?: string;
   instagram?: string;
   tiktok?: string;
@@ -1752,6 +1833,7 @@ export async function updateUserOnboarding(userId: number, data: {
   const updateData: Record<string, unknown> = {};
   if (data.businessOrIndividual !== undefined) updateData.businessOrIndividual = data.businessOrIndividual;
   if (data.hiringCategory !== undefined) updateData.hiringCategory = data.hiringCategory;
+  if (data.businessType !== undefined) updateData.businessType = data.businessType;
   if (data.clientCompanyName !== undefined) updateData.clientCompanyName = data.clientCompanyName;
   if (data.location !== undefined) updateData.location = data.location;
   if (data.locationLat !== undefined) updateData.locationLat = data.locationLat;
@@ -1767,13 +1849,16 @@ export async function updateUserOnboarding(userId: number, data: {
   if (data.userRole !== undefined) updateData.userRole = data.userRole;
 
   // A hiring client gets auto-promoted to Enterprise right here at
-  // onboarding based on business type — no admin step needed. Only Dance
+  // onboarding based on businessType — no admin step needed. Only Dance
   // Studio and Music School stay regular Client; everything else (Dance
   // Competition, Event Company, Other, etc.) is Enterprise. Only fires for
   // Client onboarding (never overrides an Artist's role), and only on the
-  // way IN (never downgrades someone manually made Enterprise for another reason).
+  // way IN (never downgrades someone manually made Enterprise for another
+  // reason). businessType is the real, Bubble-sourced field for this — falls
+  // back to hiringCategory for any caller not yet updated to send it.
   const NON_ENTERPRISE_CATEGORIES = new Set(["Dance Studio", "Music School"]);
-  const isAutoEnterpriseCategory = !!data.hiringCategory && !NON_ENTERPRISE_CATEGORIES.has(data.hiringCategory);
+  const businessCategory = data.businessType ?? data.hiringCategory;
+  const isAutoEnterpriseCategory = !!businessCategory && !NON_ENTERPRISE_CATEGORIES.has(businessCategory);
   if (data.userRole === "Client" && isAutoEnterpriseCategory) {
     updateData.enterprise = true;
     updateData.planTier = "enterprise_on_demand";
@@ -1784,8 +1869,12 @@ export async function updateUserOnboarding(userId: number, data: {
     // resend userRole for an already-onboarded account.
     updateData.planTier = data.userRole === "Artist" ? "artist_free" : "client_on_demand";
   }
-  if (data.masterArtistTypes !== undefined) updateData.masterArtistTypes = JSON.stringify(data.masterArtistTypes);
-  if (data.artistServices !== undefined) updateData.artistServices = JSON.stringify(data.artistServices);
+  if (data.masterArtistTypes !== undefined) {
+    updateData.masterArtistTypes = JSON.stringify(await resolveMasterArtistTypeIds(data.masterArtistTypes));
+  }
+  if (data.masterServiceType !== undefined) {
+    updateData.masterServiceType = JSON.stringify(await resolveMasterServiceTypeIds(data.masterServiceType));
+  }
   if (data.bio !== undefined) updateData.bio = data.bio;
   if (data.instagram !== undefined) updateData.instagram = data.instagram;
   if (data.tiktok !== undefined) updateData.tiktok = data.tiktok;
@@ -1927,18 +2016,22 @@ export async function getArtistsList({
   }
 
   if (artistType) {
-    // workTypes is the clean, human-readable field the filter pills are now
-    // generated from (getArtistTypeCounts) — masterArtistTypes stores raw
-    // Bubble internal IDs and rarely matches a typed filter term. Kept as a
-    // fallback alongside artistServices/artistDisciplines for older records.
-    conditions.push(
-      or(
-        like(users.workTypes, `%${artistType}%`),
-        like(users.masterArtistTypes, `%${artistType}%`),
-        like(users.artistServices, `%${artistType}%`),
-        like(users.artistDisciplines, `%${artistType}%`),
-      )!
-    );
+    // masterArtistTypes/masterServiceType store Bubble-matching IDs, not
+    // names — resolve the filter term to its id(s) via the lookup tables,
+    // then match against the stored ID arrays. Replaces the old
+    // workTypes/artistServices substring match now that those fields are
+    // no longer written to.
+    const [artistTypeIds, serviceTypeIds] = await Promise.all([
+      resolveMasterArtistTypeIds([artistType]),
+      resolveMasterServiceTypeIds([artistType]),
+    ]);
+    const idConditions = [
+      ...artistTypeIds.map((id) => like(users.masterArtistTypes, `%${id}%`)),
+      ...serviceTypeIds.map((id) => like(users.masterServiceType, `%${id}%`)),
+    ];
+    // An unresolved filter term (stale pill value, bad input) should match
+    // nothing rather than silently falling through to unfiltered results.
+    conditions.push(idConditions.length ? or(...idConditions)! : sql`1 = 0`);
   }
 
   if (affiliationId) {
@@ -1954,7 +2047,7 @@ export async function getArtistsList({
     .from(users)
     .where(where);
 
-  const artists = await db
+  const rawArtists = await db
     .select({
       id: users.id,
       firstName: users.firstName,
@@ -1965,8 +2058,7 @@ export async function getArtistsList({
       location: users.location,
       bio: users.bio,
       masterArtistTypes: users.masterArtistTypes,
-      workTypes: users.workTypes,
-      artistServices: users.artistServices,
+      masterServiceType: users.masterServiceType,
       artistDisciplines: users.artistDisciplines,
       artswrkPro: users.artswrkPro,
       artswrkBasic: users.artswrkBasic,
@@ -1983,6 +2075,23 @@ export async function getArtistsList({
     .limit(limit)
     .offset(offset);
 
+  // Resolve masterArtistTypes/masterServiceType ids to display names for
+  // this page of results — lookup tables fetched once, not per-row.
+  const [typeRows, serviceRows] = await Promise.all([
+    db.select({ id: masterArtistTypes.id, bubbleId: masterArtistTypes.bubbleId, name: masterArtistTypes.name }).from(masterArtistTypes),
+    db.select({ id: masterServiceTypes.id, bubbleId: masterServiceTypes.bubbleId, name: masterServiceTypes.name }).from(masterServiceTypes),
+  ]);
+  const nameById = new Map<string, string>();
+  for (const r of [...typeRows, ...serviceRows]) nameById.set(r.bubbleId ?? String(r.id), r.name);
+
+  const artists = rawArtists.map((a) => {
+    const ids: string[] = [];
+    try { ids.push(...JSON.parse(a.masterArtistTypes ?? "[]")); } catch {}
+    try { ids.push(...JSON.parse(a.masterServiceType ?? "[]")); } catch {}
+    const typeNames = [...new Set(ids.map((id) => nameById.get(id)).filter((n): n is string => !!n))];
+    return { ...a, typeNames };
+  });
+
   return { artists, total: Number(countRow?.count ?? 0) };
 }
 
@@ -1994,10 +2103,20 @@ export async function getClientCompaniesList({
   limit = 48,
   offset = 0,
   search,
+  locationQuery,
+  locationLat,
+  locationLng,
+  radiusMiles,
 }: {
   limit?: number;
   offset?: number;
   search?: string;
+  /** Free-text location (city name or full formatted address). */
+  locationQuery?: string;
+  /** Coordinates from Google Places — enables true radius filtering. */
+  locationLat?: number;
+  locationLng?: number;
+  radiusMiles?: number;
 }) {
   const db = await getDb();
   if (!db) return { companies: [], total: 0 };
@@ -2014,6 +2133,48 @@ export async function getClientCompaniesList({
         like(clientCompanies.name, q),
         like(clientCompanies.locationAddress, q),
         like(clientCompanies.description, q),
+      )!
+    );
+  }
+
+  // ── Location ───────────────────────────────────────────────────────────────
+  // Mirrors getArtistsList: coordinates give a true radius search, and studios
+  // without coordinates yet (migrated rows, addresses saved before Places
+  // capture) still match on city text so they don't vanish from every search.
+  if (locationLat !== undefined && locationLng !== undefined) {
+    const radius = radiusMiles ?? DEFAULT_RADIUS_MILES;
+    const withinRadius = sql`(
+      ${clientCompanies.locationLat} IS NOT NULL AND ${clientCompanies.locationLng} IS NOT NULL
+      AND (3959 * acos(LEAST(1, cos(radians(${locationLat}))
+        * cos(radians(CAST(${clientCompanies.locationLat} AS DECIMAL(10,6))))
+        * cos(radians(CAST(${clientCompanies.locationLng} AS DECIMAL(10,6))) - radians(${locationLng}))
+        + sin(radians(${locationLat}))
+        * sin(radians(CAST(${clientCompanies.locationLat} AS DECIMAL(10,6))))))) <= ${radius}
+    )`;
+
+    if (locationQuery) {
+      const cityLike = `%${extractCity(locationQuery)}%`;
+      conditions.push(
+        or(
+          withinRadius,
+          and(
+            sql`(${clientCompanies.locationLat} IS NULL OR ${clientCompanies.locationLng} IS NULL)`,
+            or(
+              like(clientCompanies.locationAddress, cityLike),
+              like(clientCompanies.locationCity, cityLike),
+            )!
+          )!
+        )!
+      );
+    } else {
+      conditions.push(withinRadius);
+    }
+  } else if (locationQuery) {
+    const cityLike = `%${extractCity(locationQuery)}%`;
+    conditions.push(
+      or(
+        like(clientCompanies.locationAddress, cityLike),
+        like(clientCompanies.locationCity, cityLike),
       )!
     );
   }
@@ -2035,6 +2196,8 @@ export async function getClientCompaniesList({
       locationAddress: clientCompanies.locationAddress,
       locationLat: clientCompanies.locationLat,
       locationLng: clientCompanies.locationLng,
+      locationCity: clientCompanies.locationCity,
+      locationState: clientCompanies.locationState,
       transportReimbursed: clientCompanies.transportReimbursed,
       transportDetails: clientCompanies.transportDetails,
     })
@@ -2057,7 +2220,7 @@ export async function getArtistAffiliations(userId: number) {
 export async function getFeaturedArtists(limit = 24) {
   const db = await getDb();
   if (!db) return [];
-  return db
+  const rawArtists = await db
     .select({
       id: users.id,
       firstName: users.firstName,
@@ -2067,7 +2230,7 @@ export async function getFeaturedArtists(limit = 24) {
       profilePicture: users.profilePicture,
       location: users.location,
       masterArtistTypes: users.masterArtistTypes,
-      workTypes: users.workTypes,
+      masterServiceType: users.masterServiceType,
       mediaPhotos: users.mediaPhotos,
       artswrkPro: users.artswrkPro,
       artswrkBasic: users.artswrkBasic,
@@ -2090,6 +2253,21 @@ export async function getFeaturedArtists(limit = 24) {
       desc(users.createdAt),
     )
     .limit(limit);
+
+  const [typeRows, serviceRows] = await Promise.all([
+    db.select({ id: masterArtistTypes.id, bubbleId: masterArtistTypes.bubbleId, name: masterArtistTypes.name }).from(masterArtistTypes),
+    db.select({ id: masterServiceTypes.id, bubbleId: masterServiceTypes.bubbleId, name: masterServiceTypes.name }).from(masterServiceTypes),
+  ]);
+  const nameById = new Map<string, string>();
+  for (const r of [...typeRows, ...serviceRows]) nameById.set(r.bubbleId ?? String(r.id), r.name);
+
+  return rawArtists.map((a) => {
+    const ids: string[] = [];
+    try { ids.push(...JSON.parse(a.masterArtistTypes ?? "[]")); } catch {}
+    try { ids.push(...JSON.parse(a.masterServiceType ?? "[]")); } catch {}
+    const typeNames = [...new Set(ids.map((id) => nameById.get(id)).filter((n): n is string => !!n))];
+    return { ...a, typeNames };
+  });
 }
 
 export async function getAllMasterServiceTypes() {
@@ -2102,40 +2280,35 @@ export async function getAllMasterServiceTypes() {
 }
 
 /**
- * Distinct artist type values actually present on real artists (from the
- * users.masterArtistTypes JSON column), sorted by how many artists have each
- * one. The Bubble-seeded master_artist_types lookup table was never
- * populated, so this reads the ground truth directly off live artist rows
- * instead of a static/hardcoded list.
+ * Distinct artist type / service values actually present on real artists,
+ * sorted by how many artists have each one. Reads users.masterArtistTypes +
+ * users.masterServiceType (Bubble-matching IDs) and resolves them against
+ * the master_artist_types/master_service_types lookup tables — fetched once
+ * as small id->name maps rather than resolved per-row.
  */
 export async function getArtistTypeCounts() {
   const db = await getDb();
   if (!db) return [];
 
-  const rows = await db
-    .select({ workTypes: users.workTypes })
-    .from(users)
-    .where(
-      and(
-        inArray(users.planTier, ARTIST_PLAN_TIERS),
-        isNotNull(users.workTypes),
-        sql`${users.workTypes} != ''`,
-        sql`${users.workTypes} != '[]'`,
-      )
-    );
+  const [typeRows, serviceRows, userRows] = await Promise.all([
+    db.select({ id: masterArtistTypes.id, bubbleId: masterArtistTypes.bubbleId, name: masterArtistTypes.name }).from(masterArtistTypes),
+    db.select({ id: masterServiceTypes.id, bubbleId: masterServiceTypes.bubbleId, name: masterServiceTypes.name }).from(masterServiceTypes),
+    db
+      .select({ masterArtistTypes: users.masterArtistTypes, masterServiceType: users.masterServiceType })
+      .from(users)
+      .where(inArray(users.planTier, ARTIST_PLAN_TIERS)),
+  ]);
+
+  const nameById = new Map<string, string>();
+  for (const r of [...typeRows, ...serviceRows]) nameById.set(r.bubbleId ?? String(r.id), r.name);
 
   const counts = new Map<string, number>();
-  for (const row of rows) {
-    let types: string[] = [];
-    try {
-      types = JSON.parse(row.workTypes ?? "[]");
-    } catch {
-      continue;
-    }
-    for (const t of types) {
-      if (!t) continue;
-      counts.set(t, (counts.get(t) ?? 0) + 1);
-    }
+  for (const row of userRows) {
+    const ids: string[] = [];
+    try { ids.push(...JSON.parse(row.masterArtistTypes ?? "[]")); } catch {}
+    try { ids.push(...JSON.parse(row.masterServiceType ?? "[]")); } catch {}
+    const names = new Set(ids.map((id) => nameById.get(id)).filter((n): n is string => !!n));
+    for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
   }
 
   return [...counts.entries()]
@@ -2242,7 +2415,7 @@ interface AdminArtistFilters {
   modifiedTo?: Date;
 }
 
-function buildAdminArtistConditions(f: AdminArtistFilters) {
+async function buildAdminArtistConditions(f: AdminArtistFilters) {
   const conditions = [
     inArray(users.planTier, ARTIST_PLAN_TIERS),
     // Only show artists with at least a name or firstName populated
@@ -2260,8 +2433,16 @@ function buildAdminArtistConditions(f: AdminArtistFilters) {
     like(users.credits, `%${f.search}%`),
   )!);
   if (f.locationSearch) conditions.push(like(users.location, `%${f.locationSearch}%`));
-  if (f.artistType) conditions.push(like(users.masterArtistTypes, `%${f.artistType}%`));
-  if (f.serviceType) conditions.push(like(users.artistServices, `%${f.serviceType}%`));
+  // masterArtistTypes/masterServiceType store Bubble-matching ids, not names —
+  // resolve the filter term first (mirrors getArtistsList's artistType filter).
+  if (f.artistType) {
+    const ids = await resolveMasterArtistTypeIds([f.artistType]);
+    conditions.push(ids.length ? or(...ids.map((id) => like(users.masterArtistTypes, `%${id}%`)))! : sql`1 = 0`);
+  }
+  if (f.serviceType) {
+    const ids = await resolveMasterServiceTypeIds([f.serviceType]);
+    conditions.push(ids.length ? or(...ids.map((id) => like(users.masterServiceType, `%${id}%`)))! : sql`1 = 0`);
+  }
   if (f.state) conditions.push(like(users.location, `%${f.state}%`));
   if (f.plan === "PRO") conditions.push(eq(users.artswrkPro, true));
   if (f.plan === "Basic") conditions.push(eq(users.artswrkBasic, true));
@@ -2279,7 +2460,7 @@ function buildAdminArtistConditions(f: AdminArtistFilters) {
 export async function getAdminArtistIds(filters: AdminArtistFilters, cap = 5000): Promise<number[]> {
   const db = await getDb();
   if (!db) return [];
-  const where = and(...buildAdminArtistConditions(filters));
+  const where = and(...(await buildAdminArtistConditions(filters)));
   const rows = await db.select({ id: users.id }).from(users).where(where).limit(cap);
   return rows.map(r => r.id);
 }
@@ -2311,17 +2492,17 @@ export async function getAdminArtists({
   const db = await getDb();
   if (!db) return { artists: [], total: 0 };
 
-  const where = and(...buildAdminArtistConditions({
+  const where = and(...(await buildAdminArtistConditions({
     search, locationSearch, artistType, serviceType, state, plan, affiliationId,
     onboardingStep, missingProfilePicture, createdFrom, createdTo, modifiedFrom, modifiedTo,
-  }));
+  })));
 
   const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(users).where(where);
 
   const orderCol = sortBy === "updatedAt" ? users.updatedAt : sortBy === "name" ? users.name : users.createdAt;
   const orderExpr = sortDir === "asc" ? asc(orderCol) : desc(orderCol);
 
-  const artists = await db
+  const rawArtists = await db
     .select({
       id: users.id,
       firstName: users.firstName,
@@ -2332,8 +2513,7 @@ export async function getAdminArtists({
       profilePicture: users.profilePicture,
       location: users.location,
       masterArtistTypes: users.masterArtistTypes,
-      workTypes: users.workTypes,
-      artistServices: users.artistServices,
+      masterServiceType: users.masterServiceType,
       artswrkPro: users.artswrkPro,
       artswrkBasic: users.artswrkBasic,
       onboardingStep: users.onboardingStep,
@@ -2346,6 +2526,20 @@ export async function getAdminArtists({
     .orderBy(orderExpr)
     .limit(limit)
     .offset(offset);
+
+  const [typeRows, serviceRows] = await Promise.all([
+    db.select({ id: masterArtistTypes.id, bubbleId: masterArtistTypes.bubbleId, name: masterArtistTypes.name }).from(masterArtistTypes),
+    db.select({ id: masterServiceTypes.id, bubbleId: masterServiceTypes.bubbleId, name: masterServiceTypes.name }).from(masterServiceTypes),
+  ]);
+  const nameById = new Map<string, string>();
+  for (const r of [...typeRows, ...serviceRows]) nameById.set(r.bubbleId ?? String(r.id), r.name);
+  const artists = rawArtists.map((a) => {
+    const ids: string[] = [];
+    try { ids.push(...JSON.parse(a.masterArtistTypes ?? "[]")); } catch {}
+    try { ids.push(...JSON.parse(a.masterServiceType ?? "[]")); } catch {}
+    const typeNames = [...new Set(ids.map((id) => nameById.get(id)).filter((n): n is string => !!n))];
+    return { ...a, typeNames };
+  });
 
   return { artists, total: Number(countRow?.count ?? 0) };
 }
@@ -2962,6 +3156,7 @@ export async function getEnterpriseClients(opts: {
       enterpriseStripeCustomerId: users.enterpriseStripeCustomerId,
       enterpriseStripeSubscriptionId: users.enterpriseStripeSubscriptionId,
       hiringCategory: users.hiringCategory,
+      businessType: users.businessType,
       website: users.website,
       instagram: users.instagram,
       bubbleId: users.bubbleId,
@@ -3020,6 +3215,12 @@ export async function createPremiumJob(data: {
   logo?: string | null;
   category?: string | null;
   location?: string | null;
+  /** Structured Google Places data resolved from `location`. */
+  locationLat?: string | null;
+  locationLng?: string | null;
+  locationCity?: string | null;
+  locationState?: string | null;
+  locationPlaceId?: string | null;
   budget?: string | null;
   workFromAnywhere?: boolean;
   description?: string | null;
@@ -3037,6 +3238,11 @@ export async function createPremiumJob(data: {
     logo: data.logo ?? null,
     category: data.category ?? null,
     location: data.location ?? null,
+    locationLat: data.locationLat ?? null,
+    locationLng: data.locationLng ?? null,
+    locationCity: data.locationCity ?? null,
+    locationState: data.locationState ?? null,
+    locationPlaceId: data.locationPlaceId ?? null,
     budget: data.budget ?? null,
     workFromAnywhere: data.workFromAnywhere === true,
     description: data.description ?? null,
@@ -3099,7 +3305,7 @@ export async function getArtistJobsFeed(
   let personalizationClause = "";
   if (artistUserId != null) {
     const [artist] = await db
-      .select({ masterArtistTypes: users.masterArtistTypes, artistServices: users.artistServices })
+      .select({ masterArtistTypes: users.masterArtistTypes, masterServiceType: users.masterServiceType })
       .from(users)
       .where(eq(users.id, artistUserId))
       .limit(1);
@@ -3113,7 +3319,7 @@ export async function getArtistJobsFeed(
       }
     };
     const artistTypeIds = parseIds(artist?.masterArtistTypes);
-    const serviceIds = parseIds(artist?.artistServices);
+    const serviceIds = parseIds(artist?.masterServiceType);
     const escapeSql = (s: string) => s.replace(/'/g, "''");
     if (artistTypeIds.length > 0) {
       const list = artistTypeIds.map((id) => `'${escapeSql(id)}'`).join(",");
@@ -4001,7 +4207,7 @@ export async function getUsersByEmails(emails: string[]): Promise<Map<string, {
   firstName: string | null;
   lastName: string | null;
   name: string | null;
-  userRole: "Client" | "Artist" | "Admin" | null;
+  userRole: "Client" | "Artist" | null;
   role: "user" | "admin";
   profilePicture: string | null;
   createdAt: Date;
@@ -4267,9 +4473,10 @@ export async function getArtistWalletData(artistUserId: number) {
 /**
  * Returns the artist's connected Stripe Connect account ID (acct_...), used
  * for payouts. This comes from `artistStripeAccountId` — the field the Bubble
- * migration actually populates. `users.stripeConnectAccountId` is a separate,
- * never-written column; reading it here was the bug behind "View Stripe
- * Dashboard" always saying no account was configured.
+ * migration actually populates. A separate, never-written
+ * `stripeConnectAccountId` column used to exist and be read here instead —
+ * that was the bug behind "View Stripe Dashboard" always saying no account
+ * was configured; the dead column was removed 2026-08-29.
  */
 export async function getArtistStripeConnectAccount(artistUserId: number): Promise<string | null> {
   const db = await getDb();
@@ -4512,7 +4719,13 @@ export async function createAdminBooking(input: {
   endDate: Date;
   isRecurring: boolean;
   recurringCadence?: string;
-  locationAddress?: string;
+  locationAddress?: string | null;
+  /** Structured Google Places data resolved from locationAddress. */
+  locationLat?: string | null;
+  locationLng?: string | null;
+  locationCity?: string | null;
+  locationState?: string | null;
+  locationPlaceId?: string | null;
   description?: string;
 }): Promise<number> {
   const db = await getDb();
@@ -4526,6 +4739,11 @@ export async function createAdminBooking(input: {
     startDate: input.startDate,
     endDate: input.endDate,
     locationAddress: input.locationAddress ?? null,
+    locationLat: input.locationLat ?? null,
+    locationLng: input.locationLng ?? null,
+    locationCity: input.locationCity ?? null,
+    locationState: input.locationState ?? null,
+    locationPlaceId: input.locationPlaceId ?? null,
     description: input.description ?? null,
     bookingStatus: "Confirmed",
     paymentStatus: "Unpaid",

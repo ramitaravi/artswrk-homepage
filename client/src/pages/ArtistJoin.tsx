@@ -16,9 +16,8 @@ import { trpc } from "@/lib/trpc";
 import Navbar from "@/components/Navbar";
 
 const ARTIST_TYPES = [
-  "Dance Teacher", "Choreographer", "Substitute Teacher", "Competition Coach",
-  "Yoga Instructor", "Pilates Instructor", "Fitness Instructor", "Vocal Coach",
-  "Music Teacher", "Photographer", "Videographer", "Event Performer",
+  "Dance Educator", "Dance Competition Staff", "Photographer", "Videographer",
+  "Acting Coach", "Vocal Coach", "Music Teacher", "Side Jobs",
 ];
 
 function StepDots({ current, total }: { current: number; total: number }) {
@@ -109,7 +108,7 @@ export default function ArtistJoin() {
   async function handleTypesContinue() {
     setLoading(true);
     try {
-      await updateOnboardingMutation.mutateAsync({ onboardingStep: 2 });
+      await updateOnboardingMutation.mutateAsync({ masterArtistTypes: artistTypes, onboardingStep: 2 });
     } catch {}
     setLoading(false);
     setStep(3);

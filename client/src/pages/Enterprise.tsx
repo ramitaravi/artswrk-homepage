@@ -48,6 +48,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import BoostJobModal from "@/components/BoostJobModal";
 import RichText from "@/components/RichText";
+import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
+import { toLocationData, type LocationDataPayload } from "@/hooks/useLocationField";
 import Artists from "@/pages/dashboard/Artists";
 import Bookings from "@/pages/dashboard/Bookings";
 import CompanyPage from "@/pages/dashboard/CompanyPage";
@@ -716,6 +718,7 @@ function PostJobModal({
     bubbleClientCompanyId: companies.length > 0 ? (companies[0].bubbleId || "") : "",
     category: "",
     location: "",
+    locationData: undefined as LocationDataPayload | undefined,
     budget: "",
     askArtistRate: false,
     workFromAnywhere: false,
@@ -772,6 +775,7 @@ function PostJobModal({
       logo: form.logo || undefined,
       category: form.category || undefined,
       location: form.location || undefined,
+      locationData: form.locationData,
       budget: form.askArtistRate ? undefined : (form.budget || undefined),
       workFromAnywhere: form.workFromAnywhere,
       description: form.description || undefined,
@@ -911,7 +915,7 @@ function PostJobModal({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setForm((f) => ({ ...f, workFromAnywhere: true, location: "" }))}
+                    onClick={() => setForm((f) => ({ ...f, workFromAnywhere: true, location: "", locationData: undefined }))}
                     className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all ${
                       form.workFromAnywhere
                         ? "bg-[#111] text-white border-[#111]"
@@ -922,12 +926,19 @@ function PostJobModal({
                   </button>
                 </div>
                 {!form.workFromAnywhere && (
-                  <input
-                    type="text"
-                    placeholder="City, State"
+                  <LocationAutocompleteInput
                     value={form.location}
-                    onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-                    className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
+                    onChange={(place) =>
+                      setForm((f) => ({
+                        ...f,
+                        location: place.formatted,
+                        locationData: toLocationData(place),
+                      }))
+                    }
+                    kind="any"
+                    placeholder="City, State"
+                    icon={false}
+                    inputClassName="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
                   />
                 )}
               </div>
@@ -1833,6 +1844,7 @@ function JobDetailView({
     company: job.company || "",
     category: job.category || "",
     location: job.location && !job.location.includes("[object") ? job.location : "",
+    locationData: undefined as LocationDataPayload | undefined,
     workFromAnywhere: !!job.workFromAnywhere,
     budget: job.budget || job.rate || "",
     askArtistRate: !job.budget && !job.rate,
@@ -1883,6 +1895,7 @@ function JobDetailView({
       company: editForm.company || undefined,
       category: editForm.category || undefined,
       location: editForm.workFromAnywhere ? "" : (editForm.location || undefined),
+      locationData: editForm.workFromAnywhere ? undefined : editForm.locationData,
       workFromAnywhere: editForm.workFromAnywhere,
       budget: editForm.askArtistRate ? "" : editForm.budget,
       description: editForm.description || undefined,
@@ -2395,14 +2408,23 @@ function JobDetailView({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setEditForm(f => ({ ...f, workFromAnywhere: true, location: "" }))}
+                  onClick={() => setEditForm(f => ({ ...f, workFromAnywhere: true, location: "", locationData: undefined }))}
                   className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${editForm.workFromAnywhere ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}
                 >
                   Open to traveling
                 </button>
               </div>
               {!editForm.workFromAnywhere && (
-                <input value={editForm.location} onChange={e => setEditForm(f => ({ ...f, location: e.target.value }))} className={fieldCls} placeholder="City, State" />
+                <LocationAutocompleteInput
+                  value={editForm.location}
+                  onChange={(place) =>
+                    setEditForm(f => ({ ...f, location: place.formatted, locationData: toLocationData(place) }))
+                  }
+                  kind="any"
+                  placeholder="City, State"
+                  icon={false}
+                  inputClassName={fieldCls}
+                />
               )}
             </div>
 
