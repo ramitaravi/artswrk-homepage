@@ -15,6 +15,8 @@ import {
 import { trpc } from "@/lib/trpc";
 import { formatLocation } from "@/lib/utils";
 import { MapView } from "@/components/Map";
+import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
+import { DEFAULT_RADIUS_MILES, RADIUS_OPTIONS, shortLabel } from "@shared/location";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -49,6 +51,8 @@ type Company = {
   locationAddress: string | null;
   locationLat: string | null;
   locationLng: string | null;
+  locationCity: string | null;
+  locationState: string | null;
   transportReimbursed: boolean | null;
   transportDetails: string | null;
 };
@@ -83,7 +87,9 @@ function CompanyCard({ company }: { company: Company }) {
           {company.locationAddress && (
             <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5 truncate">
               <MapPin size={11} className="flex-shrink-0" />
-              {formatLocation(company.locationAddress) ?? company.locationAddress}
+              {company.locationCity
+                ? shortLabel({ formatted: company.locationAddress, city: company.locationCity, stateCode: company.locationState ?? undefined })
+                : (formatLocation(company.locationAddress) ?? company.locationAddress)}
             </p>
           )}
           {company.description && (
@@ -146,21 +152,31 @@ export default function BrowseCompanies() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [view, setView] = useState<"grid" | "map">("grid");
+  const [locationFilter, setLocationFilter] = useState<{ query: string; lat?: number; lng?: number }>({ query: "" });
+  const [radiusMiles, setRadiusMiles] = useState<number>(DEFAULT_RADIUS_MILES);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+
+  const handleSearch = (v: string) => { setSearch(v); setPage(0); };
+  const handleLocation = (place: { formatted: string; lat?: number; lng?: number }) => {
+    setLocationFilter({ query: place.formatted, lat: place.lat, lng: place.lng });
+    setPage(0);
+  };
 
   const { data, isLoading } = trpc.companies.browse.useQuery({
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
     search: search || undefined,
+    locationQuery: locationFilter.query || undefined,
+    locationLat: locationFilter.lat,
+    locationLng: locationFilter.lng,
+    radiusMiles: locationFilter.lat ? radiusMiles : undefined,
   });
 
   const locked = data?.locked ?? false;
   const companies = (data?.companies ?? []) as Company[];
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
-
-  const handleSearch = (v: string) => { setSearch(v); setPage(0); };
 
   const geoCompanies = companies.filter((c) => c.locationLat && c.locationLng);
 
@@ -227,24 +243,51 @@ export default function BrowseCompanies() {
         <LockedState />
       ) : (
         <>
-          {/* Search */}
-          <div className="relative mb-5">
-            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              value={search}
-              onChange={(e) => handleSearch(e.target.value)}
-              placeholder="Search companies by name or location..."
-              className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-gray-200 text-sm text-[#111] placeholder-gray-400 focus:outline-none focus:border-[#ec008c] transition-all bg-white shadow-sm"
-            />
+          {/* Search + location */}
+          <div className="flex flex-col sm:flex-row gap-2 mb-5">
+            <div className="relative flex-1">
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                value={search}
+                onChange={(e) => handleSearch(e.target.value)}
+                placeholder="Search companies by name..."
+                className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-gray-200 text-sm text-[#111] placeholder-gray-400 focus:outline-none focus:border-[#ec008c] transition-all bg-white shadow-sm"
+              />
+            </div>
+            <div className="relative flex-1">
+              <MapPin size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
+              <LocationAutocompleteInput
+                value={locationFilter.query}
+                onChange={handleLocation}
+                placeholder="Anywhere"
+                icon={false}
+                inputClassName="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-gray-200 text-sm text-[#111] placeholder-gray-400 focus:outline-none focus:border-[#ec008c] transition-all bg-white shadow-sm"
+              />
+            </div>
+            {/* Radius only means something once a real place is selected. */}
+            {locationFilter.lat !== undefined && (
+              <select
+                value={radiusMiles}
+                onChange={(e) => { setRadiusMiles(Number(e.target.value)); setPage(0); }}
+                className="sm:w-36 flex-shrink-0 px-3 py-3.5 rounded-2xl border border-gray-200 text-sm text-gray-600 bg-white shadow-sm focus:outline-none focus:border-[#ec008c] cursor-pointer"
+              >
+                {RADIUS_OPTIONS.map((r) => (
+                  <option key={r} value={r}>Within {r} mi</option>
+                ))}
+              </select>
+            )}
           </div>
 
           {companies.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-gray-400">
               <Building2 size={40} className="mb-3 opacity-30" />
               <p className="text-sm font-medium">No companies found</p>
-              {search && (
-                <button onClick={() => handleSearch("")} className="mt-2 text-xs text-[#ec008c] font-semibold hover:opacity-70">
-                  Clear search
+              {(search || locationFilter.query) && (
+                <button
+                  onClick={() => { handleSearch(""); setLocationFilter({ query: "" }); }}
+                  className="mt-2 text-xs text-[#ec008c] font-semibold hover:opacity-70"
+                >
+                  Clear filters
                 </button>
               )}
             </div>
