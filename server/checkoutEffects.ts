@@ -31,6 +31,25 @@ import {
 } from "./db";
 import { sendJobPostedEmail } from "./email";
 
+/**
+ * Checkout Session webhook payloads don't include price/line-item detail by
+ * default (Stripe doesn't expand nested list resources in webhook events),
+ * but a subscription object always carries its price on `items.data[0]`
+ * with no expansion needed — so fetch the subscription itself rather than
+ * trying to expand the session.
+ */
+async function getSubscriptionPriceId(subscriptionId: string): Promise<string | null> {
+  try {
+    const { getStripe } = await import("./stripe");
+    const stripe = getStripe();
+    const sub = await stripe.subscriptions.retrieve(subscriptionId);
+    return sub.items.data[0]?.price?.id ?? null;
+  } catch (err: any) {
+    console.error("[Checkout] Failed to fetch subscription price ID:", err.message);
+    return null;
+  }
+}
+
 export async function applyCheckoutSessionCompleted(session: any): Promise<void> {
   const jobId = session.metadata?.job_id ? parseInt(session.metadata.job_id) : null;
   const userId = session.metadata?.user_id ? parseInt(session.metadata.user_id) : null;
@@ -79,22 +98,23 @@ export async function applyCheckoutSessionCompleted(session: any): Promise<void>
   const eventType = session.metadata?.type;
 
   if (userId && session.subscription) {
+    const priceId = await getSubscriptionPriceId(session.subscription);
     // Check if this is an artist PRO subscription or a client subscription
     if (eventType === "artist_pro_subscription") {
-      await saveArtistProSubscription(userId, session.subscription);
+      await saveArtistProSubscription(userId, session.subscription, priceId);
       if (session.customer) await saveArtistStripeCustomerId(userId, session.customer);
       console.log(`[Checkout] Activated artist PRO for user ${userId}`);
     } else if (eventType === "artist_basic_subscription") {
-      await saveArtistBasicSubscription(userId, session.subscription);
+      await saveArtistBasicSubscription(userId, session.subscription, priceId);
       if (session.customer) await saveArtistStripeCustomerId(userId, session.customer);
       console.log(`[Checkout] Activated artist Basic for user ${userId}`);
     } else if (eventType === "enterprise_subscription") {
       const enterpriseInterval = (session.metadata?.interval as "month" | "year" | undefined) ?? undefined;
-      await saveEnterpriseSubscription(userId, session.subscription, enterpriseInterval);
+      await saveEnterpriseSubscription(userId, session.subscription, enterpriseInterval, priceId);
       if (session.customer) await saveEnterpriseStripeCustomerId(userId, session.customer);
       console.log(`[Checkout] Activated enterprise subscription for user ${userId}, interval=${enterpriseInterval}`);
     } else {
-      await saveClientSubscriptionId(userId, session.subscription);
+      await saveClientSubscriptionId(userId, session.subscription, priceId);
     }
     if (session.customer && !["artist_pro_subscription", "artist_basic_subscription", "enterprise_subscription"].includes(eventType)) {
       await saveClientStripeCustomerId(userId, session.customer);

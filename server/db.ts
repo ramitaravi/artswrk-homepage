@@ -1630,7 +1630,7 @@ export async function saveClientStripeCustomerId(userId: number, stripeCustomerI
 /**
  * Save Stripe subscription ID on the user record (client side).
  */
-export async function saveClientSubscriptionId(userId: number, subscriptionId: string) {
+export async function saveClientSubscriptionId(userId: number, subscriptionId: string, priceId?: string | null) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db
@@ -1638,6 +1638,7 @@ export async function saveClientSubscriptionId(userId: number, subscriptionId: s
     .set({
       clientSubscriptionId: subscriptionId, clientPremium: true,
       planTier: "client_premium", stripeSubscriptionId: subscriptionId,
+      ...(priceId ? { stripePriceId: priceId } : {}),
     })
     .where(eq(users.id, userId));
 }
@@ -3348,12 +3349,13 @@ export async function saveArtistStripeCustomerId(userId: number, stripeCustomerI
 }
 
 /** Save artist PRO subscription ID and mark artswrkPro = true */
-export async function saveArtistProSubscription(userId: number, subscriptionId: string): Promise<void> {
+export async function saveArtistProSubscription(userId: number, subscriptionId: string, priceId?: string | null): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(users).set({
     artswrkPro: true, artistStripeProductId: subscriptionId,
     planTier: "artist_pro", stripeSubscriptionId: subscriptionId,
+    ...(priceId ? { stripePriceId: priceId } : {}),
   }).where(eq(users.id, userId));
 }
 
@@ -3396,12 +3398,13 @@ export async function getArtistSubscriptionInfo(userId: number): Promise<{
 }
 
 /** Save artist Basic subscription ID and mark artswrkBasic = true */
-export async function saveArtistBasicSubscription(userId: number, subscriptionId: string): Promise<void> {
+export async function saveArtistBasicSubscription(userId: number, subscriptionId: string, priceId?: string | null): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(users).set({
     artswrkBasic: true, artistStripeProductId: subscriptionId,
     planTier: "artist_basic", stripeSubscriptionId: subscriptionId,
+    ...(priceId ? { stripePriceId: priceId } : {}),
   }).where(eq(users.id, userId));
 }
 
@@ -3433,7 +3436,7 @@ export async function saveEnterpriseStripeCustomerId(userId: number, customerId:
 }
 
 /** Save enterprise subscription ID after successful checkout */
-export async function saveEnterpriseSubscription(userId: number, subscriptionId: string, interval?: "month" | "year"): Promise<void> {
+export async function saveEnterpriseSubscription(userId: number, subscriptionId: string, interval?: "month" | "year", priceId?: string | null): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(users).set({
@@ -3441,6 +3444,7 @@ export async function saveEnterpriseSubscription(userId: number, subscriptionId:
     enterprisePlan: "subscriber",
     ...(interval ? { enterpriseSubInterval: interval } : {}),
     planTier: "enterprise_subscription", stripeSubscriptionId: subscriptionId,
+    ...(priceId ? { stripePriceId: priceId } : {}),
   }).where(eq(users.id, userId));
 }
 
