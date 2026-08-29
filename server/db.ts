@@ -58,6 +58,12 @@ export function normalizeSocialLink(raw: string, platform: "instagram" | "tiktok
   return value; // not URL-shaped — leave untouched rather than guess
 }
 
+// Groups of planTier values equivalent to the old userRole = "Artist" / "Client"
+// checks (Client included enterprise accounts too, since `enterprise` was only
+// ever a boolean overlay on a Client row — never its own userRole value).
+export const ARTIST_PLAN_TIERS = ["artist_free", "artist_basic", "artist_pro"] as const;
+export const CLIENT_PLAN_TIERS = ["client_on_demand", "client_premium", "enterprise_on_demand", "enterprise_subscription"] as const;
+
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -1686,7 +1692,10 @@ export async function createNewUser(input: {
  */
 export async function setUserPlanFlags(
   userId: number,
-  flags: { artswrkBasic?: boolean; artswrkPro?: boolean; clientPremium?: boolean; enterprise?: boolean }
+  flags: {
+    artswrkBasic?: boolean; artswrkPro?: boolean; clientPremium?: boolean; enterprise?: boolean;
+    planTier?: "artist_free" | "artist_basic" | "artist_pro" | "client_on_demand" | "client_premium" | "enterprise_on_demand" | "enterprise_subscription";
+  }
 ): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -1814,7 +1823,7 @@ export async function getArtistsList({
   if (!db) return { artists: [], total: 0 };
 
   const conditions = [
-    eq(users.userRole, "Artist"),
+    inArray(users.planTier, ARTIST_PLAN_TIERS),
     // Only show artists with at least a name or firstName populated
     or(
       and(isNotNull(users.firstName), sql`${users.firstName} != ''`),
@@ -1985,7 +1994,7 @@ export async function getFeaturedArtists(limit = 24) {
     .from(users)
     .where(
       and(
-        eq(users.userRole, "Artist"),
+        inArray(users.planTier, ARTIST_PLAN_TIERS),
         isNotNull(users.profilePicture),
         sql`${users.profilePicture} != ''`,
         isNotNull(users.firstName),
@@ -2026,7 +2035,7 @@ export async function getArtistTypeCounts() {
     .from(users)
     .where(
       and(
-        eq(users.userRole, "Artist"),
+        inArray(users.planTier, ARTIST_PLAN_TIERS),
         isNotNull(users.workTypes),
         sql`${users.workTypes} != ''`,
         sql`${users.workTypes} != '[]'`,
@@ -2069,12 +2078,12 @@ export async function getAdminOverviewStats() {
   // without inflating the migration totals shown to administrators.
   const liveBubbleUser = eq(users.bubbleSourcePresent, true);
   const [totalUsers] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(liveBubbleUser);
-  const [totalArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist")));
-  const [totalClients] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Client")));
-  const [proArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist"), eq(users.artswrkPro, true)));
-  const [basicArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist"), eq(users.artswrkBasic, true)));
-  const [priorityArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist"), eq(users.priorityList, true)));
-  const [premiumClients] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Client"), eq(users.clientPremium, true)));
+  const [totalArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, inArray(users.planTier, ARTIST_PLAN_TIERS)));
+  const [totalClients] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, inArray(users.planTier, CLIENT_PLAN_TIERS)));
+  const [proArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, inArray(users.planTier, ARTIST_PLAN_TIERS), eq(users.artswrkPro, true)));
+  const [basicArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, inArray(users.planTier, ARTIST_PLAN_TIERS), eq(users.artswrkBasic, true)));
+  const [priorityArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, inArray(users.planTier, ARTIST_PLAN_TIERS), eq(users.priorityList, true)));
+  const [premiumClients] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, inArray(users.planTier, CLIENT_PLAN_TIERS), eq(users.clientPremium, true)));
   const liveBubbleBooking = eq(bookings.bubbleSourcePresent, true);
   const [totalBookings] = await db
     .select({ count: sql<number>`count(distinct ${bookings.bubbleId})` })
@@ -2153,7 +2162,7 @@ interface AdminArtistFilters {
 
 function buildAdminArtistConditions(f: AdminArtistFilters) {
   const conditions = [
-    eq(users.userRole, "Artist"),
+    inArray(users.planTier, ARTIST_PLAN_TIERS),
     // Only show artists with at least a name or firstName populated
     or(
       and(isNotNull(users.firstName), sql`${users.firstName} != ''`),
@@ -2313,7 +2322,7 @@ export async function getAdminClients({
   const db = await getDb();
   if (!db) return { clients: [], total: 0 };
 
-  const conditions = [eq(users.userRole, "Client")];
+  const conditions = [inArray(users.planTier, CLIENT_PLAN_TIERS)];
   if (search) conditions.push(or(
     like(users.name, `%${search}%`),
     like(users.firstName, `%${search}%`),

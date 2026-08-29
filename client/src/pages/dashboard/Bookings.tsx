@@ -426,7 +426,7 @@ type FilterTab = "all" | "Confirmed" | "Completed" | "Cancelled";
 export default function Bookings() {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const { user } = useAuth();
-  const isArtist = (user as any)?.userRole === "Artist";
+  const isArtist = ((user as any)?.planTier as string | undefined)?.startsWith("artist_") ?? false;
 
   const { data: stats, isLoading: statsLoading } = trpc.bookings.myStats.useQuery();
   const { data: bookings, isLoading: bookingsLoading } = trpc.bookings.myBookings.useQuery({

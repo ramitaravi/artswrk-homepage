@@ -1248,15 +1248,21 @@ export const appRouter = router({
         const target = await getUserById(input.userId);
         if (!target) throw new Error("User not found");
         const { setUserPlanFlags } = await import("./db");
-        if (target.userRole === "Artist") {
+        const targetIsArtist = (target as any).planTier
+          ? (target as any).planTier.startsWith("artist_")
+          : target.userRole === "Artist";
+        if (targetIsArtist) {
           await setUserPlanFlags(input.userId, {
             artswrkBasic: input.plan === "basic",
             artswrkPro: input.plan === "pro",
+            planTier: input.plan === "pro" ? "artist_pro" : input.plan === "basic" ? "artist_basic" : "artist_free",
           });
         } else {
+          const isEnterprise = input.plan === "enterprise";
           await setUserPlanFlags(input.userId, {
             clientPremium: input.plan === "premium",
-            enterprise: input.plan === "enterprise",
+            enterprise: isEnterprise,
+            planTier: isEnterprise ? "enterprise_on_demand" : input.plan === "premium" ? "client_premium" : "client_on_demand",
           });
         }
         return { success: true };
@@ -1699,7 +1705,7 @@ export const appRouter = router({
       .query(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
-        if (user.userRole === "Artist") {
+        if (((user as any).planTier ?? "").startsWith("artist_")) {
           return getConversationsByArtistId(user.id, input.limit, input.offset);
         }
         return getConversationsByClientId(user.id, input.limit, input.offset);
@@ -1726,7 +1732,7 @@ export const appRouter = router({
       .query(async ({ ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) return { totalConversations: 0, totalMessages: 0, unreadMessages: 0 };
-        if (user.userRole === "Artist") return getMessageStatsByArtistId(user.id);
+        if (((user as any).planTier ?? "").startsWith("artist_")) return getMessageStatsByArtistId(user.id);
         return getMessageStatsByClientId(user.id);
       }),
 
@@ -1806,7 +1812,7 @@ export const appRouter = router({
         if (!sender) throw new Error("User not found");
 
         // Determine client vs artist role — clients start convos with artists
-        const isClient = sender.userRole !== "Artist";
+        const isClient = !((sender as any).planTier ?? "").startsWith("artist_");
         const clientUserId = isClient ? sender.id : input.artistUserId;
         const artistUserId = isClient ? input.artistUserId : sender.id;
 
@@ -4529,7 +4535,7 @@ Fields to extract:
     myAdminBookings: protectedProcedure
       .query(async ({ ctx }) => {
         const user = ctx.user as any;
-        const isArtist = user.userRole === "Artist";
+        const isArtist = (user.planTier ?? "").startsWith("artist_");
         if (isArtist) return getArtistAdminBookings(user.id);
         return getClientAdminBookings(user.id);
       }),

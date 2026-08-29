@@ -82,9 +82,13 @@ function DashRoute({ component: Component }: { component: React.ComponentType })
 function AppRoute({ clientComponent: ClientComponent = Overview }: { clientComponent?: React.ComponentType }) {
   const { user, loading } = useAuth();
 
-  // auth.me returns the full User row — userRole and enterprise are on it directly
-  const isArtist = (user as any)?.userRole === "Artist";
-  const isEnterprise = !!(user as any)?.enterprise;
+  // auth.me returns the full User row — planTier is on it directly. Its
+  // prefix (artist_ / client_ / enterprise_) is the single source of truth
+  // for which dashboard to show, replacing the old userRole + enterprise
+  // boolean pair.
+  const planTier = (user as any)?.planTier as string | undefined;
+  const isArtist = planTier?.startsWith("artist_") ?? false;
+  const isEnterprise = planTier?.startsWith("enterprise_") ?? false;
 
   // Wait for auth before making routing decisions to avoid a wrong-dashboard flash
   if (loading) {
@@ -116,7 +120,7 @@ function AppRoute({ clientComponent: ClientComponent = Overview }: { clientCompo
  */
 function ArtistJobsRoute() {
   const { user, loading } = useAuth();
-  const isArtist = (user as any)?.userRole === "Artist";
+  const isArtist = ((user as any)?.planTier as string | undefined)?.startsWith("artist_") ?? false;
 
   if (loading) {
     return (
@@ -149,7 +153,7 @@ function ArtistJobsRoute() {
  */
 function BrowseCompaniesRoute() {
   const { user, loading } = useAuth();
-  const isArtist = (user as any)?.userRole === "Artist";
+  const isArtist = ((user as any)?.planTier as string | undefined)?.startsWith("artist_") ?? false;
 
   if (loading) return <DashboardLayout><div /></DashboardLayout>;
 
@@ -171,7 +175,7 @@ function BrowseCompaniesRoute() {
  */
 function CommunityRoute() {
   const { user, loading } = useAuth();
-  const isArtist = (user as any)?.userRole === "Artist";
+  const isArtist = ((user as any)?.planTier as string | undefined)?.startsWith("artist_") ?? false;
 
   if (loading) return <DashboardLayout><div /></DashboardLayout>;
 

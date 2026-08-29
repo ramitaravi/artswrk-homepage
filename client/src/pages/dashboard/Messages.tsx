@@ -300,7 +300,7 @@ export default function Messages() {
   // dispatcher (4abfa1f) and DashboardLayout.tsx.
   const artswrkUser = user as any;
   const myUserId = artswrkUser?.id;
-  const isArtist = artswrkUser?.userRole === "Artist";
+  const isArtist = (artswrkUser?.planTier as string | undefined)?.startsWith("artist_") ?? false;
 
   const utils = trpc.useUtils();
 

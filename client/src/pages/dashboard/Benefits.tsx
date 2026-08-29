@@ -97,8 +97,8 @@ export default function Benefits() {
   const { user } = useAuth();
   const [activeCategory, setActiveCategory] = useState<string>("All");
 
-  // Determine audience type from user role (available directly from auth)
-  const audienceType = user?.userRole === "Artist" ? "Artist" : "Client";
+  // Determine audience type from planTier (available directly from auth)
+  const audienceType = ((user as any)?.planTier as string | undefined)?.startsWith("artist_") ? "Artist" : "Client";
 
   const { data, isLoading } = trpc.benefits.list.useQuery(
     { audienceType },

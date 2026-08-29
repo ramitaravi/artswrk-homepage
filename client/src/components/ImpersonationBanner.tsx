@@ -39,10 +39,10 @@ export default function ImpersonationBanner() {
 
   const displayName = user?.name || user?.firstName || user?.email || "another user";
   const artswrkUser = user as any;
-  const isArtist = artswrkUser?.userRole === "Artist";
+  const isArtist = (artswrkUser?.planTier as string | undefined)?.startsWith("artist_") ?? false;
 
-  const currentArtistPlan: ArtistPlan = artswrkUser?.artswrkPro ? "pro" : artswrkUser?.artswrkBasic ? "basic" : "free";
-  const currentClientPlan: ClientPlan = artswrkUser?.enterprise ? "enterprise" : artswrkUser?.clientPremium ? "premium" : "free";
+  const currentArtistPlan: ArtistPlan = artswrkUser?.planTier === "artist_pro" ? "pro" : artswrkUser?.planTier === "artist_basic" ? "basic" : "free";
+  const currentClientPlan: ClientPlan = (artswrkUser?.planTier as string | undefined)?.startsWith("enterprise_") ? "enterprise" : artswrkUser?.planTier === "client_premium" ? "premium" : "free";
 
   return (
     <div className="fixed top-0 left-0 right-0 z-[9999] bg-[#111] text-white px-5 py-2.5 flex items-center justify-between gap-4 shadow-lg flex-wrap">

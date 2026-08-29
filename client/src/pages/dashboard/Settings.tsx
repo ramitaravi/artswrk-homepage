@@ -198,7 +198,7 @@ function AccountTab() {
     onError: (e) => toast.error(e.message || "Failed to send reset email"),
   });
 
-  const isArtist = artswrkUser?.userRole === "Artist";
+  const isArtist = (artswrkUser?.planTier as string | undefined)?.startsWith("artist_") ?? false;
   const email = user?.email || artswrkUser?.email || "";
 
   return (
@@ -277,7 +277,7 @@ function SubscriptionTab() {
   // auth.me already returns the full DB row — see AccountTab above.
   const artswrkUser = user as any;
 
-  const isPremium = (artswrkUser as any)?.clientPremium ?? false;
+  const isPremium = artswrkUser?.planTier === "client_premium";
 
   const subMutation = trpc.clientJobs.createSubscriptionCheckout.useMutation();
   const portalMutation = trpc.clientJobs.createPortalSession.useMutation({

@@ -217,8 +217,8 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
     : user?.name || "User";
 
   const displayStudio = artswrkUser?.clientCompanyName || artswrkUser?.firstName || "Artswrk";
-  const isPremium = artswrkUser?.clientPremium ?? false;
-  const isArtist = artswrkUser?.userRole === "Artist";
+  const isPremium = artswrkUser?.planTier === "client_premium";
+  const isArtist = (artswrkUser?.planTier as string | undefined)?.startsWith("artist_") ?? false;
   const coreNav = isArtist ? ARTIST_CORE_NAV : CLIENT_CORE_NAV;
   const premiumNav = isArtist ? ARTIST_PREMIUM_NAV : CLIENT_PREMIUM_NAV;
   // Sidebar card subtitle: artists see their plan (more useful than their own
