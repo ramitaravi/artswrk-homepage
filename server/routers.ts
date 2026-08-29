@@ -439,6 +439,11 @@ export const appRouter = router({
           tagline: input.tagline ?? null,
           artswrkPro: input.artswrkPro,
           artswrkBasic: input.artswrkBasic,
+          planTier: input.artswrkPro
+            ? "artist_pro" as const
+            : input.artswrkBasic
+              ? "artist_basic" as const
+              : "artist_free" as const,
           userSignedUp: true,
           onboardingStep: 4,
         };
@@ -660,6 +665,11 @@ export const appRouter = router({
           hiringCategory: input.hiringCategory ?? null,
           clientPremium: input.clientPremium,
           enterprise: input.enterprise,
+          planTier: input.enterprise
+            ? "enterprise_on_demand" as const
+            : input.clientPremium
+              ? "client_premium" as const
+              : "client_on_demand" as const,
           userSignedUp: true,
           onboardingStep: 4,
         };
@@ -714,6 +724,10 @@ export const appRouter = router({
           clientCompanyName: input.companyName,
           enterprise: true,
           enterprisePlan: input.plan ?? null,
+          // No real Stripe subscription exists yet at creation time regardless
+          // of `plan` — matches the pre-existing rule that enterprisePlan alone
+          // (without a real subscription ID) was never enough for full access.
+          planTier: "enterprise_on_demand" as const,
           hiringCategory: input.hiringCategory ?? null,
           businessOrIndividual: input.businessOrIndividual ?? "Business",
           profilePicture: input.logoUrl ?? null,
@@ -1397,7 +1411,7 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
-        if (!(user as any).artswrkBasic && !(user as any).artswrkPro) {
+        if (!["artist_basic", "artist_pro"].includes((user as any).planTier)) {
           throw new Error("Upgrade to Artswrk Basic or PRO to apply to jobs.");
         }
         const id = await applyToJob({
@@ -2638,10 +2652,12 @@ Fields to extract:
       }),
 
     /** Interested artists (applications) across all enterprise PRO jobs */
-    getApplications: publicProcedure
+    getApplications: protectedProcedure
       .input(z.object({ clientUserId: z.number().optional() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         if (!input.clientUserId) return { applications: [] };
+        const isAdmin = ctx.user.openId === ENV.ownerOpenId || ctx.user.role === "admin";
+        if (!isAdmin && ctx.user.id !== input.clientUserId) return { applications: [] };
         const raw = await getPremiumInterestedArtistsByCreatorId(input.clientUserId);
         const applications = (raw as any[]).map((ia) => ({
           id: ia.id,
@@ -2672,10 +2688,12 @@ Fields to extract:
       }),
 
     /** Unique interested artists across all PRO jobs for this enterprise user */
-    getInterestedArtists: publicProcedure
+    getInterestedArtists: protectedProcedure
       .input(z.object({ clientUserId: z.number().optional() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         if (!input.clientUserId) return { artists: [] };
+        const isAdmin = ctx.user.openId === ENV.ownerOpenId || ctx.user.role === "admin";
+        if (!isAdmin && ctx.user.id !== input.clientUserId) return { artists: [] };
         const raw = await getPremiumInterestedArtistsByCreatorId(input.clientUserId);
         // Deduplicate by artistUserId
         const seen = new Set<number>();
@@ -2710,11 +2728,8 @@ Fields to extract:
       .query(async ({ input, ctx }) => {
         const user = await getUserById(ctx.user.id);
         const isAdmin = ctx.user.openId === ENV.ownerOpenId || ctx.user.role === "admin";
-        const isOnDemand = !!user?.enterprise && user.enterprisePlan === "on_demand";
-        // `enterprisePlan === "subscriber"` is set once at activation and never
-        // cleared on cancellation — a real, currently-set subscription ID is
-        // the only reliable live signal that this subscriber is still paying.
-        const isActiveSubscriber = !!user?.enterprise && user.enterprisePlan === "subscriber" && !!(user as any).enterpriseStripeSubscriptionId;
+        const isOnDemand = (user as any)?.planTier === "enterprise_on_demand";
+        const isActiveSubscriber = (user as any)?.planTier === "enterprise_subscription";
 
         // Default-deny: only admin, an active subscriber, or an on-demand
         // client who has specifically unlocked THIS job get full access.
@@ -3230,7 +3245,7 @@ Fields to extract:
       }))
       .mutation(async ({ input, ctx }) => {
         const applicant = await getUserById(ctx.user.id);
-        if (!applicant?.artswrkPro) {
+        if ((applicant as any)?.planTier !== "artist_pro") {
           throw new Error("Upgrade to Artswrk PRO to apply to PRO jobs.");
         }
         const { getDb } = await import('./db');
@@ -4601,7 +4616,7 @@ Fields to extract:
       .query(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
-        if (!(user as any).artswrkPro) {
+        if ((user as any).planTier !== "artist_pro") {
           return { locked: true as const, companies: [], total: 0 };
         }
         const result = await getClientCompaniesList({
@@ -4619,9 +4634,12 @@ Fields to extract:
       .input(z.object({ audienceType: z.enum(["Artist", "Client"]) }))
       .query(async ({ input, ctx }) => {
         const viewer = await getUserById(ctx.user.id);
+        // Enterprise accounts never qualify for Client benefits — there
+        // simply aren't any partner benefits for that tier today, regardless
+        // of on-demand vs. subscription billing status.
         const eligible = input.audienceType === "Artist"
-          ? !!(viewer as any)?.artswrkPro
-          : !!((viewer as any)?.clientPremium || (viewer as any)?.enterprise);
+          ? (viewer as any)?.planTier === "artist_pro"
+          : (viewer as any)?.planTier === "client_premium";
         if (!eligible) return { locked: true as const, benefits: [] };
         const rows = await getBenefits(input.audienceType);
         return {

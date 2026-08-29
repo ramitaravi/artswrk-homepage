@@ -1724,6 +1724,23 @@ export async function updateUserOnboarding(userId: number, data: {
   if (data.onboardingStep !== undefined) updateData.onboardingStep = data.onboardingStep;
   if (data.userSignedUp !== undefined) updateData.userSignedUp = data.userSignedUp;
   if (data.userRole !== undefined) updateData.userRole = data.userRole;
+
+  // A hiring client whose business type is an event company or dance
+  // competition gets auto-promoted to Enterprise right here at onboarding —
+  // no admin step needed. Only fires for Client onboarding (never overrides
+  // an Artist's role), and only on the way IN (never downgrades someone who
+  // was manually made Enterprise by an admin for some other reason).
+  const isAutoEnterpriseCategory = data.hiringCategory === "Dance Competition" || data.hiringCategory === "Event Company";
+  if (data.userRole === "Client" && isAutoEnterpriseCategory) {
+    updateData.enterprise = true;
+    updateData.planTier = "enterprise_on_demand";
+  } else if (data.userRole !== undefined) {
+    // First time this account's role is being established — give it the
+    // correct free/on-demand baseline. Never fires again once a real
+    // subscription exists, since a later onboarding save wouldn't normally
+    // resend userRole for an already-onboarded account.
+    updateData.planTier = data.userRole === "Artist" ? "artist_free" : "client_on_demand";
+  }
   if (data.masterArtistTypes !== undefined) updateData.masterArtistTypes = JSON.stringify(data.masterArtistTypes);
   if (data.artistServices !== undefined) updateData.artistServices = JSON.stringify(data.artistServices);
   if (data.bio !== undefined) updateData.bio = data.bio;
@@ -3711,16 +3728,10 @@ export async function isClientJobUnlocked(clientUserId: number, jobId: number): 
   const db = await getDb();
   if (!db) return false;
   const userRows = await db.execute(
-    `SELECT clientPremium, enterprise, enterprisePlan, enterpriseStripeSubscriptionId FROM users WHERE id = ${clientUserId} LIMIT 1`
+    `SELECT planTier FROM users WHERE id = ${clientUserId} LIMIT 1`
   );
   const user = (userRows[0] as unknown as any[])[0];
-  if (user?.clientPremium) return true;
-  // `enterprise` alone is an account-type flag, set once at creation and never
-  // cleared — it is NOT a live payment-status signal. Only an active
-  // subscriber plan (a real, currently-set Stripe subscription ID) unlocks
-  // everything; a canceled/never-subscribed or on-demand enterprise account
-  // must still go through the per-job unlock check below.
-  if (user?.enterprise && user?.enterprisePlan === "subscriber" && user?.enterpriseStripeSubscriptionId) return true;
+  if (user?.planTier === "client_premium" || user?.planTier === "enterprise_subscription") return true;
   // Check per-job unlock
   const unlockRows = await db.execute(
     `SELECT id FROM client_job_unlocks WHERE clientUserId = ${clientUserId} AND jobId = ${jobId} LIMIT 1`
@@ -3742,10 +3753,7 @@ export async function canClientMessageArtist(clientUserId: number, artistUserId:
   const user = await getUserById(clientUserId);
   if (!user) return false;
   const u = user as any;
-  if (u.clientPremium || user.role === "admin") return true;
-  // Same reasoning as isClientJobUnlocked — `enterprise` alone never expires,
-  // only an active subscriber plan should grant unconditional messaging.
-  if (u.enterprise && u.enterprisePlan === "subscriber" && u.enterpriseStripeSubscriptionId) return true;
+  if (user.role === "admin" || u.planTier === "client_premium" || u.planTier === "enterprise_subscription") return true;
 
   const jobRows = await db.execute(
     `SELECT ia.jobId AS jobId FROM interested_artists ia INNER JOIN jobs j ON j.id = ia.jobId WHERE ia.artistUserId = ${artistUserId} AND j.clientUserId = ${clientUserId}`
