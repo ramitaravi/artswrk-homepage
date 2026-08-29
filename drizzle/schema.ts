@@ -63,14 +63,28 @@ export const users = mysqlTable("users", {
   artistDisciplines: text("artistDisciplines"),
   /** JSON array of service/role strings (e.g. ["Dance Educator", "Choreographer"]) */
   artistServices: text("artistServices"),
+  /** Raw Bubble "List of Master Services" — a distinct field from artistServices,
+   * mapped 1:1 from Bubble, not a replacement for it. */
+  masterServiceType: text("masterServiceType"),
   /** JSON array of master artist type strings */
   masterArtistTypes: text("masterArtistTypes"),
   /** JSON array of master style strings */
   masterStyles: text("masterStyles"),
   /** JSON array of experience strings */
   artistExperiences: text("artistExperiences"),
-  /** Location string (city, state) */
+  /** Location string (city, state) — the Google-formatted address we display. */
   location: varchar("location", { length: 256 }),
+  /** Structured Google Places data behind `location`, captured on save.
+   *  lat/lng are what radius ("artists near me") filtering runs on; city and
+   *  state back exact-match filtering for rows without coordinates. Stored as
+   *  varchar to match jobs/client_companies, which the same SQL casts. */
+  locationLat: varchar("locationLat", { length: 32 }),
+  locationLng: varchar("locationLng", { length: 32 }),
+  locationCity: varchar("locationCity", { length: 128 }),
+  locationState: varchar("locationState", { length: 64 }),
+  locationCountry: varchar("locationCountry", { length: 64 }),
+  /** Google place id — stable identity for the place, survives renames. */
+  locationPlaceId: varchar("locationPlaceId", { length: 128 }),
   /** Portfolio URL */
   portfolio: text("portfolio"),
   /** Website URL */
@@ -143,6 +157,12 @@ export const users = mysqlTable("users", {
   onboardingStep: int("onboardingStep").default(0),
   userSignedUp: boolean("userSignedUp").default(false),
   beta: boolean("beta").default(false),
+  /** True if this account was created by an admin rather than self-serve signup. */
+  addedByAdmin: boolean("addedByAdmin").default(false),
+  /** Acquisition source — from Bubble's "source", not previously captured. */
+  source: varchar("source", { length: 128 }),
+  /** Email unsubscribe / marketing opt-out flag. */
+  unsubscribe: boolean("unsubscribe").default(false),
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   /** bcrypt hash of a temporary password set by admin. Null = no password login. */
@@ -175,10 +195,18 @@ export const users = mysqlTable("users", {
   // ── Artist Stripe Connect ─────────────────────────────────────────────────
   /** Stripe Connect account ID for artist payouts (e.g. acct_1PKkRm...) */
   artistStripeAccountId: varchar("artistStripeAccountId", { length: 64 }),
+  /** Connect account type (e.g. "standard", "express") — from Bubble's
+   * "Artist Stripe Account Type", not previously captured. */
+  artistStripeAccountType: varchar("artistStripeAccountType", { length: 32 }),
   /** OAuth return code from Stripe Connect onboarding flow */
   artistStripeReturnCode: varchar("artistStripeReturnCode", { length: 256 }),
-  /** Stripe product ID tied to the artist's PRO subscription */
+  /** Legacy field, name is misleading — this is Connect/payout-related, NOT
+   * tied to any subscription (confirmed 2026-08-29). Kept for existing data;
+   * stripeProductId below is the clean go-forward field for the same concept. */
   artistStripeProductId: varchar("artistStripeProductId", { length: 64 }),
+  /** Stripe product ID for the artist's connected account — from Bubble's
+   * "Stripe product ID", mapped 1:1. Connect-related, not subscription-related. */
+  stripeProductId: varchar("stripeProductId", { length: 64 }),
   /** When the artist's Stripe Connect account was created */
   artistStripeDateCreated: timestamp("artistStripeDateCreated"),
 
@@ -240,6 +268,12 @@ export const jobs = mysqlTable("jobs", {
   locationAddress: text("locationAddress"),
   locationLat: varchar("locationLat", { length: 32 }),
   locationLng: varchar("locationLng", { length: 32 }),
+  /** Structured Google Places data behind the address above, captured when the
+   *  location is picked. City/state back exact-match filtering; placeId is the
+   *  stable identity for the place. */
+  locationCity: varchar("locationCity", { length: 128 }),
+  locationState: varchar("locationState", { length: 64 }),
+  locationPlaceId: varchar("locationPlaceId", { length: 128 }),
 
   // ── Rates ──────────────────────────────────────────────────────────────────
   isHourly: boolean("isHourly").default(true),
@@ -471,6 +505,12 @@ export const bookings = mysqlTable("bookings", {
   locationAddress: text("locationAddress"),
   locationLat: varchar("locationLat", { length: 32 }),
   locationLng: varchar("locationLng", { length: 32 }),
+  /** Structured Google Places data behind the address above, captured when the
+   *  location is picked. City/state back exact-match filtering; placeId is the
+   *  stable identity for the place. */
+  locationCity: varchar("locationCity", { length: 128 }),
+  locationState: varchar("locationState", { length: 64 }),
+  locationPlaceId: varchar("locationPlaceId", { length: 128 }),
 
   // ── Content ────────────────────────────────────────────────────────────────
   description: text("description"),
@@ -704,6 +744,12 @@ export const premiumJobs = mysqlTable("premium_jobs", {
   location: varchar("location", { length: 256 }),
   locationLat: varchar("locationLat", { length: 32 }),
   locationLng: varchar("locationLng", { length: 32 }),
+  /** Structured Google Places data behind the address above, captured when the
+   *  location is picked. City/state back exact-match filtering; placeId is the
+   *  stable identity for the place. */
+  locationCity: varchar("locationCity", { length: 128 }),
+  locationState: varchar("locationState", { length: 64 }),
+  locationPlaceId: varchar("locationPlaceId", { length: 128 }),
   /** Tag (e.g. "#Judges #MasterClasses") */
   tag: varchar("tag", { length: 256 }),
   /** URL slug */
@@ -801,6 +847,12 @@ export const clientCompanies = mysqlTable("client_companies", {
   locationAddress: text("locationAddress"),
   locationLat: varchar("locationLat", { length: 32 }),
   locationLng: varchar("locationLng", { length: 32 }),
+  /** Structured Google Places data behind the address above, captured when the
+   *  location is picked. City/state back exact-match filtering; placeId is the
+   *  stable identity for the place. */
+  locationCity: varchar("locationCity", { length: 128 }),
+  locationState: varchar("locationState", { length: 64 }),
+  locationPlaceId: varchar("locationPlaceId", { length: 128 }),
   /** Whether the company reimburses artist transportation */
   transportReimbursed: boolean("transportReimbursed").default(false),
   /** Instructions for how artists should get to this studio */
@@ -1578,3 +1630,14 @@ export const savedArtists = mysqlTable("saved_artists", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type SavedArtist = typeof savedArtists.$inferSelect;
+
+/** Who invited whom — from Bubble's "Invited Users" list field, normalized
+ * into a real table instead of a JSON blob on the user row. */
+export const referrals = mysqlTable("referrals", {
+  id: int("id").autoincrement().primaryKey(),
+  referrerUserId: int("referrerUserId").notNull(),
+  invitedUserId: int("invitedUserId").notNull(),
+  bubbleId: varchar("bubbleId", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Referral = typeof referrals.$inferSelect;
