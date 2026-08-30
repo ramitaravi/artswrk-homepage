@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { APP_URL } from "./emailTemplates";
 import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -112,7 +113,11 @@ export const appRouter = router({
           const token = crypto.randomBytes(32).toString("hex");
           const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
           await createPasswordResetToken(user.id, token, expiresAt);
-          const resetUrl = `${input.origin}/reset-password?token=${token}`;
+          // APP_URL, never input.origin: the recipient is not the person whose
+          // browser made this request, so their origin is meaningless — which is
+          // how a real reset email went out carrying localhost:3000 on 8/25 and
+          // a manus.space staging host in April.
+          const resetUrl = `${APP_URL}/reset-password?token=${token}`;
           await sendPasswordResetEmail({
             to: user.email!,
             firstName: user.firstName ?? user.name ?? "there",
@@ -509,7 +514,7 @@ export const appRouter = router({
               // Admin-created accounts get no real password (passwordIsTemporary
               // stays true) — always generate a real claim link so "create your
               // password" isn't just decorative copy in a custom email.
-              const origin = input.origin ?? process.env.VITE_APP_URL ?? "https://artswrk.com";
+              const origin = input.origin ?? APP_URL;
               const token = crypto.randomBytes(32).toString("hex");
               const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
               await createPasswordResetToken(newId, token, expiresAt);
@@ -1616,7 +1621,7 @@ export const appRouter = router({
               : job.isHourly
               ? `$${job.clientHourlyRate ?? job.artistHourlyRate ?? 0}/hr`
               : `$${job.clientHourlyRate ?? job.artistHourlyRate ?? 0} flat`;
-            const origin = (ctx.req.headers.origin as string) || "https://artswrk.com";
+            const origin = APP_URL;  // never the request Origin header — see APP_URL
             const citySlug = (job.locationAddress ?? "remote").split(",")[0].trim().toLowerCase().replace(/\s+/g, "-");
             const titleSlug = jobTitle.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-");
             const jobUrl = `${origin}/jobs/${citySlug}/${titleSlug}-${job.id}`;
@@ -3842,7 +3847,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const invoicePaymentToken = randomBytes(24).toString("hex");
 
         // Determine origin for redirect URLs
-        const origin = input.origin ?? "https://artswrk-ayegfhxr.manus.space";
+        const origin = input.origin ?? APP_URL;  // was a hardcoded manus.space staging host
         const paymentPageUrl = `${origin}/invoice/${invoicePaymentToken}`;
 
         // Create Stripe Checkout session (minimum $0.50)

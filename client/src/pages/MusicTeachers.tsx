@@ -63,9 +63,11 @@ const PRICING = [
   },
   {
     name: "PRO",
-    monthlyPrice: "$10.99",
+    // Annual-only since 2026-08-28; the $10.99/mo plan is discontinued. Both
+    // toggle states show the yearly price, same as Basic above.
+    monthlyPrice: "$110",
     annualPrice: "$110",
-    monthlyPeriod: "/month",
+    monthlyPeriod: "/year",
     annualPeriod: "/year",
     features: ["All Basic Features", "Access to PRO Jobs", "Access to Benefits Suite", "1:1 Support from Artswrk Team"],
     cta: "Get Started",

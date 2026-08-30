@@ -809,13 +809,14 @@ function Step4Plan({
             </div>
             <span className="font-bold text-sm text-[#111]">PRO</span>
           </div>
+          {/* Annual-only since 2026-08-28. The interval toggle is display-only
+              (it never reaches Stripe) and Basic already ignores it, so PRO
+              shows the same price either way rather than a monthly plan that
+              can no longer be bought. */}
           <p className="text-2xl font-black text-[#111] mb-0.5">
-            {interval === "monthly" ? "$10.99" : "$9.17"}
-            <span className="text-sm font-normal text-gray-400">/mo</span>
+            $110<span className="text-sm font-normal text-gray-400">/year</span>
           </p>
-          <p className="text-xs text-gray-400 mb-3">
-            {interval === "annual" ? "Billed $110/yr" : "Billed monthly"}
-          </p>
+          <p className="text-xs text-gray-400 mb-3">Starts with a 7-day free trial</p>
           <ul className="space-y-1.5 mb-4 flex-1">
             {["Everything in Basic", "Unlimited job applications", "Priority in search results", "PRO badge on profile", "Access competition jobs", "Dedicated support"].map((f) => (
               <li key={f} className="flex items-start gap-1.5 text-xs text-gray-600">

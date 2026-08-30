@@ -1,4 +1,8 @@
 import sgMail from "@sendgrid/mail";
+import {
+  renderEmailShell, detailsCard, sanitizeUserText, p as para, b, quote,
+  APP_URL, SUPPORT_EMAIL,
+} from "./emailTemplates";
 
 // Initialize SendGrid with API key
 if (process.env.SENDGRID_API_KEY) {
@@ -300,58 +304,40 @@ export async function sendApplicationConfirmationEmail({
 
 // ─── Typed helper: New Applicant Alert (to Artswrk team) ─────────────────────
 /**
- * Sent to contact@artswrk.com whenever someone applies to any job.
- * NEVER sent to the actual client — we are not live yet.
+ * C3 — New applicant alert (regular job). Inline; replaces CLIENT_NEW_APPLICANT.
+ *
+ * jobUrl/resumeLink MUST be built from APP_URL by the caller, never the request
+ * Origin — that is why live alerts on 2026-08-28 carried localhost:62958 links.
  */
 export async function sendNewApplicantAlertEmail({
-  to,
-  artistName,
-  artistEmail,
-  jobTitle,
-  jobLocation,
-  jobRate,
-  jobUrl,
-  message,
-  resumeLink,
+  to, artistName, artistEmail, jobTitle, jobLocation, jobRate, jobUrl, message, resumeLink, cc,
 }: {
-  to: string;
-  artistName: string;
-  artistEmail: string;
-  jobTitle: string;
-  jobLocation: string;
-  jobRate: string;
-  jobUrl: string;
-  message?: string;
-  resumeLink?: string;
+  to: string; artistName: string; artistEmail?: string; jobTitle: string;
+  jobLocation?: string; jobRate?: string; jobUrl: string;
+  message?: string; resumeLink?: string; cc?: string;
 }): Promise<boolean> {
-  const [firstName, ...lastParts] = artistName.trim().split(" ");
-  const lastName = lastParts.join(" ");
-  return sendTransactionalEmail({
-    to,
-    cc: "support@artswrk.com",
-    templateId: SENDGRID_TEMPLATES.CLIENT_NEW_APPLICANT,
-    dynamicData: {
-      subject: `${artistName} is available for your job!`,
-      ArtistName: firstName || artistName,
-      ArtistLastName: lastName,
-      ArtistType: "",
-      Date: "",
-      Description: "",
-      Location: jobLocation,
-      Message: message ?? "",
-      Service: jobTitle,
-      TransportDetails: "",
-      TransportReimbursed: "",
-      URL: jobUrl,
-      link: jobUrl,
-    },
-  }).catch((err: unknown) => {
-    console.error("[email] Failed to send new applicant alert:", err instanceof Error ? err.message : err);
-    return false;
+  const note = sanitizeUserText(message, 500);
+  const html = renderEmailShell({
+    accent: "client",
+    headline: artistName + " is available for your job!",
+    preheader: artistName + " applied to " + jobTitle + ".",
+    bodyHtml:
+      para("Hi there, " + b(artistName) + " is interested in the job below.") +
+      (note ? para("Message from " + b(artistName) + ":") + quote(note) : "") +
+      detailsCard([
+        { label: "Job", value: jobTitle },
+        { label: "Location", value: jobLocation },
+        { label: "Rate", value: jobRate },
+        { label: "Contact", value: artistEmail },
+      ]),
+    ctaText: "View Submission",
+    ctaUrl: jobUrl,
+    footerNote: resumeLink
+      ? '<a href="' + resumeLink + '" style="color:#F25722;font-weight:600;">View ' + artistName + '\u2019s resume &rarr;</a>'
+      : undefined,
   });
+  return sendSimpleEmail({ to, cc: cc ?? SUPPORT_EMAIL, subject: artistName + " is available for your job!", html });
 }
-
-// ─── Simple raw HTML email ────────────────────────────────────────────────────
 export async function sendSimpleEmail({
   to,
   subject,
@@ -422,7 +408,7 @@ export async function sendArtistWelcomeEmail({
 
           <div style="border-left:3px solid #FFBC5D;padding:12px 16px;margin-bottom:28px;background:#fffdf9;border-radius:0 8px 8px 0">
             <p style="margin:0 0 4px;font-weight:700;color:#111;font-size:14px">💳 Choose Your Plan</p>
-            <p style="margin:0;color:#666;font-size:13px;line-height:1.5">To apply to jobs, we have two plans — <strong>Artswrk Basic ($30/year)</strong> and <strong>Artswrk PRO ($10.99/month or $110/year)</strong>. Our average booking on Basic is $250/booking — on PRO, you'll earn $500+ per job. One booking pays your subscription back!</p>
+            <p style="margin:0;color:#666;font-size:13px;line-height:1.5">Choose your plan: <strong>Basic ($30/year)</strong> or <strong>PRO ($110/year — annual only, and it starts with a 7-day free trial)</strong>. No commission on anything you earn, ever — discuss your rate freely with clients. Our average Basic booking is $250; on PRO it's $500+. One booking pays the year off.</p>
           </div>
 
           <a href="${appUrl}/app" style="display:inline-block;background:linear-gradient(90deg,#FFBC5D,#F25722);color:#fff;font-weight:800;font-size:14px;padding:14px 32px;border-radius:12px;text-decoration:none;margin-bottom:32px">
@@ -446,40 +432,37 @@ export async function sendArtistWelcomeEmail({
 }
 
 // ─── Job Posted Confirmation (regular jobs) ───────────────────────────────────
+/**
+ * C1 — Job posted confirmation (regular). Inline; replaces the JOB_POSTED
+ * dynamic template, which rendered literal "*Service:*" asterisks and empty
+ * "()" rows for missing fields on 2026-08-28.
+ */
 export async function sendJobPostedEmail(data: {
-  to: string;
-  firstName: string;
-  /** Human-readable service type name e.g. "Substitute Teacher" */
-  serviceType: string;
-  date: string;
-  location: string;
-  rate: string;
-  description: string;
-  jobLink: string;
-  transportation: boolean;
-  /** Discipline/category, distinct from the job title — maps to {{ArtistType}}. Optional; the real template's field, not always available at every call site. */
-  artistType?: string;
+  to: string; firstName: string; serviceType: string; date: string;
+  location: string; rate: string; description: string; jobLink: string;
+  transportation: boolean; artistType?: string; transportDetails?: string;
 }): Promise<boolean> {
-  return sendTransactionalEmail({
-    to: data.to,
-    cc: "support@artswrk.com",
-    templateId: SENDGRID_TEMPLATES.JOB_POSTED,
-    dynamicData: {
-      subject: "Your job is live on Artswrk! 🎉",
-      FirstName: data.firstName,
-      Service: data.serviceType,
-      ArtistType: data.artistType ?? "",
-      Date: data.date,
-      Location: data.location,
-      TransportReimbursed: data.transportation ? "Yes" : "",
-      TransportDetails: "",
-      Description: data.description,
-      joblink: data.jobLink,
-    },
+  const html = renderEmailShell({
+    accent: "client",
+    headline: "Your job is live! \u{1F389}",
+    preheader: "Artists can start applying now.",
+    bodyHtml:
+      para("Hey " + b(data.firstName) + ", your job posting is now live on Artswrk and artists can start applying.") +
+      detailsCard([
+        { label: "Service", value: data.serviceType },
+        { label: "Date", value: data.date },
+        { label: "Location", value: data.location },
+        { label: "Rate", value: data.rate },
+        { label: "Transportation", value: data.transportation ? (data.transportDetails || "Reimbursed") : null },
+        // Sanitized: old Bubble descriptions carry BBCode that leaked raw.
+        { label: "Details", value: sanitizeUserText(data.description, 400) },
+      ]),
+    ctaText: "View Your Job Posting",
+    ctaUrl: data.jobLink,
+    footerNote: 'We\u2019ll email you the moment an artist applies. Questions? <a href="mailto:contact@artswrk.com" style="color:#6b7280;">contact@artswrk.com</a>',
   });
+  return sendSimpleEmail({ to: data.to, cc: SUPPORT_EMAIL, subject: "Your job is live on Artswrk! \u{1F389}", html });
 }
-
-// ─── PRO / Enterprise Job Posted Confirmation ─────────────────────────────────
 export async function sendProJobPostedEmail(data: {
   to: string;
   firstName: string;
@@ -587,76 +570,64 @@ export async function sendProJobPostedEmail(data: {
 }
 
 /**
- * Notify a user that they have a new message from someone on Artswrk.
+ * A5 — New message notification. Inline; replaces MESSAGE_RECEIVED.
+ *
+ * Two fixes carried over from the template: the sender name arrives as ONE
+ * display string (the template concatenated first+last, producing "Street Beatz
+ * Street Beatz"), and the preview appears exactly once — the template rendered
+ * it in both the preheader and the body.
  */
 export async function sendNewMessageEmail({
-  to,
-  recipientFirstName,
-  senderName,
-  messagePreview,
-  dashboardUrl,
-  cc,
+  to, cc, recipientFirstName, senderName, messagePreview, dashboardUrl,
 }: {
-  to: string;
-  recipientFirstName: string;
-  senderName: string;
-  messagePreview: string;
-  dashboardUrl: string;
-  /** Pass "support@artswrk.com" when the recipient is a client — every client-facing email gets CC'd. */
-  cc?: string;
-}) {
-  const preview = messagePreview.length > 200 ? messagePreview.slice(0, 197) + "…" : messagePreview;
-  const [senderFirstName, ...senderLastParts] = senderName.trim().split(" ");
-  await sendTransactionalEmail({
-    to,
-    cc,
-    templateId: SENDGRID_TEMPLATES.MESSAGE_RECEIVED,
-    dynamicData: {
-      // No `subject` field on this template — it builds its own subject line
-      // from SenderFirstName/SenderLastName directly.
-      SenderFirstName: senderFirstName || senderName,
-      SenderLastName: senderLastParts.join(" "),
-      MessageClip: preview,
-      magic_link: dashboardUrl,
-    },
-  });
-}
-
-// ─── PRO Job: Alert to client when artist applies ────────────────────────────
-export async function sendProJobApplicantAlertEmail(data: {
-  to: string;
-  artistFirstName: string;
-  artistLastInitial: string;
-  message: string | null;
-  serviceType: string;
-  location: string;
-  description: string | null;
-  jobLink: string;
+  to: string; recipientFirstName: string; senderName: string;
+  messagePreview: string; dashboardUrl: string; cc?: string;
 }): Promise<boolean> {
-  const descriptionText = data.description
-    ? data.description.replace(/<[^>]*>/g, "").trim()
-    : "";
-  const artistDisplay = `${data.artistFirstName} ${data.artistLastInitial}.`;
-
-  return sendTransactionalEmail({
-    to: data.to,
-    cc: "support@artswrk.com",
-    templateId: SENDGRID_TEMPLATES.ENTERPRISE_NEW_APPLICANT,
-    dynamicData: {
-      subject: `${artistDisplay} is available for your job!`,
-      ArtistName: data.artistFirstName,
-      ArtistLastName: data.artistLastInitial,
-      Description: descriptionText,
-      Location: data.location,
-      Message: data.message ?? "",
-      Service: data.serviceType,
-      URL: data.jobLink,
-      link: data.jobLink,
-    },
+  const preview = sanitizeUserText(messagePreview, 200);
+  const html = renderEmailShell({
+    accent: "artist",
+    headline: "You have a new message \u{1F4AC}",
+    preheader: senderName + " sent you a message on Artswrk.",
+    bodyHtml:
+      para("Hi " + b(recipientFirstName) + ",") +
+      para("From " + b(senderName) + ":") +
+      (preview ? quote(preview) : ""),
+    ctaText: "Reply on Artswrk",
+    ctaUrl: dashboardUrl || (APP_URL + "/app/messages"),
+    footerNote: "Please keep communication on Artswrk \u2014 it\u2019s covered by the Terms &amp; Conditions and protects both sides.",
   });
+  return sendSimpleEmail({ to, cc, subject: senderName + " just sent you a message!", html });
 }
-
-// ─── PRO Job: Submission confirmation to artist ───────────────────────────────
+/**
+ * C4 — New applicant alert (PRO/enterprise). Inline; replaces
+ * ENTERPRISE_NEW_APPLICANT. Job details are sanitized — enterprise job bodies
+ * carry the same Bubble BBCode.
+ */
+export async function sendProJobApplicantAlertEmail(data: {
+  to: string; artistFirstName: string; artistLastInitial: string;
+  message: string | null; serviceType: string; location: string;
+  description: string | null; jobLink: string;
+}): Promise<boolean> {
+  const who = (data.artistFirstName + " " + data.artistLastInitial + ".").trim();
+  const note = sanitizeUserText(data.message, 500);
+  const html = renderEmailShell({
+    accent: "client",
+    headline: who + " is available for your job!",
+    preheader: who + " applied to " + data.serviceType + ".",
+    bodyHtml:
+      para("Hi there, " + b(who) + " is interested in the job below.") +
+      (note ? para("Message from " + b(who) + ":") + quote(note) : "") +
+      detailsCard([
+        { label: "Job", value: data.serviceType },
+        { label: "Location", value: data.location },
+        { label: "Details", value: sanitizeUserText(data.description, 400) },
+      ]),
+    ctaText: "View Submission",
+    ctaUrl: data.jobLink,
+    footerNote: "You can view interested artists and their profiles from your enterprise dashboard. Need more information before confirming? Message them on Artswrk.",
+  });
+  return sendSimpleEmail({ to: data.to, cc: SUPPORT_EMAIL, subject: who + " is available for your job!", html });
+}
 export async function sendProJobSubmissionConfirmationEmail(data: {
   to: string;
   artistFirstName: string;
@@ -704,100 +675,231 @@ export async function sendProJobSubmissionConfirmationEmail(data: {
 }
 
 // ─── Booking confirmed: notify the artist ─────────────────────────────────────
+/** A6 — Booking confirmed, artist. Inline; replaces ARTIST_BOOKING_CONFIRMED. */
 export async function sendArtistBookingConfirmedEmail(data: {
-  to: string;
-  artistName: string;
-  artistType: string;
-  clientName: string;
-  date: string;
-  details: string;
-  location: string;
-  rate: string;
-  serviceType: string;
-  transportDetails?: string;
-  transportReimbursed?: string;
+  to: string; artistName: string; artistType?: string; clientName: string;
+  date: string; details?: string; location: string; rate: string;
+  serviceType: string; transportDetails?: string; transportReimbursed?: string;
   bookingUrl: string;
 }): Promise<boolean> {
-  return sendTransactionalEmail({
-    to: data.to,
-    templateId: SENDGRID_TEMPLATES.ARTIST_BOOKING_CONFIRMED,
-    dynamicData: {
-      subject: `You're confirmed for ${data.serviceType}!`,
-      ArtistName: data.artistName,
-      ArtistType: data.artistType,
-      Client: data.clientName,
-      Date: data.date,
-      Details: data.details,
-      Location: data.location,
-      Rate: data.rate,
-      Service: data.serviceType,
-      TransportationDetails: data.transportDetails ?? "",
-      TransportationReimbursement: data.transportReimbursed ?? "",
-      URL: data.bookingUrl,
-    },
+  const html = renderEmailShell({
+    accent: "artist",
+    headline: "You\u2019re confirmed! \u{1F389}",
+    preheader: data.clientName + " confirmed you for " + data.serviceType + ".",
+    bodyHtml:
+      para("Hi " + b(data.artistName) + ", " + b(data.clientName) + " has confirmed you for " + data.serviceType + ".") +
+      detailsCard([
+        { label: "Service", value: data.serviceType },
+        { label: "Date", value: data.date },
+        { label: "Location", value: data.location },
+        { label: "Rate", value: data.rate },
+        { label: "Transportation", value: data.transportReimbursed ? (data.transportDetails || "Reimbursed") : data.transportDetails },
+        { label: "Details", value: sanitizeUserText(data.details, 400) },
+      ]),
+    ctaText: "View Booking",
+    ctaUrl: data.bookingUrl,
+    footerNote: "If anything looks off, message the client on Artswrk or email us.",
   });
+  return sendSimpleEmail({ to: data.to, subject: "You\u2019re confirmed for " + data.serviceType + "!", html });
 }
-
-// ─── Booking confirmed: notify the client ─────────────────────────────────────
+/** C5 — Booking confirmed, client. Inline; replaces CLIENT_BOOKING_CONFIRMED. */
 export async function sendClientBookingConfirmedEmail(data: {
-  to: string;
-  artistName: string;
-  artistType: string;
-  clientName: string;
-  date: string;
-  details: string;
-  location: string;
-  rate: string;
-  serviceType: string;
-  transportDetails?: string;
-  transportReimbursed?: string;
+  to: string; artistName: string; artistType?: string; clientName?: string;
+  date: string; details?: string; location: string; rate: string;
+  serviceType: string; transportDetails?: string; transportReimbursed?: string;
   bookingUrl: string;
 }): Promise<boolean> {
-  return sendTransactionalEmail({
-    to: data.to,
-    cc: "support@artswrk.com",
-    templateId: SENDGRID_TEMPLATES.CLIENT_BOOKING_CONFIRMED,
-    dynamicData: {
-      subject: `Booking confirmed with ${data.artistName}!`,
-      ArtistName: data.artistName,
-      ArtistType: data.artistType,
-      Client: data.clientName,
-      Date: data.date,
-      Details: data.details,
-      Location: data.location,
-      Rate: data.rate,
-      Service: data.serviceType,
-      TransportationDetails: data.transportDetails ?? "",
-      TransportationReimbursement: data.transportReimbursed ?? "",
-      URL: data.bookingUrl,
-    },
+  const html = renderEmailShell({
+    accent: "client",
+    headline: "Booking confirmed! \u{1F389}",
+    preheader: "You\u2019re all set with " + data.artistName + ".",
+    bodyHtml:
+      para("You\u2019re all set with " + b(data.artistName) + " for " + data.serviceType + ".") +
+      detailsCard([
+        { label: "Artist", value: data.artistName },
+        { label: "Date", value: data.date },
+        { label: "Location", value: data.location },
+        { label: "Rate", value: data.rate },
+        { label: "Transportation", value: data.transportReimbursed ? (data.transportDetails || "Reimbursed") : data.transportDetails },
+        { label: "Details", value: sanitizeUserText(data.details, 400) },
+      ]),
+    ctaText: "View Booking",
+    ctaUrl: data.bookingUrl,
+    footerNote: "Need to change anything? Message " + data.artistName + " on Artswrk.",
   });
+  return sendSimpleEmail({ to: data.to, cc: SUPPORT_EMAIL, subject: "Booking confirmed with " + data.artistName + "!", html });
+}
+/**
+ * C6 — Pay artist request. Inline; replaces CLIENT_PAY_ARTIST.
+ *
+ * Leads with the amount and one button. The old Bubble wording ("PAYMENT
+ * DETAILS / edit your payment details") read like an account-settings prompt
+ * and left people unsure anything was owed.
+ */
+export async function sendClientPayArtistEmail(data: {
+  to: string; clientName?: string; artistName: string; clientRate: string;
+  date: string; reimbursements?: string; startDate?: string;
+  totalClientRate: string; payUrl: string;
+}): Promise<boolean> {
+  const total = "$" + String(data.totalClientRate).replace(/^\$/, "");
+  const html = renderEmailShell({
+    accent: "client",
+    headline: "Payment due for " + data.artistName,
+    preheader: "Total due: " + total,
+    bodyHtml:
+      para("Hi " + b(data.clientName || "there") + ", " + b(data.artistName) + "\u2019s booking is complete and payment is due.") +
+      detailsCard([
+        { label: "Date", value: data.date || data.startDate },
+        { label: "Rate", value: data.clientRate },
+        { label: "Reimbursements", value: data.reimbursements },
+        { label: "Total due", value: total },
+      ]) +
+      para("Pay in a minute by card or Apple Pay \u2014 you\u2019ll get a receipt as soon as it processes."),
+    ctaText: "Pay " + data.artistName,
+    ctaUrl: data.payUrl,
+  });
+  return sendSimpleEmail({ to: data.to, cc: SUPPORT_EMAIL, subject: "Payment due for " + data.artistName, html });
 }
 
-// ─── Studio payment request: Client - Pay Artist ──────────────────────────────
-export async function sendClientPayArtistEmail(data: {
-  to: string;
-  artistName: string;
-  clientRate: string;
-  date: string;
-  reimbursements?: string;
-  startDate: string;
-  totalClientRate: string;
-  payUrl: string;
-}): Promise<boolean> {
-  return sendTransactionalEmail({
-    to: data.to,
-    cc: "support@artswrk.com",
-    templateId: SENDGRID_TEMPLATES.CLIENT_PAY_ARTIST,
-    dynamicData: {
-      subject: `Payment due for ${data.artistName}`,
-      ArtistName: data.artistName,
-      Client_Rate: data.clientRate,
-      Date: data.date,
-      Reimbursements: data.reimbursements ?? "",
-      StartDate: data.startDate,
-      Total_Client_Rate: data.totalClientRate,
-      URL: data.payUrl,
-    },
+// ─── New builds — previously sent only by old Bubble, or not at all ─────────
+
+/**
+ * A2 — Welcome to Artswrk PRO. NEW: old Bubble was the only sender, and its
+ * version had schemeless (dead) links, "PRO!Â" mojibake, and was signed by one
+ * founder. Copy below is the approved rewrite.
+ */
+export async function sendProWelcomeEmail({
+  to, firstName,
+}: { to: string; firstName: string }): Promise<boolean> {
+  const html = renderEmailShell({
+    accent: "artist",
+    headline: "Welcome to Artswrk PRO \u{1F48E}",
+    preheader: "Jobs PRO and the Benefits Portal are unlocked.",
+    bodyHtml:
+      para("Hey " + b(firstName) + ",") +
+      para("Welcome to PRO — " + b("$110 for the year") + ", unlimited jobs, zero commission. What you and the client agree on is what you earn, so discuss your rate freely.") +
+      para("Here's what you just unlocked:") +
+      para(b("1. Jobs PRO") + " — the highest-value jobs on Artswrk ($500+ average booking), direct client messaging, and priority placement.") +
+      para(b("2. The Benefits Portal") + " — exclusive offers from vetted organizations: 1:1 health insurance and sick pay consults, plus discounts built for freelance artists.") +
+      para("One PRO booking pays for the year. Go get it."),
+    ctaText: "Explore Jobs PRO",
+    ctaUrl: `${APP_URL}/app/pro`,
+    footerNote: `Or head straight to the <a href="${APP_URL}/app/benefits" style="color:#ec008c;font-weight:600;">Benefits Portal &rarr;</a><br><br>Questions? Just reply to this email — a human reads it.<br>Best,<br>Nick &amp; Rami, Co-Founders, Artswrk`,
   });
+  return sendSimpleEmail({ to, subject: "Welcome to Artswrk PRO \u{1F48E}", html });
+}
+
+/**
+ * A11 — Payout notification. NEW on this site; the copy is kept from the old
+ * Bubble email because artists liked it, with the wallet link corrected.
+ * It points at /app/payments — the old /app?tab=payment is ignored by the new
+ * app and silently dropped people on the dashboard.
+ */
+export async function sendPayoutOnTheWayEmail({
+  to, firstName, clientName, date, location, amount,
+}: {
+  to: string; firstName: string; clientName: string;
+  date: string; location?: string; amount: string;
+}): Promise<boolean> {
+  const html = renderEmailShell({
+    accent: "artist",
+    headline: "Your payment is on its way! \u{1F4B8}",
+    preheader: `${clientName} paid you for your booking on ${date}.`,
+    bodyHtml:
+      para("Hey " + b(firstName) + ",") +
+      para(b(clientName) + " just paid you for your booking on " + date + ". The money will hit your bank account in a couple of days (as fast as your bank moves).") +
+      para("Your earnings are already showing in your Artswrk Wallet.") +
+      detailsCard([
+        { label: "Date", value: date },
+        { label: "Location", value: location },
+        { label: "Amount", value: `$${String(amount).replace(/^\$/, "")}` },
+      ]),
+    ctaText: "View My Wallet",
+    ctaUrl: `${APP_URL}/app/payments`,
+    footerNote: "Best,<br>The Artswrk Team",
+  });
+  return sendSimpleEmail({ to, subject: "Your payment is on its way! \u{1F4B8}", html });
+}
+
+/**
+ * C9 — Client payment receipt. NEW: without it, clients get only Stripe's
+ * generic receipt once Bubble stops sending.
+ */
+export async function sendClientPaymentReceiptEmail({
+  to, firstName, artistName, date, rate, reimbursements, total,
+}: {
+  to: string; firstName: string; artistName: string; date: string;
+  rate?: string; reimbursements?: string; total: string;
+}): Promise<boolean> {
+  const html = renderEmailShell({
+    accent: "client",
+    headline: `Payment confirmed — ${artistName}`,
+    preheader: `Your payment for ${artistName}'s booking went through.`,
+    bodyHtml:
+      para("Hi " + b(firstName) + ",") +
+      para("Your payment for " + b(artistName) + "'s booking on " + date + " went through. Thanks for paying on time — artists feel it.") +
+      detailsCard([
+        { label: "Date", value: date },
+        { label: "Rate", value: rate },
+        { label: "Reimbursements", value: reimbursements },
+        { label: "Total paid", value: `$${String(total).replace(/^\$/, "")}` },
+      ]),
+    ctaText: "View My Bookings",
+    ctaUrl: `${APP_URL}/app`,
+    footerNote: 'Questions? <a href="mailto:contact@artswrk.com" style="color:#6b7280;">contact@artswrk.com</a><br>Best,<br>The Artswrk Team',
+  });
+  return sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject: `Payment confirmed — ${artistName} on ${date}`, html });
+}
+
+/**
+ * C7 — Payment reminder. NEW. The trigger (an unpaid-invoice sweep) does not
+ * exist yet; this renders the email so the scheduled job only has to call it.
+ */
+export async function sendPaymentReminderEmail({
+  to, firstName, artistName, date, total, payUrl,
+}: {
+  to: string; firstName: string; artistName: string;
+  date: string; total: string; payUrl: string;
+}): Promise<boolean> {
+  const amount = `$${String(total).replace(/^\$/, "")}`;
+  const html = renderEmailShell({
+    accent: "client",
+    headline: `Payment due for ${artistName}`,
+    preheader: `Total due: ${amount}`,
+    bodyHtml:
+      para("Hi " + b(firstName) + ",") +
+      para("Quick nudge — " + b(artistName) + "'s booking on " + date + " is complete and payment is still open.") +
+      detailsCard([
+        { label: "Date", value: date },
+        { label: "Total due", value: amount },
+      ]) +
+      para("Pay in a minute by card or Apple Pay. You'll get a receipt as soon as it processes."),
+    ctaText: "Pay Now",
+    ctaUrl: payUrl,
+    footerNote: 'Questions? <a href="mailto:contact@artswrk.com" style="color:#6b7280;">contact@artswrk.com</a><br>Best,<br>The Artswrk Team',
+  });
+  return sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject: `Reminder — payment due for ${artistName} | ${date}`, html });
+}
+
+/**
+ * I3 — Internal subscription-change alert. NEW; Bubble sends this today.
+ * Internal accent, no unsubscribe — it goes to the team, not a customer.
+ */
+export async function sendInternalSubscriptionAlert({
+  userName, userEmail, plan, role,
+}: { userName: string; userEmail: string; plan: string; role?: string }): Promise<boolean> {
+  const html = renderEmailShell({
+    accent: "internal",
+    headline: "Subscription updated",
+    showUnsubscribe: false,
+    bodyHtml:
+      para("Hey team,") +
+      para(b(userName) + " is now on: " + b(plan)) +
+      detailsCard([
+        { label: "Email", value: userEmail },
+        { label: "Plan", value: plan },
+        { label: "Role", value: role },
+      ]),
+  });
+  return sendSimpleEmail({ to: "contact@artswrk.com", subject: "Subscription Updated!", html });
 }

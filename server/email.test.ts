@@ -70,81 +70,81 @@ describe("email.ts", () => {
   });
 
   describe("sendJobPostedEmail", () => {
-    it("should send the job-posted dynamic template with the expected merge fields", async () => {
+    // C1 is inline HTML now, not a SendGrid dynamic template. These assert the
+    // rendered body rather than merge fields, and specifically cover the three
+    // faults the template shipped on 2026-08-28: BBCode leaking through from
+    // old Bubble descriptions, empty "()" rows for absent fields, and literal
+    // "*Service:*" asterisks.
+    const base = {
+      to: "studio@artswrk.com",
+      firstName: "Phyllis",
+      serviceType: "Ballet Teacher",
+      date: "Saturday, April 15",
+      location: "New York, NY",
+      rate: "$50/hr",
+      description: "Looking for a ballet teacher for Saturday class.",
+      jobLink: "https://artswrk.com/jobs/123",
+      transportation: true,
+    };
+
+    const sentMessage = async () => {
       const sgMail = await import("@sendgrid/mail");
-      const result = await sendJobPostedEmail({
-        to: "studio@artswrk.com",
-        firstName: "Phyllis",
-        serviceType: "Ballet Teacher",
-        date: "Saturday, April 15",
-        location: "New York, NY",
-        rate: "$50/hr",
-        description: "Looking for a ballet teacher for Saturday class.",
-        jobLink: "https://artswrk.com/jobs/123",
-        transportation: true,
-      });
+      return (sgMail.default.send as any).mock.calls[0][0];
+    };
+
+    it("sends inline HTML to the client, cc'ing support, from the Artswrk address", async () => {
+      const result = await sendJobPostedEmail(base);
       expect(result).toBe(true);
-      expect(sgMail.default.send).toHaveBeenCalledWith(
-        expect.objectContaining({
-          to: "studio@artswrk.com",
-          cc: "support@artswrk.com",
-          from: expect.objectContaining({
-            email: "contact@artswrk.com",
-          }),
-          templateId: SENDGRID_TEMPLATES.JOB_POSTED,
-          dynamicTemplateData: expect.objectContaining({
-            subject: expect.stringContaining("live"),
-            FirstName: "Phyllis",
-            Service: "Ballet Teacher",
-            Date: "Saturday, April 15",
-            Location: "New York, NY",
-            TransportReimbursed: "Yes",
-            Description: "Looking for a ballet teacher for Saturday class.",
-            joblink: "https://artswrk.com/jobs/123",
-          }),
-        })
-      );
+
+      const msg = await sentMessage();
+      expect(msg.to).toBe("studio@artswrk.com");
+      expect(msg.cc).toBe("support@artswrk.com");
+      expect(msg.from).toEqual(expect.objectContaining({ email: "contact@artswrk.com" }));
+      expect(msg.subject).toContain("live");
+      // The template layer is gone — a templateId here would mean a regression.
+      expect(msg.templateId).toBeUndefined();
+      expect(msg.html).toContain("Phyllis");
+      expect(msg.html).toContain("Ballet Teacher");
+      expect(msg.html).toContain("https://artswrk.com/jobs/123");
     });
 
-    it("should include transportation info when transportation is true", async () => {
-      const sgMail = await import("@sendgrid/mail");
+    it("strips Bubble BBCode out of the description", async () => {
       await sendJobPostedEmail({
-        to: "studio@artswrk.com",
-        firstName: "Nick",
-        serviceType: "Hip Hop Teacher",
-        date: "Flexible",
-        location: "Chicago, IL",
-        rate: "Open rate",
-        description: "Need a hip hop teacher.",
-        jobLink: "https://artswrk.com/jobs/456",
-        transportation: true,
+        ...base,
+        description: "[color=rgb(94, 94, 94)]Ballet teacher wanted.[/color]",
       });
-      expect(sgMail.default.send).toHaveBeenCalledWith(
-        expect.objectContaining({
-          dynamicTemplateData: expect.objectContaining({
-            TransportReimbursed: "Yes",
-          }),
-        })
-      );
+      const msg = await sentMessage();
+      expect(msg.html).toContain("Ballet teacher wanted.");
+      expect(msg.html).not.toContain("[color");
+      expect(msg.html).not.toContain("[/color]");
     });
 
-    it("should not include transport row when transportation is false", async () => {
-      const sgMail = await import("@sendgrid/mail");
-      await sendJobPostedEmail({
-        to: "studio@artswrk.com",
-        firstName: "Nick",
-        serviceType: "Hip Hop Teacher",
-        date: "Flexible",
-        location: "Chicago, IL",
-        rate: "Open rate",
-        description: "Need a hip hop teacher.",
-        jobLink: "https://artswrk.com/jobs/456",
-        transportation: false,
-      });
-      const callArg = vi.mocked(sgMail.default.send).mock.calls[0][0] as {
-        dynamicTemplateData: { TransportReimbursed: string };
-      };
-      expect(callArg.dynamicTemplateData.TransportReimbursed).toBe("");
+    it("includes the transportation row when transportation is true", async () => {
+      await sendJobPostedEmail({ ...base, transportation: true, transportDetails: "Subway reimbursed" });
+      const msg = await sentMessage();
+      expect(msg.html).toContain("Transportation");
+      expect(msg.html).toContain("Subway reimbursed");
+    });
+
+    it("omits the transportation row entirely when false — never an empty ()", async () => {
+      await sendJobPostedEmail({ ...base, transportation: false });
+      const msg = await sentMessage();
+      expect(msg.html).not.toContain("Transportation");
+      expect(msg.html).not.toMatch(/\(\s*\)/);
+    });
+
+    it("drops rows whose value is missing rather than rendering a blank", async () => {
+      await sendJobPostedEmail({ ...base, location: "", rate: "", transportation: false });
+      const msg = await sentMessage();
+      expect(msg.html).not.toContain("Location");
+      expect(msg.html).not.toContain("Rate");
+      expect(msg.html).toContain("Ballet Teacher");
+    });
+
+    it("carries the SendGrid unsubscribe substitution tags", async () => {
+      await sendJobPostedEmail(base);
+      const msg = await sentMessage();
+      expect(msg.html).toContain("<%asm_group_unsubscribe_raw_url%>");
     });
   });
 });
