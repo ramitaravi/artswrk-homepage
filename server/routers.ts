@@ -6,7 +6,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, normalizeSocialLink } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail, sendArtistBookingConfirmedEmail, sendClientBookingConfirmedEmail, sendClientPayArtistEmail } from "./email";
 import crypto from "crypto";
@@ -587,11 +587,14 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
         const { setUserPlanFlags } = await import("./db");
+        // planTier is what real access checks gate on — the booleans alone
+        // used to leave real access unchanged while the admin UI showed the
+        // plan as "updated."
         const flags = input.plan === "pro"
-          ? { artswrkPro: true, artswrkBasic: false }
+          ? { artswrkPro: true, artswrkBasic: false, planTier: "artist_pro" as const }
           : input.plan === "basic"
-          ? { artswrkPro: false, artswrkBasic: true }
-          : { artswrkPro: false, artswrkBasic: false };
+          ? { artswrkPro: false, artswrkBasic: true, planTier: "artist_basic" as const }
+          : { artswrkPro: false, artswrkBasic: false, planTier: "artist_free" as const };
         for (const id of input.artistIds) await setUserPlanFlags(id, flags);
         return { updated: input.artistIds.length };
       }),
@@ -895,7 +898,78 @@ export const appRouter = router({
           ? await resolveJobLocation({ locationAddress: input.locationAddress, locationData })
           : {};
         await updateAdminJob(id, { ...fields, ...location });
+
+        // An admin flipping a job to Active is a third way a job goes live, so
+        // the 48-hour check belongs here too. (There is no start-date field on
+        // this mutation, so the spec's "edit moves the date into the window"
+        // case can't arise yet — add the check here when that field appears.)
+        if (input.requestStatus === "Active") {
+          import("./jobAlerts/lastMinute")
+            .then(({ maybeSendLastMinute }) => maybeSendLastMinute(id))
+            .then((r) => { if (r.eligible) console.log(`[last-minute] job ${id}: ${r.sent} sent`); })
+            .catch((err) => console.error("[last-minute]", err));
+        }
         return getAdminJobById(id);
+      }),
+
+    /**
+     * Job alert master switch. Deliberately DB-backed rather than an env var:
+     * it has to be flippable — especially OFF — without a deploy.
+     */
+    getJobAlertStatus: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+      const { getDb } = await import("./db");
+      const { isEnabledInDb, ALLOWLIST } = await import("./jobAlerts/safety");
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+
+      const one = async (sql: string) => {
+        const r: any = await db.execute(sql);
+        const l: any[] = Array.isArray(r) ? (Array.isArray(r[0]) ? r[0] : r) : [];
+        return l[0] ?? {};
+      };
+      const queued = await one(
+        `SELECT COUNT(*) n FROM jobs WHERE networkStatus = 'pending' AND requestStatus = 'Active'`);
+      const queuedPro = await one(
+        `SELECT COUNT(*) n FROM premium_jobs WHERE networkStatus = 'pending' AND status = 'Active'`);
+      const sent24 = await one(
+        `SELECT COUNT(*) n FROM email_send_log WHERE status='sent' AND sentAt > DATE_SUB(NOW(), INTERVAL 24 HOUR)`);
+      const sentAll = await one(`SELECT COUNT(*) n FROM email_send_log WHERE status='sent'`);
+      const suppressed = await one(`SELECT COUNT(*) n FROM email_suppressions`);
+      const meta = await one(
+        `SELECT settingValue, updatedBy, updatedAt FROM app_settings WHERE settingKey='job_alerts_enabled'`);
+
+      return {
+        enabled: await isEnabledInDb(),
+        // A hard env kill beats the switch; surface it so the UI can't claim
+        // "on" while something upstream is silently blocking every send.
+        killSwitch: process.env.JOB_ALERTS_KILL === "true",
+        allowlist: ALLOWLIST,
+        lastChangedBy: meta.updatedBy ?? null,
+        lastChangedAt: meta.updatedAt ?? null,
+        queuedJobs: Number(queued.n ?? 0),
+        queuedProJobs: Number(queuedPro.n ?? 0),
+        emailsLast24h: Number(sent24.n ?? 0),
+        emailsAllTime: Number(sentAll.n ?? 0),
+        suppressedAddresses: Number(suppressed.n ?? 0),
+      };
+    }),
+
+    setJobAlertEnabled: protectedProcedure
+      .input(z.object({ enabled: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getDb } = await import("./db");
+        const db = await getDb();
+        if (!db) throw new Error("Database unavailable");
+        const who = String(ctx.user.email ?? ctx.user.openId ?? "admin").replace(/'/g, "''").slice(0, 128);
+        await db.execute(`
+          INSERT INTO app_settings (settingKey, settingValue, updatedBy)
+          VALUES ('job_alerts_enabled', '${input.enabled ? "true" : "false"}', '${who}')
+          ON DUPLICATE KEY UPDATE settingValue = VALUES(settingValue),
+                                  updatedBy = VALUES(updatedBy), updatedAt = NOW()`);
+        console.warn(`[job-alerts] master switch turned ${input.enabled ? "ON" : "OFF"} by ${who}`);
+        return { enabled: input.enabled };
       }),
 
     /** All applicants for a specific regular job — admin only */
@@ -1811,6 +1885,9 @@ export const appRouter = router({
 
     /**
      * Get all messages for a specific conversation.
+     * Only a participant (the client or the artist on this conversation) may
+     * read it — previously unchecked, so any logged-in user could read any
+     * conversation by guessing/iterating conversationId.
      */
     byConversation: protectedProcedure
       .input(z.object({
@@ -1818,7 +1895,17 @@ export const appRouter = router({
         limit: z.number().min(1).max(500).default(200),
         offset: z.number().min(0).default(0),
       }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const { getDb } = await import("./db");
+        const { conversations } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const db = await getDb();
+        if (!db) throw new Error("DB unavailable");
+        const [conv] = await db.select().from(conversations).where(eq(conversations.id, input.conversationId)).limit(1);
+        if (!conv) throw new Error("Conversation not found");
+        if (conv.clientUserId !== user.id && conv.artistUserId !== user.id) throw new Error("Forbidden: not a participant in this conversation");
         return getMessagesByConversationId(input.conversationId, input.limit, input.offset);
       }),
 
@@ -1859,20 +1946,28 @@ export const appRouter = router({
         const sender = await getUserByOpenId(ctx.user.openId);
         if (!sender) throw new Error("User not found");
 
+        // Only a participant may send into this conversation — previously
+        // unchecked, so any logged-in user could inject a message (and
+        // trigger a real notification email) into any conversation.
+        const { getDb } = await import("./db");
+        const { conversations } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const db = await getDb();
+        if (!db) throw new Error("DB unavailable");
+        const [convCheck] = await db.select().from(conversations).where(eq(conversations.id, input.conversationId)).limit(1);
+        if (!convCheck) throw new Error("Conversation not found");
+        if (convCheck.clientUserId !== sender.id && convCheck.artistUserId !== sender.id) throw new Error("Forbidden: not a participant in this conversation");
+
         const msg = await sendMessageToConversation({
           conversationId: input.conversationId,
           senderUserId: sender.id,
           content: input.content,
         });
 
-        // Determine recipient from conversation
-        const { getDb } = await import("./db");
-        const db = await getDb();
-        if (db) {
-          const { conversations } = await import("../drizzle/schema");
-          const { eq } = await import("drizzle-orm");
-          const convRows = await db.select().from(conversations).where(eq(conversations.id, input.conversationId)).limit(1);
-          const conv = convRows[0];
+        // Determine recipient from conversation (reuse convCheck from the
+        // participant check above — same row, no need to re-query)
+        {
+          const conv = convCheck;
           if (conv) {
             // Recipient is whoever isn't the sender
             const recipientId = sender.id === conv.clientUserId ? conv.artistUserId : conv.clientUserId;
@@ -2185,6 +2280,12 @@ export const appRouter = router({
     parseText: publicProcedure
       .input(z.object({ text: z.string().min(10).max(2000) }))
       .mutation(async ({ input }) => {
+        // The parsed service type has to be one the poster can actually pick,
+        // otherwise the prefill never matches an option and every poster starts
+        // that field from blank. Feed the real taxonomy in rather than letting
+        // the model invent labels ("Ballet", "Hip Hop" — those are styles).
+        const serviceTypeOptions = await getAllMasterServiceTypes();
+        const serviceTypeNames = serviceTypeOptions.map((t) => t.name);
         const response = await invokeLLM({
           messages: [
             {
@@ -2204,7 +2305,8 @@ Fields to extract:
 - clientHourlyRate: number or null (hourly rate in dollars)
 - clientFlatRate: number or null (flat rate in dollars, only if not hourly)
 - transportation: boolean (true if travel/transportation is covered)
-- serviceType: string or null (e.g. "Ballet", "Hip Hop", "Yoga", "Competition", "Piano", "Violin")`,
+- serviceType: string or null — the KIND OF WORK, chosen verbatim from this list and nothing else. Return null if none clearly fits; do not guess a close-sounding one, and never return a dance style or instrument name that isn't on the list:
+${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
             },
             { role: "user", content: input.text },
           ],
@@ -2246,7 +2348,11 @@ Fields to extract:
      */
     createFreeJob: protectedProcedure
       .input(z.object({
-        title: z.string().max(256).optional(),
+        /** Required. The form has always enforced this client-side, but the
+         *  server accepted it as optional — which is how a couple of in-app
+         *  jobs got in with no title. The digest email leads with the title,
+         *  so a job without one is a blank card. */
+        title: z.string().min(1, "Job title is required").max(256),
         description: z.string().min(10),
         locationAddress: z.string().optional(),
         locationLat: z.string().optional(),
@@ -2266,14 +2372,26 @@ Fields to extract:
         transportationInstructions: z.string().optional(),
         studioName: z.string().optional(),
         companyId: z.number().optional(),
+        /** Master service type NAME from the picker. Required: it drives job
+         *  alert matching and the personalized feed, so a job posted without
+         *  one is invisible to the artists it's meant to reach. */
+        serviceType: z.string().min(1, "Choose the type of work this job is for"),
       }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
+        // Reject rather than silently storing null — a job with an unresolvable
+        // service type would post successfully and then never match an artist.
+        const serviceType = await resolveJobServiceType(input.serviceType);
+        if (!serviceType.masterServiceTypeId) {
+          throw new Error(`Unknown service type: ${input.serviceType}`);
+        }
         // Resolve the address into real place data (coordinates + city/state)
         // so the job is findable by radius, not just by matching text.
         const jobLocation = await resolveJobLocation(input);
         const job = await createJob({
+          masterServiceTypeId: serviceType.masterServiceTypeId,
+          bubbleArtistTypeId: serviceType.bubbleArtistTypeId,
           clientUserId: user.id,
           clientCompanyId: input.companyId,
           clientEmail: user.email ?? undefined,
@@ -2309,7 +2427,7 @@ Fields to extract:
           sendJobPostedEmail({
             to: user.email,
             firstName: user.firstName ?? user.name?.split(" ")[0] ?? "there",
-            serviceType: "Job Posting",
+            serviceType: input.serviceType,
             date: input.startDate
               ? new Date(input.startDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
               : input.dateType === "Ongoing" ? "Ongoing" : "Flexible / TBD",
@@ -2321,6 +2439,15 @@ Fields to extract:
           }).catch((err) => console.error("[free job email]", err));
         }
 
+        // Urgent path: a job starting inside 48 hours can't wait for 1pm.
+        // Fire-and-forget so a slow match never blocks the post from returning.
+        import("./jobAlerts/lastMinute")
+          .then(({ maybeSendLastMinute }) => maybeSendLastMinute(job.id))
+          .then((r) => {
+            if (r.eligible) console.log(`[last-minute] job ${job.id}: ${r.sent} sent, ${r.capped} capped, ${r.skipped} held`);
+          })
+          .catch((err) => console.error("[last-minute]", err));
+
         return { jobId: job.id };
       }),
 
@@ -2330,7 +2457,8 @@ Fields to extract:
      */
     createAndCheckout: protectedProcedure
       .input(z.object({
-        title: z.string().max(256).optional(),
+        /** Required — see createFreeJob. */
+        title: z.string().min(1, "Job title is required").max(256),
         description: z.string().min(10),
         locationAddress: z.string().optional(),
         locationLat: z.string().optional(),
@@ -2350,6 +2478,8 @@ Fields to extract:
         transportationInstructions: z.string().optional(),
         studioName: z.string().optional(),
         companyId: z.number().optional(),
+        /** See createFreeJob — same requirement, same reason. */
+        serviceType: z.string().min(1, "Choose the type of work this job is for"),
         plan: z.enum(["one_time", "subscription"]).default("one_time"),
         origin: z.string().url(),
       }))
@@ -2357,11 +2487,18 @@ Fields to extract:
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
 
+        const serviceType = await resolveJobServiceType(input.serviceType);
+        if (!serviceType.masterServiceTypeId) {
+          throw new Error(`Unknown service type: ${input.serviceType}`);
+        }
+
         // Create the job in "Pending Payment" status
         // Resolve the address into real place data (coordinates + city/state)
         // so the job is findable by radius, not just by matching text.
         const jobLocation = await resolveJobLocation(input);
         const job = await createJob({
+          masterServiceTypeId: serviceType.masterServiceTypeId,
+          bubbleArtistTypeId: serviceType.bubbleArtistTypeId,
           clientUserId: user.id,
           clientCompanyId: input.companyId,
           clientEmail: user.email ?? undefined,
@@ -2568,6 +2705,10 @@ Fields to extract:
       .input(z.object({
         businessOrIndividual: z.string().optional(),
         hiringCategory: clientHiringCategorySchema,
+        /** The real, Bubble-sourced business category — client onboarding
+         * previously only sent hiringCategory, so this column stayed NULL
+         * for every new signup even after being made the primary field. */
+        businessType: clientHiringCategorySchema,
         clientCompanyName: z.string().optional(),
         location: z.string().optional(),
         /** Structured Google Places data for `location`. */
@@ -2996,6 +3137,10 @@ Fields to extract:
     postJob: protectedProcedure
       .input(z.object({
         serviceType: z.string().min(1, 'Job title is required'),
+        /** The taxonomy value, distinct from `serviceType` above — that one is
+         *  the free-text job title. Required: without it a PRO job matches no
+         *  artist and never reaches the network email. */
+        masterServiceType: z.string().min(1, 'Choose the type of work this job is for'),
         company: z.string().min(1, 'Company is required'),
         logo: z.string().optional(),
         category: z.string().optional(),
@@ -3017,7 +3162,13 @@ Fields to extract:
         if (!isAdmin0 && !(poster0 as any)?.enterprise) {
           throw new Error("An Enterprise account is required to post PRO jobs.");
         }
+        const proServiceType = await resolveJobServiceType(input.masterServiceType);
+        if (!proServiceType.masterServiceTypeId) {
+          throw new Error(`Unknown service type: ${input.masterServiceType}`);
+        }
         const jobId = await createPremiumJob({
+          masterServiceTypeId: proServiceType.masterServiceTypeId,
+          bubbleArtistTypeId: proServiceType.bubbleArtistTypeId,
           serviceType: input.serviceType,
           company: input.company,
           logo: input.logo || null,
@@ -3145,6 +3296,14 @@ Fields to extract:
       const user = await getUserById(ctx.user.id);
       if (!user?.enterprise) throw new Error("Not an enterprise account");
       const billing = await getEnterpriseBillingInfo(ctx.user.id);
+      // planTier is the real source of truth — the legacy enterprisePlan
+      // column isn't reliably set by self-signup or every admin path, so
+      // derive the displayed plan from planTier rather than trusting it raw.
+      const derivedEnterprisePlan = (user.planTier as string | null) === "enterprise_subscription"
+        ? "subscriber"
+        : (user.planTier as string | null) === "enterprise_on_demand"
+          ? "on_demand"
+          : (billing?.enterprisePlan ?? null);
       // Fetch live subscription status from Stripe if subscriber
       let subscriptionStatus: string | null = null;
       let subscriptionInterval: string | null = null;
@@ -3190,7 +3349,11 @@ Fields to extract:
       .mutation(async ({ input, ctx }) => {
         const user = await getUserById(ctx.user.id);
         if (!user?.enterprise) throw new Error("Not an enterprise account");
-        if (user.enterprisePlan !== "on_demand") throw new Error("Job unlock is only for on-demand plan");
+        // planTier is the real source of truth — self-signup (auto-detected
+        // via businessType) and several admin-creation paths set planTier
+        // but never touch the legacy enterprisePlan column, so checking that
+        // column here left those accounts unable to ever pay the $100 unlock.
+        if (user.planTier !== "enterprise_on_demand") throw new Error("Job unlock is only for on-demand plan");
         // Prevent double-paying
         const alreadyUnlocked = await isJobUnlocked(ctx.user.id, input.jobId);
         if (alreadyUnlocked) return { alreadyUnlocked: true, url: null };
@@ -3211,8 +3374,9 @@ Fields to extract:
       .mutation(async ({ input, ctx }) => {
         const user = await getUserById(ctx.user.id);
         if (!user?.enterprise) throw new Error("Not an enterprise account");
-        // Allow on-demand users to upgrade; only block if already actively subscribed
-        if (user.enterprisePlan === "subscriber" && user.enterpriseStripeSubscriptionId) {
+        // Allow on-demand users to upgrade; only block if already actively
+        // subscribed. planTier is the reliable signal (see checkoutJobUnlock).
+        if (user.planTier === "enterprise_subscription" && user.enterpriseStripeSubscriptionId) {
           throw new Error("Already subscribed — manage your subscription via the billing portal");
         }
         const { url, sessionId } = await createEnterpriseSubscriptionCheckoutSession({
@@ -3310,7 +3474,8 @@ Fields to extract:
         // on-demand client must have actually unlocked THIS job, not just own it.
         const confirmer = await getUserById(ctx.user.id);
         const confirmerIsAdmin = ctx.user.openId === ENV.ownerOpenId || ctx.user.role === "admin";
-        const confirmerIsActiveSubscriber = !!(confirmer as any)?.enterprise && (confirmer as any)?.enterprisePlan === "subscriber" && !!(confirmer as any)?.enterpriseStripeSubscriptionId;
+        // planTier is the reliable signal (see checkoutJobUnlock above).
+        const confirmerIsActiveSubscriber = (confirmer as any)?.planTier === "enterprise_subscription" && !!(confirmer as any)?.enterpriseStripeSubscriptionId;
         if (!confirmerIsAdmin && !confirmerIsActiveSubscriber) {
           const unlocked = await isJobUnlocked(ctx.user.id, applicantRow.premiumJobId!);
           if (!unlocked) throw new Error("Unlock this job before confirming an applicant.");

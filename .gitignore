@@ -119,3 +119,12 @@ temp/
 # Resumability log for the geocode backfill script — machine-local run state,
 # not something to commit.
 scripts/_geocode_backfill_failed.json
+
+# Job-alert tooling output — regenerated on demand from live data, and the
+# recipient CSVs contain real artist names and email addresses.
+/email-previews/
+/recent-jobs-recipients.csv
+/artists-missing-location.csv
+/pro-jobs-to-classify.csv
+/valid-service-types.csv
+/scripts/_geocode_backfill_failed.json

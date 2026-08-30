@@ -5,7 +5,7 @@
  * Job detail view: breadcrumb → Applicants + Details tabs
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -713,6 +713,7 @@ function PostJobModal({
   );
   const [form, setForm] = useState({
     serviceType: "",
+    masterServiceType: "",
     company: companies.length > 0 ? companies[0].name : "",
     logo: companies.length > 0 ? (companies[0].logoUrl || "") : "",
     bubbleClientCompanyId: companies.length > 0 ? (companies[0].bubbleId || "") : "",
@@ -727,6 +728,21 @@ function PostJobModal({
     applyDirect: false,
     applyLink: "",
   });
+
+  // Service types grouped under their parent artist type, same source and
+  // grouping the regular job form uses.
+  const { data: serviceTypeOptions = [] } = trpc.artists.getMasterServiceTypes.useQuery();
+  const serviceTypeGroups = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    for (const t of serviceTypeOptions) {
+      const key = t.artistTypeName ?? "Other";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(t.name);
+    }
+    return [...groups.entries()].sort(([a], [b]) =>
+      a === "Other" ? 1 : b === "Other" ? -1 : 0
+    );
+  }, [serviceTypeOptions]);
 
   const postJob = trpc.enterprise.postJob.useMutation({
     onSuccess: () => {
@@ -765,12 +781,17 @@ function PostJobModal({
       toast.error("Job title is required");
       return;
     }
+    if (!form.masterServiceType) {
+      toast.error("Choose the type of work this job is for");
+      return;
+    }
     if (!companyName) {
       toast.error("Company name is required");
       return;
     }
     postJob.mutate({
       serviceType: form.serviceType,
+      masterServiceType: form.masterServiceType,
       company: companyName,
       logo: form.logo || undefined,
       category: form.category || undefined,
@@ -845,6 +866,34 @@ function PostJobModal({
                 className="flex-1 px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
                 required
               />
+            </div>
+
+            {/* Type of Work — the taxonomy value. Job Title above stays free
+                text; this is what decides which artists hear about the job. */}
+            <div className="flex items-start gap-4 py-4 border-b border-gray-100">
+              <label className="w-36 text-sm font-bold text-[#111] pt-2 flex-shrink-0">
+                Type of Work
+              </label>
+              <div className="flex-1">
+                <select
+                  value={form.masterServiceType}
+                  onChange={(e) => setForm((f) => ({ ...f, masterServiceType: e.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
+                  required
+                >
+                  <option value="">Select the type of work...</option>
+                  {serviceTypeGroups.map(([groupName, names]) => (
+                    <optgroup key={groupName} label={groupName}>
+                      {names.map((name) => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  Matches your job to artists who signed up for this kind of work.
+                </p>
+              </div>
             </div>
 
             {/* Company */}
@@ -2205,19 +2254,16 @@ function JobDetailView({
                     </button>
                   </div>
                   <div className="mb-0.5">
-                    <span className="text-sm text-gray-400 line-through mr-1">
-                      {subInterval === "month" ? "$500" : "$417"}
-                    </span>
                     <span className="text-3xl font-black text-[#111]">
-                      {subInterval === "month" ? "$250" : "$208"}
+                      {subInterval === "month" ? "$500" : "$417"}
                     </span>
                     <span className="text-sm font-normal text-gray-400">/mo</span>
                   </div>
                   <p className="text-xs text-gray-400 mb-1">
-                    {subInterval === "year" ? "Billed $2,500/yr (list $5,000) · save 50%" : "Billed monthly · cancel anytime"}
+                    {subInterval === "year" ? "Billed $5,000/yr" : "Billed monthly · cancel anytime"}
                   </p>
                   <p className="text-[11px] text-[#F25722] font-semibold mb-4">
-                    Introductory pricing — locked in for life of subscription
+                    Have an OG discount code? Apply it at checkout for 50% off.
                   </p>
                   <ul className="space-y-1.5 mb-5 flex-1">
                     {[
@@ -2240,7 +2286,7 @@ function JobDetailView({
                     {subscribing ? (
                       <><div className="w-4 h-4 border-2 border-[#F25722]/40 border-t-[#F25722] rounded-full animate-spin" /> Redirecting…</>
                     ) : (
-                      <>Subscribe — {subInterval === "month" ? "$250/mo" : "$2,500/yr"}</>
+                      <>Subscribe — {subInterval === "month" ? "$500/mo" : "$5,000/yr"}</>
                     )}
                   </button>
                   <p className="text-[11px] text-gray-400 text-center mt-2">

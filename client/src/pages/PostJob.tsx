@@ -4,7 +4,7 @@
  * Step 2: AI-autofilled summary form (editable) → "Post Job Free"
  * Step 3: Job is live! + Job Unlock / Artswrk Premium pricing (pay to UNLOCK candidates)
  *
- * Model: Free to post. $30 Job Unlock (one-time). Or Artswrk Premium $50/mo or $500/yr for unlimited.
+ * Model: Free to post. $40 Job Unlock (one-time). Or Artswrk Premium $65/mo or $650/yr for unlimited.
  */
 
 import { useState, useRef, useEffect, useMemo } from "react";
@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Sparkles,
   MapPin,
@@ -438,12 +438,33 @@ function Step2({
     },
   });
 
+  // Service types, grouped under their parent artist type for the picker.
+  const { data: serviceTypeOptions = [] } = trpc.artists.getMasterServiceTypes.useQuery();
+  const serviceTypeGroups = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    for (const t of serviceTypeOptions) {
+      const key = t.artistTypeName ?? "Other";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(t.name);
+    }
+    // A handful of service types have no parent category; they'd otherwise
+    // sort to the top of the list under "Other", ahead of the real ones.
+    return [...groups.entries()].sort(([a], [b]) =>
+      a === "Other" ? 1 : b === "Other" ? -1 : 0
+    );
+  }, [serviceTypeOptions]);
+  // The AI guess only counts if it's a real option — otherwise the field reads
+  // as filled while holding a value the server would reject.
+  const serviceTypeIsKnown =
+    !!form.serviceType && serviceTypeOptions.some((t) => t.name === form.serviceType);
+
   // ── Validation ────────────────────────────────────────────────────────────
   const isValid = {
     title: !!form.title.trim(),
     description: !!form.description.trim(),
     location: !!form.locationAddress.trim(),
     rate: form.openRate || !!form.clientHourlyRate.trim() || !!form.clientFlatRate.trim(),
+    serviceType: serviceTypeIsKnown,
   };
   const isFormValid = Object.values(isValid).every(Boolean);
 
@@ -458,7 +479,7 @@ function Step2({
       return;
     }
     createFreeJob.mutate({
-      title: form.title || undefined,
+      title: form.title,
       description: form.description,
       locationAddress: form.locationAddress || undefined,
       locationData: form.locationData,
@@ -474,6 +495,7 @@ function Step2({
       transportationInstructions: form.transportationInstructions || undefined,
       studioName: form.studioName || undefined,
       companyId: form.selectedCompanyId ?? undefined,
+      serviceType: form.serviceType,
     });
   }
 
@@ -516,6 +538,37 @@ function Step2({
             placeholder="e.g. Hip Hop Sub Teacher"
             className={`focus:border-[#F25722] ${!isValid.title ? "border-red-200" : "border-gray-200"}`}
           />
+        </div>
+
+        {/* Service type — required. Decides which artists get told about this
+            job, both in their feed and in the job alert emails. */}
+        <div className={`p-5 transition-colors ${fieldSection(isValid.serviceType)}`}>
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
+            Type of Work {!isValid.serviceType && <span className="text-red-400 normal-case font-normal ml-1">· required</span>}
+          </label>
+          <Select
+            value={serviceTypeIsKnown ? form.serviceType : undefined}
+            onValueChange={(val) => set("serviceType", val)}
+          >
+            <SelectTrigger
+              className={`w-full focus:border-[#F25722] ${!isValid.serviceType ? "border-red-200" : "border-gray-200"}`}
+            >
+              <SelectValue placeholder="Select the type of work..." />
+            </SelectTrigger>
+            <SelectContent>
+              {serviceTypeGroups.map(([groupName, names]) => (
+                <SelectGroup key={groupName}>
+                  <SelectLabel>{groupName}</SelectLabel>
+                  {names.map((name) => (
+                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-400 mt-2">
+            This is how we match your job to the right artists — they only hear about work in the categories they signed up for.
+          </p>
         </div>
 
         {/* Studio / Company — dropdown */}
@@ -1046,8 +1099,8 @@ const TIERS = [
   {
     id: "connect",
     label: "Job Unlock",
-    price: 30,
-    priceLabel: "$30",
+    price: 40,
+    priceLabel: "$40",
     description: "Unlock all applicants for this job",
     features: ["View all applicants", "Message artists directly", "One-time fee"],
     icon: <Unlock size={20} className="text-white" />,
@@ -1057,11 +1110,11 @@ const TIERS = [
   {
     id: "pro",
     label: "Artswrk Premium",
-    price: 50,
-    priceMonthly: 50,
-    priceAnnual: 500,
-    priceLabel: "$50/mo",
-    priceLabelAnnual: "$500/yr",
+    price: 65,
+    priceMonthly: 65,
+    priceAnnual: 650,
+    priceLabel: "$65/mo",
+    priceLabelAnnual: "$650/yr",
     description: "Unlimited unlocks for all your jobs",
     features: ["Unlimited applicant unlocks", "Priority listing placement", "Cancel anytime"],
     icon: <Crown size={20} className="text-white" />,
@@ -1071,7 +1124,7 @@ const TIERS = [
   },
 ];
 
-// Competition-specific tiers ($100 unlock + $250/mo or $2500/yr subscription)
+// Competition-specific tiers ($100 unlock + $500/mo or $5,000/yr subscription)
 const COMPETITION_TIERS = [
   {
     id: "connect",
@@ -1087,11 +1140,11 @@ const COMPETITION_TIERS = [
   {
     id: "pro",
     label: "Artswrk Premium",
-    price: 250,
-    priceMonthly: 250,
-    priceAnnual: 2500,
-    priceLabel: "$250/mo",
-    priceLabelAnnual: "$2,500/yr",
+    price: 500,
+    priceMonthly: 500,
+    priceAnnual: 5000,
+    priceLabel: "$500/mo",
+    priceLabelAnnual: "$5,000/yr",
     description: "Unlimited unlocks for all your jobs",
     features: ["Unlimited applicant unlocks", "Priority listing placement", "Cancel anytime"],
     icon: <Crown size={20} className="text-white" />,
@@ -1151,11 +1204,13 @@ function Step3({
     onError: (err) => toast.error(err.message ?? "Failed to start boost checkout"),
   });
 
-  const createAndCheckout = trpc.postJob.createAndCheckout.useMutation({
+  const createSubscriptionCheckout = trpc.clientJobs.createSubscriptionCheckout.useMutation({
     onSuccess: (data) => {
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
+      if (data.url) {
+        window.open(data.url, "_blank");
+        toast.success("Redirecting to Artswrk Premium checkout…");
       }
+      setIsLoading(false);
     },
     onError: (err) => {
       setIsLoading(false);
@@ -1163,11 +1218,17 @@ function Step3({
     },
   });
 
-  const createSubscriptionCheckout = trpc.clientJobs.createSubscriptionCheckout.useMutation({
+  // The real $40 applicant-unlock checkout for the job that was just posted —
+  // previously this tier wrongly called postJob.createAndCheckout, which
+  // creates a SECOND, duplicate job and charges the (now $0) posting fee
+  // instead of the unlock fee, so nothing ever actually got unlocked.
+  const createJobUnlock = trpc.clientJobs.createUnlockCheckout.useMutation({
     onSuccess: (data) => {
-      if (data.url) {
+      if (data.alreadyUnlocked) {
+        toast.success("Already unlocked — check My Jobs to view applicants.");
+      } else if (data.url) {
         window.open(data.url, "_blank");
-        toast.success("Redirecting to Artswrk Premium checkout…");
+        toast.success("Redirecting to checkout…");
       }
       setIsLoading(false);
     },
@@ -1243,23 +1304,10 @@ function Step3({
       return;
     }
 
-    createAndCheckout.mutate({
-      title: form.title || undefined,
-      description: form.description,
-      locationAddress: form.locationAddress || undefined,
-      locationData: form.locationData,
-      dateType: form.dateType as "Single Date" | "Weekly" | "Multiple Dates" | "Dates Flexible" | "Ongoing" | "Recurring",
-      startDate: localDatetimeInputToISO(form.startDate),
-      endDate: localDatetimeInputToISO(form.endDate),
-      hours: form.hours ? parseFloat(form.hours) : undefined,
-      isHourly: form.isHourly,
-      openRate: form.openRate,
-      clientHourlyRate: form.clientHourlyRate ? parseFloat(form.clientHourlyRate) : undefined,
-      clientFlatRate: form.clientFlatRate ? parseFloat(form.clientFlatRate) : undefined,
-      transportation: form.transportation,
-      studioName: form.studioName || undefined,
-      companyId: form.selectedCompanyId ?? undefined,
-      plan: tier.plan,
+    // Job Unlock tier: the job was already created (free) earlier in this
+    // flow — this pays to unlock ITS applicants, not create another job.
+    createJobUnlock.mutate({
+      jobId,
       origin: window.location.origin,
     });
   }
@@ -1486,8 +1534,8 @@ function Step3({
                   <p className="font-black text-[#F25722] text-lg whitespace-nowrap">
                     {tier.id === "pro"
                       ? premiumInterval === "year"
-                        ? (isCompetition ? "$2,500/yr" : "$500/yr")
-                        : (isCompetition ? "$250/mo" : "$50/mo")
+                        ? (isCompetition ? "$5,000/yr" : "$650/yr")
+                        : (isCompetition ? "$500/mo" : "$65/mo")
                       : tier.priceLabel}
                   </p>
                 </div>

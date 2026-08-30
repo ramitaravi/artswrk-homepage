@@ -53,10 +53,25 @@ export const SENDGRID_TEMPLATES = {
   PASSWORD_RESET: "d-password-reset-placeholder",
 } as const;
 
-// The account's one unsubscribe group ("Transactional emails", default).
-// Required on every templated send so {{unsubscribe}}/{{unsubscribe_preferences}}
-// actually resolve instead of rendering as raw placeholder text.
+// SendGrid unsubscribe (ASM) groups. Required on every templated send so
+// {{unsubscribe}}/{{unsubscribe_preferences}} actually resolve instead of
+// rendering as raw placeholder text.
+//
+// "Transactional emails" — the account default. Booking confirmations, password
+// resets, applicant alerts, messages. Unsubscribing here is a big hammer.
 const ASM_GROUP_ID = 24547;
+
+/**
+ * "Job Alerts" — created 2026-08-29 for the automated job digest and
+ * last-minute emails. Separate on purpose: a person who no longer wants job
+ * alerts must be able to stop them WITHOUT also losing booking confirmations
+ * and messages, which is exactly what unsubscribing from the shared
+ * transactional group would have done.
+ *
+ * Every job alert send stamps this group, so SendGrid enforces its own
+ * unsubscribes for it independently of ours.
+ */
+export const ASM_GROUP_JOB_ALERTS = 33079;
 
 // ─── From address ─────────────────────────────────────────────────────────────
 const FROM_EMAIL = "contact@artswrk.com";
@@ -92,11 +107,16 @@ export async function sendTransactionalEmail<T extends Record<string, unknown>>(
   cc,
   templateId,
   dynamicData,
+  asmGroupId,
 }: {
   to: string;
   cc?: string | string[];
   templateId: string;
   dynamicData: T;
+  /** Which unsubscribe group to stamp. Defaults to the shared transactional
+   *  group; job alert sends pass ASM_GROUP_JOB_ALERTS so opting out of job
+   *  emails doesn't also silence booking confirmations. */
+  asmGroupId?: number;
 }): Promise<boolean> {
   if (!process.env.SENDGRID_API_KEY) {
     console.warn("[email] SENDGRID_API_KEY not set — skipping email send");
@@ -110,7 +130,7 @@ export async function sendTransactionalEmail<T extends Record<string, unknown>>(
       from: { email: FROM_EMAIL, name: FROM_NAME },
       templateId,
       dynamicTemplateData: dynamicData,
-      asm: { groupId: ASM_GROUP_ID },
+      asm: { groupId: asmGroupId ?? ASM_GROUP_ID },
     });
     console.log(`[email] Sent template ${templateId} to ${to}`);
     return true;
@@ -118,6 +138,65 @@ export async function sendTransactionalEmail<T extends Record<string, unknown>>(
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[email] Failed to send template ${templateId} to ${to}:`, message);
     return false;
+  }
+}
+
+/**
+ * Raw-HTML send, for mail whose body lives in this repo rather than in a
+ * SendGrid dynamic template — currently the job alerts, whose HTML is in
+ * server/jobAlerts/templates.ts so it can be diffed and previewed without
+ * sending anything.
+ *
+ * Returns the provider message id on success so the send log can tie a later
+ * bounce or complaint back to a specific message.
+ */
+export async function sendHtmlEmail({
+  to,
+  subject,
+  html,
+  asmGroupId,
+  unsubscribeUrl,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+  asmGroupId?: number;
+  /** Enables RFC 8058 one-click unsubscribe. Gmail and Yahoo require this of
+   *  bulk senders — without it a "report spam" is often the only exit a
+   *  recipient is offered, and complaint rate is what gets a domain blocked. */
+  unsubscribeUrl?: string;
+}): Promise<{ ok: boolean; messageId?: string }> {
+  if (!process.env.SENDGRID_API_KEY) {
+    console.warn("[email] SENDGRID_API_KEY not set — skipping HTML email send");
+    return { ok: false };
+  }
+  try {
+    const [res] = await sgMail.send({
+      to,
+      from: { email: FROM_EMAIL, name: FROM_NAME },
+      replyTo: FROM_EMAIL,
+      subject,
+      html,
+      asm: { groupId: asmGroupId ?? ASM_GROUP_ID },
+      trackingSettings: { clickTracking: { enable: true, enableText: false } },
+      ...(unsubscribeUrl
+        ? {
+            headers: {
+              "List-Unsubscribe": `<${unsubscribeUrl}>`,
+              // Signals the URL accepts a POST, so the client can unsubscribe
+              // silently instead of opening a browser tab.
+              "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            },
+          }
+        : {}),
+    });
+    const messageId = (res?.headers as any)?.["x-message-id"];
+    console.log(`[email] Sent "${subject}" to ${to}`);
+    return { ok: true, messageId };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[email] Failed to send "${subject}" to ${to}:`, message);
+    return { ok: false };
   }
 }
 

@@ -54,6 +54,9 @@ function saveFailedIds(set) {
 const { geocodeLocation } = await import("../server/location.ts");
 
 const DELAY_MS = 250; // ~4 req/s — comfortably under typical Geocoding API limits
+// Matches the varchar(128) locationPlaceId column on every table below.
+const PLACE_ID_MAX = 128;
+let oversizedPlaceIds = 0;
 const BATCH_SIZE = 50;
 
 const TABLES = [
@@ -107,19 +110,40 @@ for (const { table, addressCol, idCol, hasCountry } of TABLES) {
     for (const row of rows) {
       const result = await geocodeLocation(row.address);
       if (result && result.lat != null && result.lng != null) {
+        // Google place ids are usually ~27 chars but are not bounded: results
+        // resolved from a plus code or an imprecise match come back with ids
+        // hundreds of characters long, which overflow varchar(128) and used to
+        // abort the entire run mid-table. A truncated place id is worse than
+        // none (it identifies nothing), and nothing in radius matching reads
+        // it, so an oversized one is dropped rather than mangled.
+        const placeId =
+          result.placeId && result.placeId.length <= PLACE_ID_MAX ? result.placeId : null;
+        if (result.placeId && !placeId) oversizedPlaceIds++;
+
         const cols = {
           locationLat: String(result.lat),
           locationLng: String(result.lng),
           locationCity: result.city ?? null,
           // Short code, not the long name — filters compare against short codes.
           locationState: result.stateCode ?? result.state ?? null,
-          locationPlaceId: result.placeId ?? null,
+          locationPlaceId: placeId,
         };
         if (hasCountry) cols.locationCountry = result.countryCode ?? result.country ?? null;
 
         const setClause = Object.keys(cols).map((c) => `${c} = ?`).join(", ");
-        await conn.execute(`UPDATE ${table} SET ${setClause} WHERE ${idCol} = ?`, [...Object.values(cols), row.id]);
-        geocoded++;
+        try {
+          await conn.execute(`UPDATE ${table} SET ${setClause} WHERE ${idCol} = ?`, [...Object.values(cols), row.id]);
+          geocoded++;
+        } catch (err) {
+          // One unwritable row must never take down a multi-thousand-row
+          // backfill. Log it like a geocode failure so the window advances and
+          // a re-run skips it instead of stalling here forever.
+          console.error(`\n  write failed for ${table}:${row.id} (${row.address}): ${err.message}`);
+          failedIds.add(`${table}:${row.id}`);
+          saveFailedIds(failedIds);
+          failedForTable.push(row.id);
+          failed++;
+        }
       } else {
         failedIds.add(`${table}:${row.id}`);
         saveFailedIds(failedIds);
@@ -136,6 +160,10 @@ for (const { table, addressCol, idCol, hasCountry } of TABLES) {
   }
 
   console.log(`\n  Done: ${geocoded} geocoded, ${failed} no match, ${processed} processed this run`);
+}
+
+if (oversizedPlaceIds) {
+  console.log(`\n${oversizedPlaceIds} row(s) geocoded fine but had a place id over ${PLACE_ID_MAX} chars — stored without it (coordinates, city and state are all present).`);
 }
 
 await conn.end();

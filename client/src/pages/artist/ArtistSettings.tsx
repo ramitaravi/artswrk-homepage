@@ -287,21 +287,33 @@ function AccountSection() {
 }
 
 function NotificationsSection() {
-  const [prefs, setPrefs] = useState({
-    jobAlerts: true,
-    applicationUpdates: true,
-    messages: true,
-    marketing: false,
+  // Real preferences, not local state. The previous version of this section
+  // held four toggles in useState and saved nothing — anyone who set a
+  // preference here had it silently discarded on navigation.
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.artistProfile.getJobAlertSettings.useQuery();
+  const save = trpc.artistProfile.updateJobAlertSettings.useMutation({
+    onSuccess: () => utils.artistProfile.getJobAlertSettings.invalidate(),
   });
 
-  const toggle = (key: keyof typeof prefs) => setPrefs((p) => ({ ...p, [key]: !p[key] }));
+  if (isLoading || !data) {
+    return (
+      <div>
+        <h2 className="text-2xl font-black text-[#111]">Notification Preferences</h2>
+        <p className="text-sm text-gray-500 mt-5">Loading…</p>
+      </div>
+    );
+  }
 
-  const rows: { key: keyof typeof prefs; label: string; desc: string }[] = [
-    { key: "jobAlerts", label: "New job alerts", desc: "Get notified when new jobs match your profile" },
-    { key: "applicationUpdates", label: "Application updates", desc: "Status changes on jobs you've applied to" },
-    { key: "messages", label: "Messages", desc: "New messages from hirers" },
-    { key: "marketing", label: "Artswrk news & tips", desc: "Occasional product updates and tips" },
-  ];
+  const jobEmailsOn = data.jobEmailsEnabled;
+  const enabledTypes = data.allServiceTypes.filter((t) => t.enabled);
+
+  const toggleType = (id: string) => {
+    const next = data.allServiceTypes
+      .filter((t) => (t.id === id ? !t.enabled : t.enabled))
+      .map((t) => t.id);
+    save.mutate({ serviceTypes: next });
+  };
 
   return (
     <div>
@@ -309,26 +321,67 @@ function NotificationsSection() {
       <p className="text-sm text-gray-500 mt-1">Choose what Artswrk emails you about</p>
       <hr className="border-gray-100 my-5" />
 
-      {rows.map((row) => (
-        <div key={row.key} className="py-5 border-b border-gray-100 last:border-b-0 flex items-center justify-between gap-6">
-          <div className="min-w-0">
-            <p className="text-base font-bold text-[#111]">{row.label}</p>
-            <p className="text-sm text-gray-500 mt-0.5">{row.desc}</p>
-          </div>
-          <button
-            onClick={() => toggle(row.key)}
-            className={`flex-shrink-0 w-11 h-6 rounded-full transition-colors relative ${
-              prefs[row.key] ? "bg-[#ec008c]" : "bg-gray-200"
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
-                prefs[row.key] ? "translate-x-5" : "translate-x-0.5"
+      <Row
+        label="Job alerts"
+        desc="A daily email at 1pm ET, only on days there are new jobs matching your services and area. No matches, no email."
+        on={jobEmailsOn}
+        onToggle={() => save.mutate({ jobEmailsEnabled: !jobEmailsOn })}
+      />
+      <Row
+        label="Last-minute jobs"
+        desc="Sent right away when a job starts within 48 hours. Never more than 3 a day."
+        on={data.lastMinuteEnabled}
+        disabled={!jobEmailsOn}
+        onToggle={() => save.mutate({ lastMinuteEnabled: !data.lastMinuteEnabled })}
+      />
+
+      <div className={`py-5 ${!jobEmailsOn ? "opacity-40 pointer-events-none" : ""}`}>
+        <p className="text-base font-bold text-[#111]">Which work you hear about</p>
+        <p className="text-sm text-gray-500 mt-0.5 mb-4">
+          {enabledTypes.length === 0
+            ? "You have none selected, so you won't receive any job alerts."
+            : `You'll hear about ${enabledTypes.length} ${enabledTypes.length === 1 ? "type" : "types"} of work.`}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {data.allServiceTypes.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => toggleType(t.id)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                t.enabled
+                  ? "bg-[#ec008c] border-[#ec008c] text-white"
+                  : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
               }`}
-            />
-          </button>
+            >
+              {t.name}
+            </button>
+          ))}
         </div>
-      ))}
+      </div>
+
+      {save.isPending && <p className="text-xs text-gray-400 mt-2">Saving…</p>}
+      {save.isError && <p className="text-xs text-red-500 mt-2">Couldn't save that — try again.</p>}
+    </div>
+  );
+}
+
+function Row({ label, desc, on, onToggle, disabled }: {
+  label: string; desc: string; on: boolean; onToggle: () => void; disabled?: boolean;
+}) {
+  return (
+    <div className={`py-5 border-b border-gray-100 flex items-center justify-between gap-6 ${disabled ? "opacity-40 pointer-events-none" : ""}`}>
+      <div className="min-w-0">
+        <p className="text-base font-bold text-[#111]">{label}</p>
+        <p className="text-sm text-gray-500 mt-0.5">{desc}</p>
+      </div>
+      <button
+        onClick={onToggle}
+        aria-pressed={on}
+        aria-label={label}
+        className={`flex-shrink-0 w-11 h-6 rounded-full transition-colors relative ${on ? "bg-[#ec008c]" : "bg-gray-200"}`}
+      >
+        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${on ? "translate-x-5" : "translate-x-0.5"}`} />
+      </button>
     </div>
   );
 }

@@ -1581,6 +1581,13 @@ export interface CreateJobInput {
   requestStatus?: string;
   slug?: string;
   hours?: number;
+  /** Bubble master_service_type id — what kind of work this is. Required on
+   *  every posting path: it's the primary filter for job-alert emails and for
+   *  the personalized jobs feed, so a job without one reaches nobody. */
+  masterServiceTypeId?: string | null;
+  /** Bubble master_artist_type id — the parent category of the service type
+   *  above, resolved alongside it. The jobs feed filters on this too. */
+  bubbleArtistTypeId?: string | null;
 }
 
 /**
@@ -1615,6 +1622,13 @@ export async function createJob(input: CreateJobInput) {
       requestStatus: input.requestStatus ?? "Pending Payment",
       slug: input.slug,
       hours: input.hours,
+      masterServiceTypeId: input.masterServiceTypeId,
+      bubbleArtistTypeId: input.bubbleArtistTypeId,
+      // Enter the job-alert queue only once the job is actually live. A job
+      // sitting in "Pending Payment" must not be emailed to the network, so it
+      // stays NULL until activateJob flips it. NULL is treated as suppressed
+      // everywhere, never as pending — the safe direction to fail in.
+      networkStatus: (input.requestStatus ?? "Pending Payment") === "Active" ? "pending" : null,
     });
   const newId = (result as { insertId: number }).insertId;
   const [job] = await db.select().from(jobs).where(eq(jobs.id, newId));
@@ -1629,7 +1643,9 @@ export async function activateJob(jobId: number) {
   if (!db) throw new Error("Database not available");
   await db
     .update(jobs)
-    .set({ requestStatus: "Active" })
+    // Joining the queue is part of going live — this is the paid path's
+    // equivalent of what createJob does for free posts.
+    .set({ requestStatus: "Active", networkStatus: "pending" })
     .where(eq(jobs.id, jobId));
 }
 
@@ -1754,6 +1770,38 @@ export async function resolveMasterServiceTypeIds(names: string[]): Promise<stri
   if (!db) return [];
   const rows = await db.select().from(masterServiceTypes).where(inArray(masterServiceTypes.name, names));
   return rows.map((r) => r.bubbleId ?? String(r.id));
+}
+
+/**
+ * Resolve one service type — by name or by Bubble id — into the pair of ids a
+ * job row stores. Job posting takes a name from the picker; the Bubble webhook
+ * already has an id. Accepting both keeps one resolution path.
+ *
+ * Returns nulls when the value matches nothing, so a caller can decide whether
+ * that's a hard error (posting) or just an unmapped legacy value (sync).
+ */
+export async function resolveJobServiceType(
+  nameOrId: string
+): Promise<{ masterServiceTypeId: string | null; bubbleArtistTypeId: string | null }> {
+  const empty = { masterServiceTypeId: null, bubbleArtistTypeId: null };
+  const value = nameOrId?.trim();
+  if (!value) return empty;
+  const db = await getDb();
+  if (!db) return empty;
+  const [row] = await db
+    .select({
+      bubbleId: masterServiceTypes.bubbleId,
+      id: masterServiceTypes.id,
+      artistTypeId: masterServiceTypes.bubbleArtistTypeId,
+    })
+    .from(masterServiceTypes)
+    .where(or(eq(masterServiceTypes.name, value), eq(masterServiceTypes.bubbleId, value)))
+    .limit(1);
+  if (!row) return empty;
+  return {
+    masterServiceTypeId: row.bubbleId ?? String(row.id),
+    bubbleArtistTypeId: row.artistTypeId ?? null,
+  };
 }
 
 export async function resolveMasterServiceTypeNames(ids: string[]): Promise<string[]> {
@@ -2273,10 +2321,21 @@ export async function getFeaturedArtists(limit = 24) {
 export async function getAllMasterServiceTypes() {
   const db = await getDb();
   if (!db) return [];
+  // bubbleId and the parent artist type ride along so callers that need to
+  // *store* a service type (job posting) can resolve it without a second
+  // round trip, and so pickers can group the 55 options under their 9
+  // categories. Name-only callers (the admin chip picker) ignore the extras.
   return db
-    .select({ id: masterServiceTypes.id, name: masterServiceTypes.name })
+    .select({
+      id: masterServiceTypes.id,
+      name: masterServiceTypes.name,
+      bubbleId: masterServiceTypes.bubbleId,
+      artistTypeName: masterArtistTypes.name,
+      artistTypeBubbleId: masterArtistTypes.bubbleId,
+    })
     .from(masterServiceTypes)
-    .orderBy(masterServiceTypes.name);
+    .leftJoin(masterArtistTypes, eq(masterServiceTypes.masterArtistTypeId, masterArtistTypes.id))
+    .orderBy(masterArtistTypes.name, masterServiceTypes.listingOrder, masterServiceTypes.name);
 }
 
 /**
@@ -3229,6 +3288,11 @@ export async function createPremiumJob(data: {
   applyDirect?: boolean;
   createdByUserId: number;
   bubbleClientCompanyId?: string | null;
+  /** Bubble master_service_type id + its parent artist type. What makes a PRO
+   *  job matchable to artists at all — `serviceType` above is the free-text
+   *  job title ("Awards Coordinator | Multiple Dates"), not a taxonomy value. */
+  masterServiceTypeId?: string | null;
+  bubbleArtistTypeId?: string | null;
 }): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -3251,7 +3315,11 @@ export async function createPremiumJob(data: {
     applyDirect: data.applyDirect === true,
     createdByUserId: data.createdByUserId,
     bubbleClientCompanyId: data.bubbleClientCompanyId ?? null,
+    masterServiceTypeId: data.masterServiceTypeId ?? null,
+    bubbleArtistTypeId: data.bubbleArtistTypeId ?? null,
     status: "Active",
+    // PRO jobs are created Active, so they join the queue immediately.
+    networkStatus: "pending",
   });
   // @ts-ignore
   return result[0].insertId;
@@ -3712,6 +3780,17 @@ export async function setEnterprisePlan(
   } else if (interval !== undefined) {
     updates.enterpriseSubInterval = interval;
   }
+  // planTier is what checkoutJobUnlock/checkoutSubscription/getJobApplicants
+  // actually gate on — this function previously only touched the legacy
+  // enterprisePlan column, leaving planTier stale. An admin manually setting
+  // someone to "Subscriber" here now correctly grants unlimited candidate
+  // access via planTier. NOTE: confirmApplicant's subscriber bypass also
+  // requires a real enterpriseStripeSubscriptionId — an admin-comped
+  // subscriber with no real Stripe subscription will see the unlocked
+  // candidate list but still needs a per-job unlock (or an admin override
+  // via adminUnlockEnterpriseJob) to confirm a booking. That's a separate,
+  // narrower gap than the one this fixes.
+  updates.planTier = plan === "subscriber" ? "enterprise_subscription" : "enterprise_on_demand";
   await db.update(users).set(updates).where(eq(users.id, userId));
 }
 
@@ -3777,6 +3856,17 @@ export async function getEnterpriseBillingInfo(userId: number): Promise<{
 export async function recordEnterpriseJobUnlock(unlock: InsertEnterpriseJobUnlock): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  // Both the webhook and the client-side verify fallback call this for the
+  // same checkout session — without this guard, a normal double-fire (both
+  // paths succeeding, which is the common case, not an error case) inserts
+  // two unlock rows for one real $100 charge, double-counting revenue.
+  // Mirrors the same guard already in createClientJobUnlock.
+  const existing = await db
+    .select({ id: enterpriseJobUnlocks.id })
+    .from(enterpriseJobUnlocks)
+    .where(and(eq(enterpriseJobUnlocks.clientUserId, unlock.clientUserId), eq(enterpriseJobUnlocks.jobId, unlock.jobId)))
+    .limit(1);
+  if (existing.length > 0) return;
   await db.insert(enterpriseJobUnlocks).values(unlock);
 }
 

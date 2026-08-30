@@ -310,6 +310,113 @@ export const artistProfileRouter = router({
     }));
   }),
 
+  /**
+   * Job alert preferences. Reads user_notification_settings, falling back to
+   * the artist's profile service types when no row exists yet — so the settings
+   * page shows what they would actually receive today, not an empty form.
+   */
+  getJobAlertSettings: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new Error("Database unavailable");
+    const { getAllMasterServiceTypes } = await import("./db");
+    const all = await getAllMasterServiceTypes();
+
+    const rows: any = await db.execute(
+      `SELECT s.jobEmailsEnabled, s.lastMinuteEnabled, s.serviceTypes, u.masterServiceType
+       FROM users u LEFT JOIN user_notification_settings s ON s.userId = u.id
+       WHERE u.id = ${ctx.user.id}`
+    );
+    const row = (Array.isArray(rows) ? (Array.isArray(rows[0]) ? rows[0] : rows) : [])[0] ?? {};
+
+    const parse = (v: unknown): string[] => {
+      if (!v) return [];
+      try { const p = JSON.parse(String(v)); return Array.isArray(p) ? p.filter((x) => typeof x === "string") : []; }
+      catch { return []; }
+    };
+    const enabled = new Set(
+      parse(row.serviceTypes).length ? parse(row.serviceTypes) : parse(row.masterServiceType)
+    );
+
+    return {
+      jobEmailsEnabled: row.jobEmailsEnabled == null ? true : !!row.jobEmailsEnabled,
+      lastMinuteEnabled: row.lastMinuteEnabled == null ? true : !!row.lastMinuteEnabled,
+      /** Only the artist's own service types — offering all 56 would invite
+       *  opting into work they don't do. */
+      serviceTypes: all
+        .filter((t) => enabled.has(t.bubbleId ?? String(t.id)))
+        .map((t) => ({ id: t.bubbleId ?? String(t.id), name: t.name, group: t.artistTypeName ?? "Other", enabled: true })),
+      allServiceTypes: all.map((t) => ({
+        id: t.bubbleId ?? String(t.id), name: t.name, group: t.artistTypeName ?? "Other",
+        enabled: enabled.has(t.bubbleId ?? String(t.id)),
+      })),
+    };
+  }),
+
+  /**
+   * Save job alert preferences. Writes user_notification_settings AND mirrors a
+   * global opt-out into email_suppressions, so the send worker has exactly one
+   * pre-send check to make rather than two sources that can disagree.
+   */
+  updateJobAlertSettings: protectedProcedure
+    .input(z.object({
+      jobEmailsEnabled: z.boolean().optional(),
+      lastMinuteEnabled: z.boolean().optional(),
+      serviceTypes: z.array(z.string()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      const uid = ctx.user.id;
+
+      const esc = (v: string) => `'${v.replace(/'/g, "''")}'`;
+      const sets: string[] = [];
+      const cols: string[] = ["userId"];
+      const vals: string[] = [String(uid)];
+      if (input.jobEmailsEnabled !== undefined) {
+        cols.push("jobEmailsEnabled"); vals.push(input.jobEmailsEnabled ? "1" : "0");
+        sets.push(`jobEmailsEnabled = ${input.jobEmailsEnabled ? 1 : 0}`);
+      }
+      if (input.lastMinuteEnabled !== undefined) {
+        cols.push("lastMinuteEnabled"); vals.push(input.lastMinuteEnabled ? "1" : "0");
+        sets.push(`lastMinuteEnabled = ${input.lastMinuteEnabled ? 1 : 0}`);
+      }
+      if (input.serviceTypes !== undefined) {
+        const json = esc(JSON.stringify(input.serviceTypes));
+        cols.push("serviceTypes"); vals.push(json);
+        sets.push(`serviceTypes = ${json}`);
+      }
+      if (sets.length) {
+        await db.execute(
+          `INSERT INTO user_notification_settings (${cols.join(",")}) VALUES (${vals.join(",")})
+           ON DUPLICATE KEY UPDATE ${sets.join(", ")}, updatedAt = NOW()`
+        );
+      }
+
+      if (input.jobEmailsEnabled !== undefined) {
+        const emailRows: any = await db.execute(`SELECT email FROM users WHERE id = ${uid}`);
+        const email = String(
+          (Array.isArray(emailRows) ? (Array.isArray(emailRows[0]) ? emailRows[0] : emailRows) : [])[0]?.email ?? ""
+        ).trim().toLowerCase();
+        if (email) {
+          if (input.jobEmailsEnabled) {
+            // Only clear OUR own opt-out. A bounce or spam report recorded by
+            // the provider must survive the artist flipping a toggle back on.
+            await db.execute(
+              `DELETE FROM email_suppressions
+               WHERE email = ${esc(email)} AND source = 'inapp' AND scope = 'job_alerts'`
+            );
+          } else {
+            await db.execute(
+              `INSERT INTO email_suppressions (email, source, scope, reason, createdAt, updatedAt)
+               VALUES (${esc(email)}, 'inapp', 'job_alerts', 'turned off in settings', NOW(), NOW())
+               ON DUPLICATE KEY UPDATE source='inapp', reason='turned off in settings', updatedAt=NOW()`
+            );
+          }
+        }
+      }
+      return { success: true };
+    }),
+
   /** Get service categories for the current user's profile */
   getMyServiceCategories: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();

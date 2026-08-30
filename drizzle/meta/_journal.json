@@ -365,6 +365,13 @@
       "when": 1788026826048,
       "tag": "0051_rich_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "5",
+      "when": 1788049230710,
+      "tag": "0052_naive_the_fallen",
+      "breakpoints": true
     }
   ]
 }

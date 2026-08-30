@@ -12,6 +12,9 @@ import { ENV } from "./env";
 import { applyCheckoutSessionCompleted } from "../checkoutEffects";
 import { handleBubbleWebhook } from "../bubbleWebhook";
 import { handleScheduledBubbleSync } from "../scheduledSync";
+import { handleSendGridWebhook } from "../jobAlerts/webhook";
+import { handleScheduledJobAlerts, handleScheduledBrevoSync } from "../jobAlerts/scheduled";
+import { handleUnsubscribeGet, handleUnsubscribePost } from "../jobAlerts/unsubscribe";
 import { registerStorageProxy } from "./storageProxy";
 import { registerLegacyRedirects } from "../redirects";
 
@@ -216,6 +219,21 @@ async function startServer() {
 
   // ── Scheduled Bubble sync — triggered by Manus Heartbeat cron ─────────────
   app.post("/api/scheduled/bubble-sync", express.json({ limit: "1mb" }), handleScheduledBubbleSync);
+
+  // ── Job alerts ────────────────────────────────────────────────────────────
+  // SendGrid delivery events -> email_suppressions (bounces, spam reports,
+  // unsubscribes). Read before every send, so a one-click unsubscribe applies
+  // to the next batch rather than the next nightly sync.
+  app.post("/api/webhooks/sendgrid", express.json({ limit: "2mb" }), handleSendGridWebhook);
+  // Hourly cron; exits immediately unless it is the 1 PM hour in New York.
+  app.post("/api/scheduled/job-alerts", express.json({ limit: "1mb" }), handleScheduledJobAlerts);
+  // One-click unsubscribe. Deliberately NOT behind auth — someone who wants out
+  // shouldn't have to remember a password, and a sign-in wall in front of an
+  // unsubscribe link is how bulk senders collect spam complaints. The signed
+  // token in the URL is what proves the link came from us.
+  app.post("/api/scheduled/brevo-suppressions", express.json({ limit: "1mb" }), handleScheduledBrevoSync);
+  app.get("/unsubscribe", handleUnsubscribeGet);
+  app.post("/unsubscribe", express.urlencoded({ extended: true }), handleUnsubscribePost);
 
   // ── Stripe Connect OAuth callback — artist just approved payout linking ──
   app.get("/stripe-connect/callback", async (req, res) => {

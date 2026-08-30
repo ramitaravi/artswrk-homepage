@@ -1,0 +1,21 @@
+Raw value,Companies,Maps to,Method,Confidence,Status
+Judge,65,Judge (Dance Competition Staff),exact,1.00,auto-mapped
+Tabulator,16,Tabulator (Dance Competition Staff),exact,1.00,auto-mapped
+Emcee,23,Emcee (Dance Competition Staff),exact,1.00,auto-mapped
+Event Director,8,Event Director (Dance Competition Staff),exact,1.00,auto-mapped
+Executive Assistant/Admin,25,Executive Assistant / Admin (Side Jobs),normalized,1.00,auto-mapped
+Merch/Merchandise,31,Merch (Dance Competition Staff),normalized,0.95,auto-mapped
+Competition Choreographer,3,Competition Choreography (Dance Educator),normalized,0.95,auto-mapped
+Master Teacher/Convention faculty,12,Master Classes (Dance Educator),fuzzy,0.87,auto-mapped - sanity check this one
+Backstage/Stage crew,40,Backstage Staff / Crew / Stage Manager,,,REVIEW - compound value
+Competition staff (general),79,Crew / Registration / Backstage Staff,,,REVIEW - biggest bucket; General Staff type may not exist in live DB
+Sales/Recruiting/Customer relations,30,Sales / Customer Service,,,REVIEW - compound
+Social Media/Content,20,Social Media Manager / Content Creator / Marketing,,,REVIEW - compound
+Photographer/Videographer (events),20,Event Photo + Event Video / Competition Photo / Competition Video,,,REVIEW - may need 2 map rows
+Summer Intensive faculty,11,Master Classes / Weekly Teacher,,,REVIEW - no intensive type exists
+Competition (unspecified),11,Judge / Crew / Registration,,,REVIEW - too vague
+Production staff,9,Crew / Stage Manager / Backstage Staff,,,REVIEW - compound
+Convention staff/faculty,3,Master Classes / Crew / Registration,,,REVIEW - compound
+DJ,1,(none),,,REVIEW - no DJ type exists
+Other/Unclear,52,(none),,,REVIEW - job by job
+(blank category),4,(none),,,REVIEW - treated as unmatched at runtime

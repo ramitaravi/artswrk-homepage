@@ -17,6 +17,7 @@
  */
 import {
   activateJob,
+  activateBoost,
   saveClientStripeCustomerId,
   saveClientSubscriptionId,
   getJobById,
@@ -25,6 +26,7 @@ import {
   saveArtistProSubscription,
   saveArtistBasicSubscription,
   recordEnterpriseJobUnlock,
+  createClientJobUnlock,
   saveEnterpriseStripeCustomerId,
   saveEnterpriseSubscription,
   getMasterServiceTypeName,
@@ -53,10 +55,44 @@ async function getSubscriptionPriceId(subscriptionId: string): Promise<string | 
 export async function applyCheckoutSessionCompleted(session: any): Promise<void> {
   const jobId = session.metadata?.job_id ? parseInt(session.metadata.job_id) : null;
   const userId = session.metadata?.user_id ? parseInt(session.metadata.user_id) : null;
+  const eventType = session.metadata?.type;
 
-  if (jobId) {
+  // Boost and client_job_unlock checkouts both carry job_id (to know which
+  // job they're for), but neither one is "a new job was posted" — they used
+  // to fall into the block below anyway, silently re-activating an
+  // already-active job and sending the wrong "Your job is live!" email
+  // instead of ever recording the actual payment (no case existed for
+  // either event type until now).
+  if (jobId && eventType === "boost") {
+    const dailyBudget = session.metadata?.daily_budget ? parseFloat(session.metadata.daily_budget) : 10;
+    const durationDays = session.metadata?.duration_days ? parseInt(session.metadata.duration_days) : 7;
+    await activateBoost(jobId, { dailyBudget, durationDays, stripeSessionId: session.id });
+    if (userId && session.customer) await saveClientStripeCustomerId(userId, session.customer);
+    console.log(`[Checkout] Boosted job ${jobId}`);
+  } else if (jobId && eventType === "client_job_unlock" && userId) {
+    await createClientJobUnlock({
+      clientUserId: userId,
+      jobId,
+      stripeSessionId: session.id,
+      stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : undefined,
+      amountCents: session.amount_total ?? 4000,
+    });
+    if (session.customer) await saveClientStripeCustomerId(userId, session.customer);
+    console.log(`[Checkout] Unlocked job ${jobId} for client ${userId}`);
+  } else if (jobId) {
     await activateJob(jobId);
     console.log(`[Checkout] Activated job ${jobId}`);
+
+    // The paid path's equivalent of what createFreeJob does: a job that goes
+    // live inside the 48-hour window skips the 1pm queue and goes out now.
+    // activateJob has just put it in the queue, so this is the first moment the
+    // check can meaningfully run.
+    import("./jobAlerts/lastMinute")
+      .then(({ maybeSendLastMinute }) => maybeSendLastMinute(jobId))
+      .then((r) => {
+        if (r.eligible) console.log(`[last-minute] job ${jobId}: ${r.sent} sent, ${r.capped} capped`);
+      })
+      .catch((err) => console.error("[last-minute]", err));
 
     // Send "Your job is live!" confirmation email
     try {
@@ -94,8 +130,6 @@ export async function applyCheckoutSessionCompleted(session: any): Promise<void>
   if (userId && session.customer) {
     await saveClientStripeCustomerId(userId, session.customer);
   }
-
-  const eventType = session.metadata?.type;
 
   if (userId && session.subscription) {
     const priceId = await getSubscriptionPriceId(session.subscription);

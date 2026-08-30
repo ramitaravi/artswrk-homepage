@@ -295,7 +295,22 @@ export const jobs = mysqlTable("jobs", {
 
   // ── Flags ──────────────────────────────────────────────────────────────────
   direct: boolean("direct").default(false),
+  /** Bubble-era boolean. Superseded by networkStatus below, kept because the
+   *  Bubble sync scripts still write it and it's the historical record of what
+   *  the old system sent. Do not read it for send decisions. */
   sentToNetwork: boolean("sentToNetwork").default(false),
+  /** Where this job sits in the job-alert queue.
+   *    pending         — waiting for the next 1pm ET digest run
+   *    sent_digest     — included in a digest
+   *    sent_lastminute — sent immediately (starts within 48h)
+   *    expired         — start date passed before it was ever sent
+   *    suppressed      — deliberately excluded; every pre-launch job is set to
+   *                      this so the first digest run can't blast the backlog
+   *  Null on legacy rows is treated as `suppressed`, never as `pending`. */
+  networkStatus: mysqlEnum("networkStatus", [
+    "pending", "sent_digest", "sent_lastminute", "expired", "suppressed",
+  ]),
+  networkSentAt: timestamp("networkSentAt"),
   transportation: boolean("transportation").default(false),
   transportationDetails: text("transportationDetails"),
   converted: boolean("converted").default(false),
@@ -754,6 +769,16 @@ export const premiumJobs = mysqlTable("premium_jobs", {
   locationCity: varchar("locationCity", { length: 128 }),
   locationState: varchar("locationState", { length: 64 }),
   locationPlaceId: varchar("locationPlaceId", { length: 128 }),
+  /** Bubble master_service_type id, and its parent artist type. PRO jobs stored
+   *  only free-text serviceType/category until now, which left them unmatchable
+   *  — this is what lets them into the job alert emails for the first time. */
+  masterServiceTypeId: varchar("masterServiceTypeId", { length: 64 }),
+  bubbleArtistTypeId: varchar("bubbleArtistTypeId", { length: 64 }),
+  /** Job-alert queue state. Same semantics as jobs.networkStatus. */
+  networkStatus: mysqlEnum("networkStatus", [
+    "pending", "sent_digest", "sent_lastminute", "expired", "suppressed",
+  ]),
+  networkSentAt: timestamp("networkSentAt"),
   /** Tag (e.g. "#Judges #MasterClasses") */
   tag: varchar("tag", { length: 256 }),
   /** URL slug */
@@ -1645,3 +1670,185 @@ export const referrals = mysqlTable("referrals", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type Referral = typeof referrals.$inferSelect;
+
+// ─── Job Alert Emails ─────────────────────────────────────────────────────────
+
+/**
+ * Per-artist job alert preferences — layer 1 of the three-layer opt-out
+ * architecture, and the source of truth for what a person *asked* for (as
+ * opposed to email_suppressions, which records what they or their provider
+ * have *blocked*).
+ *
+ * `serviceTypes` deliberately holds the same Bubble master_service_type ids
+ * the matcher reads off users.masterServiceType, not names. The older
+ * name-keyed toggles on artist_service_categories.jobEmailEnabled stay as a
+ * display surface and write through to this table — one place decides who
+ * gets what, so a preference can never be true in one taxonomy and false in
+ * the other.
+ */
+export const userNotificationSettings = mysqlTable("user_notification_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  /** FK → users.id */
+  userId: int("userId").notNull().unique(),
+  /** Global kill switch for job alert emails. Off = no digest, no last-minute. */
+  jobEmailsEnabled: boolean("jobEmailsEnabled").default(true).notNull(),
+  /** Separate toggle — some artists want the daily digest but not urgent one-offs. */
+  lastMinuteEnabled: boolean("lastMinuteEnabled").default(true).notNull(),
+  /** JSON array of Bubble master_service_type ids the artist wants alerts for.
+   *  Seeded from users.masterServiceType. Empty array = matches nothing, which
+   *  is intentional: an artist who never picked a service hasn't consented to
+   *  hearing about all of them. */
+  serviceTypes: text("serviceTypes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type UserNotificationSettings = typeof userNotificationSettings.$inferSelect;
+export type InsertUserNotificationSettings = typeof userNotificationSettings.$inferInsert;
+
+/**
+ * Unified suppression list — every address that must not receive a given class
+ * of mail, whatever the reason and whoever recorded it. Written by the SendGrid
+ * event webhook, the nightly Brevo blocklist sync, and in-app unsubscribes;
+ * read by the send worker before EVERY send rather than on a nightly snapshot,
+ * so a one-click unsubscribe takes effect on the next batch instead of the
+ * next day.
+ *
+ * Keyed by email rather than userId on purpose: bounces and spam reports
+ * arrive from providers as bare addresses, often for people who no longer
+ * have (or never had) an account.
+ */
+export const emailSuppressions = mysqlTable("email_suppressions", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Always stored lowercased — every read path lowercases before comparing. */
+  email: varchar("email", { length: 320 }).notNull(),
+  /** Who told us: sendgrid | brevo | inapp */
+  source: mysqlEnum("source", ["sendgrid", "brevo", "inapp"]).notNull(),
+  /** How wide the block is. `global` blocks all mail; `job_alerts` blocks only
+   *  this system, leaving booking confirmations and other transactional mail. */
+  scope: mysqlEnum("scope", ["global", "job_alerts"]).default("job_alerts").notNull(),
+  /** Provider event or human reason: bounce, spamreport, unsubscribe, … */
+  reason: varchar("reason", { length: 128 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  // One row per address per scope — re-reporting the same block updates in
+  // place instead of growing the table on every webhook retry.
+  emailScope: uniqueIndex("email_suppressions_email_scope").on(t.email, t.scope),
+}));
+export type EmailSuppression = typeof emailSuppressions.$inferSelect;
+export type InsertEmailSuppression = typeof emailSuppressions.$inferInsert;
+
+/**
+ * One row per (job, artist, send). This is the load-bearing table of the whole
+ * system: it is simultaneously the dedupe guard (an artist can never be sent
+ * the same job twice, across both the digest and last-minute paths), the
+ * counter behind the 3-per-rolling-24h last-minute cap, and the audit trail
+ * for what actually went out.
+ *
+ * A run that matched nobody still writes a row with recipientCount = 0, so a
+ * job is never left looking unsent and retried forever.
+ */
+export const emailSendLog = mysqlTable("email_send_log", {
+  id: int("id").autoincrement().primaryKey(),
+  /** FK → jobs.id for regular jobs, null when premiumJobId is set. */
+  jobId: int("jobId"),
+  /** FK → premium_jobs.id for PRO jobs, null when jobId is set. */
+  premiumJobId: int("premiumJobId"),
+  /** FK → users.id — the artist. Null on a zero-recipient bookkeeping row. */
+  userId: int("userId"),
+  sendType: mysqlEnum("sendType", ["digest", "lastminute"]).notNull(),
+  /** `capped` records a send deliberately skipped by the 24h cap — kept so the
+   *  skip is visible in reporting rather than looking like a matching failure. */
+  status: mysqlEnum("status", ["sent", "capped", "failed"]).default("sent").notNull(),
+  /** SendGrid's x-message-id, for tracing a complaint back to a specific send. */
+  providerMessageId: varchar("providerMessageId", { length: 128 }),
+  /** How many artists this send reached. 0 is a real, meaningful value. */
+  recipientCount: int("recipientCount").default(1),
+  sentAt: timestamp("sentAt").defaultNow().notNull(),
+}, (t) => ({
+  // The dedupe lookup: "has this artist already been sent this job?"
+  userJob: uniqueIndex("email_send_log_user_job").on(t.userId, t.jobId, t.premiumJobId),
+}));
+export type EmailSendLog = typeof emailSendLog.$inferSelect;
+export type InsertEmailSendLog = typeof emailSendLog.$inferInsert;
+
+// ─── PRO Job Service Type Mapping ─────────────────────────────────────────────
+
+/**
+ * Maps a premium_jobs free-text `serviceType`/`category` value onto canonical
+ * master_service_types rows, so PRO jobs can be matched to artists the same way
+ * regular jobs are. PRO jobs only ever stored free text, which is why they have
+ * never been matchable — this table is the bridge.
+ *
+ * Deliberately NOT unique on rawValue alone: one raw value may legitimately map
+ * to two types ("Photographer/Videographer (events)" is both), so the key is the
+ * pair. The admin review action writes one row per chosen type.
+ *
+ * Column names are camelCase to match every other table here; the hand-written
+ * seed that populates this used snake_case and was adjusted to match.
+ */
+export const premiumServiceTypeMap = mysqlTable("premium_service_type_map", {
+  id: int("id").autoincrement().primaryKey(),
+  /** The raw premium_jobs value, verbatim — e.g. "Merch/Merchandise". */
+  rawValue: varchar("rawValue", { length: 256 }).notNull(),
+  /** FK → master_service_types.id (the local int id, not the Bubble id — nine
+   *  of the competition-staff types have no Bubble id at all). */
+  masterServiceTypeId: int("masterServiceTypeId").notNull(),
+  /** How the mapping was arrived at. `manual` = a human picked it in the admin
+   *  review view; the rest come from the seed. */
+  matchMethod: mysqlEnum("matchMethod", ["exact", "normalized", "fuzzy", "manual"]).notNull(),
+  /** 0–1. Seed policy: exact/normalized apply silently, fuzzy only at >= 0.85,
+   *  anything lower goes to review instead of being written here. */
+  confidence: double("confidence"),
+  reviewedBy: varchar("reviewedBy", { length: 128 }),
+  reviewedAt: timestamp("reviewedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  rawType: uniqueIndex("premium_service_type_map_raw_type").on(t.rawValue, t.masterServiceTypeId),
+}));
+export type PremiumServiceTypeMap = typeof premiumServiceTypeMap.$inferSelect;
+export type InsertPremiumServiceTypeMap = typeof premiumServiceTypeMap.$inferInsert;
+
+/**
+ * The queue of raw values too ambiguous to auto-map — compound values
+ * ("Sales/Recruiting/Customer relations"), values with no matching type (DJ),
+ * and the catch-all buckets. These wait here for a human pick rather than being
+ * guessed at, because a wrong mapping silently emails the wrong artists.
+ *
+ * `candidateTypes` is a JSON array of master_service_types NAMES for the admin
+ * view to offer as one-click options.
+ */
+export const premiumServiceTypeReview = mysqlTable("premium_service_type_review", {
+  id: int("id").autoincrement().primaryKey(),
+  rawValue: varchar("rawValue", { length: 256 }).notNull().unique(),
+  /** JSON array of candidate type names. Empty array = nothing plausible;
+   *  needs a new type created or a job-by-job decision. */
+  candidateTypes: text("candidateTypes"),
+  reason: text("reason"),
+  /** Set when a human has dealt with it — the corresponding rows now live in
+   *  premium_service_type_map. Kept rather than deleted so the decision, and
+   *  the fact it was made, stay visible. */
+  resolvedAt: timestamp("resolvedAt"),
+  resolvedBy: varchar("resolvedBy", { length: 128 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PremiumServiceTypeReview = typeof premiumServiceTypeReview.$inferSelect;
+export type InsertPremiumServiceTypeReview = typeof premiumServiceTypeReview.$inferInsert;
+
+/**
+ * Small key/value store for operational switches that must be changeable
+ * WITHOUT a deploy. The job-alert master switch lives here rather than in an
+ * env var so it can be flipped from the admin UI — and, more importantly, so it
+ * can be flipped OFF instantly if something goes wrong mid-send.
+ *
+ * Absence of a row always means "off". Nothing here should ever default to on.
+ */
+export const appSettings = mysqlTable("app_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  settingKey: varchar("settingKey", { length: 64 }).notNull().unique(),
+  settingValue: text("settingValue"),
+  /** Who last changed it, for the audit trail on a switch this consequential. */
+  updatedBy: varchar("updatedBy", { length: 128 }),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type AppSetting = typeof appSettings.$inferSelect;

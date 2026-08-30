@@ -4393,14 +4393,14 @@ function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; 
                   disabled={setPlan.isPending}
                   className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all ${localInterval === "month" ? "bg-purple-200 border-purple-400 text-purple-800" : "bg-white border-purple-200 text-purple-400 hover:bg-purple-100"}`}
                 >
-                  Monthly — $250/mo
+                  Monthly — $500/mo
                 </button>
                 <button
                   onClick={() => handleIntervalChange("year")}
                   disabled={setPlan.isPending}
                   className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all ${localInterval === "year" ? "bg-purple-200 border-purple-400 text-purple-800" : "bg-white border-purple-200 text-purple-400 hover:bg-purple-100"}`}
                 >
-                  Annual — $2,500/yr
+                  Annual — $5,000/yr
                 </button>
                 {!localInterval && <span className="text-xs text-purple-400 italic">No interval set</span>}
               </div>
@@ -5419,6 +5419,122 @@ const CATEGORY_LABELS: Record<EmailCategory, { label: string; color: string }> =
   both: { label: "Both", color: "bg-gray-100 text-gray-600" },
 };
 
+/**
+ * Job alert master switch. The one control that decides whether automated job
+ * emails reach real artists. Deliberately loud and deliberately awkward to turn
+ * on — a mis-click here mails thousands of people.
+ */
+function JobAlertsSwitch() {
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.admin.getJobAlertStatus.useQuery(undefined, {
+    refetchInterval: 30000,
+  });
+  const [confirming, setConfirming] = useState(false);
+  const setEnabled = trpc.admin.setJobAlertEnabled.useMutation({
+    onSuccess: () => { setConfirming(false); utils.admin.getJobAlertStatus.invalidate(); },
+  });
+
+  if (isLoading || !data) {
+    return <div className="rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-400">Loading job alert status…</div>;
+  }
+
+  const on = data.enabled && !data.killSwitch;
+  const limited = on && data.allowlist.length > 0;
+
+  return (
+    <div className={`rounded-2xl border-2 bg-white overflow-hidden ${on && !limited ? "border-[#ec008c]" : "border-gray-200"}`}>
+      <div className="p-6">
+        <div className="flex items-start justify-between gap-6 flex-wrap">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5 mb-1.5">
+              <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${on ? (limited ? "bg-amber-500" : "bg-[#ec008c]") : "bg-gray-300"}`} />
+              <h2 className="text-lg font-black text-[#111]">
+                Automated job alerts are {on ? (limited ? "ON — test mode" : "ON") : "OFF"}
+              </h2>
+            </div>
+            <p className="text-sm text-gray-500 max-w-xl leading-relaxed">
+              {on && !limited
+                ? "Matched artists will receive the daily 1pm digest and last-minute alerts. This is live."
+                : limited
+                ? `Sending is on, but only these addresses can receive anything: ${data.allowlist.join(", ")}.`
+                : "Everything runs — matching, assembling, logging — but no email is sent to anyone."}
+            </p>
+            {data.killSwitch && (
+              <p className="text-sm text-red-600 font-semibold mt-2">
+                JOB_ALERTS_KILL is set in the environment. Nothing sends regardless of this switch.
+              </p>
+            )}
+            {data.lastChangedBy && (
+              <p className="text-xs text-gray-400 mt-2">
+                Last changed by {data.lastChangedBy}{data.lastChangedAt ? ` · ${fmtDate(data.lastChangedAt as any)}` : ""}
+              </p>
+            )}
+          </div>
+
+          <div className="flex-shrink-0">
+            {on ? (
+              <button
+                onClick={() => setEnabled.mutate({ enabled: false })}
+                disabled={setEnabled.isPending}
+                className="px-5 py-2.5 rounded-xl text-sm font-bold border-2 border-gray-200 text-gray-700 hover:border-gray-300 transition-colors"
+              >
+                {setEnabled.isPending ? "Turning off…" : "Turn OFF"}
+              </button>
+            ) : confirming ? (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setEnabled.mutate({ enabled: true })}
+                  disabled={setEnabled.isPending || data.killSwitch}
+                  className="px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-40"
+                  style={{ background: "linear-gradient(90deg,#ec008c,#ff7171)" }}
+                >
+                  {setEnabled.isPending ? "Turning on…" : "Yes, start emailing artists"}
+                </button>
+                <button onClick={() => setConfirming(false)}
+                  className="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:text-gray-700">
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirming(true)}
+                disabled={data.killSwitch}
+                className="px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-40"
+                style={{ background: "linear-gradient(90deg,#ec008c,#ff7171)" }}
+              >
+                Turn ON
+              </button>
+            )}
+          </div>
+        </div>
+
+        {confirming && !on && (
+          <div className="mt-5 rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-900 leading-relaxed">
+            <b>{data.queuedJobs + data.queuedProJobs} job{data.queuedJobs + data.queuedProJobs === 1 ? "" : "s"} are waiting in the queue.</b>{" "}
+            Turning this on means the next 1pm run emails every artist who matches them, and any
+            job posted within 48 hours of its start goes out immediately.
+            {data.allowlist.length === 0 && " No allowlist is set, so these go to real artists."}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-gray-100 divide-x divide-gray-100 bg-gray-50/60">
+        {[
+          ["In the queue", data.queuedJobs + data.queuedProJobs],
+          ["Emails last 24h", data.emailsLast24h],
+          ["Emails all time", data.emailsAllTime],
+          ["Suppressed", data.suppressedAddresses],
+        ].map(([label, value]) => (
+          <div key={label as string} className="px-4 py-3">
+            <p className="text-lg font-black text-[#111] tabular-nums">{Number(value).toLocaleString()}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mt-0.5">{label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function EmailsSection() {
   const [filter, setFilter] = useState<"all" | EmailCategory>("all");
 
@@ -5430,6 +5546,8 @@ function EmailsSection() {
         <h1 className="text-2xl font-black text-[#111] mb-1">Transactional Emails</h1>
         <p className="text-sm text-gray-400">All automated emails that go out from Artswrk — triggers, recipients, and content.</p>
       </div>
+
+      <JobAlertsSwitch />
 
       {/* Filter pills */}
       <div className="flex gap-2">
