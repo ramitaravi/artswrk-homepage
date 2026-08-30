@@ -782,3 +782,13 @@
 ## GitHub Sync Dependency Repair
 - [x] Install the rich-text editor dependencies introduced by the latest GitHub changes
 - [x] Verify the development preview, TypeScript, and tests after dependency installation
+
+## Latest GitHub Release Review
+- [x] Inventory all commits and changed files introduced since checkpoint ccbfc583
+- [x] Review every schema and SQL migration change for destructive or data-loss risk before execution
+- [x] Review authentication, payment, email, webhook, and data-access changes for production regressions
+- [x] Remove remaining server-side direct clientPremium unlock bypasses in favor of centralized planTier authorization
+- [x] Audit 127 Bubble users without a plan tier, including four legacy live-mode subscription IDs, without guessing entitlements
+- [x] Install or reconcile dependency changes without overwriting lockfile intent
+- [x] Run TypeScript, deterministic tests, build checks, and visual smoke tests on key routes
+- [x] Save a reviewed checkpoint and document the before-and-after application state

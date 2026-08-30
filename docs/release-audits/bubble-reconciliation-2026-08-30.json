@@ -1,0 +1,302 @@
+{
+  "auditedAt": "2026-08-30T00:08:33.295Z",
+  "tables": {
+    "users": {
+      "bubbleType": "user",
+      "sourceRows": 7573,
+      "sourceDistinctIds": 7573,
+      "destinationRows": 7543,
+      "destinationDistinctIds": 7543,
+      "missingIds": 30,
+      "extraCanonicalIds": 0,
+      "modifiedMismatches": 100,
+      "missingIdSamples": [
+        "1653337339549x437192633132776450",
+        "1662134111070x880153175512172000",
+        "1663868889400x171274204025748660",
+        "1668005015488x725802146905064600",
+        "1682721819357x796839593024502900",
+        "1683920228649x760124321887842900",
+        "1690330337703x870201122537079400",
+        "1710251117273x407931542786206700",
+        "1715712046637x316658392500434700",
+        "1715726698491x186909312323378050"
+      ],
+      "extraIdSamples": [],
+      "modifiedMismatchSamples": [
+        "1653035222788x800107136493249300",
+        "1653036422631x397078204902059400",
+        "1653036512516x182000839820667840",
+        "1653036992375x461137216374631900",
+        "1653042625540x731984725920253400",
+        "1653043314834x898092891573882900",
+        "1653061991491x978847243295512700",
+        "1653688199801x485557410174090500",
+        "1656388874657x408179088552067300",
+        "1656513379394x209528820493780200"
+      ]
+    },
+    "jobs": {
+      "bubbleType": "Request",
+      "sourceRows": 3880,
+      "sourceDistinctIds": 3880,
+      "destinationRows": 3875,
+      "destinationDistinctIds": 3875,
+      "missingIds": 5,
+      "extraCanonicalIds": 0,
+      "modifiedMismatches": 5,
+      "missingIdSamples": [
+        "1683920394031x908418758861652000",
+        "1695934449802x342835715005218800",
+        "1720806516854x942746863347695600",
+        "1787834456643x120652503757619200",
+        "1787862161559x206170778769817600"
+      ],
+      "extraIdSamples": [],
+      "modifiedMismatchSamples": [
+        "1784835364158x345680449588166660",
+        "1785161559764x414791490891677700",
+        "1786821401974x643768435199705100",
+        "1786821492553x331126655861915650",
+        "1787156622000x959407543138910200"
+      ]
+    },
+    "client_companies": {
+      "bubbleType": "ClientCompany",
+      "sourceRows": 1225,
+      "sourceDistinctIds": 1225,
+      "destinationRows": 1212,
+      "destinationDistinctIds": 1212,
+      "missingIds": 13,
+      "extraCanonicalIds": 0,
+      "modifiedMismatches": 0,
+      "missingIdSamples": [
+        "1715712266015x868010049153269800",
+        "1715712363226x309014372322902000",
+        "1715726925085x342756901774950400",
+        "1720806516854x227019376379822100",
+        "1736287458974x376139740147089400",
+        "1740666837475x395592004579622900",
+        "1749455442091x248021249848770560",
+        "1754830722714x106795023280898050",
+        "1770163860128x239319255596662800",
+        "1770324641813x424028892931555300"
+      ],
+      "extraIdSamples": [],
+      "modifiedMismatchSamples": []
+    },
+    "premium_jobs": {
+      "bubbleType": "premium_jobs",
+      "sourceRows": 248,
+      "sourceDistinctIds": 248,
+      "destinationRows": 243,
+      "destinationDistinctIds": 243,
+      "missingIds": 5,
+      "extraCanonicalIds": 0,
+      "modifiedMismatches": 6,
+      "missingIdSamples": [
+        "1787851400097x157194368028246000",
+        "1787851465570x682252404520386600",
+        "1787851529402x361940849795006460",
+        "1787851586211x698728404570603500",
+        "1787851649928x810208008913813500"
+      ],
+      "extraIdSamples": [],
+      "modifiedMismatchSamples": [
+        "1768083565466x341622390621494140",
+        "1771858759332x379735863916232700",
+        "1777217887184x969745237206630400",
+        "1779221306303x636908655535194100",
+        "1783712142385x457846692156276740",
+        "1787025393707x373856403477890000"
+      ]
+    },
+    "bubble_interested_artists_source": {
+      "bubbleType": "interestedartists",
+      "sourceRows": 10646,
+      "sourceDistinctIds": 10646,
+      "destinationRows": 10631,
+      "destinationDistinctIds": 10631,
+      "missingIds": 15,
+      "extraCanonicalIds": 0,
+      "modifiedMismatches": 0,
+      "missingIdSamples": [
+        "1787834627884x365319776186138600",
+        "1787848605472x519684712494268400",
+        "1787867071673x411793168854417400",
+        "1787950651505x301756442626490400",
+        "1788037663588x287582842520338430",
+        "1788037718722x639818990910701600",
+        "1788037834686x702660359586840600",
+        "1788037908502x763315363999907800",
+        "1788037969302x512723614041636860",
+        "1788038023552x777763058501550000"
+      ],
+      "extraIdSamples": [],
+      "modifiedMismatchSamples": []
+    },
+    "bookings": {
+      "bubbleType": "booking",
+      "sourceRows": 5681,
+      "sourceDistinctIds": 5681,
+      "destinationRows": 5678,
+      "destinationDistinctIds": 5678,
+      "missingIds": 3,
+      "extraCanonicalIds": 0,
+      "modifiedMismatches": 1,
+      "missingIdSamples": [
+        "1663263427145x138967637518712830",
+        "1683932246182x173892601823887360",
+        "1787834683580x294236584482963460"
+      ],
+      "extraIdSamples": [],
+      "modifiedMismatchSamples": [
+        "1782593618814x884321615396995100"
+      ]
+    },
+    "payments": {
+      "bubbleType": "payment",
+      "sourceRows": 18331,
+      "sourceDistinctIds": 18331,
+      "destinationRows": 18221,
+      "destinationDistinctIds": 18221,
+      "missingIds": 110,
+      "extraCanonicalIds": 0,
+      "modifiedMismatches": 0,
+      "missingIdSamples": [
+        "1787819241559x698410674940625800",
+        "1787821197055x549130664705860500",
+        "1787822344685x253060871345483400",
+        "1787825645374x217681648060287680",
+        "1787828349864x283686489374424200",
+        "1787832441738x276888076486007780",
+        "1787836403861x130232432638799790",
+        "1787836418583x219417288450317600",
+        "1787839987220x299166841400272200",
+        "1787842914840x548498310285175500"
+      ],
+      "extraIdSamples": [],
+      "modifiedMismatchSamples": []
+    },
+    "conversations": {
+      "bubbleType": "conversation",
+      "sourceRows": 5258,
+      "sourceDistinctIds": 5258,
+      "destinationRows": 5250,
+      "destinationDistinctIds": 5250,
+      "missingIds": 8,
+      "extraCanonicalIds": 0,
+      "modifiedMismatches": 5,
+      "missingIdSamples": [
+        "1683920637997x457777636767170560",
+        "1683922748912x844149769311092700",
+        "1722053767667x958889580362465300",
+        "1787834627884x900456233517187100",
+        "1787834683580x150786505779970050",
+        "1788038145597x209663521193984000",
+        "1788038251583x608718071114498000",
+        "1788038326311x613898805900214300"
+      ],
+      "extraIdSamples": [],
+      "modifiedMismatchSamples": [
+        "1754543948565x469095459301097500",
+        "1756785616266x985099237961236500",
+        "1760112501009x544134727788920800",
+        "1785040357052x663343590362316800",
+        "1787586495936x303010808092688400"
+      ]
+    },
+    "messages": {
+      "bubbleType": "message",
+      "sourceRows": 15244,
+      "sourceDistinctIds": 15244,
+      "destinationRows": 15235,
+      "destinationDistinctIds": 15235,
+      "missingIds": 9,
+      "extraCanonicalIds": 0,
+      "modifiedMismatches": 0,
+      "missingIdSamples": [
+        "1683927679496x850547735230152700",
+        "1683932246182x583050907111915500",
+        "1787827979933x362356470538043400",
+        "1787834627884x912095196792225800",
+        "1787834683580x908533405664411600",
+        "1788038145597x172615417213747200",
+        "1788038251583x447321860889640960",
+        "1788038271190x249906676473004030",
+        "1788038326311x909891055195521000"
+      ],
+      "extraIdSamples": [],
+      "modifiedMismatchSamples": []
+    },
+    "benefits": {
+      "bubbleType": "Benefits",
+      "sourceRows": 28,
+      "sourceDistinctIds": 28,
+      "destinationRows": 28,
+      "destinationDistinctIds": 28,
+      "missingIds": 0,
+      "extraCanonicalIds": 0,
+      "modifiedMismatches": 28,
+      "missingIdSamples": [],
+      "extraIdSamples": [],
+      "modifiedMismatchSamples": [
+        "1768315942042x475614873501379900",
+        "1768316417691x785086839730220700",
+        "1768316584050x433374050453227700",
+        "1768317873042x379686197078625600",
+        "1768318020652x833995555008235100",
+        "1768319915884x364197448031220200",
+        "1772043300380x466317247923531300",
+        "1772043800807x750082430963293700",
+        "1772044082607x520303080959543700",
+        "1772044676458x211067249701255330"
+      ]
+    }
+  },
+  "integrity": {
+    "duplicateCanonicalUsers": 0,
+    "duplicateCanonicalJobs": 0,
+    "duplicateCanonicalCompanies": 0,
+    "duplicateCanonicalPremiumJobs": 0,
+    "duplicateCanonicalApplications": 0,
+    "duplicateCanonicalBookings": 0,
+    "duplicateCanonicalPayments": 0,
+    "duplicateCanonicalConversations": 0,
+    "duplicateCanonicalMessages": 0,
+    "orphanJobCompanies": 0,
+    "orphanCompanyMembershipUsers": 12,
+    "orphanStandardApplicationJobs": 0,
+    "orphanStandardApplicationArtists": 0,
+    "orphanPremiumApplicationJobs": 0,
+    "orphanPremiumApplicationArtists": 0,
+    "orphanBookingJobs": 0,
+    "orphanBookingArtists": 0,
+    "orphanBookingClients": 0,
+    "orphanPaymentBookings": 1,
+    "orphanMessageConversations": 0,
+    "orphanMessageSenders": 0
+  },
+  "headlineMetrics": {
+    "users": {
+      "totalUsers": 7543,
+      "artists": 6178,
+      "clients": 1238,
+      "basic": 218,
+      "pro": 251,
+      "priority": 337,
+      "premiumClients": 36
+    },
+    "financials": {
+      "completedBookings": 3991,
+      "nonDeletedCompletedBookings": "3986",
+      "revenueDollars": 988916.3799999993,
+      "commissionDollars": 55188.17971500035
+    },
+    "payments": {
+      "payments": 18221,
+      "stripeAmountCents": "174849277",
+      "applicationFeeCents": "415737"
+    }
+  }
+}
