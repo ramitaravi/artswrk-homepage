@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { useUpgrade } from "@/components/UpgradeModal";
 import { JobCard } from "@/components/ClientJobCard";
 import { toSimpleJobStatus } from "@shared/jobStatus";
 
@@ -135,11 +136,12 @@ function PostJobBox() {
 // Mirrors the artist dashboard's "Your Tasks" pattern — same collapsible card,
 // same idea: only show what's actually actionable, nothing else.
 
-type TaskItem = { key: string; icon: React.ReactNode; label: string; sublabel?: string; href: string; upsell?: boolean };
+/** `onClick` wins over `href` — the upgrade row opens the modal rather than
+ *  navigating, so the pitch is the same one every other premium CTA shows. */
+type TaskItem = { key: string; icon: React.ReactNode; label: string; sublabel?: string; href?: string; onClick?: () => void; upsell?: boolean };
 
 function TaskRow({ task }: { task: TaskItem }) {
-  return (
-    <Link href={task.href}>
+  const body = (
       <div className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
         task.upsell
           ? "bg-gradient-to-r from-pink-50 to-orange-50 border border-orange-100 hover:border-orange-200"
@@ -154,8 +156,11 @@ function TaskRow({ task }: { task: TaskItem }) {
         </div>
         <ChevronRight size={14} className="text-gray-400 flex-shrink-0" />
       </div>
-    </Link>
   );
+  if (task.onClick) {
+    return <button type="button" onClick={task.onClick} className="block w-full text-left">{body}</button>;
+  }
+  return <Link href={task.href ?? "#"}>{body}</Link>;
 }
 
 function TasksCard({ tasks }: { tasks: TaskItem[] }) {
@@ -673,6 +678,8 @@ export default function Overview() {
   const { data: benefitsData } = trpc.benefits.list.useQuery({ audienceType: "Client" });
   const benefitsCount = benefitsData?.benefits?.length ?? 0;
 
+  const { open: openUpgrade } = useUpgrade();
+
   const tasks: TaskItem[] = [
     waitingToConfirm > 0 && {
       key: "confirm",
@@ -699,7 +706,7 @@ export default function Overview() {
       icon: <Sparkles size={16} className="text-[#F25722]" />,
       label: "Upgrade to Artswrk Premium",
       sublabel: "Unlimited jobs unlocked for one flat rate",
-      href: "/app/settings",
+      onClick: () => openUpgrade({ audience: "client" }),
       upsell: true,
     },
   ].filter(Boolean) as TaskItem[];

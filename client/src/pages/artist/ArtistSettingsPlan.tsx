@@ -45,17 +45,17 @@ export default function ArtistSettingsPlan() {
   const { data: pricingData, isLoading: pricingLoading } = trpc.artistSubscription.getPricing.useQuery();
 
   const createBasicCheckout = trpc.artistSubscription.createBasicCheckout.useMutation({
-    onSuccess: ({ url }) => window.open(url, "_blank"),
+    onSuccess: ({ url }) => { window.location.href = url; },
     onError: (err) => toast.error("Checkout failed", { description: err.message }),
   });
 
   const createProCheckout = trpc.artistSubscription.createProCheckout.useMutation({
-    onSuccess: ({ url }) => window.open(url, "_blank"),
+    onSuccess: ({ url }) => { window.location.href = url; },
     onError: (err) => toast.error("Checkout failed", { description: err.message }),
   });
 
   const createPortal = trpc.artistSubscription.createPortalSession.useMutation({
-    onSuccess: ({ url }) => window.open(url, "_blank"),
+    onSuccess: ({ url }) => { window.location.href = url; },
     onError: (err) => toast.error("Portal unavailable", { description: err.message }),
   });
 
@@ -95,8 +95,15 @@ export default function ArtistSettingsPlan() {
 
       {/* Free */}
       <div className="py-6 border-b border-gray-100">
-        <h3 className="text-xl font-black text-[#111]">Free</h3>
-        <PricePill>$0/month</PricePill>
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-xl font-black text-[#111]">Free</h3>
+          {currentPlan === "free" && (
+            <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500 bg-gray-100 px-3 py-1 rounded-full flex-shrink-0">
+              Current Plan
+            </span>
+          )}
+        </div>
+        <PricePill>$0</PricePill>
         <ul className="space-y-2">
           {FREE_FEATURES.map((f) => (
             <li key={f} className="flex items-start gap-2 text-[15px] text-[#111]">

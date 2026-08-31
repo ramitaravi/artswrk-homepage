@@ -19,6 +19,7 @@ import {
   UserCheck, CreditCard, Banknote, Zap, Share2,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useUpgrade } from "@/components/UpgradeModal";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation, useParams, Link } from "wouter";
 import { toast } from "sonner";
@@ -465,12 +466,7 @@ function ApplicantsTab({
     onError: (e) => toast.error(e.message || "Failed to start checkout"),
   });
 
-  const subMutation = trpc.clientJobs.createSubscriptionCheckout.useMutation({
-    onSuccess: (res) => {
-      if (res.url) window.open(res.url, "_blank");
-    },
-    onError: (e) => toast.error(e.message || "Failed to start checkout"),
-  });
+  const { open: openUpgrade } = useUpgrade();
 
   if (isLoading) {
     return (
@@ -612,14 +608,13 @@ function ApplicantsTab({
               ))}
             </ul>
             <Button
-              onClick={() => subMutation.mutate({ jobId, origin: window.location.origin })}
-              disabled={subMutation.isPending}
+              onClick={() => openUpgrade({ audience: "client", feature: "Unlimited applicant unlocks" })}
               variant="outline"
               className="w-full gap-2 text-[#F25722] border-[#F25722] hover:bg-orange-50"
               size="sm"
             >
-              {subMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Star size={14} />}
-              Subscribe — $65/mo
+              <Star size={14} />
+              See Premium — $65/mo
             </Button>
             <p className="text-[11px] text-gray-400 text-center mt-2">
               {data.applicantCount >= 2 ? `Break-even at 2 jobs · you have ${data.applicantCount}+ waiting` : "Unlimited jobs · cancel anytime"}

@@ -17,7 +17,7 @@ import {
   MapPin, Clock, ArrowUpRight, UserCog, ArrowLeft, Sparkles, Globe, ExternalLink, Megaphone,
   Plus, Edit2, Mail, ChevronDown, ToggleLeft, ToggleRight, Instagram, Link as LinkIcon, Send, Copy, Loader2,
   Gift, Trash2, LayoutGrid, List as ListIcon, Tag, SlidersHorizontal,
-  Upload, Image as ImageIcon,
+  Upload, Image as ImageIcon, Check,
 } from "lucide-react";
 import { ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE } from "@shared/const";
 import { Link } from "wouter";
@@ -1809,7 +1809,7 @@ const HIRING_CATEGORIES = [
 export const CLIENT_BUSINESS_TYPES = ["Dance Studio", "Dance Competition", "Music School", "Event Company", "Other"] as const;
 
 /**
- * Multi-select for the benefit taxonomy fields.
+ * Dropdown multi-select for the benefit taxonomy fields.
  *
  * These were comma-separated free text, and the data drifted exactly as you'd
  * expect: "Dance Studio" and "Dance Studios" both exist as business types, and
@@ -1819,7 +1819,7 @@ export const CLIENT_BUSINESS_TYPES = ["Dance Studio", "Dance Competition", "Musi
  *
  * Values already on a row that aren't in the canonical list are still shown and
  * still selected — dropping them silently on save would quietly delete real
- * data. They render greyed so the legacy ones are obvious.
+ * data. They render amber so the legacy ones are obvious.
  */
 function BenefitTagPicker({
   label, options, selected, onChange,
@@ -1829,41 +1829,110 @@ function BenefitTagPicker({
   selected: string[];
   onChange: (next: string[]) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  // Close on an outside click or Escape. Without this the panel stays open
+  // behind whatever you click next, inside a modal that already scrolls.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   const legacy = selected.filter((v) => !options.includes(v));
   const toggle = (v: string) =>
     onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
 
+  // Artist types run to a few dozen; a filter box beats scrolling for those.
+  const searchable = options.length > 8;
+  const visible = query.trim()
+    ? options.filter((o) => o.toLowerCase().includes(query.trim().toLowerCase()))
+    : options;
+
   return (
-    <div>
-      <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">{label}</label>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map((o) => {
-          const on = selected.includes(o);
-          return (
+    <div ref={wrapRef} className="relative">
+      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">{label}</label>
+
+      <button
+        type="button"
+        onClick={() => { setOpen((o) => !o); setQuery(""); }}
+        className="flex w-full items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-left text-sm transition-colors hover:border-gray-300 focus:border-[#F25722] focus:outline-none"
+      >
+        <span className={selected.length ? "text-[#111]" : "text-gray-400"}>
+          {selected.length ? selected.join(", ") : `Select ${label.toLowerCase()}…`}
+        </span>
+        <ChevronDown size={15} className={`flex-shrink-0 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 z-20 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
+          {searchable && (
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search…"
+              className="w-full border-b border-gray-100 px-3.5 py-2.5 text-sm text-[#111] placeholder-gray-400 focus:outline-none"
+            />
+          )}
+          <div className="max-h-56 overflow-y-auto py-1">
+            {visible.length === 0 ? (
+              <p className="px-3.5 py-3 text-sm text-gray-400">No matches.</p>
+            ) : visible.map((o) => {
+              const on = selected.includes(o);
+              return (
+                <button
+                  key={o}
+                  type="button"
+                  onClick={() => toggle(o)}
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-[#111] transition-colors hover:bg-gray-50"
+                >
+                  <span className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border ${on ? "border-[#111] bg-[#111]" : "border-gray-300 bg-white"}`}>
+                    {on && <Check size={11} className="text-white" strokeWidth={3} />}
+                  </span>
+                  {o}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {(selected.length > 0 || legacy.length > 0) && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {selected.filter((v) => options.includes(v)).map((o) => (
             <button
               key={o}
               type="button"
               onClick={() => toggle(o)}
-              className={`px-2.5 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                on ? "bg-[#111] border-[#111] text-white" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
-              }`}
+              className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-300"
             >
-              {o}
+              {o} <X size={11} />
             </button>
-          );
-        })}
-        {legacy.map((o) => (
-          <button
-            key={o}
-            type="button"
-            onClick={() => toggle(o)}
-            title="Not in the current list — kept from the existing data. Click to remove."
-            className="px-2.5 py-1.5 rounded-full text-xs font-semibold border border-amber-200 bg-amber-50 text-amber-700"
-          >
-            {o} ×
-          </button>
-        ))}
-      </div>
+          ))}
+          {legacy.map((o) => (
+            <button
+              key={o}
+              type="button"
+              onClick={() => toggle(o)}
+              title="Not in the current list — kept from the existing data. Click to remove."
+              className="flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700"
+            >
+              {o} <X size={11} />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

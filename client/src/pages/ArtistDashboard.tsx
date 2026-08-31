@@ -41,6 +41,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { useUpgrade } from "@/components/UpgradeModal";
 import { formatLocation, getJobTitle } from "@/lib/utils";
 import { toProJobUrl } from "./ProJobDetail";
 
@@ -163,6 +164,7 @@ function formatRate(job: any): string {
 }
 
 function DashboardTab({ user }: { user: any }) {
+  const { open: openUpgrade } = useUpgrade();
   const [, navigate] = useLocation();
   const firstName = user?.firstName || user?.name?.split(" ")[0] || "there";
   const isPro = !!(user?.artswrkPro);
@@ -304,15 +306,16 @@ function DashboardTab({ user }: { user: any }) {
                 <p className="text-xs text-gray-400 py-1">No pending tasks — you're all caught up!</p>
               )}
               {!isPro && (
-                <a
-                  href="/app/settings"
-                  className="flex items-center justify-between gap-2 mt-2 p-3 rounded-xl bg-gradient-to-r from-pink-50 to-orange-50 border border-pink-100 hover:border-pink-200 transition-colors group"
+                <button
+                  type="button"
+                  onClick={() => openUpgrade({ audience: "artist" })}
+                  className="flex w-full items-center justify-between gap-2 mt-2 p-3 rounded-xl bg-gradient-to-r from-pink-50 to-orange-50 border border-pink-100 hover:border-pink-200 transition-colors group"
                 >
                   <span className="text-xs font-semibold text-[#111]">
                     {user?.artswrkBasic ? "Upgrade to Artswrk PRO" : "Upgrade"}
                   </span>
                   <ArrowRight size={13} className="text-[#ec008c] group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
-                </a>
+                </button>
               )}
             </div>
           )}
@@ -561,6 +564,7 @@ function DashboardTab({ user }: { user: any }) {
 type JobsSubTab = "jobs-for-you" | "pro-jobs" | "applications";
 
 function JobsTab({ user }: { user: any }) {
+  const { open: openUpgrade } = useUpgrade();
   // Support deep-linking into a specific subtab via ?tab=applications (etc.),
   // e.g. the "View My Applications" link from the job apply flow.
   const searchStr = useSearch();
@@ -664,12 +668,13 @@ function JobsTab({ user }: { user: any }) {
               <Star size={36} className="mx-auto text-gray-300 mb-3" />
               <p className="text-sm font-semibold text-gray-700 mb-1">No PRO jobs right now</p>
               <p className="text-sm text-gray-500 mb-4">New PRO jobs are posted regularly. Check back soon!</p>
-              <a
-                href="/app/settings"
+              <button
+                type="button"
+                onClick={() => openUpgrade({ audience: "artist", feature: "PRO jobs" })}
                 className="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white artist-grad-bg hover:opacity-80 transition-opacity"
               >
                 Upgrade to PRO →
-              </a>
+              </button>
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
@@ -1825,7 +1830,11 @@ function ProfileTab({ user }: { user: any }) {
 
 // ─── PRO Jobs Tab ─────────────────────────────────────────────────────────────
 
-function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
+function ProJobsTab() {
+  // Both CTAs below used to hard-navigate to /app/settings, which shows the
+  // plan page but never says what PRO costs on the way. The modal does.
+  const { open } = useUpgrade();
+  const onGoToSettings = () => open({ audience: "artist", feature: "PRO jobs", returnPath: "/app/pro-jobs" });
   const { data: planData, isLoading: planLoading } = trpc.artistSubscription.getCurrentPlan.useQuery();
   const { data: pricingData } = trpc.artistSubscription.getPricing.useQuery();
   const { data: proJobsData, isLoading: proJobsLoading } = trpc.artistDashboard.getProJobsFeed.useQuery({ limit: 50 });
@@ -1987,7 +1996,7 @@ export default function ArtistDashboard() {
     if (location.startsWith("/app/payments")) return <PaymentsTab />;
     if (location.startsWith("/app/messages")) return null; // handled separately below
     if (location.startsWith("/app/profile")) return <ArtistProfilePage />;
-    if (location.startsWith("/app/pro-jobs")) return <ProJobsTab onGoToSettings={() => { window.location.href = "/app/settings"; }} />;
+    if (location.startsWith("/app/pro-jobs")) return <ProJobsTab />;
     if (location.startsWith("/app/benefits")) return <Benefits />;
     if (location.startsWith("/app/community")) { window.location.replace("/app"); return null; }
     if (location.startsWith("/app/settings")) return <ArtistSettings />;

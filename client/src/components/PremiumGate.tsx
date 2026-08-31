@@ -1,14 +1,21 @@
 /**
- * Paywall for client-facing premium features.
+ * Paywall and teaser for client-facing premium features.
  *
  * Wrap the feature, not the nav item. Marking something `premium: true` in the
  * dashboard nav only draws a badge — it never blocked anything, so
  * /app/artists and friends were reachable by typing the URL regardless of
  * plan. This is the actual gate.
+ *
+ * Use it only where a free account has no business seeing the feature at all.
+ * Where the content is itself the sales pitch — the artist roster, the jobs
+ * board — leave the feature visible and gate the action instead; that's what
+ * Browse Artists does, and it converts better than an empty page.
+ *
+ * The button opens the same upgrade modal as every other premium CTA.
  */
-import { Link } from "wouter";
 import { Crown, Check } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useUpgrade } from "@/components/UpgradeModal";
 
 /** Plans that carry the client premium feature set. */
 export function hasClientPremium(planTier: string | null | undefined): boolean {
@@ -21,14 +28,17 @@ export function PremiumGate({
   title,
   blurb,
   bullets,
+  feature,
   children,
 }: {
   title: string;
   blurb: string;
   bullets: string[];
+  feature?: string;
   children: React.ReactNode;
 }) {
   const { user, loading } = useAuth();
+  const { open } = useUpgrade();
   const planTier = (user as any)?.planTier as string | undefined;
 
   // Don't flash the paywall at a subscriber while their plan is still loading.
@@ -55,12 +65,13 @@ export function PremiumGate({
         ))}
       </ul>
 
-      <Link
-        href="/app/settings?section=subscription"
+      <button
+        type="button"
+        onClick={() => open({ audience: "client", feature: feature ?? title })}
         className="mt-7 inline-flex items-center justify-center rounded-xl bg-[#111] px-7 py-3.5 text-[15px] font-bold text-white transition-colors hover:bg-[#3D3D4A]"
       >
         Upgrade to Premium →
-      </Link>
+      </button>
       <p className="mt-3 text-xs text-gray-400">
         Questions? Email <a href="mailto:contact@artswrk.com" className="underline">contact@artswrk.com</a>
       </p>

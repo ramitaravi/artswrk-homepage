@@ -13,6 +13,7 @@
 import { useState } from "react";
 import { CheckCircle2, ChevronRight, ExternalLink, Lock, Sparkles } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useUpgrade } from "@/components/UpgradeModal";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -28,42 +29,6 @@ function initials(name: string): string {
 }
 
 // ── Benefit Card ───────────────────────────────────────────────────────────────
-
-/**
- * Sends the viewer to Stripe checkout for the plan that unlocks this page.
- *
- * The banner used to link at /app/settings, which is not where you subscribe —
- * people landed on an account page with no obvious next step. Artists need
- * artist_pro, clients need client_premium, so the audience picks the mutation.
- * Stripe returns to /app/benefits, and the page re-reads the plan on mount, so
- * the benefits are unlocked the moment they come back.
- */
-function useUpgrade(audienceType: "Artist" | "Client") {
-  const [pending, setPending] = useState(false);
-  const clientSub = trpc.clientJobs.createSubscriptionCheckout.useMutation();
-  const artistPro = trpc.artistSubscription.createProCheckout.useMutation();
-
-  const go = async () => {
-    if (pending) return;
-    setPending(true);
-    try {
-      const origin = window.location.origin;
-      const res = audienceType === "Artist"
-        ? await artistPro.mutateAsync({ origin, interval: "year" } as any)
-        : await clientSub.mutateAsync({ origin, interval: "month" } as any);
-      const url = (res as any)?.url;
-      if (url) { window.location.href = url; return; }
-      // No URL back — send them somewhere useful rather than leaving the
-      // button spinning forever.
-      window.location.href = "/app/settings";
-    } catch {
-      window.location.href = "/app/settings";
-    } finally {
-      setPending(false);
-    }
-  };
-  return { go, pending };
-}
 
 function BenefitCard({ benefit, locked, onUpgrade }: { benefit: any; locked: boolean; onUpgrade?: () => void }) {
   const logoUrl = fixUrl(benefit.logoUrl);
@@ -193,7 +158,15 @@ export default function Benefits() {
       : allBenefits.filter((b: any) => b.categories?.includes(activeCategory));
 
   const upgradeLabel = audienceType === "Artist" ? "Artswrk PRO" : "Artswrk Premium";
-  const upgrade = useUpgrade(audienceType);
+  // The banner used to fire Stripe checkout the moment you clicked it — no
+  // price, no plan, straight to a card form. Now it opens the shared modal.
+  const { open } = useUpgrade();
+  const goUpgrade = () =>
+    open({
+      audience: audienceType === "Artist" ? "artist" : "client",
+      feature: "The Benefits Portal",
+      returnPath: "/app/benefits",
+    });
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -208,9 +181,8 @@ export default function Benefits() {
         locked ? (
           <button
             type="button"
-            onClick={upgrade.go}
-            disabled={upgrade.pending}
-            className="flex w-full items-start justify-between gap-4 bg-gradient-to-r from-pink-50 to-orange-50 border border-orange-100 rounded-xl px-4 py-4 mb-7 text-left hover:border-orange-200 transition-colors disabled:opacity-60"
+            onClick={goUpgrade}
+            className="flex w-full items-start justify-between gap-4 bg-gradient-to-r from-pink-50 to-orange-50 border border-orange-100 rounded-xl px-4 py-4 mb-7 text-left hover:border-orange-200 transition-colors"
           >
             <div className="flex items-start gap-3">
               <Sparkles size={18} className="text-[#F25722] flex-shrink-0 mt-0.5" />
@@ -224,7 +196,7 @@ export default function Benefits() {
               </div>
             </div>
             <span className="flex-shrink-0 text-xs font-bold text-white bg-[#F25722] px-3 py-2 rounded-full whitespace-nowrap self-center">
-              {upgrade.pending ? "Opening…" : "Upgrade →"}
+              Upgrade →
             </span>
           </button>
         ) : (
@@ -293,7 +265,7 @@ export default function Benefits() {
       ) : (
         <div className="space-y-4">
           {filtered.map((benefit: any) => (
-            <BenefitCard key={benefit.id} benefit={benefit} locked={locked} onUpgrade={upgrade.go} />
+            <BenefitCard key={benefit.id} benefit={benefit} locked={locked} onUpgrade={goUpgrade} />
           ))}
         </div>
       )}

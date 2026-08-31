@@ -4,6 +4,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { UpgradeProvider } from "@/components/UpgradeModal";
 import Home from "./pages/Home";
 import Jobs from "./pages/Jobs";
 import Login from "./pages/Login";
@@ -399,10 +400,15 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
-          <Toaster />
-          <ImpersonationBanner />
-          <CheckoutSessionVerifier />
-          <Router />
+          {/* Every premium CTA on the site opens the same modal — see
+              components/UpgradeModal.tsx for why. It has to sit above the
+              router so any page can reach it. */}
+          <UpgradeProvider>
+            <Toaster />
+            <ImpersonationBanner />
+            <CheckoutSessionVerifier />
+            <Router />
+          </UpgradeProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

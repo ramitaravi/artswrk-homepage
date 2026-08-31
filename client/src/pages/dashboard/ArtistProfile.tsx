@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { useUpgrade } from "@/components/UpgradeModal";
 import { formatLocation } from "@/lib/utils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -420,15 +421,7 @@ export default function ArtistProfile() {
     { enabled: artistId > 0 }
   );
 
-  const subscribeCheckout = trpc.clientJobs.createSubscriptionCheckout.useMutation({
-    onSuccess: (data) => {
-      if (data.url) {
-        window.open(data.url, "_blank");
-        toast.success("Redirecting to Artswrk Premium checkout…");
-      }
-    },
-    onError: (err) => toast.error("Checkout failed", { description: err.message }),
-  });
+  const { open: openUpgrade } = useUpgrade();
 
   const handleShare = () => {
     const url = window.location.href;
@@ -486,12 +479,11 @@ export default function ArtistProfile() {
           </p>
         </div>
         <button
-          onClick={() => subscribeCheckout.mutate({ interval: "month", origin: window.location.origin })}
-          disabled={subscribeCheckout.isPending}
-          className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white bg-[#111] hover:opacity-90 transition-opacity disabled:opacity-60"
+          onClick={() => openUpgrade({ audience: "client", feature: "Full artist profiles" })}
+          className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white bg-[#111] hover:opacity-90 transition-opacity"
         >
-          {subscribeCheckout.isPending ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
-          Subscribe to connect
+          <Sparkles size={15} />
+          See Premium
         </button>
         <Link href="/app/artists" className="text-sm text-gray-400 font-semibold hover:text-[#111]">← Back to Artists</Link>
       </div>

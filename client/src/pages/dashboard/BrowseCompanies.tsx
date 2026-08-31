@@ -13,6 +13,7 @@ import {
   Sparkles, Lock, Car, Map as MapIcon, Grid as GridIcon,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useUpgrade } from "@/components/UpgradeModal";
 import { formatLocation } from "@/lib/utils";
 import { MapView } from "@/components/Map";
 import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
@@ -121,6 +122,7 @@ function CompanyCard({ company }: { company: Company }) {
 // ─── Locked (non-PRO) state ────────────────────────────────────────────────────
 
 function LockedState() {
+  const { open } = useUpgrade();
   return (
     <div className="rounded-3xl bg-[#111] p-8 md:p-12 relative overflow-hidden text-center">
       <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 50% 0%, rgba(236,0,140,0.35) 0%, transparent 60%)" }} />
@@ -133,12 +135,13 @@ function LockedState() {
         <p className="text-white/60 text-sm mb-7 leading-relaxed">
           Upgrade to Artswrk PRO to get full access to studio profiles — locations, transport policies, websites, and more — so you always know who you're working with before you apply.
         </p>
-        <Link
-          href="/subscribe/pro"
+        <button
+          type="button"
+          onClick={() => open({ audience: "artist", feature: "Browse Companies", returnPath: "/app/companies" })}
           className="inline-flex items-center gap-2 bg-[#ec008c] text-white text-sm font-bold px-6 py-3 rounded-full hover:opacity-90 transition-opacity"
         >
           <Sparkles size={15} /> Upgrade to PRO
-        </Link>
+        </button>
       </div>
     </div>
   );

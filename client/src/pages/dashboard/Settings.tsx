@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { useUpgrade } from "@/components/UpgradeModal";
 import { toast } from "sonner";
 import CompanyManager from "@/components/CompanyManager";
 import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
@@ -284,12 +285,13 @@ function SubscriptionTab() {
   const { user } = useAuth();
   // auth.me already returns the full DB row — see AccountTab above.
   const artswrkUser = user as any;
+  const { open: openUpgrade } = useUpgrade();
 
   const isPremium = artswrkUser?.planTier === "client_premium";
 
-  const subMutation = trpc.clientJobs.createSubscriptionCheckout.useMutation();
   const portalMutation = trpc.clientJobs.createPortalSession.useMutation({
-    onSuccess: ({ url }) => window.open(url, "_blank"),
+    // Same tab: window.open a tick after the click is what popup blockers eat.
+    onSuccess: ({ url }) => { window.location.href = url; },
     onError: (err) => toast.error("Couldn't open billing portal", { description: err.message }),
   });
 
@@ -301,32 +303,43 @@ function SubscriptionTab() {
       </div>
 
       <div className="border-t border-gray-100 pt-6">
-        {/* On-Demand */}
+        {/* On-Demand — this is what you are on if you haven't subscribed. The
+            page used to mark no plan as current at all, so a free account
+            opened "My Plan" and saw three cards and no answer to the only
+            question they came with. */}
         <div className="flex items-start justify-between gap-4 mb-3">
           <h3 className="text-xl font-black text-[#111]">Artswrk On-Demand</h3>
+          {!isPremium && (
+            <span className="text-[10px] font-black tracking-widest uppercase px-3 py-1 border border-gray-200 rounded-full text-gray-500 flex-shrink-0">
+              Current Plan
+            </span>
+          )}
         </div>
         <div className="inline-flex items-center gap-1 mb-4">
           <span className="px-3 py-1.5 rounded-full bg-orange-50 border border-orange-100 text-sm font-bold text-[#F25722]">
-            $40 Unlock
+            Free to post · $40 to unlock applicants
           </span>
         </div>
         <div className="space-y-1.5 mb-5">
-          <PlanFeature text="Post a single job and view all applicants" />
+          <PlanFeature text="Post a job free, then unlock the applicant list per job as needed" />
           <PlanFeature text="Hire directly from your applicant pool" />
-          <PlanFeature text="Access to Artswrk artist network" />
+          <PlanFeature text="Browse artists sitewide" />
+          <PlanFeature text="Job boosts for more visibility and traction" />
         </div>
-        <a
-          href="/join"
-          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors"
-        >
-          Get Started →
-        </a>
+        {!isPremium && (
+          <a
+            href="/post-job"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-gray-200 text-[#111] text-sm font-bold hover:bg-gray-50 transition-colors"
+          >
+            Post a job →
+          </a>
+        )}
       </div>
 
       <div className="border-t border-gray-100 pt-6">
-        {/* Subscription */}
+        {/* Premium */}
         <div className="flex items-start justify-between gap-4 mb-3">
-          <h3 className="text-xl font-black text-[#111]">Artswrk Subscription</h3>
+          <h3 className="text-xl font-black text-[#111]">Artswrk Premium</h3>
           {isPremium && (
             <span className="text-[10px] font-black tracking-widest uppercase px-3 py-1 border border-gray-200 rounded-full text-gray-500 flex-shrink-0">
               Current Plan
@@ -335,20 +348,19 @@ function SubscriptionTab() {
         </div>
         <div className="inline-flex items-center gap-1 mb-4">
           <span className="px-3 py-1.5 rounded-full bg-orange-50 border border-orange-100 text-sm font-bold text-[#F25722]">
-            $65/month or $650/yr
+            $65/mo or $650/yr
           </span>
         </div>
         <p className="text-sm text-gray-500 mb-1">Unlock the entire Artswrk platform.</p>
         <p className="text-sm font-semibold text-[#F25722] mb-4">Posting more than 1 job? This plan saves you money.</p>
         <div className="space-y-1.5 mb-5">
-          <PlanFeature text="Unlimited jobs unlocked" />
+          <PlanFeature text="Unlimited applicant unlocks across all your job postings" />
           <PlanFeature text="Post unlimited jobs" />
           <PlanFeature text="Browse and book 6,000+ artists" />
-          <PlanFeature text="Custom Hiring Profile" />
-          <PlanFeature text="Save & Favorite Artists" />
-          <PlanFeature text="Build Custom Sub Lists" />
+          <PlanFeature text="Customized hiring page for your business" />
+          <PlanFeature text="Favorite artists and rebook them fast" />
           <PlanFeature text="Dedicated recruiting support from Artswrk" />
-          <PlanFeature text="Access to $1,000+ in partner discounts (pays back 1.5x your annual membership)" />
+          <PlanFeature text="Benefits Portal — discounts that pay back the annual subscription 3x over" />
         </div>
         {isPremium ? (
           <button
@@ -360,35 +372,31 @@ function SubscriptionTab() {
             Manage Subscription →
           </button>
         ) : (
-          <a
-            href="/join"
+          /* Was <a href="/join"> — a marketing page, from inside the logged-in
+             dashboard. You could not actually subscribe from "My Plan". */
+          <button
+            onClick={() => openUpgrade({ audience: "client", returnPath: "/app/settings?section=subscription" })}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors"
           >
-            Subscribe →
-          </a>
+            Upgrade to Premium →
+          </button>
         )}
       </div>
 
+      {/* Artswrk Business is gone. It wasn't a plan — it appears nowhere in the
+          pricing source of truth, and its only CTA was a mailto. Enterprise is
+          sold by conversation, not from a self-serve plan page. */}
       <div className="border-t border-gray-100 pt-6">
-        {/* Business */}
-        <h3 className="text-xl font-black text-[#111] mb-3">Artswrk Business</h3>
-        <div className="inline-flex items-center gap-1 mb-4">
-          <span className="px-3 py-1.5 rounded-full bg-orange-50 border border-orange-100 text-sm font-bold text-[#F25722]">
-            Custom Pricing
-          </span>
-        </div>
-        <div className="space-y-1.5 mb-5">
-          <PlanFeature text="View submissions and hire artists" />
-          <PlanFeature text="Compatible with your payroll" />
-          <PlanFeature text="Access a global network of artists" />
-          <PlanFeature text="1:1 with Artswrk Team" />
-        </div>
-        <a
-          href="mailto:contact@artswrk.com?subject=Artswrk%20Business%20Inquiry"
-          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors"
-        >
-          Schedule a call →
-        </a>
+        <p className="text-sm text-gray-500">
+          Hiring at scale, or need PRO job postings?{" "}
+          <a
+            href="mailto:contact@artswrk.com?subject=Artswrk%20Enterprise%20Inquiry"
+            className="font-semibold text-[#F25722] hover:underline"
+          >
+            Talk to us about Enterprise
+          </a>
+          .
+        </p>
       </div>
     </div>
   );

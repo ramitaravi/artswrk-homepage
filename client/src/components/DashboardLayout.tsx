@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import {
   LayoutDashboard,
   Briefcase,
@@ -34,6 +34,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { isNavItemActive } from "@shared/nav";
 
 interface NavItem {
   label: string;
@@ -146,9 +147,27 @@ function CollapsibleNavItem({ label, icon, children, isArtist, defaultOpen = fal
   );
 }
 
-function NavLink({ item, isArtist }: { item: NavItem; isArtist: boolean }) {
+/**
+ * Is this nav item the page we're on?
+ *
+ * wouter's useLocation() returns the pathname only — no query string — so the
+ * old `location.startsWith(item.href)` could never match "My Artists"
+ * (/app/artists?tab=my) and it stayed unhighlighted no matter where you were.
+ * Worse, Browse Artists (/app/artists) matched BOTH tabs, so the wrong row lit
+ * up. Compare the path and the query separately, and only treat a query as
+ * significant when the item actually carries one.
+ */
+function useIsNavActive(href: string): boolean {
   const [location] = useLocation();
-  const isActive = location === item.href || (item.href !== "/app" && location.startsWith(item.href));
+  // useSearch, not window.location.search: the query is the only thing that
+  // changes when you move between /app/artists and /app/artists?tab=my, and
+  // reading it off window wouldn't re-render the sidebar when it did.
+  const search = useSearch();
+  return isNavItemActive(href, location, search);
+}
+
+function NavLink({ item, isArtist }: { item: NavItem; isArtist: boolean }) {
+  const isActive = useIsNavActive(item.href);
   const activeColor = isArtist ? "bg-pink-50 text-[#ec008c]" : "bg-orange-50 text-[#F25722]";
   const badgeColor = isArtist ? "bg-[#ec008c]" : "bg-[#F25722]";
 

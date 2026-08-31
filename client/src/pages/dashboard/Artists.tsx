@@ -6,13 +6,14 @@
  */
 
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import {
   Search, Users, ChevronRight, Loader2,
   Heart, ArrowRight, CalendarCheck, Lock, Sparkles, MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PremiumGate } from "@/components/PremiumGate";
+import { useUpgrade } from "@/components/UpgradeModal";
 import { trpc } from "@/lib/trpc";
 import { formatLocation } from "@/lib/utils";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -387,22 +388,16 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
   const planTier = (user as any)?.planTier;
   const canConnect = planTier === "client_premium" || planTier === "enterprise_subscription";
 
-  const subscribeCheckout = trpc.clientJobs.createSubscriptionCheckout.useMutation({
-    onSuccess: (data) => {
-      if (data.url) {
-        window.open(data.url, "_blank");
-        toast.success("Redirecting to Artswrk Premium checkout…");
-      }
-    },
-    onError: (err) => toast.error("Checkout failed", { description: err.message }),
-  });
+  // Clicking an artist used to fire Stripe checkout on the spot — a toast, then
+  // a new tab asking for a card, with the price never shown. Now it opens the
+  // same upgrade modal as everywhere else.
+  const { open: openUpgrade } = useUpgrade();
 
   function handleArtistClick(artistId: number) {
     if (canConnect) {
       navigate(`/app/artists/${artistId}`);
     } else {
-      toast("Subscribe to Premium to view full profiles and connect with artists.");
-      subscribeCheckout.mutate({ interval: "month", origin: window.location.origin });
+      openUpgrade({ audience: "client", feature: "Viewing full artist profiles" });
     }
   }
 
@@ -456,12 +451,10 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
               </div>
             </div>
             <button
-              onClick={() => subscribeCheckout.mutate({ interval: "month", origin: window.location.origin })}
-              disabled={subscribeCheckout.isPending}
-              className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-bold text-[#111] bg-white hover:bg-gray-100 transition-colors disabled:opacity-60 flex items-center gap-1.5"
+              onClick={() => openUpgrade({ audience: "client", feature: "Connecting with artists" })}
+              className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-bold text-[#111] bg-white hover:bg-gray-100 transition-colors"
             >
-              {subscribeCheckout.isPending && <Loader2 size={13} className="animate-spin" />}
-              Subscribe
+              See Premium →
             </button>
           </div>
         )}
@@ -767,13 +760,14 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
 type Tab = "browse" | "my";
 
 export default function Artists() {
-  // The sidebar links straight to the My Artists tab, so honour ?tab=my rather
-  // than always opening on Browse.
-  const initialTab: Tab =
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "my"
-      ? "my"
-      : "browse";
-  const [tab, setTab] = useState<Tab>(initialTab);
+  // The tab lives in the URL, not just in state. The sidebar links straight to
+  // ?tab=my, and it highlights the row that matches the query — so if an
+  // in-page tab click didn't update the URL, the sidebar would keep pointing at
+  // the tab you just left.
+  const search = useSearch();
+  const [, navigate] = useLocation();
+  const tab: Tab = new URLSearchParams(search).get("tab") === "my" ? "my" : "browse";
+  const setTab = (t: Tab) => navigate(t === "my" ? "/app/artists?tab=my" : "/app/artists");
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "browse", label: "Browse Artists" },
@@ -797,24 +791,23 @@ export default function Artists() {
         ))}
       </div>
 
-      {tab === "browse" && (
-        <PremiumGate
-          title="Browse the full artist roster"
-          blurb="Search 6,000+ vetted artists by discipline, location and availability — and reach out directly, before they ever see a job post."
-          bullets={[
-            "Search every artist on Artswrk by service, style and area",
-            "See full profiles, reels, resumes and rates",
-            "Message artists directly instead of waiting for applicants",
-            "Save the ones you like and rebook them in a click",
-          ]}
-        >
-          <BrowseArtistsTab />
-        </PremiumGate>
-      )}
+      {/* Browse is a teaser, not a wall. It was behind a full PremiumGate, which
+          showed a free account nothing at all — and the roster is the single
+          most persuasive thing we have. The tab already gates the part that
+          matters (opening a profile or messaging prompts the upgrade), and the
+          pricing source of truth puts "browse artists sitewide" on every client
+          tier, with favourites as the Premium line. So: show the grid, sell on
+          top of it. */}
+      {tab === "browse" && <BrowseArtistsTab />}
+
+      {/* My Artists stays a hard gate: favouriting and saved rosters are the
+          Premium line in the pricing doc, and there's nothing to preview until
+          someone has one. */}
       {tab === "my" && (
         <PremiumGate
           title="Keep your own roster of artists"
           blurb="The teachers who already work for you, in one place — who applied, who you hired, and the favourites you want back."
+          feature="My Artists"
           bullets={[
             "Everyone who has applied to your jobs, in one list",
             "Every artist you have hired, with their history",

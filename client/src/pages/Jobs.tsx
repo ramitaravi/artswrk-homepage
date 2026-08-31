@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Link, useSearch, useLocation as useWouterLocation, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useUpgrade } from "@/components/UpgradeModal";
 import { formatLocation, getJobTitle } from "@/lib/utils";
 import JobListCard, { ApplyCta } from "@/components/JobListCard";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -162,6 +163,7 @@ function SubscriptionPaywallModal({
   onClose: () => void;
   isLoggedIn: boolean;
 }) {
+  const { open: openUpgrade } = useUpgrade();
   if (!isOpen) return null;
 
   return (
@@ -253,12 +255,22 @@ function SubscriptionPaywallModal({
                   Priority in search results
                 </li>
               </ul>
-              <Link
-                href={isLoggedIn ? "/subscribe/pro" : "/join?next=/subscribe/pro"}
-                className="block w-full text-center text-xs font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors py-2.5 rounded-xl"
-              >
-                Get PRO <ArrowRight size={12} className="inline ml-1" />
-              </Link>
+              {isLoggedIn ? (
+                <button
+                  type="button"
+                  onClick={() => openUpgrade({ audience: "artist", feature: "PRO jobs" })}
+                  className="block w-full text-center text-xs font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors py-2.5 rounded-xl"
+                >
+                  Get PRO <ArrowRight size={12} className="inline ml-1" />
+                </button>
+              ) : (
+                <Link
+                  href="/join?next=/subscribe/pro"
+                  className="block w-full text-center text-xs font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors py-2.5 rounded-xl"
+                >
+                  Get PRO <ArrowRight size={12} className="inline ml-1" />
+                </Link>
+              )}
             </div>
           </div>
 
@@ -413,6 +425,7 @@ function ApplicationCard({ job, status }: { job: DisplayApplication; status: App
 type Tab = "near-me" | "pro" | "applications";
 
 export default function Jobs({ inDashboard = false }: { inDashboard?: boolean }) {
+  const { open: openUpgrade } = useUpgrade();
   const searchStr = useSearch();
   const searchParams = new URLSearchParams(searchStr);
   const [path] = useLocation();
@@ -866,12 +879,22 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
                     </p>
                   </div>
                 </div>
-                <Link
-                  href={isAuthenticated ? "/subscribe/pro" : "/join?next=/subscribe/pro"}
-                  className="flex-shrink-0 flex items-center gap-1.5 text-xs font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors px-4 py-2 rounded-full"
-                >
-                  Upgrade <ArrowRight size={12} />
-                </Link>
+                {isAuthenticated ? (
+                  <button
+                    type="button"
+                    onClick={() => openUpgrade({ audience: "artist", feature: "PRO jobs" })}
+                    className="flex-shrink-0 flex items-center gap-1.5 text-xs font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors px-4 py-2 rounded-full"
+                  >
+                    Upgrade <ArrowRight size={12} />
+                  </button>
+                ) : (
+                  <Link
+                    href="/join?next=/subscribe/pro"
+                    className="flex-shrink-0 flex items-center gap-1.5 text-xs font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors px-4 py-2 rounded-full"
+                  >
+                    Upgrade <ArrowRight size={12} />
+                  </Link>
+                )}
               </div>
             )}
 

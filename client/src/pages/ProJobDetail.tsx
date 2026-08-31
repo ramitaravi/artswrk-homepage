@@ -13,6 +13,7 @@ import {
   FileText, Upload, DollarSign, Share2, ExternalLink, Lock,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useUpgrade } from "@/components/UpgradeModal";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { slugify, extractIdFromSlug } from "./JobDetail";
 import Navbar from "@/components/Navbar";
@@ -324,10 +325,11 @@ export default function ProJobDetail() {
   const [appliedSummary, setAppliedSummary] = useState<ApplicationSummary | null>(null);
   const applyRef = useRef<HTMLDivElement>(null);
 
-  const proCheckoutMutation = trpc.artistSubscription.createProCheckout.useMutation({
-    onSuccess: (data: { url: string }) => { window.location.href = data.url; },
-    onError: (err) => { console.error("[PRO checkout]", err); toast.error("Checkout failed: " + err.message); },
-  });
+  // Neither unlock button here showed a price before firing Stripe — you
+  // clicked "Unlock PRO" on a job and landed on a card form. The modal names
+  // the price and the trial first.
+  const { open: openUpgrade } = useUpgrade();
+  const unlockPro = () => openUpgrade({ audience: "artist", feature: "PRO jobs", returnPath: jobUrl });
 
   // Sync applied state + summary from server once loaded.
   // Use functional update so an already-set in-session summary is never overwritten.
@@ -663,18 +665,13 @@ export default function ProJobDetail() {
                 </div>
                 <div className="bg-white p-3.5">
                   <button
-                    onClick={() => proCheckoutMutation.mutate({
-                      origin: window.location.origin,
-                      returnPath: jobUrl,
-                    })}
-                    disabled={proCheckoutMutation.isPending}
-                    className="w-full text-left rounded-xl border border-gray-100 hover:border-pink-200 hover:bg-pink-50/30 transition-colors p-3.5 disabled:opacity-60"
+                    onClick={unlockPro}
+                    className="w-full text-left rounded-xl border border-gray-100 hover:border-pink-200 hover:bg-pink-50/30 transition-colors p-3.5"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-bold text-[#111]">Artswrk PRO</span>
-                      <span className="text-sm font-black text-[#ec008c] flex-shrink-0 flex items-center gap-1.5">
-                        {proCheckoutMutation.isPending && <Loader2 size={13} className="animate-spin" />}
-                        Unlock →
+                      <span className="text-sm font-black text-[#ec008c] flex-shrink-0">
+                        $110/yr →
                       </span>
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5">PRO jobs, partner discounts &amp; more</p>
@@ -726,15 +723,10 @@ export default function ProJobDetail() {
           </a>
         ) : !isPro ? (
           <button
-            onClick={() => proCheckoutMutation.mutate({
-              origin: window.location.origin,
-              returnPath: jobUrl,
-            })}
-            disabled={proCheckoutMutation.isPending}
-            className="artist-grad-bg flex-shrink-0 px-6 py-3 rounded-2xl text-sm font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
+            onClick={unlockPro}
+            className="artist-grad-bg flex-shrink-0 px-6 py-3 rounded-2xl text-sm font-bold text-white hover:opacity-90 transition-opacity flex items-center gap-2"
           >
-            {proCheckoutMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : "🔒"}
-            Unlock PRO
+            🔒 Unlock PRO
           </button>
         ) : (
           <button
