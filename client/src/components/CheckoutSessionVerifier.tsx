@@ -9,37 +9,34 @@
  * boost need different success messaging), so it's skipped here to avoid a
  * redundant duplicate call.
  *
- * Checkout opens in a new tab, so the verify happens THERE — and the tab the
- * user actually came from would sit on a stale, still-locked page until they
- * reloaded it. On success we broadcast, and every other open tab refetches.
+ * Checkout opens in a new tab, so the verify happens THERE. Two consequences,
+ * both handled here: the tab the user came from would otherwise sit on a
+ * stale, locked page, and they would be left with two tabs on the same thing.
+ * On success we tell the other tabs to refetch and — once one confirms it
+ * heard us — this tab closes, dropping the user back where they started.
  */
 import { useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-
-/** Same-origin channel name; only our own tabs can hear it. */
-const PLAN_CHANGED = "artswrk:plan-changed";
+import { announceVerified, listenForPlanChange, wasOpenedByUs } from "@/lib/planSync";
 
 export default function CheckoutSessionVerifier() {
   const utils = trpc.useUtils();
   const hasRun = useRef(false);
 
   // Another tab finished a checkout — pick up the new plan without a reload.
-  useEffect(() => {
-    if (typeof BroadcastChannel === "undefined") return;
-    const ch = new BroadcastChannel(PLAN_CHANGED);
-    ch.onmessage = () => { utils.invalidate(); };
-    return () => ch.close();
-  }, [utils]);
+  useEffect(() => listenForPlanChange(() => { utils.invalidate(); }), [utils]);
 
   const verifySession = trpc.checkout.verifySession.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       utils.invalidate();
-      if (typeof BroadcastChannel !== "undefined") {
-        const ch = new BroadcastChannel(PLAN_CHANGED);
-        ch.postMessage("verified");
-        ch.close();
-      }
+
+      // Hand back to the tab they came from, but only once it has confirmed it
+      // heard us. If nothing acks — BroadcastChannel unsupported, or the
+      // original tab is gone — this is the only tab showing the result, so it
+      // stays open.
+      const handedOff = await announceVerified();
+      if (handedOff && wasOpenedByUs()) window.close();
     },
     onError: (err) => {
       console.error("[CheckoutSessionVerifier]", err.message);
