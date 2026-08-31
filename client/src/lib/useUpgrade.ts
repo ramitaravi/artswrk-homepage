@@ -78,6 +78,7 @@ export function useUpgrade() {
         origin,
         interval: req.interval ?? "month",
         jobId: req.jobId,
+        returnPath: req.returnPath ?? window.location.pathname,
       });
     }
   };

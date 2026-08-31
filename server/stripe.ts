@@ -218,7 +218,8 @@ export async function createArtistProCheckoutSession(
       ? { trial_period_days: ARTIST_PRO.annual.trialPeriodDays }
       : undefined,
     success_url: `${opts.origin}${successPath}${separator}plan=pro&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${opts.origin}/app/settings?cancelled=1`,
+    // Back where they started, not a settings page they never asked for.
+    cancel_url: `${opts.origin}${successPath}${separator}cancelled=1`,
     allow_promotion_codes: true,
     client_reference_id: opts.userId?.toString(),
     metadata: {
@@ -260,7 +261,7 @@ export async function createArtistBasicCheckoutSession(
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${opts.origin}${successPath}${separator}plan=basic&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${opts.origin}/app/settings?cancelled=1`,
+    cancel_url: `${opts.origin}${successPath}${separator}cancelled=1`,
     allow_promotion_codes: true,
     client_reference_id: opts.userId?.toString(),
     metadata: {
@@ -452,12 +453,18 @@ export async function createClientJobUnlockCheckoutSession(
  * Monthly: $65/mo  |  Annual: $650/yr
  */
 export async function createClientSubscriptionCheckoutSession(
-  opts: CreateCheckoutOptions & { jobId?: number; interval?: "month" | "year" }
+  opts: CreateCheckoutOptions & { jobId?: number; interval?: "month" | "year"; returnPath?: string }
 ): Promise<{ url: string; sessionId: string }> {
   const stripe = getStripe();
   const interval = opts.interval ?? "month";
   const isAnnual = interval === "year";
-  const returnJobPath = opts.jobId ? `/app/jobs/${opts.jobId}` : "/app/jobs";
+  // Where they came from wins. Failing that, the job they were unlocking; then
+  // the jobs list. Before returnPath existed, EVERY client upgrade landed on
+  // /app/jobs — so subscribing from Benefits, Browse Artists or My Plan bounced
+  // you somewhere unrelated and you had to navigate back to the thing you had
+  // just paid to unlock. The artist flows already took a returnPath.
+  const returnJobPath = opts.returnPath ?? (opts.jobId ? `/app/jobs/${opts.jobId}` : "/app/jobs");
+  const separator = returnJobPath.includes("?") ? "&" : "?";
   const plan = STRIPE_PRODUCTS.CLIENT_PREMIUM;
   const tier = isAnnual ? plan.annual : plan.monthly;
 
@@ -482,7 +489,7 @@ export async function createClientSubscriptionCheckoutSession(
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode: "subscription",
     line_items: [lineItem],
-    success_url: `${opts.origin}${returnJobPath}?subscribed=1&session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${opts.origin}${returnJobPath}${separator}subscribed=1&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${opts.origin}${returnJobPath}`,
     allow_promotion_codes: true,
     client_reference_id: opts.userId?.toString(),

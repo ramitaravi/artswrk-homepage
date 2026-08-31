@@ -4535,7 +4535,14 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
       }),
     /** Start a Stripe checkout for a client monthly subscription ($50/mo). */
     createSubscriptionCheckout: protectedProcedure
-      .input(z.object({ jobId: z.number().optional(), origin: z.string(), interval: z.enum(["month", "year"]).optional() }))
+      .input(z.object({
+        jobId: z.number().optional(),
+        origin: z.string(),
+        interval: z.enum(["month", "year"]).optional(),
+        // Must start with "/" — this is interpolated straight into the Stripe
+        // success_url, so an absolute URL here would be an open redirect.
+        returnPath: z.string().regex(/^\/[^\/\\]/).max(512).optional(),
+      }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
@@ -4546,6 +4553,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           origin: input.origin,
           jobId: input.jobId,
           interval: input.interval,
+          returnPath: input.returnPath,
         });
         return { url };
       }),
