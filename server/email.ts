@@ -690,6 +690,36 @@ export async function sendPayoutOnTheWayEmail({
 }
 
 /**
+ * Artist payment-received notification. Shared by both the regular booking
+ * invoice path and the admin booking-period path (checkoutEffects.ts) —
+ * previously each had its own hand-copied inline HTML block that didn't
+ * match the renderEmailShell/detailsCard house style everything else uses.
+ */
+export async function sendArtistPaymentReceivedEmail({
+  to, firstName, bookingLabel, amount,
+}: {
+  to: string; firstName: string; bookingLabel: string; amount: string;
+}): Promise<boolean> {
+  const total = `$${String(amount).replace(/^\$/, "")}`;
+  const html = renderEmailShell({
+    accent: "artist",
+    headline: "Your payment has been received!",
+    preheader: `You were just paid ${total} for ${bookingLabel}.`,
+    bodyHtml:
+      para("Hi " + b(firstName) + ",") +
+      para("Great news — the studio has paid your invoice for " + b(bookingLabel) + ".") +
+      detailsCard([
+        { label: "Amount", value: total },
+        { label: "Booking", value: bookingLabel },
+      ]),
+    ctaText: "View My Wallet",
+    ctaUrl: `${APP_URL}/app/payments`,
+    footerNote: "Best,<br>The Artswrk Team",
+  });
+  return sendSimpleEmail({ to, subject: `Payment Received — ${bookingLabel}`, html });
+}
+
+/**
  * C9 — Client payment receipt. NEW: without it, clients get only Stripe's
  * generic receipt once Bubble stops sending.
  */

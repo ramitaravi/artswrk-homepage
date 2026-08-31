@@ -230,23 +230,27 @@ export async function applyCheckoutSessionCompleted(session: any): Promise<void>
         if (booking?.artistUserId) {
           const artist = await getUser(booking.artistUserId);
           if (artist?.email) {
-            const { sendSimpleEmail } = await import("./email");
-            await sendSimpleEmail({
+            const { sendArtistPaymentReceivedEmail } = await import("./email");
+            await sendArtistPaymentReceivedEmail({
               to: artist.email,
-              subject: `Payment received — ${periodLabel}`,
-              html: `<p>Hi ${artist.firstName ?? "there"},</p><p>Your invoice for <strong>${periodLabel}</strong> has been paid.</p><p><strong>Amount: $${totalDollars.toFixed(2)}</strong></p><p>Best,<br/>The Artswrk Team</p>`,
+              firstName: artist.firstName ?? "there",
+              bookingLabel: periodLabel,
+              amount: totalDollars.toFixed(2),
             });
           }
         }
         if (booking?.clientUserId) {
           const client = await getUser(booking.clientUserId);
           if (client?.email) {
-            const { sendSimpleEmail } = await import("./email");
+            const { sendClientPaymentReceiptEmail } = await import("./email");
             const grossDollars = (session.amount_total ?? 0) / 100;
-            await sendSimpleEmail({
+            const artist = booking.artistUserId ? await getUser(booking.artistUserId) : null;
+            await sendClientPaymentReceiptEmail({
               to: client.email,
-              subject: `Payment confirmed — ${periodLabel}`,
-              html: `<p>Hi ${(client as any).clientCompanyName ?? client.firstName ?? "there"},</p><p>Your payment for <strong>${periodLabel}</strong> has been processed.</p><p><strong>Amount: $${grossDollars.toFixed(2)}</strong></p><p>You'll also receive a separate receipt from Stripe.</p><p>Best,<br/>The Artswrk Team</p>`,
+              firstName: (client as any).clientCompanyName ?? client.firstName ?? "there",
+              artistName: artist?.name ?? artist?.firstName ?? "your artist",
+              date: periodLabel,
+              total: grossDollars.toFixed(2),
             }).catch((e: any) => console.error("[Checkout] Client confirmation email failed:", e.message));
           }
         }
@@ -314,25 +318,12 @@ export async function applyCheckoutSessionCompleted(session: any): Promise<void>
         if (booking?.artistUserId) {
           const artist = await getUser(booking.artistUserId);
           if (artist?.email) {
-            const { sendSimpleEmail } = await import("./email");
-            await sendSimpleEmail({
+            const { sendArtistPaymentReceivedEmail } = await import("./email");
+            await sendArtistPaymentReceivedEmail({
               to: artist.email,
-              subject: `Payment Received — Booking #${bookingId}`,
-              html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px">
-                <div style="text-align:center;margin-bottom:24px">
-                  <span style="font-size:22px;font-weight:900">
-                    <span style="background:linear-gradient(90deg,#FFBC5D,#F25722);-webkit-background-clip:text;-webkit-text-fill-color:transparent">ARTS</span><span style="background:#111;color:#fff;padding:2px 8px;border-radius:4px;margin-left:2px">WRK</span>
-                  </span>
-                </div>
-                <h2 style="color:#111;margin:0 0 16px">Your payment has been received!</h2>
-                <p style="color:#444;font-size:15px;margin:0 0 12px">Hi ${artist.firstName ?? artist.name ?? "there"},</p>
-                <p style="color:#444;font-size:15px;margin:0 0 20px">Great news — the studio has paid your invoice for Booking #${bookingId}.</p>
-                <div style="background:#f9f9f9;border-radius:8px;padding:16px 20px;margin-bottom:20px">
-                  <p style="margin:0;font-size:15px;color:#111"><strong>Amount:</strong> $${totalDollars.toFixed(2)}</p>
-                  <p style="margin:4px 0 0;font-size:13px;color:#666">Booking #${bookingId}</p>
-                </div>
-                <p style="color:#444;font-size:14px">Best,<br>The Artswrk Team</p>
-              </div>`,
+              firstName: artist.firstName ?? artist.name ?? "there",
+              bookingLabel: `Booking #${bookingId}`,
+              amount: totalDollars.toFixed(2),
             });
             console.log(`[Checkout] Sent payment confirmation to artist ${artist.email}`);
           }
@@ -344,26 +335,15 @@ export async function applyCheckoutSessionCompleted(session: any): Promise<void>
         if (booking?.clientUserId) {
           const client = await getUser(booking.clientUserId);
           if (client?.email) {
-            const { sendSimpleEmail } = await import("./email");
+            const { sendClientPaymentReceiptEmail } = await import("./email");
             const grossDollars = (session.amount_total ?? 0) / 100;
-            await sendSimpleEmail({
+            const artist = booking.artistUserId ? await getUser(booking.artistUserId) : null;
+            await sendClientPaymentReceiptEmail({
               to: client.email,
-              subject: `Payment Confirmed — Booking #${bookingId}`,
-              html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px">
-                <div style="text-align:center;margin-bottom:24px">
-                  <span style="font-size:22px;font-weight:900">
-                    <span style="background:linear-gradient(90deg,#FFBC5D,#F25722);-webkit-background-clip:text;-webkit-text-fill-color:transparent">ARTS</span><span style="background:#111;color:#fff;padding:2px 8px;border-radius:4px;margin-left:2px">WRK</span>
-                  </span>
-                </div>
-                <h2 style="color:#111;margin:0 0 16px">Payment confirmed</h2>
-                <p style="color:#444;font-size:15px;margin:0 0 12px">Hi ${(client as any).clientCompanyName ?? client.firstName ?? "there"},</p>
-                <p style="color:#444;font-size:15px;margin:0 0 20px">Your payment for Booking #${bookingId} has been processed.</p>
-                <div style="background:#f9f9f9;border-radius:8px;padding:16px 20px;margin-bottom:20px">
-                  <p style="margin:0;font-size:15px;color:#111"><strong>Amount:</strong> $${grossDollars.toFixed(2)}</p>
-                  <p style="margin:4px 0 0;font-size:13px;color:#666">You'll also receive a separate receipt from Stripe.</p>
-                </div>
-                <p style="color:#444;font-size:14px">Best,<br>The Artswrk Team</p>
-              </div>`,
+              firstName: (client as any).clientCompanyName ?? client.firstName ?? "there",
+              artistName: artist?.name ?? artist?.firstName ?? "your artist",
+              date: `Booking #${bookingId}`,
+              total: grossDollars.toFixed(2),
             }).catch((e: any) => console.error("[Checkout] Client confirmation email failed:", e.message));
           }
         }
