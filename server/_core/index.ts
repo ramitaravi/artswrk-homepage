@@ -15,6 +15,7 @@ import { handleScheduledBubbleSync } from "../scheduledSync";
 import { handleSendGridWebhook } from "../jobAlerts/webhook";
 import { handleScheduledJobAlerts, handleScheduledBrevoSync } from "../jobAlerts/scheduled";
 import { handleUnsubscribeGet, handleUnsubscribePost } from "../jobAlerts/unsubscribe";
+import { handleScheduledBookingCompletionReminders } from "../bookingReminders";
 import { registerStorageProxy } from "./storageProxy";
 import { registerLegacyRedirects } from "../redirects";
 
@@ -227,6 +228,9 @@ async function startServer() {
   app.post("/api/webhooks/sendgrid", express.json({ limit: "2mb" }), handleSendGridWebhook);
   // Hourly cron; exits immediately unless it is the 1 PM hour in New York.
   app.post("/api/scheduled/job-alerts", express.json({ limit: "1mb" }), handleScheduledJobAlerts);
+  // Every 15 min — "10 minutes after the job starts" only needs to be
+  // approximately true, and finer-grained crons cost more on this platform.
+  app.post("/api/scheduled/booking-completion-reminders", express.json({ limit: "1mb" }), handleScheduledBookingCompletionReminders);
   // One-click unsubscribe. Deliberately NOT behind auth — someone who wants out
   // shouldn't have to remember a password, and a sign-in wall in front of an
   // unsubscribe link is how bulk senders collect spam complaints. The signed

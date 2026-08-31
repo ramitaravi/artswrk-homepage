@@ -549,9 +549,15 @@ export const bookings = mysqlTable("bookings", {
   directPayConfirmedAt: timestamp("directPayConfirmedAt"),
   /** Timestamp when the artist submitted their Artswrk invoice */
   artswrkInvoiceSubmittedAt: timestamp("artswrkInvoiceSubmittedAt"),
+  /**
+   * Timestamp the "complete your booking" reminder was sent (fires 10 min
+   * after startDate has a real time-of-day, or the calendar day of startDate
+   * if it doesn't). Set once so the reminder never sends twice.
+   */
+  completionReminderSentAt: timestamp("completionReminderSentAt"),
   /** Unique token for the studio payment link (e.g. /invoice/:token) */
   invoicePaymentToken: varchar("invoicePaymentToken", { length: 64 }),
-  /** Stripe Checkout session URL generated at invoice submission */
+  /** Stripe Checkout session URL — created when the studio approves the invoice, not when the artist submits it */
   invoiceStripeCheckoutUrl: text("invoiceStripeCheckoutUrl"),
   /** Total invoice amount in cents at submission time */
   invoiceTotalCents: int("invoiceTotalCents"),

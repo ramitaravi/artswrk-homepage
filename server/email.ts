@@ -544,8 +544,9 @@ export async function sendArtistBookingConfirmedEmail(data: {
   to: string; artistName: string; artistType?: string; clientName: string;
   date: string; details?: string; location: string; rate: string;
   serviceType: string; transportDetails?: string; transportReimbursed?: string;
-  bookingUrl: string;
+  bookingUrl: string; paymentMethod?: string | null;
 }): Promise<boolean> {
+  const payLabel = data.paymentMethod === "direct" ? "Paid directly by the studio" : "Paid via Artswrk";
   const html = renderEmailShell({
     accent: "artist",
     headline: "You\u2019re confirmed! \u{1F389}",
@@ -557,6 +558,7 @@ export async function sendArtistBookingConfirmedEmail(data: {
         { label: "Date", value: data.date },
         { label: "Location", value: data.location },
         { label: "Rate", value: data.rate },
+        { label: "Payment", value: payLabel },
         { label: "Transportation", value: data.transportReimbursed ? (data.transportDetails || "Reimbursed") : data.transportDetails },
         { label: "Details", value: sanitizeUserText(data.details, 400) },
       ]),
@@ -571,8 +573,9 @@ export async function sendClientBookingConfirmedEmail(data: {
   to: string; artistName: string; artistType?: string; clientName?: string;
   date: string; details?: string; location: string; rate: string;
   serviceType: string; transportDetails?: string; transportReimbursed?: string;
-  bookingUrl: string;
+  bookingUrl: string; paymentMethod?: string | null;
 }): Promise<boolean> {
+  const payLabel = data.paymentMethod === "direct" ? "You\u2019ll pay this artist directly" : "Paid via Artswrk";
   const html = renderEmailShell({
     accent: "client",
     headline: "Booking confirmed! \u{1F389}",
@@ -584,6 +587,7 @@ export async function sendClientBookingConfirmedEmail(data: {
         { label: "Date", value: data.date },
         { label: "Location", value: data.location },
         { label: "Rate", value: data.rate },
+        { label: "Payment", value: payLabel },
         { label: "Transportation", value: data.transportReimbursed ? (data.transportDetails || "Reimbursed") : data.transportDetails },
         { label: "Details", value: sanitizeUserText(data.details, 400) },
       ]),
@@ -743,6 +747,55 @@ export async function sendPaymentReminderEmail({
     footerNote: 'Questions? <a href="mailto:contact@artswrk.com" style="color:#6b7280;">contact@artswrk.com</a><br>Best,<br>The Artswrk Team',
   });
   return sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject: `Reminder — payment due for ${artistName} | ${date}`, html });
+}
+
+/**
+ * "Complete your booking" reminder — artswrk-pay path. Old Bubble copy,
+ * kept close to verbatim per Ramita's request 2026-08-31. Fires from a
+ * scheduled sweep (server/bookingReminders.ts), not on demand.
+ */
+export async function sendCompleteBookingReminderEmail({
+  to, firstName, bookingUrl,
+}: {
+  to: string; firstName: string; bookingUrl: string;
+}): Promise<boolean> {
+  const html = renderEmailShell({
+    accent: "artist",
+    headline: "Complete Your Booking",
+    preheader: "Verify your hours and mark your booking complete to get paid.",
+    bodyHtml:
+      para("Hello " + b(firstName) + ",") +
+      para("We hope your Artswrk booking went well today. To get paid, please log in to verify total hours, upload any reimbursements, and mark your booking as “complete.”") +
+      para("If you haven’t connected to Stripe yet, you will be prompted to do so before you’re able to complete your booking."),
+    ctaText: "Complete Booking",
+    ctaUrl: bookingUrl,
+    footerNote: "Best,<br>The Artswrk Team",
+  });
+  return sendSimpleEmail({ to, subject: "Artswrk: Complete Your Booking", html });
+}
+
+/**
+ * "Did you get paid?" reminder — direct-pay path. Same trigger and timing
+ * as the Artswrk-pay reminder above, different content since there's no
+ * invoice to submit here — just self-attesting the studio already paid.
+ */
+export async function sendConfirmDirectPaymentReminderEmail({
+  to, firstName, bookingUrl,
+}: {
+  to: string; firstName: string; bookingUrl: string;
+}): Promise<boolean> {
+  const html = renderEmailShell({
+    accent: "artist",
+    headline: "Complete Your Booking",
+    preheader: "Confirm you were paid directly for this booking.",
+    bodyHtml:
+      para("Hello " + b(firstName) + ",") +
+      para("We hope your Artswrk booking went well today. This one's set up as a direct payment from the studio — once you've received it, please log in and confirm you were paid so we can close out the booking."),
+    ctaText: "Confirm Payment",
+    ctaUrl: bookingUrl,
+    footerNote: "Haven’t been paid yet? No action needed — just confirm once it comes through.<br><br>Best,<br>The Artswrk Team",
+  });
+  return sendSimpleEmail({ to, subject: "Artswrk: Complete Your Booking", html });
 }
 
 /**

@@ -4701,6 +4701,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
               rate: rateDisplay,
               serviceType: job.serviceType || jobTitle,
               bookingUrl,
+              paymentMethod: input.paymentMethod,
             });
           }
           if (user.email) {
@@ -4715,6 +4716,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
               rate: rateDisplay,
               serviceType: job.serviceType || jobTitle,
               bookingUrl,
+              paymentMethod: input.paymentMethod,
             });
           }
         } catch (e) {
