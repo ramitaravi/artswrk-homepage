@@ -497,7 +497,7 @@ export default function ProJobDetail() {
                   <Lock size={14} className="text-white" />
                 </div>
                 <span className="text-sm text-gray-400 select-none">
-                  {businessType ?? "Company hidden"} · <button onClick={scrollToApply} className="text-[#F25722] font-semibold hover:underline">Unlock PRO to see</button>
+                  {businessType ?? "Company hidden"} · <button onClick={unlockPro} className="text-[#F25722] font-semibold hover:underline">Unlock PRO to see</button>
                 </span>
               </>
             ) : (

@@ -1206,10 +1206,9 @@ function Step3({
 
   const createSubscriptionCheckout = trpc.clientJobs.createSubscriptionCheckout.useMutation({
     onSuccess: (data) => {
-      if (data.url) {
-        window.open(data.url, "_blank");
-        toast.success("Redirecting to Artswrk Premium checkout…");
-      }
+      // Same tab, like every other upgrade — a new tab here was both
+      // inconsistent and blockable.
+      if (data.url) { window.location.href = data.url; return; }
       setIsLoading(false);
     },
     onError: (err) => {

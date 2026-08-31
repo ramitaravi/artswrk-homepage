@@ -20,6 +20,7 @@ import {
   Mic, BookOpen, Users, Dumbbell, Briefcase
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useUpgrade } from "@/lib/useUpgrade";
 import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
 import { useLocationField, type LocationDataPayload } from "@/hooks/useLocationField";
 import { parseAddressComponents, type PlaceLocation } from "@shared/location";
@@ -884,8 +885,7 @@ export default function ArtistOnboarding() {
   const updateOnboarding = trpc.signup.updateArtistOnboarding.useMutation();
   const uploadPictureMutation = trpc.signup.uploadProfilePicture.useMutation();
   const sendInvitesMutation = trpc.signup.sendArtistInvites.useMutation();
-  const basicCheckout = trpc.artistSubscription.createBasicCheckout?.useMutation?.();
-  const proCheckout = trpc.artistSubscription.createProCheckout?.useMutation?.();
+  const { start: startUpgrade } = useUpgrade();
 
   // ── Auth redirect ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1010,25 +1010,25 @@ export default function ArtistOnboarding() {
     window.location.href = "/app";
   }
 
-  async function handleChooseBasic() {
+  /**
+   * Both of these used to land on /app/settings — you picked a plan, on a
+   * screen with prices and a MOST POPULAR badge, and arrived at a settings
+   * page to pick it again. The checkout mutations were even declared here and
+   * then never called. This is the last step of signup, so it's the worst
+   * place on the site to lose someone who has already decided.
+   */
+  async function choosePlan(tier: "basic" | "pro") {
     setCheckoutLoading(true);
     try {
       await updateOnboarding.mutateAsync({ userSignedUp: true });
-      window.location.href = "/app/settings";
-    } finally {
+      startUpgrade({ audience: "artist", tier, returnPath: "/app" });
+    } catch {
       setCheckoutLoading(false);
     }
   }
 
-  async function handleChoosePro() {
-    setCheckoutLoading(true);
-    try {
-      await updateOnboarding.mutateAsync({ userSignedUp: true });
-      window.location.href = "/app/settings";
-    } finally {
-      setCheckoutLoading(false);
-    }
-  }
+  const handleChooseBasic = () => choosePlan("basic");
+  const handleChoosePro = () => choosePlan("pro");
 
   if (authLoading || statusQuery.isLoading) {
     return (

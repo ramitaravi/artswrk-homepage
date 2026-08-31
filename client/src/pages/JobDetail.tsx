@@ -105,12 +105,14 @@ export default function JobDetail() {
   const proPrice = pricingData?.pro?.annual?.dollars ?? "$110";
   const trialDays = pricingData?.pro?.trialDays ?? 0;
 
+  // Same tab. window.open fires a tick after the click, once the mutation
+  // resolves — the exact shape popup blockers kill.
   const createBasicCheckout = trpc.artistSubscription.createBasicCheckout.useMutation({
-    onSuccess: ({ url }) => window.open(url, "_blank"),
+    onSuccess: ({ url }) => { window.location.href = url; },
     onError: (err) => toast.error("Checkout failed", { description: err.message }),
   });
   const createProCheckout = trpc.artistSubscription.createProCheckout.useMutation({
-    onSuccess: ({ url }) => window.open(url, "_blank"),
+    onSuccess: ({ url }) => { window.location.href = url; },
     onError: (err) => toast.error("Checkout failed", { description: err.message }),
   });
   const unlockBusy = createBasicCheckout.isPending || createProCheckout.isPending;
