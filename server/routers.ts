@@ -7,7 +7,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, approveArtswrkInvoice, approveBookingPeriodInvoice, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail, sendArtistBookingConfirmedEmail, sendClientBookingConfirmedEmail, sendClientPayArtistEmail } from "./email";
 import crypto from "crypto";
@@ -3900,10 +3900,15 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
 
     /**
      * Submit the Artswrk invoice for a booking.
-     * 1. Creates a Stripe Checkout session for the total amount.
-     * 2. Generates a unique invoice payment token.
-     * 3. Saves both on the booking record.
-     * 4. Emails the studio with booking details + "Continue to Payment" button.
+     * 1. Generates a unique invoice payment token.
+     * 2. Saves the token + estimated total on the booking record.
+     * 3. Emails the studio to review the invoice.
+     *
+     * Deliberately does NOT create the Stripe Checkout session here — studios
+     * sometimes need to adjust hours before paying, so the actual payment
+     * link only gets created once they review and approve (invoice.approve),
+     * matching how the old Bubble flow worked: artist invoices, studio
+     * confirms, THAT confirm is what creates the payment link.
      */
     submitArtswrkInvoice: protectedProcedure
       .input(z.object({
@@ -3937,7 +3942,6 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const processingFee = Math.round((artistRate + totalReimb) * 0.04);
         const totalDollars = artistRate + totalReimb + processingFee;
         const totalCents = Math.round(totalDollars * 100);
-        const applicationFeeCents = Math.round(processingFee * 100);
 
         // Generate a unique invoice payment token
         const { randomBytes } = await import("crypto");
@@ -3947,55 +3951,10 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const origin = input.origin ?? APP_URL;  // was a hardcoded manus.space staging host
         const paymentPageUrl = `${origin}/invoice/${invoicePaymentToken}`;
 
-        // Create Stripe Checkout session (minimum $0.50)
-        let stripeCheckoutUrl: string | undefined;
-        if (totalCents >= 50) {
-          try {
-            const stripe = getStripe();
-            const artistName = user.name ?? user.firstName ?? "Artist";
-            const jobTitle = (booking.description ?? "").split("\n")[0].slice(0, 80) || `Booking #${input.bookingId}`;
-            const session = await stripe.checkout.sessions.create({
-              mode: "payment",
-              line_items: [{
-                price_data: {
-                  currency: "usd",
-                  unit_amount: totalCents,
-                  product_data: {
-                    name: `Payment for ${artistName}`,
-                    description: jobTitle,
-                  },
-                },
-                quantity: 1,
-              }],
-              customer_email: clientUser?.email ?? undefined,
-              allow_promotion_codes: true,
-              payment_intent_data: {
-                application_fee_amount: applicationFeeCents,
-                transfer_data: {
-                  destination: connectAccountId,
-                },
-              },
-              metadata: {
-                booking_id: String(input.bookingId),
-                invoice_payment_token: invoicePaymentToken,
-                artist_id: String(user.id),
-                client_id: String(booking.clientUserId ?? ""),
-                type: "artswrk_invoice",
-              },
-              success_url: `${paymentPageUrl}?paid=1`,
-              cancel_url: paymentPageUrl,
-            });
-            stripeCheckoutUrl = session.url ?? undefined;
-          } catch (e) {
-            console.error("[submitArtswrkInvoice] Stripe session creation failed:", e);
-            // Don't block invoice submission if Stripe fails
-          }
-        }
-
-        // Persist token + checkout URL on the booking
+        // Persist token + estimated total on the booking — no checkout URL yet,
+        // that gets created when the studio approves.
         await markArtswrkInvoiceSubmitted(input.bookingId, user.id, {
           invoicePaymentToken,
-          invoiceStripeCheckoutUrl: stripeCheckoutUrl,
           invoiceTotalCents: totalCents,
         });
 
@@ -4032,7 +3991,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
   <!-- Greeting -->
   <tr><td style="padding:0 40px 20px">
     <p style="margin:0 0 16px;font-size:16px;color:#444">Hi ${studioName},</p>
-    <p style="margin:0;font-size:16px;color:#444">Your booking has been completed by ${artistDisplayName} and requires payment.</p>
+    <p style="margin:0;font-size:16px;color:#444">Your booking has been completed by ${artistDisplayName} and is ready for your review.</p>
   </td></tr>
   <!-- Booking details block -->
   <tr><td style="padding:0 40px 24px">
@@ -4051,11 +4010,11 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
   <!-- Payment details -->
   <tr><td style="padding:0 40px 24px">
     <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#999;letter-spacing:1px;text-transform:uppercase">PAYMENT DETAILS</p>
-    <p style="margin:0;font-size:16px;color:#444;line-height:1.6">If you need to edit your payment details, you can do so on Artswrk by following the link below. You will be able to pay digitally with a card or Apple Pay, and will receive a receipt upon payment.</p>
+    <p style="margin:0;font-size:16px;color:#444;line-height:1.6">If the hours need adjusting, you can update them on the review page below before paying. Once you approve, you'll be able to pay digitally with a card or Apple Pay, and will receive a receipt upon payment.</p>
   </td></tr>
   <!-- CTA Button -->
   <tr><td style="padding:0 40px 32px;text-align:center">
-    <a href="${paymentPageUrl}" style="display:inline-block;background:#111;color:#fff;font-size:18px;font-weight:600;padding:18px 48px;border-radius:50px;text-decoration:none;letter-spacing:0.3px">Continue to Payment →</a>
+    <a href="${paymentPageUrl}" style="display:inline-block;background:#111;color:#fff;font-size:18px;font-weight:600;padding:18px 48px;border-radius:50px;text-decoration:none;letter-spacing:0.3px">Review Invoice →</a>
   </td></tr>
   <!-- Divider -->
   <tr><td style="padding:0 40px 24px"><hr style="border:none;border-top:1px solid #eee;margin:0"></td></tr>
@@ -4847,6 +4806,148 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         if (!period) throw new Error("Invoice not found");
         return period;
       }),
+
+    /**
+     * Studio reviews (and optionally adjusts hours) then approves an
+     * invoice — THIS is what creates the Stripe Checkout session/payment
+     * link, not the artist's original submission. Public + token-scoped,
+     * same trust model as getByToken. Idempotent: re-approving an
+     * already-approved invoice just returns the existing checkout link
+     * instead of creating a second one.
+     */
+    approve: publicProcedure
+      .input(z.object({ token: z.string(), hours: z.number().min(0).optional() }))
+      .mutation(async ({ input }) => {
+        const booking = await getBookingByInvoiceToken(input.token);
+        if (booking) {
+          if (booking.invoicePaidAt) throw new Error("This invoice has already been paid");
+          if (booking.invoiceStripeCheckoutUrl) return { checkoutUrl: booking.invoiceStripeCheckoutUrl };
+          if (!booking.artistUserId) throw new Error("Booking not found");
+
+          const connectAccountId = await getArtistStripeConnectAccount(booking.artistUserId);
+          if (!connectAccountId) {
+            throw new Error("The artist's payout account isn't connected yet — contact Artswrk support.");
+          }
+
+          const isHourly = booking.hours != null && booking.hours > 0;
+          const finalHours = input.hours ?? booking.hours ?? 0;
+          const baseAmount = isHourly ? (booking.artistRate ?? 0) * finalHours : (booking.artistRate ?? 0);
+          const totalReimb = booking.reimbursementsTotal ?? 0;
+          const processingFee = Math.round((baseAmount + totalReimb) * 0.04);
+          const totalDollars = baseAmount + totalReimb + processingFee;
+          const totalCents = Math.round(totalDollars * 100);
+          const applicationFeeCents = Math.round(processingFee * 100);
+          if (totalCents < 50) throw new Error("Total is below Stripe's minimum charge amount");
+
+          const clientUser = booking.clientUserId ? await getUserById(booking.clientUserId) : null;
+          const artist = await getUserById(booking.artistUserId);
+          const artistName = artist?.name ?? artist?.firstName ?? "Artist";
+          const paymentPageUrl = `${APP_URL}/invoice/${booking.invoicePaymentToken}`;
+          const jobTitle = (booking.jobDescription ?? "").split("\n")[0].slice(0, 80) || `Booking #${booking.id}`;
+
+          const stripe = getStripe();
+          const session = await stripe.checkout.sessions.create({
+            mode: "payment",
+            line_items: [{
+              price_data: {
+                currency: "usd",
+                unit_amount: totalCents,
+                product_data: { name: `Payment for ${artistName}`, description: jobTitle },
+              },
+              quantity: 1,
+            }],
+            customer_email: clientUser?.email ?? undefined,
+            allow_promotion_codes: true,
+            payment_intent_data: {
+              application_fee_amount: applicationFeeCents,
+              transfer_data: { destination: connectAccountId },
+            },
+            metadata: {
+              booking_id: String(booking.id),
+              invoice_payment_token: booking.invoicePaymentToken ?? "",
+              artist_id: String(booking.artistUserId),
+              client_id: String(booking.clientUserId ?? ""),
+              type: "artswrk_invoice",
+            },
+            success_url: `${paymentPageUrl}?paid=1`,
+            cancel_url: paymentPageUrl,
+          });
+          if (!session.url) throw new Error("Could not create payment link");
+
+          await approveArtswrkInvoice(booking.id, {
+            hours: isHourly ? finalHours : undefined,
+            invoiceStripeCheckoutUrl: session.url,
+            invoiceTotalCents: totalCents,
+          });
+
+          return { checkoutUrl: session.url };
+        }
+
+        const period = await getBookingPeriodByInvoiceToken(input.token);
+        if (!period) throw new Error("Invoice not found");
+        if ((period as any).invoicePaidAt) throw new Error("This invoice has already been paid");
+        if ((period as any).invoiceStripeCheckoutUrl) return { checkoutUrl: (period as any).invoiceStripeCheckoutUrl };
+
+        const parentBooking = await getBookingById((period as any).bookingId);
+        if (!parentBooking?.artistUserId) throw new Error("Booking not found");
+        const connectAccountId = await getArtistStripeConnectAccount(parentBooking.artistUserId);
+        if (!connectAccountId) {
+          throw new Error("The artist's payout account isn't connected yet — contact Artswrk support.");
+        }
+
+        const finalHours = input.hours ?? (period as any).actualHours ?? 0;
+        const totalReimb = (period as any).reimbursementsTotal ?? 0;
+        const artistTotal = ((period as any).artistRate ?? 0) * finalHours + totalReimb;
+        const clientTotal = ((period as any).clientRate ?? 0) * finalHours + totalReimb;
+        const totalCents = Math.round(clientTotal * 100);
+        const applicationFeeCents = Math.max(0, totalCents - Math.round(artistTotal * 100));
+        if (totalCents < 50) throw new Error("Total is below Stripe's minimum charge amount");
+
+        const clientUser = parentBooking.clientUserId ? await getUserById(parentBooking.clientUserId) : null;
+        const artistName = (period as any).artistName ?? (period as any).artistFirstName ?? "Artist";
+        const periodLabel = new Date((period as any).periodStart).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+        const paymentPageUrl = `${APP_URL}/invoice/${(period as any).invoicePaymentToken}`;
+
+        const stripe = getStripe();
+        const session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          line_items: [{
+            price_data: {
+              currency: "usd",
+              unit_amount: totalCents,
+              product_data: {
+                name: `Payment for ${artistName} — ${periodLabel}`,
+                description: ((period as any).jobDescription ?? "").split("\n")[0].slice(0, 80) || `Booking #${parentBooking.id}`,
+              },
+            },
+            quantity: 1,
+          }],
+          customer_email: clientUser?.email ?? undefined,
+          allow_promotion_codes: true,
+          payment_intent_data: {
+            application_fee_amount: applicationFeeCents,
+            transfer_data: { destination: connectAccountId },
+          },
+          metadata: {
+            booking_period_id: String((period as any).id),
+            invoice_payment_token: (period as any).invoicePaymentToken ?? "",
+            artist_id: String(parentBooking.artistUserId),
+            client_id: String(parentBooking.clientUserId ?? ""),
+            type: "admin_booking_period",
+          },
+          success_url: `${paymentPageUrl}?paid=1`,
+          cancel_url: paymentPageUrl,
+        });
+        if (!session.url) throw new Error("Could not create payment link");
+
+        await approveBookingPeriodInvoice((period as any).id, {
+          actualHours: finalHours,
+          invoiceStripeCheckoutUrl: session.url,
+          invoiceTotalCents: totalCents,
+        });
+
+        return { checkoutUrl: session.url };
+      }),
   }),
 
   /** Admin Bookings — created directly by admin, not tied to job/applicant */
@@ -4979,59 +5080,16 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const origin = input.origin ?? "https://artswrk.com";
         const paymentPageUrl = `${origin}/invoice/${invoicePaymentToken}`;
 
-        let stripeCheckoutUrl: string | undefined;
-        if (totalCents >= 50) {
-          try {
-            const stripe = getStripe();
-            const clientUser = booking.clientUserId ? await getUserById(booking.clientUserId) : null;
-            const artistName = user.name ?? user.firstName ?? "Artist";
-            const periodLabel = new Date(period.periodStart).toLocaleDateString("en-US", { month: "long", year: "numeric" });
-            const session = await stripe.checkout.sessions.create({
-              mode: "payment",
-              line_items: [{
-                price_data: {
-                  currency: "usd",
-                  unit_amount: totalCents,
-                  product_data: {
-                    name: `Payment for ${artistName} — ${periodLabel}`,
-                    description: booking.description?.split("\n")[0].slice(0, 80) ?? `Admin Booking #${booking.id}`,
-                  },
-                },
-                quantity: 1,
-              }],
-              customer_email: clientUser?.email ?? undefined,
-              allow_promotion_codes: true,
-              payment_intent_data: {
-                application_fee_amount: applicationFeeCents,
-                transfer_data: {
-                  destination: connectAccountId,
-                },
-              },
-              metadata: {
-                booking_period_id: String(input.periodId),
-                invoice_payment_token: invoicePaymentToken,
-                artist_id: String(user.id),
-                client_id: String(booking.clientUserId ?? ""),
-                type: "admin_booking_period",
-              },
-              success_url: `${paymentPageUrl}?paid=1`,
-              cancel_url: paymentPageUrl,
-            });
-            stripeCheckoutUrl = session.url ?? undefined;
-          } catch (e) {
-            console.error("[bookingPeriods.submit] Stripe error:", e);
-          }
-        }
-
+        // No checkout session yet — created once the studio reviews and
+        // approves (invoice.approve), same as the regular booking flow above.
         await submitBookingPeriod(input.periodId, {
           actualHours: input.actualHours,
           artistNotes: input.artistNotes,
           invoicePaymentToken,
-          invoiceStripeCheckoutUrl: stripeCheckoutUrl,
           invoiceTotalCents: totalCents,
         });
 
-        // Email client with payment link
+        // Email client to review
         const clientUser = booking.clientUserId ? await getUserById(booking.clientUserId) : null;
         if (clientUser?.email) {
           const periodLabel = new Date(period.periodStart).toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -5040,12 +5098,12 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           await _sendClientInvoice({
             to: clientUser.email,
             cc: "support@artswrk.com",
-            subject: `Invoice ready — ${artistName} (${periodLabel})`,
-            html: `<p>Hi ${(clientUser as any).clientCompanyName ?? clientUser.firstName ?? "there"},</p><p>${artistName} has submitted their hours for <strong>${periodLabel}</strong>.</p><p><strong>Total: $${(totalCents / 100).toFixed(2)}</strong>${totalReimb > 0 ? ` (incl. $${totalReimb.toFixed(2)} reimbursements)` : ""}</p><p><a href="${stripeCheckoutUrl ?? paymentPageUrl}" style="background:#F25722;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Pay Invoice →</a></p><p>Best,<br/>The Artswrk Team</p>`,
+            subject: `Invoice ready for review — ${artistName} (${periodLabel})`,
+            html: `<p>Hi ${(clientUser as any).clientCompanyName ?? clientUser.firstName ?? "there"},</p><p>${artistName} has submitted their hours for <strong>${periodLabel}</strong> — ready for your review.</p><p><strong>Estimated total: $${(totalCents / 100).toFixed(2)}</strong>${totalReimb > 0 ? ` (incl. $${totalReimb.toFixed(2)} reimbursements)` : ""}</p><p>If the hours need adjusting, you can update them on the review page before paying.</p><p><a href="${paymentPageUrl}" style="background:#F25722;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Review Invoice →</a></p><p>Best,<br/>The Artswrk Team</p>`,
           }).catch(() => {});
         }
 
-        return { invoicePaymentToken, stripeCheckoutUrl };
+        return { invoicePaymentToken };
       }),
 
     /** Get periods for a booking (artist or admin can call) */

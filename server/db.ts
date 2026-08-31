@@ -4664,6 +4664,8 @@ export async function markArtswrkInvoiceSubmitted(
 
 /**
  * Get a booking by its invoice payment token (public, for studio payment page).
+ * Includes hours + reimbursement total so the studio-facing review page can
+ * show a full summary and let the studio adjust hours before approving.
  */
 export async function getBookingByInvoiceToken(token: string) {
   const db = await getDb();
@@ -4676,6 +4678,7 @@ export async function getBookingByInvoiceToken(token: string) {
       artistUserId: bookings.artistUserId,
       paymentMethod: bookings.paymentMethod,
       artistRate: bookings.artistRate,
+      hours: bookings.hours,
       invoicePaymentToken: bookings.invoicePaymentToken,
       invoiceStripeCheckoutUrl: bookings.invoiceStripeCheckoutUrl,
       invoiceTotalCents: bookings.invoiceTotalCents,
@@ -4695,7 +4698,97 @@ export async function getBookingByInvoiceToken(token: string) {
     .leftJoin(users, eq(bookings.artistUserId, users.id))
     .where(eq(bookings.invoicePaymentToken, token))
     .limit(1);
-  return result.length > 0 ? result[0] : undefined;
+  if (result.length === 0) return undefined;
+  const booking = result[0];
+  const reimbList = await getReimbursementsByBookingId(booking.id);
+  const reimbursementsTotal = reimbList.reduce((s, r) => s + (r.value ?? 0), 0);
+  return { ...booking, reimbursementsTotal };
+}
+
+/**
+ * Approves a submitted invoice (studio reviewed, optionally adjusted hours,
+ * clicked approve) — saves the now-created Stripe checkout link and the
+ * server-recomputed total. Separate from markArtswrkInvoiceSubmitted since
+ * that fires when the ARTIST submits; this fires when the STUDIO approves,
+ * which is the point the checkout session (and therefore the payment link)
+ * actually gets created — matching the old Bubble flow's "confirm creates
+ * the payment link" step instead of creating it upfront.
+ */
+export async function approveArtswrkInvoice(
+  bookingId: number,
+  opts: { hours?: number; invoiceStripeCheckoutUrl: string; invoiceTotalCents: number }
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(bookings)
+    .set({
+      ...(opts.hours !== undefined ? { hours: opts.hours } : {}),
+      invoiceStripeCheckoutUrl: opts.invoiceStripeCheckoutUrl,
+      invoiceTotalCents: opts.invoiceTotalCents,
+    })
+    .where(eq(bookings.id, bookingId));
+}
+
+/**
+ * Records the payments-table row + booking financial summary fields for a
+ * completed Artswrk-invoice or period-invoice charge. Before this,
+ * markInvoicePaid/markPeriodInvoicePaid only set bookings.invoicePaidAt —
+ * nothing ever wrote to the `payments` table, so paid invoices never showed
+ * up on either side's Payments/Transactions page (getArtistPayments and
+ * getPaymentsByClientId both read `payments`; getWalletStatsByClientId's
+ * totalPaidAmount reads it too). Idempotent on stripeChargeId — the webhook
+ * and the verify-on-return fallback can both fire for the same session.
+ */
+export async function recordArtswrkPayment(params: {
+  bookingId: number;
+  clientUserId: number | null;
+  stripeChargeId: string | null;
+  stripePaymentIntentId: string;
+  grossCents: number;
+  applicationFeeCents: number;
+  cardBrand: string | null;
+  cardLast4: string | null;
+  receiptUrl: string | null;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  const dedupeId = params.stripeChargeId ?? params.stripePaymentIntentId;
+  const existing = await db
+    .select({ id: payments.id })
+    .from(payments)
+    .where(eq(payments.stripeId, dedupeId))
+    .limit(1);
+  if (existing.length > 0) return;
+
+  const grossDollars = params.grossCents / 100;
+  const feeDollars = params.applicationFeeCents / 100;
+  const artistNetDollars = grossDollars - feeDollars;
+
+  await db.insert(payments).values({
+    bookingId: params.bookingId,
+    clientUserId: params.clientUserId,
+    stripeId: dedupeId,
+    stripeStatus: "succeeded",
+    status: "Success",
+    stripeAmount: params.grossCents,
+    stripeApplicationFeeAmount: params.applicationFeeCents,
+    stripeCardBrand: params.cardBrand,
+    stripeCardLast4: params.cardLast4,
+    stripeReceiptUrl: params.receiptUrl,
+    paymentDate: new Date(),
+  });
+
+  await db
+    .update(bookings)
+    .set({
+      clientRate: grossDollars,
+      totalClientRate: grossDollars,
+      totalArtistRate: artistNetDollars,
+      grossProfit: feeDollars,
+    })
+    .where(eq(bookings.id, params.bookingId));
 }
 
 /**
@@ -5035,7 +5128,26 @@ export async function getBookingPeriodByInvoiceToken(token: string) {
   `);
   const row = (rows[0] as unknown as any[])[0];
   if (!row) return null;
-  return { ...row, isPeriodInvoice: true };
+  const reimbList = await getReimbursementsByPeriodId(row.id);
+  const reimbursementsTotal = reimbList.reduce((s, r: any) => s + (r.value ?? 0), 0);
+  return { ...row, isPeriodInvoice: true, reimbursementsTotal };
+}
+
+/** Same as approveArtswrkInvoice, for the period-booking flow. */
+export async function approveBookingPeriodInvoice(
+  periodId: number,
+  opts: { actualHours?: number; invoiceStripeCheckoutUrl: string; invoiceTotalCents: number }
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .update(bookingPeriods)
+    .set({
+      ...(opts.actualHours !== undefined ? { actualHours: opts.actualHours } : {}),
+      invoiceStripeCheckoutUrl: opts.invoiceStripeCheckoutUrl,
+      invoiceTotalCents: opts.invoiceTotalCents,
+    } as any)
+    .where(eq(bookingPeriods.id, periodId));
 }
 
 /** Get all admin bookings for an artist (for artist's Bookings page). */

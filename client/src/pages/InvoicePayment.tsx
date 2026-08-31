@@ -2,6 +2,12 @@
  * InvoicePayment — public page for studios to review and pay an artist invoice.
  * URL: /invoice/:token
  * No login required. The token in the URL is the only auth mechanism.
+ *
+ * Two states before payment: the artist's submission only saves an estimate
+ * (no payment link yet) — this page shows an editable review first (hours
+ * can be adjusted), and approving is what actually creates the Stripe
+ * checkout link. Matches how the old Bubble flow worked: artist invoices,
+ * studio confirms, THAT confirm is what creates the payment link.
  */
 import { useEffect, useState } from "react";
 import { useParams } from "wouter";
@@ -11,6 +17,7 @@ import { Loader2, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
 export default function InvoicePayment() {
   const { token } = useParams<{ token: string }>();
   const [alreadyPaid, setAlreadyPaid] = useState(false);
+  const [approveError, setApproveError] = useState<string | null>(null);
 
   // Detect ?paid=1 in URL (Stripe success redirect)
   useEffect(() => {
@@ -25,6 +32,22 @@ export default function InvoicePayment() {
     { token: token ?? "" },
     { enabled: !!token }
   );
+
+  const isPeriodInvoice = !!(booking as any)?.isPeriodInvoice;
+  const isHourly = isPeriodInvoice ? true : (booking?.hours != null && booking.hours > 0);
+  const initialHours = isPeriodInvoice ? (booking as any)?.actualHours : booking?.hours;
+
+  const [hoursInput, setHoursInput] = useState<string>("");
+  useEffect(() => {
+    if (initialHours != null) setHoursInput(String(initialHours));
+  }, [initialHours]);
+
+  const approve = trpc.invoice.approve.useMutation({
+    onSuccess: (data) => {
+      window.location.href = data.checkoutUrl;
+    },
+    onError: (err) => setApproveError(err.message),
+  });
 
   if (isLoading) {
     return (
@@ -47,18 +70,36 @@ export default function InvoicePayment() {
   }
 
   const isPaid = alreadyPaid || !!booking.invoicePaidAt;
-  const totalCents = booking.invoiceTotalCents ?? 0;
-  const totalDollars = totalCents / 100;
+  const checkoutUrl = booking.invoiceStripeCheckoutUrl;
+  const isApproved = !!checkoutUrl;
   const artistName = booking.artistName ?? booking.artistFirstName ?? "Your artist";
-  const jobTitle = (booking.jobDescription ?? "").split("\n")[0].slice(0, 80) || "Booking";
+  const jobTitle = ((booking as any).jobDescription ?? "").split("\n")[0].slice(0, 80) || "Booking";
   const bookingDate = booking.startDate
     ? new Date(booking.startDate).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" })
-    : new Date(booking.artswrkInvoiceSubmittedAt ?? Date.now()).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" });
+    : new Date((booking as any).artswrkInvoiceSubmittedAt ?? Date.now()).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" });
 
-  // Rough breakdown (we don't store individual line items on the booking, so we reverse-engineer)
-  // processingFee = round((base + reimb) * 0.04), total = base + reimb + fee
-  // We display total only since we don't have the split stored separately here
-  const checkoutUrl = booking.invoiceStripeCheckoutUrl;
+  const reimbTotal = (booking as any).reimbursementsTotal ?? 0;
+  const hoursNum = parseFloat(hoursInput) || 0;
+  const artistRate = (booking as any).artistRate ?? 0;
+  const clientRate = (booking as any).clientRate ?? 0;
+
+  // Live recompute as the studio edits hours — mirrors the server's math
+  // exactly (invoice.approve), so what they see here is what they'll pay.
+  let liveTotalDollars: number;
+  if (isApproved || isPaid) {
+    liveTotalDollars = (booking.invoiceTotalCents ?? 0) / 100;
+  } else if (isPeriodInvoice) {
+    liveTotalDollars = clientRate * hoursNum + reimbTotal;
+  } else {
+    const base = isHourly ? artistRate * hoursNum : artistRate;
+    const fee = Math.round((base + reimbTotal) * 0.04);
+    liveTotalDollars = base + reimbTotal + fee;
+  }
+
+  const handleApprove = () => {
+    setApproveError(null);
+    approve.mutate({ token: token ?? "", hours: isHourly ? hoursNum : undefined });
+  };
 
   return (
     <div className="min-h-screen bg-[#f5f5f5] font-serif">
@@ -84,12 +125,12 @@ export default function InvoicePayment() {
             </div>
           </div>
         ) : (
-          /* ── Invoice details + pay button ── */
+          /* ── Invoice details + review/pay ── */
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             {/* Title */}
             <div className="px-10 pt-10 pb-6 border-b border-gray-100">
               <h1 className="text-2xl font-bold text-[#111]">
-                Payment Request for {artistName} {bookingDate}
+                {isApproved ? "Payment Request" : "Review Invoice"} for {artistName} {bookingDate}
               </h1>
             </div>
 
@@ -97,23 +138,50 @@ export default function InvoicePayment() {
             <div className="px-10 py-6 border-b border-gray-100">
               <p className="text-base text-gray-600 mb-3">Hi there,</p>
               <p className="text-base text-gray-600">
-                Your booking has been completed by <strong>{artistName}</strong> and requires payment.
+                Your booking has been completed by <strong>{artistName}</strong>{" "}
+                {isApproved ? "and requires payment." : "— take a look before approving."}
               </p>
             </div>
 
             {/* Booking details */}
             <div className="px-10 py-6 border-b border-gray-100">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Your Booking:</p>
-              <div className="border-l-4 border-[#ec008c] pl-5 space-y-2">
+              <div className="border-l-4 border-[#ec008c] pl-5 space-y-3">
                 <p className="text-sm text-gray-700"><strong>Job:</strong> {jobTitle}</p>
                 <p className="text-sm text-gray-700"><strong>Date:</strong> {bookingDate}</p>
-                {booking.jobLocation && (
-                  <p className="text-sm text-gray-700"><strong>Location:</strong> {booking.jobLocation}</p>
+                {(booking as any).jobLocation && (
+                  <p className="text-sm text-gray-700"><strong>Location:</strong> {(booking as any).jobLocation}</p>
                 )}
-                <p className="text-sm text-gray-700">
+                {isHourly && (
+                  <div className="text-sm text-gray-700 flex items-center gap-2">
+                    <strong>Hours:</strong>
+                    {isApproved ? (
+                      <span>{initialHours}</span>
+                    ) : (
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.25"
+                        value={hoursInput}
+                        onChange={(e) => setHoursInput(e.target.value)}
+                        className="w-24 px-2 py-1 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#ec008c]"
+                      />
+                    )}
+                    <span className="text-gray-400 text-xs">
+                      ({isPeriodInvoice ? `$${clientRate}/hr` : `$${artistRate}/hr`})
+                    </span>
+                  </div>
+                )}
+                {reimbTotal > 0 && (
+                  <p className="text-sm text-gray-700"><strong>Reimbursements:</strong> ${reimbTotal.toFixed(2)}</p>
+                )}
+                <p className="text-sm text-gray-700 pt-1">
                   <strong>Total Payment Amount:</strong>{" "}
-                  <span className="text-[#F25722] font-bold">${totalDollars.toFixed(2)}</span>
+                  <span className="text-[#F25722] font-bold">${liveTotalDollars.toFixed(2)}</span>
                 </p>
+                {!isApproved && isHourly && (
+                  <p className="text-xs text-gray-400">Adjust hours above if they don't match — the total updates automatically.</p>
+                )}
               </div>
             </div>
 
@@ -121,14 +189,15 @@ export default function InvoicePayment() {
             <div className="px-10 py-6 border-b border-gray-100">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Payment Details</p>
               <p className="text-base text-gray-600 leading-relaxed">
-                If you need to edit your payment details, you can do so on Artswrk by following the link below.
-                You will be able to pay digitally with a card or Apple Pay, and will receive a receipt upon payment.
+                {isApproved
+                  ? "You will be able to pay digitally with a card or Apple Pay, and will receive a receipt upon payment."
+                  : "Once you approve the invoice above, you'll get a secure payment link to pay by card or Apple Pay, and will receive a receipt upon payment."}
               </p>
             </div>
 
             {/* CTA */}
             <div className="px-10 py-8 text-center">
-              {checkoutUrl ? (
+              {isApproved ? (
                 <a
                   href={checkoutUrl}
                   target="_blank"
@@ -138,9 +207,18 @@ export default function InvoicePayment() {
                   Continue to Payment <ExternalLink size={18} />
                 </a>
               ) : (
-                <div className="text-center">
-                  <p className="text-sm text-gray-500 mb-2">Payment link is being generated.</p>
-                  <p className="text-sm text-gray-400">Please contact <a href="mailto:contact@artswrk.com" className="text-[#F25722] underline">contact@artswrk.com</a> if this persists.</p>
+                <div>
+                  <button
+                    onClick={handleApprove}
+                    disabled={approve.isPending}
+                    className="inline-flex items-center gap-2 bg-[#111] text-white text-lg font-semibold px-12 py-5 rounded-full hover:bg-gray-800 transition-colors disabled:opacity-50"
+                  >
+                    {approve.isPending ? <Loader2 size={18} className="animate-spin" /> : null}
+                    Approve & Continue to Payment
+                  </button>
+                  {approveError && (
+                    <p className="text-sm text-red-500 mt-3">{approveError}</p>
+                  )}
                 </div>
               )}
             </div>

@@ -179,35 +179,75 @@ export async function applyCheckoutSessionCompleted(session: any): Promise<void>
     const periodId = session.metadata?.booking_period_id ? parseInt(session.metadata.booking_period_id) : null;
     const paymentIntentId = session.payment_intent ?? null;
     if (periodId) {
-      const { markPeriodInvoicePaid, getBookingPeriodById, getBookingById, getUserById: getUser } = await import("./db");
+      const { markPeriodInvoicePaid, getBookingPeriodById, getBookingById, getUserById: getUser, recordArtswrkPayment } = await import("./db");
       await markPeriodInvoicePaid(periodId, paymentIntentId ?? "");
       console.log(`[Checkout] Admin booking period ${periodId} paid`);
       try {
         const period = await getBookingPeriodById(periodId);
         const booking = period ? await getBookingById(period.bookingId) : null;
+
+        // Pull the full charge (card brand/last4/receipt URL, fee amount) once —
+        // used for both the payments-table row and the artist's net amount below.
+        let feeCents = 0;
+        let chargeId: string | null = null;
+        let cardBrand: string | null = null;
+        let cardLast4: string | null = null;
+        let receiptUrl: string | null = null;
+        if (paymentIntentId) {
+          try {
+            const { getStripe } = await import("./stripe");
+            const pi = await getStripe().paymentIntents.retrieve(paymentIntentId, { expand: ["latest_charge"] });
+            feeCents = (pi as any).application_fee_amount ?? 0;
+            const charge = (pi as any).latest_charge;
+            if (charge && typeof charge === "object") {
+              chargeId = charge.id ?? null;
+              cardBrand = charge.payment_method_details?.card?.brand ?? null;
+              cardLast4 = charge.payment_method_details?.card?.last4 ?? null;
+              receiptUrl = charge.receipt_url ?? null;
+            }
+          } catch (feeErr: any) {
+            console.error("[Checkout] Couldn't retrieve payment intent detail:", feeErr.message);
+          }
+        }
+        const totalDollars = ((session.amount_total ?? 0) - feeCents) / 100;
+
+        if (booking) {
+          await recordArtswrkPayment({
+            bookingId: booking.id,
+            clientUserId: booking.clientUserId ?? null,
+            stripeChargeId: chargeId,
+            stripePaymentIntentId: paymentIntentId ?? "",
+            grossCents: session.amount_total ?? 0,
+            applicationFeeCents: feeCents,
+            cardBrand,
+            cardLast4,
+            receiptUrl,
+          });
+        }
+
+        const periodLabel = period ? new Date(period.periodStart).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "";
+
         if (booking?.artistUserId) {
           const artist = await getUser(booking.artistUserId);
           if (artist?.email) {
             const { sendSimpleEmail } = await import("./email");
-            // Show what the artist actually receives, not the total the studio
-            // paid — that total includes Artswrk's cut of the rate spread.
-            let totalDollars = (session.amount_total ?? 0) / 100;
-            if (paymentIntentId) {
-              try {
-                const { getStripe } = await import("./stripe");
-                const pi = await getStripe().paymentIntents.retrieve(paymentIntentId);
-                const feeCents = (pi as any).application_fee_amount ?? 0;
-                totalDollars = ((session.amount_total ?? 0) - feeCents) / 100;
-              } catch (feeErr: any) {
-                console.error("[Checkout] Couldn't retrieve application fee, showing gross amount:", feeErr.message);
-              }
-            }
-            const periodLabel = period ? new Date(period.periodStart).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "";
             await sendSimpleEmail({
               to: artist.email,
               subject: `Payment received — ${periodLabel}`,
               html: `<p>Hi ${artist.firstName ?? "there"},</p><p>Your invoice for <strong>${periodLabel}</strong> has been paid.</p><p><strong>Amount: $${totalDollars.toFixed(2)}</strong></p><p>Best,<br/>The Artswrk Team</p>`,
             });
+          }
+        }
+        if (booking?.clientUserId) {
+          const client = await getUser(booking.clientUserId);
+          if (client?.email) {
+            const { sendSimpleEmail } = await import("./email");
+            const grossDollars = (session.amount_total ?? 0) / 100;
+            await sendSimpleEmail({
+              to: client.email,
+              subject: `Payment confirmed — ${periodLabel}`,
+              html: `<p>Hi ${(client as any).clientCompanyName ?? client.firstName ?? "there"},</p><p>Your payment for <strong>${periodLabel}</strong> has been processed.</p><p><strong>Amount: $${grossDollars.toFixed(2)}</strong></p><p>You'll also receive a separate receipt from Stripe.</p><p>Best,<br/>The Artswrk Team</p>`,
+            }).catch((e: any) => console.error("[Checkout] Client confirmation email failed:", e.message));
           }
         }
       } catch (e: any) {
@@ -221,31 +261,60 @@ export async function applyCheckoutSessionCompleted(session: any): Promise<void>
     const bookingId = session.metadata?.booking_id ? parseInt(session.metadata.booking_id) : null;
     const paymentIntentId = session.payment_intent ?? null;
     if (bookingId) {
-      const { markInvoicePaid, getBookingById, getUserById: getUser } = await import("./db");
+      const { markInvoicePaid, getBookingById, getUserById: getUser, recordArtswrkPayment } = await import("./db");
       await markInvoicePaid(bookingId, paymentIntentId ?? "");
       console.log(`[Checkout] Invoice paid for booking ${bookingId}`);
 
-      // Notify the artist that they've been paid
       try {
         const booking = await getBookingById(bookingId);
+
+        // Pull the full charge (card brand/last4/receipt URL, fee amount) once —
+        // used for both the payments-table row and the artist's net amount below.
+        let feeCents = 0;
+        let chargeId: string | null = null;
+        let cardBrand: string | null = null;
+        let cardLast4: string | null = null;
+        let receiptUrl: string | null = null;
+        if (paymentIntentId) {
+          try {
+            const { getStripe } = await import("./stripe");
+            const pi = await getStripe().paymentIntents.retrieve(paymentIntentId, { expand: ["latest_charge"] });
+            feeCents = (pi as any).application_fee_amount ?? 0;
+            const charge = (pi as any).latest_charge;
+            if (charge && typeof charge === "object") {
+              chargeId = charge.id ?? null;
+              cardBrand = charge.payment_method_details?.card?.brand ?? null;
+              cardLast4 = charge.payment_method_details?.card?.last4 ?? null;
+              receiptUrl = charge.receipt_url ?? null;
+            }
+          } catch (feeErr: any) {
+            console.error("[Checkout] Couldn't retrieve payment intent detail:", feeErr.message);
+          }
+        }
+        // Show what the artist actually receives, not the total the studio
+        // paid — that total includes the Artswrk processing fee, which
+        // artists never see anywhere else in the product.
+        const totalDollars = ((session.amount_total ?? 0) - feeCents) / 100;
+
+        if (booking) {
+          await recordArtswrkPayment({
+            bookingId: booking.id,
+            clientUserId: booking.clientUserId ?? null,
+            stripeChargeId: chargeId,
+            stripePaymentIntentId: paymentIntentId ?? "",
+            grossCents: session.amount_total ?? 0,
+            applicationFeeCents: feeCents,
+            cardBrand,
+            cardLast4,
+            receiptUrl,
+          });
+        }
+
+        // Notify the artist that they've been paid
         if (booking?.artistUserId) {
           const artist = await getUser(booking.artistUserId);
           if (artist?.email) {
             const { sendSimpleEmail } = await import("./email");
-            // Show what the artist actually receives, not the total the studio
-            // paid — that total includes the Artswrk processing fee, which
-            // artists never see anywhere else in the product.
-            let totalDollars = (session.amount_total ?? 0) / 100;
-            if (paymentIntentId) {
-              try {
-                const { getStripe } = await import("./stripe");
-                const pi = await getStripe().paymentIntents.retrieve(paymentIntentId);
-                const feeCents = (pi as any).application_fee_amount ?? 0;
-                totalDollars = ((session.amount_total ?? 0) - feeCents) / 100;
-              } catch (feeErr: any) {
-                console.error("[Checkout] Couldn't retrieve application fee, showing gross amount:", feeErr.message);
-              }
-            }
             await sendSimpleEmail({
               to: artist.email,
               subject: `Payment Received — Booking #${bookingId}`,
@@ -268,8 +337,38 @@ export async function applyCheckoutSessionCompleted(session: any): Promise<void>
             console.log(`[Checkout] Sent payment confirmation to artist ${artist.email}`);
           }
         }
+
+        // Notify the client (studio) too — previously only the artist got an
+        // Artswrk-branded confirmation; the studio only ever got Stripe's own
+        // generic receipt email, if that's even enabled on the account.
+        if (booking?.clientUserId) {
+          const client = await getUser(booking.clientUserId);
+          if (client?.email) {
+            const { sendSimpleEmail } = await import("./email");
+            const grossDollars = (session.amount_total ?? 0) / 100;
+            await sendSimpleEmail({
+              to: client.email,
+              subject: `Payment Confirmed — Booking #${bookingId}`,
+              html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px">
+                <div style="text-align:center;margin-bottom:24px">
+                  <span style="font-size:22px;font-weight:900">
+                    <span style="background:linear-gradient(90deg,#FFBC5D,#F25722);-webkit-background-clip:text;-webkit-text-fill-color:transparent">ARTS</span><span style="background:#111;color:#fff;padding:2px 8px;border-radius:4px;margin-left:2px">WRK</span>
+                  </span>
+                </div>
+                <h2 style="color:#111;margin:0 0 16px">Payment confirmed</h2>
+                <p style="color:#444;font-size:15px;margin:0 0 12px">Hi ${(client as any).clientCompanyName ?? client.firstName ?? "there"},</p>
+                <p style="color:#444;font-size:15px;margin:0 0 20px">Your payment for Booking #${bookingId} has been processed.</p>
+                <div style="background:#f9f9f9;border-radius:8px;padding:16px 20px;margin-bottom:20px">
+                  <p style="margin:0;font-size:15px;color:#111"><strong>Amount:</strong> $${grossDollars.toFixed(2)}</p>
+                  <p style="margin:4px 0 0;font-size:13px;color:#666">You'll also receive a separate receipt from Stripe.</p>
+                </div>
+                <p style="color:#444;font-size:14px">Best,<br>The Artswrk Team</p>
+              </div>`,
+            }).catch((e: any) => console.error("[Checkout] Client confirmation email failed:", e.message));
+          }
+        }
       } catch (notifyErr: any) {
-        console.error("[Checkout] Artist payment notification failed:", notifyErr.message);
+        console.error("[Checkout] Payment notification failed:", notifyErr.message);
       }
     }
   }

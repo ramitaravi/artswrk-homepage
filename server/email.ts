@@ -611,15 +611,15 @@ export async function sendClientPayArtistEmail(data: {
     headline: "Payment due for " + data.artistName,
     preheader: "Total due: " + total,
     bodyHtml:
-      para("Hi " + b(data.clientName || "there") + ", " + b(data.artistName) + "\u2019s booking is complete and payment is due.") +
+      para("Hi " + b(data.clientName || "there") + ", " + b(data.artistName) + "\u2019s booking is complete and ready for your review.") +
       detailsCard([
         { label: "Date", value: data.date || data.startDate },
         { label: "Rate", value: data.clientRate },
         { label: "Reimbursements", value: data.reimbursements },
         { label: "Total due", value: total },
       ]) +
-      para("Pay in a minute by card or Apple Pay \u2014 you\u2019ll get a receipt as soon as it processes."),
-    ctaText: "Pay " + data.artistName,
+      para("If the hours need adjusting, you can update them before paying. Once you approve, pay in a minute by card or Apple Pay \u2014 you\u2019ll get a receipt as soon as it processes."),
+    ctaText: "Review & Pay",
     ctaUrl: data.payUrl,
   });
   return sendSimpleEmail({ to: data.to, cc: SUPPORT_EMAIL, subject: "Payment due for " + data.artistName, html });
