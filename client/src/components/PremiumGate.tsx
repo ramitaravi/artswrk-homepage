@@ -11,11 +11,13 @@
  * board — leave the feature visible and gate the action instead; that's what
  * Browse Artists does, and it converts better than an empty page.
  *
- * The button opens the same upgrade modal as every other premium CTA.
+ * The button goes straight to Stripe, like every other premium CTA on the
+ * site — the bullets above it are the pitch, so there's nothing left to say
+ * in between.
  */
 import { Crown, Check } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { useUpgrade } from "@/components/UpgradeModal";
+import { useUpgrade } from "@/lib/useUpgrade";
 
 /** Plans that carry the client premium feature set. */
 export function hasClientPremium(planTier: string | null | undefined): boolean {
@@ -28,17 +30,15 @@ export function PremiumGate({
   title,
   blurb,
   bullets,
-  feature,
   children,
 }: {
   title: string;
   blurb: string;
   bullets: string[];
-  feature?: string;
   children: React.ReactNode;
 }) {
   const { user, loading } = useAuth();
-  const { open } = useUpgrade();
+  const { start: startUpgrade, pending: upgradePending } = useUpgrade();
   const planTier = (user as any)?.planTier as string | undefined;
 
   // Don't flash the paywall at a subscriber while their plan is still loading.
@@ -67,10 +67,11 @@ export function PremiumGate({
 
       <button
         type="button"
-        onClick={() => open({ audience: "client", feature: feature ?? title })}
-        className="mt-7 inline-flex items-center justify-center rounded-xl bg-[#111] px-7 py-3.5 text-[15px] font-bold text-white transition-colors hover:bg-[#3D3D4A]"
+        onClick={() => startUpgrade({ audience: "client" })}
+        disabled={upgradePending}
+        className="mt-7 inline-flex items-center justify-center rounded-xl bg-[#111] px-7 py-3.5 text-[15px] font-bold text-white transition-colors hover:bg-[#3D3D4A] disabled:opacity-60"
       >
-        Upgrade to Premium →
+        {upgradePending ? "Opening checkout…" : "Upgrade to Premium →"}
       </button>
       <p className="mt-3 text-xs text-gray-400">
         Questions? Email <a href="mailto:contact@artswrk.com" className="underline">contact@artswrk.com</a>

@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { useUpgrade } from "@/components/UpgradeModal";
+import { useUpgrade } from "@/lib/useUpgrade";
 import { JobCard } from "@/components/ClientJobCard";
 import { toSimpleJobStatus } from "@shared/jobStatus";
 
@@ -136,8 +136,8 @@ function PostJobBox() {
 // Mirrors the artist dashboard's "Your Tasks" pattern — same collapsible card,
 // same idea: only show what's actually actionable, nothing else.
 
-/** `onClick` wins over `href` — the upgrade row opens the modal rather than
- *  navigating, so the pitch is the same one every other premium CTA shows. */
+/** `onClick` wins over `href` — the upgrade row goes straight to Stripe rather
+ *  than navigating to a page that would only show another upgrade button. */
 type TaskItem = { key: string; icon: React.ReactNode; label: string; sublabel?: string; href?: string; onClick?: () => void; upsell?: boolean };
 
 function TaskRow({ task }: { task: TaskItem }) {
@@ -678,7 +678,7 @@ export default function Overview() {
   const { data: benefitsData } = trpc.benefits.list.useQuery({ audienceType: "Client" });
   const benefitsCount = benefitsData?.benefits?.length ?? 0;
 
-  const { open: openUpgrade } = useUpgrade();
+  const { start: startUpgrade, pending: upgradePending } = useUpgrade();
 
   const tasks: TaskItem[] = [
     waitingToConfirm > 0 && {
@@ -706,7 +706,7 @@ export default function Overview() {
       icon: <Sparkles size={16} className="text-[#F25722]" />,
       label: "Upgrade to Artswrk Premium",
       sublabel: "Unlimited jobs unlocked for one flat rate",
-      onClick: () => openUpgrade({ audience: "client" }),
+      onClick: () => startUpgrade({ audience: "client" }),
       upsell: true,
     },
   ].filter(Boolean) as TaskItem[];

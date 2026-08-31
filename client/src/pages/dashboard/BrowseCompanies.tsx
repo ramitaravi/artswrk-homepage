@@ -13,7 +13,7 @@ import {
   Sparkles, Lock, Car, Map as MapIcon, Grid as GridIcon,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { useUpgrade } from "@/components/UpgradeModal";
+import { useUpgrade } from "@/lib/useUpgrade";
 import { formatLocation } from "@/lib/utils";
 import { MapView } from "@/components/Map";
 import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
@@ -122,7 +122,7 @@ function CompanyCard({ company }: { company: Company }) {
 // ─── Locked (non-PRO) state ────────────────────────────────────────────────────
 
 function LockedState() {
-  const { open } = useUpgrade();
+  const { start: startUpgrade, pending: upgradePending } = useUpgrade();
   return (
     <div className="rounded-3xl bg-[#111] p-8 md:p-12 relative overflow-hidden text-center">
       <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 50% 0%, rgba(236,0,140,0.35) 0%, transparent 60%)" }} />
@@ -137,10 +137,11 @@ function LockedState() {
         </p>
         <button
           type="button"
-          onClick={() => open({ audience: "artist", feature: "Browse Companies", returnPath: "/app/companies" })}
-          className="inline-flex items-center gap-2 bg-[#ec008c] text-white text-sm font-bold px-6 py-3 rounded-full hover:opacity-90 transition-opacity"
+          onClick={() => startUpgrade({ audience: "artist", returnPath: "/app/companies" })}
+          disabled={upgradePending}
+          className="inline-flex items-center gap-2 bg-[#ec008c] text-white text-sm font-bold px-6 py-3 rounded-full hover:opacity-90 transition-opacity disabled:opacity-60"
         >
-          <Sparkles size={15} /> Upgrade to PRO
+          <Sparkles size={15} /> {upgradePending ? "Opening checkout…" : "Upgrade to PRO — $110/yr"}
         </button>
       </div>
     </div>

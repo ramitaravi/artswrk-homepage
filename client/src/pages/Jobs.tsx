@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { Link, useSearch, useLocation as useWouterLocation, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { useUpgrade } from "@/components/UpgradeModal";
+import { useUpgrade } from "@/lib/useUpgrade";
 import { formatLocation, getJobTitle } from "@/lib/utils";
 import JobListCard, { ApplyCta } from "@/components/JobListCard";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -163,7 +163,7 @@ function SubscriptionPaywallModal({
   onClose: () => void;
   isLoggedIn: boolean;
 }) {
-  const { open: openUpgrade } = useUpgrade();
+  const { start: startUpgrade, pending: upgradePending } = useUpgrade();
   if (!isOpen) return null;
 
   return (
@@ -225,12 +225,23 @@ function SubscriptionPaywallModal({
                   Public artist profile
                 </li>
               </ul>
-              <Link
-                href={isLoggedIn ? "/subscribe/basic" : "/join?next=/subscribe/basic"}
-                className="block w-full text-center text-xs font-bold text-white bg-[#F25722] hover:bg-[#d44a1a] transition-colors py-2.5 rounded-xl"
-              >
-                Get Basic <ArrowRight size={12} className="inline ml-1" />
-              </Link>
+              {isLoggedIn ? (
+                <button
+                  type="button"
+                  onClick={() => startUpgrade({ audience: "artist", tier: "basic" })}
+                  disabled={upgradePending}
+                  className="block w-full text-center text-xs font-bold text-white bg-[#F25722] hover:bg-[#d44a1a] transition-colors py-2.5 rounded-xl disabled:opacity-60"
+                >
+                  Get Basic <ArrowRight size={12} className="inline ml-1" />
+                </button>
+              ) : (
+                <Link
+                  href="/join?next=/subscribe/basic"
+                  className="block w-full text-center text-xs font-bold text-white bg-[#F25722] hover:bg-[#d44a1a] transition-colors py-2.5 rounded-xl"
+                >
+                  Get Basic <ArrowRight size={12} className="inline ml-1" />
+                </Link>
+              )}
             </div>
 
             {/* PRO plan */}
@@ -258,7 +269,7 @@ function SubscriptionPaywallModal({
               {isLoggedIn ? (
                 <button
                   type="button"
-                  onClick={() => openUpgrade({ audience: "artist", feature: "PRO jobs" })}
+                  onClick={() => startUpgrade({ audience: "artist" })}
                   className="block w-full text-center text-xs font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors py-2.5 rounded-xl"
                 >
                   Get PRO <ArrowRight size={12} className="inline ml-1" />
@@ -425,7 +436,7 @@ function ApplicationCard({ job, status }: { job: DisplayApplication; status: App
 type Tab = "near-me" | "pro" | "applications";
 
 export default function Jobs({ inDashboard = false }: { inDashboard?: boolean }) {
-  const { open: openUpgrade } = useUpgrade();
+  const { start: startUpgrade, pending: upgradePending } = useUpgrade();
   const searchStr = useSearch();
   const searchParams = new URLSearchParams(searchStr);
   const [path] = useLocation();
@@ -882,7 +893,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
                 {isAuthenticated ? (
                   <button
                     type="button"
-                    onClick={() => openUpgrade({ audience: "artist", feature: "PRO jobs" })}
+                    onClick={() => startUpgrade({ audience: "artist" })}
                     className="flex-shrink-0 flex items-center gap-1.5 text-xs font-bold text-[#111] bg-yellow-400 hover:bg-yellow-300 transition-colors px-4 py-2 rounded-full"
                   >
                     Upgrade <ArrowRight size={12} />

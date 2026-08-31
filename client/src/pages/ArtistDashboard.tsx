@@ -41,7 +41,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { useUpgrade } from "@/components/UpgradeModal";
+import { useUpgrade } from "@/lib/useUpgrade";
 import { formatLocation, getJobTitle } from "@/lib/utils";
 import { toProJobUrl } from "./ProJobDetail";
 
@@ -164,7 +164,7 @@ function formatRate(job: any): string {
 }
 
 function DashboardTab({ user }: { user: any }) {
-  const { open: openUpgrade } = useUpgrade();
+  const { start: startUpgrade, pending: upgradePending } = useUpgrade();
   const [, navigate] = useLocation();
   const firstName = user?.firstName || user?.name?.split(" ")[0] || "there";
   const isPro = !!(user?.artswrkPro);
@@ -308,7 +308,7 @@ function DashboardTab({ user }: { user: any }) {
               {!isPro && (
                 <button
                   type="button"
-                  onClick={() => openUpgrade({ audience: "artist" })}
+                  onClick={() => startUpgrade({ audience: "artist" })}
                   className="flex w-full items-center justify-between gap-2 mt-2 p-3 rounded-xl bg-gradient-to-r from-pink-50 to-orange-50 border border-pink-100 hover:border-pink-200 transition-colors group"
                 >
                   <span className="text-xs font-semibold text-[#111]">
@@ -564,7 +564,7 @@ function DashboardTab({ user }: { user: any }) {
 type JobsSubTab = "jobs-for-you" | "pro-jobs" | "applications";
 
 function JobsTab({ user }: { user: any }) {
-  const { open: openUpgrade } = useUpgrade();
+  const { start: startUpgrade, pending: upgradePending } = useUpgrade();
   // Support deep-linking into a specific subtab via ?tab=applications (etc.),
   // e.g. the "View My Applications" link from the job apply flow.
   const searchStr = useSearch();
@@ -670,7 +670,7 @@ function JobsTab({ user }: { user: any }) {
               <p className="text-sm text-gray-500 mb-4">New PRO jobs are posted regularly. Check back soon!</p>
               <button
                 type="button"
-                onClick={() => openUpgrade({ audience: "artist", feature: "PRO jobs" })}
+                onClick={() => startUpgrade({ audience: "artist" })}
                 className="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white artist-grad-bg hover:opacity-80 transition-opacity"
               >
                 Upgrade to PRO →
@@ -1831,10 +1831,10 @@ function ProfileTab({ user }: { user: any }) {
 // ─── PRO Jobs Tab ─────────────────────────────────────────────────────────────
 
 function ProJobsTab() {
-  // Both CTAs below used to hard-navigate to /app/settings, which shows the
-  // plan page but never says what PRO costs on the way. The modal does.
-  const { open } = useUpgrade();
-  const onGoToSettings = () => open({ audience: "artist", feature: "PRO jobs", returnPath: "/app/pro-jobs" });
+  // Both CTAs below used to hard-navigate to /app/settings, where you had to
+  // find the upgrade button all over again.
+  const { start: startUpgrade, pending: upgradePending } = useUpgrade();
+  const onGoToSettings = () => startUpgrade({ audience: "artist", returnPath: "/app/pro-jobs" });
   const { data: planData, isLoading: planLoading } = trpc.artistSubscription.getCurrentPlan.useQuery();
   const { data: pricingData } = trpc.artistSubscription.getPricing.useQuery();
   const { data: proJobsData, isLoading: proJobsLoading } = trpc.artistDashboard.getProJobsFeed.useQuery({ limit: 50 });

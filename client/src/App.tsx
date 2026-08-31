@@ -4,7 +4,6 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { UpgradeProvider } from "@/components/UpgradeModal";
 import Home from "./pages/Home";
 import Jobs from "./pages/Jobs";
 import Login from "./pages/Login";
@@ -63,6 +62,8 @@ import LeadsCRM from "./pages/leads/LeadsCRM";
 import LeadsFacebook from "./pages/leads/LeadsFacebook";
 import BrowseArtists from "./pages/BrowseArtists";
 import { useAuth } from "./_core/hooks/useAuth";
+import { useEffect, useRef } from "react";
+import { useUpgrade } from "@/lib/useUpgrade";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 import CheckoutSessionVerifier from "./components/CheckoutSessionVerifier";
 
@@ -328,15 +329,14 @@ function Router() {
         {() => <AppRoute clientComponent={Settings} />}
       </Route>
 
-      {/* /subscribe/basic and /subscribe/pro are referenced as upgrade CTAs
-          (Jobs.tsx paywall + banner) but never had a matching route — real
-          checkout lives in the Settings > Subscription tab, which already
-          defaults to showing it. */}
+      {/* /subscribe/* is where a logged-out artist lands after joining, via
+          /join?next=/subscribe/pro. It used to dump them on the settings page
+          to start over; now it finishes the thing they clicked. */}
       <Route path="/subscribe/basic">
-        {() => { window.location.replace("/app/settings"); return null; }}
+        {() => <SubscribeRedirect tier="basic" />}
       </Route>
       <Route path="/subscribe/pro">
-        {() => { window.location.replace("/app/settings"); return null; }}
+        {() => <SubscribeRedirect tier="pro" />}
       </Route>
 
       {/* Legacy redirects — old /dashboard/* paths → /app/* */}
@@ -395,20 +395,41 @@ function Router() {
   );
 }
 
+/**
+ * Sends an artist straight into Stripe for the tier they asked for.
+ *
+ * The only way here is /join?next=/subscribe/pro — they clicked "Get PRO"
+ * while logged out, made an account, and came back. Making them find the
+ * button a second time loses people who had already decided.
+ */
+function SubscribeRedirect({ tier }: { tier: "basic" | "pro" }) {
+  const { user, loading } = useAuth();
+  const { start } = useUpgrade();
+  const fired = useRef(false);
+
+  useEffect(() => {
+    if (loading || fired.current) return;
+    if (!user) { window.location.replace(`/login?next=/subscribe/${tier}`); return; }
+    fired.current = true;
+    start({ audience: "artist", tier, returnPath: "/app" });
+  }, [loading, user, tier, start]);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <p className="text-sm text-gray-400">Opening checkout…</p>
+    </div>
+  );
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
-          {/* Every premium CTA on the site opens the same modal — see
-              components/UpgradeModal.tsx for why. It has to sit above the
-              router so any page can reach it. */}
-          <UpgradeProvider>
-            <Toaster />
-            <ImpersonationBanner />
-            <CheckoutSessionVerifier />
-            <Router />
-          </UpgradeProvider>
+          <Toaster />
+          <ImpersonationBanner />
+          <CheckoutSessionVerifier />
+          <Router />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

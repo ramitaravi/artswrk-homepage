@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PremiumGate } from "@/components/PremiumGate";
-import { useUpgrade } from "@/components/UpgradeModal";
+import { useUpgrade } from "@/lib/useUpgrade";
 import { trpc } from "@/lib/trpc";
 import { formatLocation } from "@/lib/utils";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -388,16 +388,13 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
   const planTier = (user as any)?.planTier;
   const canConnect = planTier === "client_premium" || planTier === "enterprise_subscription";
 
-  // Clicking an artist used to fire Stripe checkout on the spot — a toast, then
-  // a new tab asking for a card, with the price never shown. Now it opens the
-  // same upgrade modal as everywhere else.
-  const { open: openUpgrade } = useUpgrade();
+  const { start: startUpgrade, pending: upgradePending } = useUpgrade();
 
   function handleArtistClick(artistId: number) {
     if (canConnect) {
       navigate(`/app/artists/${artistId}`);
     } else {
-      openUpgrade({ audience: "client", feature: "Viewing full artist profiles" });
+      startUpgrade({ audience: "client" });
     }
   }
 
@@ -451,10 +448,12 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
               </div>
             </div>
             <button
-              onClick={() => openUpgrade({ audience: "client", feature: "Connecting with artists" })}
-              className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-bold text-[#111] bg-white hover:bg-gray-100 transition-colors"
+              onClick={() => startUpgrade({ audience: "client" })}
+              disabled={upgradePending}
+              className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-bold text-[#111] bg-white hover:bg-gray-100 transition-colors disabled:opacity-60 flex items-center gap-1.5"
             >
-              See Premium →
+              {upgradePending && <Loader2 size={13} className="animate-spin" />}
+              Subscribe — $65/mo
             </button>
           </div>
         )}
@@ -807,7 +806,6 @@ export default function Artists() {
         <PremiumGate
           title="Keep your own roster of artists"
           blurb="The teachers who already work for you, in one place — who applied, who you hired, and the favourites you want back."
-          feature="My Artists"
           bullets={[
             "Everyone who has applied to your jobs, in one list",
             "Every artist you have hired, with their history",

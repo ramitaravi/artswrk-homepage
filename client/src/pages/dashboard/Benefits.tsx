@@ -13,7 +13,7 @@
 import { useState } from "react";
 import { CheckCircle2, ChevronRight, ExternalLink, Lock, Sparkles } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { useUpgrade } from "@/components/UpgradeModal";
+import { useUpgrade } from "@/lib/useUpgrade";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -30,7 +30,7 @@ function initials(name: string): string {
 
 // ── Benefit Card ───────────────────────────────────────────────────────────────
 
-function BenefitCard({ benefit, locked, onUpgrade }: { benefit: any; locked: boolean; onUpgrade?: () => void }) {
+function BenefitCard({ benefit, locked, onUpgrade, upgradePending }: { benefit: any; locked: boolean; onUpgrade?: () => void; upgradePending?: boolean }) {
   const logoUrl = fixUrl(benefit.logoUrl);
   const category = benefit.categories?.[0] ?? "";
   const href = !locked ? fixUrl(benefit.url) : undefined;
@@ -90,9 +90,10 @@ function BenefitCard({ benefit, locked, onUpgrade }: { benefit: any; locked: boo
               <button
                 type="button"
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onUpgrade?.(); }}
-                className="rounded-full bg-[#F25722] px-3 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-[#d94a1c]"
+                disabled={upgradePending}
+                className="rounded-full bg-[#F25722] px-3 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-[#d94a1c] disabled:opacity-60"
               >
-                Unlock with Premium →
+                {upgradePending ? "Opening…" : "Unlock with Premium →"}
               </button>
             </div>
           ) : benefit.howToRedeem && (
@@ -158,13 +159,10 @@ export default function Benefits() {
       : allBenefits.filter((b: any) => b.categories?.includes(activeCategory));
 
   const upgradeLabel = audienceType === "Artist" ? "Artswrk PRO" : "Artswrk Premium";
-  // The banner used to fire Stripe checkout the moment you clicked it — no
-  // price, no plan, straight to a card form. Now it opens the shared modal.
-  const { open } = useUpgrade();
+  const { start: startUpgrade, pending: upgradePending } = useUpgrade();
   const goUpgrade = () =>
-    open({
+    startUpgrade({
       audience: audienceType === "Artist" ? "artist" : "client",
-      feature: "The Benefits Portal",
       returnPath: "/app/benefits",
     });
 
@@ -182,6 +180,7 @@ export default function Benefits() {
           <button
             type="button"
             onClick={goUpgrade}
+            disabled={upgradePending}
             className="flex w-full items-start justify-between gap-4 bg-gradient-to-r from-pink-50 to-orange-50 border border-orange-100 rounded-xl px-4 py-4 mb-7 text-left hover:border-orange-200 transition-colors"
           >
             <div className="flex items-start gap-3">
@@ -196,7 +195,7 @@ export default function Benefits() {
               </div>
             </div>
             <span className="flex-shrink-0 text-xs font-bold text-white bg-[#F25722] px-3 py-2 rounded-full whitespace-nowrap self-center">
-              Upgrade →
+              {upgradePending ? "Opening…" : "Upgrade →"}
             </span>
           </button>
         ) : (
@@ -265,7 +264,7 @@ export default function Benefits() {
       ) : (
         <div className="space-y-4">
           {filtered.map((benefit: any) => (
-            <BenefitCard key={benefit.id} benefit={benefit} locked={locked} onUpgrade={goUpgrade} />
+            <BenefitCard key={benefit.id} benefit={benefit} locked={locked} onUpgrade={goUpgrade} upgradePending={upgradePending} />
           ))}
         </div>
       )}

@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { useUpgrade } from "@/components/UpgradeModal";
+import { useUpgrade } from "@/lib/useUpgrade";
 import { toast } from "sonner";
 import CompanyManager from "@/components/CompanyManager";
 import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
@@ -285,7 +285,7 @@ function SubscriptionTab() {
   const { user } = useAuth();
   // auth.me already returns the full DB row — see AccountTab above.
   const artswrkUser = user as any;
-  const { open: openUpgrade } = useUpgrade();
+  const { start: startUpgrade, pending: upgradePending } = useUpgrade();
 
   const isPremium = artswrkUser?.planTier === "client_premium";
 
@@ -373,13 +373,27 @@ function SubscriptionTab() {
           </button>
         ) : (
           /* Was <a href="/join"> — a marketing page, from inside the logged-in
-             dashboard. You could not actually subscribe from "My Plan". */
-          <button
-            onClick={() => openUpgrade({ audience: "client", returnPath: "/app/settings?section=subscription" })}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors"
-          >
-            Upgrade to Premium →
-          </button>
+             dashboard. You could not actually subscribe from "My Plan".
+             Two buttons, because this is the one surface where the yearly
+             option has to be a real choice rather than a default. */
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => startUpgrade({ audience: "client", interval: "month" })}
+              disabled={upgradePending}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors disabled:opacity-60"
+            >
+              {upgradePending && <Loader2 size={15} className="animate-spin" />}
+              Subscribe — $65/month
+            </button>
+            <button
+              onClick={() => startUpgrade({ audience: "client", interval: "year" })}
+              disabled={upgradePending}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-gray-200 text-[#111] text-sm font-bold hover:bg-gray-50 transition-colors disabled:opacity-60"
+            >
+              Subscribe — $650/year
+              <span className="text-[#F25722]">save $130</span>
+            </button>
+          </div>
         )}
       </div>
 

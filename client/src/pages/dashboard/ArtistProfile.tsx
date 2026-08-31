@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
-import { useUpgrade } from "@/components/UpgradeModal";
+import { useUpgrade } from "@/lib/useUpgrade";
 import { formatLocation } from "@/lib/utils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -421,7 +421,7 @@ export default function ArtistProfile() {
     { enabled: artistId > 0 }
   );
 
-  const { open: openUpgrade } = useUpgrade();
+  const { start: startUpgrade, pending: upgradePending } = useUpgrade();
 
   const handleShare = () => {
     const url = window.location.href;
@@ -479,11 +479,12 @@ export default function ArtistProfile() {
           </p>
         </div>
         <button
-          onClick={() => openUpgrade({ audience: "client", feature: "Full artist profiles" })}
-          className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white bg-[#111] hover:opacity-90 transition-opacity"
+          onClick={() => startUpgrade({ audience: "client" })}
+          disabled={upgradePending}
+          className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white bg-[#111] hover:opacity-90 transition-opacity disabled:opacity-60"
         >
-          <Sparkles size={15} />
-          See Premium
+          {upgradePending ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+          Subscribe to connect — $65/mo
         </button>
         <Link href="/app/artists" className="text-sm text-gray-400 font-semibold hover:text-[#111]">← Back to Artists</Link>
       </div>
