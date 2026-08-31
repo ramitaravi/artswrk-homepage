@@ -39,6 +39,47 @@ export interface CreateCheckoutOptions {
 /**
  * Create a Stripe Checkout Session for a one-time $30 job post.
  */
+/**
+ * Create a Checkout Session, surviving a stored customer id from the other
+ * Stripe mode.
+ *
+ * Stripe customer ids are mode-scoped. 931 client rows carry a
+ * clientStripeCustomerId imported from the live/Bubble account, so passing one
+ * under a test key fails the whole request:
+ *
+ *   No such customer: 'cus_NXhubY5rVowCjD'; a similar object exists in live
+ *   mode, but a test mode key was used to make this request.
+ *
+ * That made the upgrade flow impossible to exercise in test mode for any
+ * pre-existing client — and it would break the same way in production if the
+ * key were ever rotated across modes. The customer id is an optimisation (it
+ * prefills the card on file); the checkout works without it. So: try with it,
+ * and if Stripe says it does not exist here, drop it and fall back to the
+ * email. Costs nothing when the id is valid, which is the normal case.
+ */
+async function createSessionTolerantOfMode(
+  stripe: Stripe,
+  params: Stripe.Checkout.SessionCreateParams,
+  email?: string,
+): Promise<Stripe.Checkout.Session> {
+  try {
+    return await stripe.checkout.sessions.create(params);
+  } catch (err: any) {
+    const missingCustomer = err?.code === "resource_missing" && err?.param === "customer";
+    if (!missingCustomer || !params.customer) throw err;
+
+    console.warn(
+      `[Stripe] Customer ${params.customer} does not exist in this mode — ` +
+      `falling back to customer_email. (Mode-scoped id, likely imported from live.)`
+    );
+    const { customer, ...rest } = params;
+    return stripe.checkout.sessions.create({
+      ...rest,
+      ...(email ? { customer_email: email } : {}),
+    });
+  }
+}
+
 export async function createJobPostCheckoutSession(
   opts: CreateCheckoutOptions
 ): Promise<{ url: string; sessionId: string }> {
@@ -83,7 +124,7 @@ export async function createJobPostCheckoutSession(
     sessionParams.customer_email = opts.email;
   }
 
-  const session = await stripe.checkout.sessions.create(sessionParams);
+  const session = await createSessionTolerantOfMode(stripe, sessionParams, opts.email ?? undefined);
   return { url: session.url!, sessionId: session.id };
 }
 
@@ -133,7 +174,7 @@ export async function createSubscriptionCheckoutSession(
     sessionParams.customer_email = opts.email;
   }
 
-  const session = await stripe.checkout.sessions.create(sessionParams);
+  const session = await createSessionTolerantOfMode(stripe, sessionParams, opts.email ?? undefined);
   return { url: session.url!, sessionId: session.id };
 }
 
@@ -188,7 +229,7 @@ export async function createBoostCheckoutSession(
     sessionParams.customer_email = opts.email;
   }
 
-  const session = await stripe.checkout.sessions.create(sessionParams);
+  const session = await createSessionTolerantOfMode(stripe, sessionParams, opts.email ?? undefined);
   return { url: session.url!, sessionId: session.id };
 }
 
@@ -236,7 +277,7 @@ export async function createArtistProCheckoutSession(
     sessionParams.customer_email = opts.email;
   }
 
-  const session = await stripe.checkout.sessions.create(sessionParams);
+  const session = await createSessionTolerantOfMode(stripe, sessionParams, opts.email ?? undefined);
   return { url: session.url!, sessionId: session.id };
 }
 
@@ -278,7 +319,7 @@ export async function createArtistBasicCheckoutSession(
     sessionParams.customer_email = opts.email;
   }
 
-  const session = await stripe.checkout.sessions.create(sessionParams);
+  const session = await createSessionTolerantOfMode(stripe, sessionParams, opts.email ?? undefined);
   return { url: session.url!, sessionId: session.id };
 }
 
@@ -331,7 +372,7 @@ export async function createEnterpriseJobUnlockCheckoutSession(
     sessionParams.customer_email = opts.email;
   }
 
-  const session = await stripe.checkout.sessions.create(sessionParams);
+  const session = await createSessionTolerantOfMode(stripe, sessionParams, opts.email ?? undefined);
   return { url: session.url!, sessionId: session.id };
 }
 
@@ -380,7 +421,7 @@ export async function createEnterpriseSubscriptionCheckoutSession(
     sessionParams.customer_email = opts.email;
   }
 
-  const session = await stripe.checkout.sessions.create(sessionParams);
+  const session = await createSessionTolerantOfMode(stripe, sessionParams, opts.email ?? undefined);
   return { url: session.url!, sessionId: session.id };
 }
 
@@ -444,7 +485,7 @@ export async function createClientJobUnlockCheckoutSession(
   } else if (opts.email) {
     sessionParams.customer_email = opts.email;
   }
-  const session = await stripe.checkout.sessions.create(sessionParams);
+  const session = await createSessionTolerantOfMode(stripe, sessionParams, opts.email ?? undefined);
   return { url: session.url!, sessionId: session.id };
 }
 
@@ -505,7 +546,7 @@ export async function createClientSubscriptionCheckoutSession(
   } else if (opts.email) {
     sessionParams.customer_email = opts.email;
   }
-  const session = await stripe.checkout.sessions.create(sessionParams);
+  const session = await createSessionTolerantOfMode(stripe, sessionParams, opts.email ?? undefined);
   return { url: session.url!, sessionId: session.id };
 }
 
