@@ -17,6 +17,7 @@ import {
   MapPin, Clock, ArrowUpRight, UserCog, ArrowLeft, Sparkles, Globe, ExternalLink, Megaphone,
   Plus, Edit2, Mail, ChevronDown, ToggleLeft, ToggleRight, Instagram, Link as LinkIcon, Send, Copy, Loader2,
   Gift, Trash2, LayoutGrid, List as ListIcon, Tag, SlidersHorizontal,
+  Upload, Image as ImageIcon,
 } from "lucide-react";
 import { ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE } from "@shared/const";
 import { Link } from "wouter";
@@ -1807,6 +1808,144 @@ const HIRING_CATEGORIES = [
 // both in sync if this list ever changes.
 export const CLIENT_BUSINESS_TYPES = ["Dance Studio", "Dance Competition", "Music School", "Event Company", "Other"] as const;
 
+/**
+ * Multi-select for the benefit taxonomy fields.
+ *
+ * These were comma-separated free text, and the data drifted exactly as you'd
+ * expect: "Dance Studio" and "Dance Studios" both exist as business types, and
+ * the artist types on benefits ("Dance Teachers / Judges / Choreographer")
+ * match nothing in master_artist_types. Picking from a list stops new rows
+ * adding to that.
+ *
+ * Values already on a row that aren't in the canonical list are still shown and
+ * still selected — dropping them silently on save would quietly delete real
+ * data. They render greyed so the legacy ones are obvious.
+ */
+function BenefitTagPicker({
+  label, options, selected, onChange,
+}: {
+  label: string;
+  options: readonly string[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const legacy = selected.filter((v) => !options.includes(v));
+  const toggle = (v: string) =>
+    onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
+
+  return (
+    <div>
+      <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">{label}</label>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((o) => {
+          const on = selected.includes(o);
+          return (
+            <button
+              key={o}
+              type="button"
+              onClick={() => toggle(o)}
+              className={`px-2.5 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                on ? "bg-[#111] border-[#111] text-white" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+              }`}
+            >
+              {o}
+            </button>
+          );
+        })}
+        {legacy.map((o) => (
+          <button
+            key={o}
+            type="button"
+            onClick={() => toggle(o)}
+            title="Not in the current list — kept from the existing data. Click to remove."
+            className="px-2.5 py-1.5 rounded-full text-xs font-semibold border border-amber-200 bg-amber-50 text-amber-700"
+          >
+            {o} ×
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const BENEFIT_AUDIENCES = ["Artist", "Client"] as const;
+const BENEFIT_CATEGORIES = [
+  "Apparel", "Business Coaching", "Classes", "Community", "Competition",
+  "Convention", "Curriculum", "Live Event", "Services", "Software",
+] as const;
+
+/**
+ * Logo picker for the benefit form: upload a file, or paste a URL.
+ *
+ * Was a bare URL text box, which meant every logo had to already be hosted
+ * somewhere — so partners' logos ended up as hotlinks to their own sites, which
+ * break when they redesign. Uploading puts a copy on our storage.
+ */
+function BenefitLogoInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const upload = trpc.benefits.adminUploadLogo.useMutation();
+
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    if (file.size > 5 * 1024 * 1024) { setError("That file is over 5MB — please shrink it first."); return; }
+    setBusy(true);
+    try {
+      const base64: string = await new Promise((res, rej) => {
+        const r = new FileReader();
+        // readAsDataURL gives "data:image/png;base64,XXXX" — the endpoint wants
+        // just the payload.
+        r.onload = () => res(String(r.result).split(",")[1] ?? "");
+        r.onerror = () => rej(new Error("Could not read that file"));
+        r.readAsDataURL(file);
+      });
+      const { url } = await upload.mutateAsync({ base64, contentType: file.type || "image/png", filename: file.name });
+      onChange(url);
+    } catch (e: any) {
+      setError(e?.message ?? "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-3">
+        <div className="flex h-14 w-14 flex-none items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+          {value
+            ? <img src={value} alt="" className="h-full w-full object-contain p-1" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+            : <ImageIcon size={18} className="text-gray-300" />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-300">
+            {busy ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+            {busy ? "Uploading…" : value ? "Replace image" : "Upload image"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+              className="hidden"
+              onChange={(e) => { void pick(e.target.files?.[0]); e.currentTarget.value = ""; }}
+            />
+          </label>
+          {value && (
+            <button type="button" onClick={() => onChange("")} className="ml-2 text-xs font-semibold text-gray-400 hover:text-red-500">
+              Remove
+            </button>
+          )}
+        </div>
+      </div>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-2 w-full px-4 py-2.5 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-[#F25722]"
+        placeholder="…or paste an image URL"
+      />
+      {error && <p className="mt-1.5 text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
+
 // ─── Admin Client Form ────────────────────────────────────────────────────────
 function AdminClientForm({
   initial,
@@ -2799,6 +2938,35 @@ function AdminJobEditWrapper({ jobId, onBack, onSave, isSaving }: { jobId: numbe
 }
 
 // ─── Jobs Section ─────────────────────────────────────────────────────────────
+/**
+ * Job-alert queue state, in words an admin can act on. The column values are
+ * terse (`pending`, `sent_digest`, `suppressed`), and the difference between
+ * "will be emailed" and "will never be emailed" is the thing worth seeing at a
+ * glance — a job stuck in the wrong state either spams people or reaches
+ * nobody, and neither is visible anywhere else.
+ */
+const NETWORK_STATUS_META: Record<string, { label: string; cls: string; hint: string }> = {
+  pending:         { label: "Queued",    cls: "bg-amber-50 text-amber-700 border-amber-200",   hint: "Will be emailed at the next 1pm ET digest" },
+  sent_digest:     { label: "Sent",      cls: "bg-green-50 text-green-700 border-green-200",   hint: "Went out in a daily digest" },
+  sent_lastminute: { label: "Sent · urgent", cls: "bg-green-50 text-green-700 border-green-200", hint: "Went out immediately as a last-minute alert" },
+  expired:         { label: "Expired",   cls: "bg-gray-100 text-gray-500 border-gray-200",     hint: "Start date passed before it was ever sent" },
+  suppressed:      { label: "Held back", cls: "bg-gray-100 text-gray-500 border-gray-200",     hint: "Excluded from job alerts — never emailed" },
+};
+
+function NetworkStatusBadge({ status, sentAt }: { status?: string | null; sentAt?: string | Date | null }) {
+  // Null predates the job-alert system and is treated as suppressed everywhere,
+  // so it reads the same here rather than as a mystery blank.
+  const meta = NETWORK_STATUS_META[status ?? "suppressed"] ?? NETWORK_STATUS_META.suppressed;
+  return (
+    <span
+      title={sentAt ? `${meta.hint} — ${fmtDate(sentAt as any)}` : meta.hint}
+      className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border ${meta.cls}`}
+    >
+      {meta.label}
+    </span>
+  );
+}
+
 function JobsSection() {
   type View = { mode: "list" } | { mode: "detail"; id: number } | { mode: "edit"; id: number };
   const [view, setView] = useState<View>({ mode: "list" });
@@ -2877,14 +3045,15 @@ function JobsSection() {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Description</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Rate</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Job alerts</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Posted</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={5} className="px-5 py-10 text-center text-gray-400 text-xs">Loading…</td></tr>
+                <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-xs">Loading…</td></tr>
               ) : data?.jobs.length === 0 ? (
-                <tr><td colSpan={5} className="px-5 py-10 text-center text-gray-400 text-xs">No jobs found</td></tr>
+                <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-xs">No jobs found</td></tr>
               ) : data?.jobs.map(j => (
                 <tr key={j.id} className="border-b border-gray-50 hover:bg-orange-50/40 transition-colors cursor-pointer" onClick={() => setView({ mode: "detail", id: j.id })}>
                   <td className="px-5 py-3">
@@ -2897,6 +3066,7 @@ function JobsSection() {
                   </td>
                   <td className="px-4 py-3 text-xs font-semibold text-[#111]">{j.openRate ? "Open Rate" : j.clientHourlyRate ? `$${j.clientHourlyRate}/hr` : "—"}</td>
                   <td className="px-4 py-3"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${jobStatusColor(j.requestStatus)}`}>{j.requestStatus || "—"}</span></td>
+                  <td className="px-4 py-3"><NetworkStatusBadge status={(j as any).networkStatus} sentAt={(j as any).networkSentAt} /></td>
                   <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(j.bubbleCreatedAt || j.createdAt)}</td>
                 </tr>
               ))}
@@ -4013,10 +4183,11 @@ function BenefitFormModal({ benefit, onClose, onSaved }: { benefit?: AdminBenefi
   const [howToRedeem, setHowToRedeem] = useState(benefit?.howToRedeem ?? "");
   const [contactName, setContactName] = useState(benefit?.contactName ?? "");
   const [contactEmail, setContactEmail] = useState(benefit?.contactEmail ?? "");
-  const [audienceTypes, setAudienceTypes] = useState(parseJsonArr(benefit?.audienceTypes).join(", "));
-  const [businessTypes, setBusinessTypes] = useState(parseJsonArr(benefit?.businessTypes).join(", "));
-  const [artistTypes, setArtistTypes] = useState(parseJsonArr(benefit?.artistTypes).join(", "));
-  const [categories, setCategories] = useState(parseJsonArr(benefit?.categories).join(", "));
+  const [audienceTypes, setAudienceTypes] = useState<string[]>(parseJsonArr(benefit?.audienceTypes));
+  const [businessTypes, setBusinessTypes] = useState<string[]>(parseJsonArr(benefit?.businessTypes));
+  const [artistTypes, setArtistTypes] = useState<string[]>(parseJsonArr(benefit?.artistTypes));
+  const { data: artistTypeOptions = [] } = trpc.artists.getMasterArtistTypes.useQuery();
+  const [categories, setCategories] = useState<string[]>(parseJsonArr(benefit?.categories));
 
   const utils = trpc.useUtils();
   const createMutation = trpc.benefits.adminCreate.useMutation({
@@ -4038,10 +4209,10 @@ function BenefitFormModal({ benefit, onClose, onSaved }: { benefit?: AdminBenefi
       howToRedeem: howToRedeem || null,
       contactName: contactName || null,
       contactEmail: contactEmail || null,
-      audienceTypes: csvToArr(audienceTypes),
-      businessTypes: csvToArr(businessTypes),
-      artistTypes: csvToArr(artistTypes),
-      categories: csvToArr(categories),
+      audienceTypes,
+      businessTypes,
+      artistTypes,
+      categories,
     };
     if (isCreate) createMutation.mutate(data);
     else updateMutation.mutate({ id: benefit.id, ...data });
@@ -4070,8 +4241,8 @@ function BenefitFormModal({ benefit, onClose, onSaved }: { benefit?: AdminBenefi
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Logo URL</label>
-              <input value={logoUrl} onChange={e => setLogoUrl(e.target.value)} className={inputCls} placeholder="https://…" />
+              <label className={labelCls}>Logo</label>
+              <BenefitLogoInput value={logoUrl} onChange={setLogoUrl} />
             </div>
             <div>
               <label className={labelCls}>Website URL</label>
@@ -4102,23 +4273,18 @@ function BenefitFormModal({ benefit, onClose, onSaved }: { benefit?: AdminBenefi
           </div>
           <div className="pt-2 border-t border-gray-100" />
           <div>
-            <label className={labelCls}>Audience (comma-separated: Artist, Client)</label>
-            <input value={audienceTypes} onChange={e => setAudienceTypes(e.target.value)} className={inputCls} placeholder="Artist, Client" />
+            <BenefitTagPicker label="Audience" options={BENEFIT_AUDIENCES} selected={audienceTypes} onChange={setAudienceTypes} />
           </div>
           <div>
-            <label className={labelCls}>Categories (comma-separated)</label>
-            <input value={categories} onChange={e => setCategories(e.target.value)} className={inputCls} placeholder="Software, Curriculum, Insurance…" />
+            <BenefitTagPicker label="Categories" options={BENEFIT_CATEGORIES} selected={categories} onChange={setCategories} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Business Types</label>
-              <input value={businessTypes} onChange={e => setBusinessTypes(e.target.value)} className={inputCls} placeholder="Dance Studio, Dance Competition…" />
-            </div>
-            <div>
-              <label className={labelCls}>Artist Types</label>
-              <input value={artistTypes} onChange={e => setArtistTypes(e.target.value)} className={inputCls} placeholder="Dance Educator…" />
-            </div>
-          </div>
+          <BenefitTagPicker label="Business Types" options={CLIENT_BUSINESS_TYPES} selected={businessTypes} onChange={setBusinessTypes} />
+          <BenefitTagPicker
+            label="Artist Types"
+            options={artistTypeOptions.map((t: any) => t.name)}
+            selected={artistTypes}
+            onChange={setArtistTypes}
+          />
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
             <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-50 transition-colors">

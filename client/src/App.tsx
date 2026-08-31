@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
@@ -17,8 +17,9 @@ import Payments from "./pages/dashboard/Payments";
 import Artists from "./pages/dashboard/Artists";
 import Messages from "./pages/dashboard/Messages";
 import CompanyPage from "./pages/dashboard/CompanyPage";
-import SubLists from "./pages/dashboard/SubLists";
-import Community from "./pages/dashboard/Community";
+// Hidden for launch — see the redirected routes below.
+// import SubLists from "./pages/dashboard/SubLists";
+// import Community from "./pages/dashboard/Community";
 import Benefits from "./pages/dashboard/Benefits";
 import BrowseCompanies from "./pages/dashboard/BrowseCompanies";
 import ArtistProfile from "./pages/dashboard/ArtistProfile";
@@ -173,27 +174,6 @@ function BrowseCompaniesRoute() {
   );
 }
 
-/**
- * Community is a client-only feature for now — artists get redirected
- * back to their dashboard instead of a "coming soon" placeholder.
- */
-function CommunityRoute() {
-  const { user, loading } = useAuth();
-  const isArtist = ((user as any)?.planTier as string | undefined)?.startsWith("artist_") ?? false;
-
-  if (loading) return <DashboardLayout><div /></DashboardLayout>;
-
-  if (isArtist) {
-    window.location.replace("/app");
-    return null;
-  }
-
-  return (
-    <DashboardLayout>
-      <Community />
-    </DashboardLayout>
-  );
-}
 
 /**
  * `/jobs` and `/pro` are public browsing routes with their own standalone
@@ -322,12 +302,13 @@ function Router() {
       <Route path="/app/company">
         {() => <DashRoute component={CompanyPage} />}
       </Route>
-      <Route path="/app/lists">
-        {() => <DashRoute component={SubLists} />}
-      </Route>
-      <Route path="/app/community">
-        {() => <CommunityRoute />}
-      </Route>
+      {/* Sub Lists and Community are hidden for launch — neither feature is
+          finished. They were reachable by URL with no gate of any kind, so the
+          routes redirect rather than just being dropped from the nav. Restore
+          these two blocks alongside their nav entries in DashboardLayout when
+          the features ship. */}
+      <Route path="/app/lists">{() => <Redirect to="/app" />}</Route>
+      <Route path="/app/community">{() => <Redirect to="/app" />}</Route>
       <Route path="/app/benefits">
         {() => <DashRoute component={Benefits} />}
       </Route>

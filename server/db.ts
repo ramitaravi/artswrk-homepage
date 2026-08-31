@@ -2715,6 +2715,7 @@ export async function getAdminClients({
 
 /** Admin: list all jobs with search + filters */
 export async function getAdminJobs({
+  networkStatus,
   search,
   companySearch,
   artistSearch,
@@ -2725,6 +2726,7 @@ export async function getAdminJobs({
   limit = 50,
   offset = 0,
 }: {
+  networkStatus?: string;
   search?: string;
   companySearch?: string;
   artistSearch?: string;
@@ -2743,6 +2745,10 @@ export async function getAdminJobs({
   if (companySearch) conditions.push(like(users.clientCompanyName, `%${companySearch}%`) as any);
   if (locationSearch) conditions.push(like(jobs.locationAddress, `%${locationSearch}%`) as any);
   if (status) conditions.push(eq(jobs.requestStatus, status) as any);
+  // "(none)" targets the legacy rows whose networkStatus is NULL — they behave
+  // as suppressed but are invisible to an equality filter.
+  if (networkStatus === "(none)") conditions.push(sql`${jobs.networkStatus} IS NULL` as any);
+  else if (networkStatus) conditions.push(eq(jobs.networkStatus, networkStatus as any) as any);
   if (state) conditions.push(like(jobs.locationAddress, `%${state}%`) as any);
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -2759,6 +2765,12 @@ export async function getAdminJobs({
       description: jobs.description,
       locationAddress: jobs.locationAddress,
       requestStatus: jobs.requestStatus,
+      // Job-alert queue state, so admin can see at a glance which jobs are
+      // waiting to be emailed, which have gone out, and which are held back.
+      networkStatus: jobs.networkStatus,
+      networkSentAt: jobs.networkSentAt,
+      title: jobs.title,
+      bubbleId: jobs.bubbleId,
       clientHourlyRate: jobs.clientHourlyRate,
       isHourly: jobs.isHourly,
       openRate: jobs.openRate,

@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
 import ArtistProfilePage from "./artist/ArtistProfilePage";
 import ArtistSettings from "./artist/ArtistSettings";
+import Benefits from "./dashboard/Benefits";
 import MessagesPage from "./dashboard/Messages";
 import {
   Briefcase,
@@ -179,6 +180,9 @@ function DashboardTab({ user }: { user: any }) {
 
   const { data: msgStats } = trpc.messages.myStats.useQuery();
   const unreadMessages = msgStats?.unreadMessages ?? 0;
+
+  const { data: benefitsData } = trpc.benefits.list.useQuery({ audienceType: "Artist" });
+  const benefitsCount = benefitsData?.benefits?.length ?? 0;
 
   const { data: myBookings } = trpc.artistDashboard.getBookings.useQuery();
   const nextBooking = (myBookings as any[] ?? [])
@@ -358,6 +362,27 @@ function DashboardTab({ user }: { user: any }) {
               </>
             )}
           </div>
+        )}
+
+        {/* Benefits teaser — only promoted once there's something real to show.
+            Enterprise gets benefits:[] from the server, so this naturally
+            never renders for them without any extra check here. */}
+        {benefitsCount > 0 && (
+          <a
+            href="/app/benefits"
+            className="block bg-gradient-to-br from-pink-50 to-orange-50 border border-pink-100 rounded-2xl p-5 hover:border-pink-200 transition-colors"
+          >
+            <div className="flex items-center gap-2 mb-1.5">
+              <Gift size={16} className="text-[#ec008c]" />
+              <span className="text-sm font-semibold text-[#111]">Partner Benefits</span>
+            </div>
+            <p className="text-xs text-gray-600 leading-relaxed mb-2">
+              {benefitsData?.locked
+                ? `$1000+ in savings waiting — unlock ${benefitsCount} partner discount${benefitsCount !== 1 ? "s" : ""} with Artswrk PRO.`
+                : `${benefitsCount} exclusive discount${benefitsCount !== 1 ? "s" : ""} from studios, classes & more — just for Artswrk artists.`}
+            </p>
+            <span className="text-xs font-semibold text-[#ec008c]">{benefitsData?.locked ? "Unlock with PRO →" : "See what's included →"}</span>
+          </a>
         )}
       </div>
 
@@ -1947,18 +1972,6 @@ function ProJobsTab({ onGoToSettings }: { onGoToSettings: () => void }) {
   );
 }
 
-// ─── Coming Soon Tab ──────────────────────────────────────────────────────────
-
-function ComingSoonTab({ icon, title }: { icon: React.ReactNode; title: string }) {
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
-      <div className="w-12 h-12 mx-auto text-gray-300 mb-3">{icon}</div>
-      <h2 className="text-lg font-semibold text-[#111] mb-1">{title}</h2>
-      <p className="text-sm text-gray-500">Coming soon. Data integration in progress.</p>
-    </div>
-  );
-}
-
 // ─── Main Artist Dashboard ────────────────────────────────────────────────────
 // Renders inside DashboardLayout — no sidebar of its own.
 // Content is driven by the current URL path (/app, /app/jobs, etc.)
@@ -1975,7 +1988,7 @@ export default function ArtistDashboard() {
     if (location.startsWith("/app/messages")) return null; // handled separately below
     if (location.startsWith("/app/profile")) return <ArtistProfilePage />;
     if (location.startsWith("/app/pro-jobs")) return <ProJobsTab onGoToSettings={() => { window.location.href = "/app/settings"; }} />;
-    if (location.startsWith("/app/benefits")) return <ComingSoonTab icon={<Gift size={40} />} title="Benefits" />;
+    if (location.startsWith("/app/benefits")) return <Benefits />;
     if (location.startsWith("/app/community")) { window.location.replace("/app"); return null; }
     if (location.startsWith("/app/settings")) return <ArtistSettings />;
     // Default: /app overview

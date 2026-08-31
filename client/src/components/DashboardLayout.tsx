@@ -46,14 +46,21 @@ interface NavItem {
 // Client (hirer) nav
 const CLIENT_CORE_NAV: NavItem[] = [
   { label: "Dashboard", icon: <LayoutDashboard size={18} />, href: "/app" },
-  { label: "Artists", icon: <Users size={18} />, href: "/app/artists" },
   { label: "Payments", icon: <CreditCard size={18} />, href: "/app/payments" },
   { label: "Messages", icon: <MessageSquare size={18} />, href: "/app/messages" },
 ];
 
 const CLIENT_PREMIUM_NAV: NavItem[] = [
-  { label: "Sub Lists", icon: <List size={18} />, href: "/app/lists", premium: true },
-  { label: "Community", icon: <Users2 size={18} />, href: "/app/community", premium: true },
+  // Browse Artists and My Artists live here rather than in the core nav: both
+  // are gated, and a free account should be able to see that from the sidebar
+  // instead of discovering it after clicking.
+  { label: "Browse Artists", icon: <Users size={18} />, href: "/app/artists", premium: true },
+  { label: "My Artists", icon: <Star size={18} />, href: "/app/artists?tab=my", premium: true },
+  // Sub Lists and Community are hidden for launch — neither is finished, and
+  // we don't want anyone reaching them. Removing them from the nav is not
+  // enough on its own: /app/lists and /app/community had no gate of any kind,
+  // so both routes now redirect too (see App.tsx). Restore both here and there
+  // together when the features are ready.
   { label: "Benefits", icon: <Gift size={18} />, href: "/app/benefits", premium: true },
 ];
 
@@ -161,7 +168,7 @@ function NavLink({ item, isArtist }: { item: NavItem; isArtist: boolean }) {
             </span>
           ) : (
             <span className="flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200">
-              <Crown size={9} /> PRO
+              <Crown size={9} /> PREMIUM
             </span>
           )
         )}

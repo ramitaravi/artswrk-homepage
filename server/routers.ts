@@ -5207,26 +5207,53 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
       .input(z.object({ audienceType: z.enum(["Artist", "Client"]) }))
       .query(async ({ input, ctx }) => {
         const viewer = await getUserById(ctx.user.id);
+        const planTier = (viewer as any)?.planTier as string | undefined;
+        const isEnterprise = !!planTier?.startsWith("enterprise_");
         // Enterprise accounts never qualify for Client benefits — there
         // simply aren't any partner benefits for that tier today, regardless
-        // of on-demand vs. subscription billing status.
+        // of on-demand vs. subscription billing status. Full exclusion, no
+        // teaser either: an enterprise account never sees this exists.
+        if (isEnterprise) return { locked: true as const, enterprise: true as const, benefits: [] };
+
         const eligible = input.audienceType === "Artist"
-          ? (viewer as any)?.planTier === "artist_pro"
-          : (viewer as any)?.planTier === "client_premium";
-        if (!eligible) return { locked: true as const, benefits: [] };
+          ? planTier === "artist_pro"
+          : planTier === "client_premium";
         const rows = await getBenefits(input.audienceType);
+        const mapped = rows.map((b) => ({
+          id: b.id,
+          companyName: b.companyName ?? "",
+          logoUrl: b.logoUrl ?? null,
+          url: b.url ?? null,
+          businessDescription: b.businessDescription ?? null,
+          discountOffering: b.discountOffering ?? null,
+          categories: (() => { try { return JSON.parse(b.categories ?? "[]") as string[]; } catch { return [] as string[]; } })(),
+          audienceTypes: (() => { try { return JSON.parse(b.audienceTypes ?? "[]") as string[]; } catch { return [] as string[]; } })(),
+        }));
+
+        if (!eligible) {
+          // Teaser mode — the whole point is to make free/basic/on-demand
+          // accounts want to upgrade. Show them exactly what they're missing
+          // (who the partner is, what the offer is), but never the redemption
+          // code — that's the one thing this endpoint must never leak to
+          // someone who hasn't actually paid for it. No `url` either, so
+          // there's no way to click through to a partner's redeem page and
+          // fish the code out some other way.
+          return {
+            locked: true as const,
+            enterprise: false as const,
+            // howToRedeem and url are the only things withheld. That is enough
+            // because the codes now live in howToRedeem where they belong —
+            // four partners had them written into discountOffering, which is
+            // the teaser copy every free account sees, and that data was fixed
+            // rather than papered over at render time.
+            benefits: mapped.map((b) => ({ ...b, url: null, howToRedeem: null })),
+          };
+        }
+
         return {
-          benefits: rows.map((b) => ({
-            id: b.id,
-            companyName: b.companyName ?? "",
-            logoUrl: b.logoUrl ?? null,
-            url: b.url ?? null,
-            businessDescription: b.businessDescription ?? null,
-            discountOffering: b.discountOffering ?? null,
-            howToRedeem: b.howToRedeem ?? null,
-            categories: (() => { try { return JSON.parse(b.categories ?? "[]") as string[]; } catch { return [] as string[]; } })(),
-            audienceTypes: (() => { try { return JSON.parse(b.audienceTypes ?? "[]") as string[]; } catch { return [] as string[]; } })(),
-          })),
+          locked: false as const,
+          enterprise: false as const,
+          benefits: mapped.map((b, i) => ({ ...b, howToRedeem: rows[i].howToRedeem ?? null })),
         };
       }),
 
@@ -5249,6 +5276,36 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
         const { getBenefitById } = await import("./db");
         return getBenefitById(input.id);
+      }),
+
+    /**
+     * Upload a benefit's logo and get back a hosted URL.
+     *
+     * Deliberately not tied to a benefit id: the admin form needs to accept a
+     * logo while ADDING a benefit, before any row exists. The caller drops the
+     * returned URL into the form and it saves with everything else.
+     */
+    adminUploadLogo: protectedProcedure
+      .input(z.object({
+        base64: z.string().max(8 * 1024 * 1024),
+        contentType: z.string().default("image/png"),
+        filename: z.string().max(200).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        if (!/^image\/(png|jpe?g|gif|webp|svg\+xml)$/i.test(input.contentType)) {
+          throw new Error("Logos must be an image (png, jpg, gif, webp or svg).");
+        }
+        const { storagePut } = await import("./storage");
+        const buf = Buffer.from(input.base64, "base64");
+        const ext = (input.contentType.split("/")[1] ?? "png").replace("+xml", "");
+        const safe = (input.filename ?? "logo").replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 60);
+        const { url } = await storagePut(
+          `benefit-logos/${Date.now()}-${safe}.${ext}`,
+          buf,
+          input.contentType
+        );
+        return { url };
       }),
 
     adminCreate: protectedProcedure

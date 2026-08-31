@@ -12,6 +12,7 @@ import {
   Heart, ArrowRight, CalendarCheck, Lock, Sparkles, MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PremiumGate } from "@/components/PremiumGate";
 import { trpc } from "@/lib/trpc";
 import { formatLocation } from "@/lib/utils";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -766,7 +767,13 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
 type Tab = "browse" | "my";
 
 export default function Artists() {
-  const [tab, setTab] = useState<Tab>("browse");
+  // The sidebar links straight to the My Artists tab, so honour ?tab=my rather
+  // than always opening on Browse.
+  const initialTab: Tab =
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "my"
+      ? "my"
+      : "browse";
+  const [tab, setTab] = useState<Tab>(initialTab);
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "browse", label: "Browse Artists" },
@@ -790,8 +797,34 @@ export default function Artists() {
         ))}
       </div>
 
-      {tab === "browse" && <BrowseArtistsTab />}
-      {tab === "my" && <MyArtistsTab />}
+      {tab === "browse" && (
+        <PremiumGate
+          title="Browse the full artist roster"
+          blurb="Search 6,000+ vetted artists by discipline, location and availability — and reach out directly, before they ever see a job post."
+          bullets={[
+            "Search every artist on Artswrk by service, style and area",
+            "See full profiles, reels, resumes and rates",
+            "Message artists directly instead of waiting for applicants",
+            "Save the ones you like and rebook them in a click",
+          ]}
+        >
+          <BrowseArtistsTab />
+        </PremiumGate>
+      )}
+      {tab === "my" && (
+        <PremiumGate
+          title="Keep your own roster of artists"
+          blurb="The teachers who already work for you, in one place — who applied, who you hired, and the favourites you want back."
+          bullets={[
+            "Everyone who has applied to your jobs, in one list",
+            "Every artist you have hired, with their history",
+            "Favourite the ones you trust and rebook them fast",
+            "Message any of them directly from your roster",
+          ]}
+        >
+          <MyArtistsTab />
+        </PremiumGate>
+      )}
     </div>
   );
 }

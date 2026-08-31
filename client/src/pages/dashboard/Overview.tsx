@@ -4,7 +4,7 @@ import {
   Users, ChevronRight, Sparkles, MapPin,
   Loader2, ArrowRight, Briefcase, Plus, Wand2,
   CalendarCheck, MessageSquare, Building2,
-  Heart, UserCheck,
+  Heart, UserCheck, Gift,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
@@ -670,6 +670,9 @@ export default function Overview() {
   const unreadMessages = (messageStats as any)?.unreadMessages ?? 0;
   const isPremium = (user as any)?.planTier === "client_premium";
 
+  const { data: benefitsData } = trpc.benefits.list.useQuery({ audienceType: "Client" });
+  const benefitsCount = benefitsData?.benefits?.length ?? 0;
+
   const tasks: TaskItem[] = [
     waitingToConfirm > 0 && {
       key: "confirm",
@@ -735,6 +738,27 @@ export default function Overview() {
 
       {/* ── Tasks (only what's actually applicable) ──────────────────────── */}
       <TasksCard tasks={tasks} />
+
+      {/* ── Benefits teaser — only promoted once there's something real to show.
+          Enterprise gets benefits:[] from the server, so this naturally never
+          renders for them without any extra check here. ── */}
+      {benefitsCount > 0 && (
+        <a
+          href="/app/benefits"
+          className="block bg-gradient-to-br from-orange-50 to-pink-50 border border-orange-100 rounded-2xl p-5 hover:border-orange-200 transition-colors"
+        >
+          <div className="flex items-center gap-2 mb-1.5">
+            <Gift size={16} className="text-[#F25722]" />
+            <span className="text-sm font-semibold text-[#111]">Partner Benefits</span>
+          </div>
+          <p className="text-xs text-gray-600 leading-relaxed mb-2">
+            {benefitsData?.locked
+              ? `$1000+ in savings waiting — unlock ${benefitsCount} partner discount${benefitsCount !== 1 ? "s" : ""} with Artswrk Premium.`
+              : `${benefitsCount} exclusive discount${benefitsCount !== 1 ? "s" : ""} for your studio — from booking tools to event partners.`}
+          </p>
+          <span className="text-xs font-semibold text-[#F25722]">{benefitsData?.locked ? "Unlock with Premium →" : "See what's included →"}</span>
+        </a>
+      )}
 
       {/* ── Tab bar ──────────────────────────────────────────────────────── */}
       <div className="border-b border-gray-200">
