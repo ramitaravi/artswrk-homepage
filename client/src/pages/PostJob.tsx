@@ -1734,7 +1734,17 @@ export default function PostJob() {
 
   if (isSuccess) return <SuccessPage />;
 
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const [, navigate] = useLocation();
+
+  // Artists can't post jobs. This only covers someone who's already logged
+  // in when they land here — the logged-out case (enters an artist email
+  // partway through) is handled separately by InlineAuth's blockRole prop
+  // below, since that path never reaches an authenticated session at all.
+  const isArtist = isAuthenticated && (user as any)?.planTier?.startsWith("artist_");
+  useEffect(() => {
+    if (isArtist) navigate("/app");
+  }, [isArtist]);
 
   // Read pre-parsed job data from the lead capture flow (DanceStudios → parse → here)
   const [initialParsed] = useState<{ parsed: ParsedJob; rawText: string } | null>(() => {
@@ -1750,7 +1760,8 @@ export default function PostJob() {
   const [parsed, setParsed] = useState<ParsedJob | null>(initialParsed?.parsed ?? null);
   const [form, setForm] = useState<FormData | null>(null);
   const [jobId, setJobId] = useState<number | null>(null);
-  const [, navigate] = useLocation();
+
+  if (isArtist) return null;
 
   return (
     <div className="min-h-screen bg-white">

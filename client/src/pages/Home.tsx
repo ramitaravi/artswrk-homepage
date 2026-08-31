@@ -383,7 +383,7 @@ function ForHirers() {
 
           <div className="mt-7 flex flex-wrap items-center gap-3">
             <Link
-              href={shown.href}
+              href="/join?role=client"
               className="rounded-xl px-7 py-4 text-[15px] font-bold text-white transition-colors hover:bg-[#3D3D4A]"
               style={{ background: INK }}
             >
@@ -782,7 +782,7 @@ function CTABanner() {
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link
-            href="/post-job"
+            href="/join?role=client"
             className="rounded-full bg-white px-[34px] py-4 text-base font-bold"
             style={{ color: INK }}
           >
