@@ -278,10 +278,11 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
       {/* Logo */}
       <div className="px-5 pt-6 pb-5">
         <Link href="/app">
-          <span className="font-black text-xl tracking-tight">
-            <span className={isArtist ? "artist-grad-text" : "hirer-grad-text"}>ARTS</span>
-            <span className="bg-[#111] text-white px-1.5 py-0.5 rounded ml-0.5">WRK</span>
-          </span>
+          <img
+            src={`https://app.artswrk.com/logos/artswrk-${isArtist ? "pink" : "orange"}.png`}
+            alt="Artswrk"
+            className="h-8 w-auto"
+          />
         </Link>
       </div>
 
