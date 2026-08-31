@@ -671,7 +671,12 @@ export default function Overview() {
     (a: any) => (!a.status || a.status === "Interested") && activeJobIds.has(a.jobId)
   ).length;
 
-  const unpaidBookings = (bookingStats as any)?.unpaid ?? 0;
+  // Deliberately `awaitingPayment`, not `unpaid` — `unpaid` also counts
+  // bookings the artist hasn't invoiced yet (nothing for the client to do)
+  // and `direct`-pay bookings that never go through Artswrk checkout at all.
+  // The client can't pay until the artist invoices, so this task should only
+  // fire once that's actually happened.
+  const unpaidBookings = (bookingStats as any)?.awaitingPayment ?? 0;
   const unreadMessages = (messageStats as any)?.unreadMessages ?? 0;
   const isPremium = (user as any)?.planTier === "client_premium";
 
@@ -692,7 +697,7 @@ export default function Overview() {
       key: "pay",
       icon: <CalendarCheck size={16} className="text-[#F25722]" />,
       label: `Pay ${unpaidBookings} artist${unpaidBookings !== 1 ? "s" : ""}`,
-      sublabel: "Unpaid confirmed booking" + (unpaidBookings !== 1 ? "s" : ""),
+      sublabel: "Invoice" + (unpaidBookings !== 1 ? "s" : "") + " ready for payment",
       href: "/app/bookings",
     },
     unreadMessages > 0 && {

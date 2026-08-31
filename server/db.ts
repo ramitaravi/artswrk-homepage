@@ -936,20 +936,22 @@ export async function getBookingsByClientId(
  */
 export async function getBookingStatsByClientId(clientUserId: number) {
   const db = await getDb();
-  if (!db) return { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, totalRevenue: 0 };
+  if (!db) return { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, awaitingPayment: 0, totalRevenue: 0 };
 
   const statusResult = await db
     .select({
       bookingStatus: bookings.bookingStatus,
       paymentStatus: bookings.paymentStatus,
+      paymentMethod: bookings.paymentMethod,
+      artswrkInvoiceSubmittedAt: bookings.artswrkInvoiceSubmittedAt,
       count: sql<number>`COUNT(*)`,
       sumClientRate: sql<number>`SUM(COALESCE(totalClientRate, clientRate, 0))`,
     })
     .from(bookings)
     .where(eq(bookings.clientUserId, clientUserId))
-    .groupBy(bookings.bookingStatus, bookings.paymentStatus);
+    .groupBy(bookings.bookingStatus, bookings.paymentStatus, bookings.paymentMethod, bookings.artswrkInvoiceSubmittedAt);
 
-  const stats = { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, totalRevenue: 0 };
+  const stats = { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, awaitingPayment: 0, totalRevenue: 0 };
   for (const row of statusResult) {
     const count = Number(row.count);
     stats.total += count;
@@ -961,6 +963,14 @@ export async function getBookingStatsByClientId(clientUserId: number) {
       stats.totalRevenue += Number(row.sumClientRate ?? 0);
     }
     if (row.paymentStatus === 'Unpaid') stats.unpaid += count;
+    // "Awaiting payment" — genuinely actionable for the client, unlike `unpaid`
+    // above (which also counts bookings the artist hasn't invoiced yet, and
+    // even `direct`-pay bookings that never go through Artswrk checkout at
+    // all). The client can't pay until the artist invoices — this only
+    // counts bookings where that's actually happened.
+    if (row.paymentMethod === 'artswrk' && row.paymentStatus !== 'Paid' && row.artswrkInvoiceSubmittedAt) {
+      stats.awaitingPayment += count;
+    }
   }
   return stats;
 }
