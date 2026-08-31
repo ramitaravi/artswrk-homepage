@@ -1,23 +1,27 @@
+import "dotenv/config";
 import { describe, expect, it } from "vitest";
+import Stripe from "stripe";
 import { ENV } from "./_core/env";
 
 describe("Stripe Connect configuration", () => {
-  it("accepts the configured OAuth client ID at Stripe's authorization endpoint", async () => {
-    expect(ENV.stripeConnectClientId).toMatch(/^ca_[A-Za-z0-9]+$/);
+  it("can create an Express account and an onboarding Account Link", async () => {
+    expect(ENV.stripeSecretKey).toMatch(/^sk_(test|live)_/);
 
-    const params = new URLSearchParams({
-      response_type: "code",
-      client_id: ENV.stripeConnectClientId,
-      scope: "read_write",
-      redirect_uri: "http://localhost:3000/stripe-connect/callback",
+    const stripe = new Stripe(ENV.stripeSecretKey, { apiVersion: "2026-03-25.dahlia" });
+    const account = await stripe.accounts.create({
+      type: "express",
+      email: `connect-config-test-${Date.now()}@example.com`,
+      business_type: "individual",
+      capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
     });
-    const response = await fetch(`https://connect.stripe.com/oauth/authorize?${params.toString()}`, {
-      redirect: "manual",
-    });
-    const body = await response.text();
+    expect(account.id).toMatch(/^acct_/);
 
-    expect(response.status).toBeGreaterThanOrEqual(200);
-    expect(response.status).toBeLessThan(400);
-    expect(body.toLowerCase()).not.toContain("invalid_client");
+    const link = await stripe.accountLinks.create({
+      account: account.id,
+      type: "account_onboarding",
+      return_url: "http://localhost:3000/stripe-connect/callback?state=test",
+      refresh_url: "http://localhost:3000/stripe-connect/refresh?state=test",
+    });
+    expect(link.url).toMatch(/^https:\/\/connect\.stripe\.com\//);
   }, 20_000);
 });

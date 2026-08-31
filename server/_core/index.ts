@@ -235,21 +235,32 @@ async function startServer() {
   app.get("/unsubscribe", handleUnsubscribeGet);
   app.post("/unsubscribe", express.urlencoded({ extended: true }), handleUnsubscribePost);
 
-  // ── Stripe Connect OAuth callback — artist just approved payout linking ──
+  // ── Stripe Connect — artist returned from (or needs to resume) Express onboarding ──
+  // Landing here doesn't guarantee they finished — Stripe's own guidance is to
+  // check details_submitted on return, and send them back into a fresh Account
+  // Link (they expire after a few minutes) if they didn't. /refresh below
+  // handles the same recovery path when Stripe redirects there directly
+  // because the link itself expired mid-flow.
   app.get("/stripe-connect/callback", async (req, res) => {
-    const { code, state, error: oauthError } = req.query as { code?: string; state?: string; error?: string };
-
-    if (oauthError || !code || !state) {
+    const { state } = req.query as { state?: string };
+    if (!state) {
       res.redirect("/app/settings?stripe_connect=cancelled");
       return;
     }
 
     try {
-      const { verifyStripeConnectState, exchangeStripeConnectCode } = await import("../stripe");
-      const { saveArtistStripeConnectAccount, getUserById } = await import("../db");
+      const { verifyStripeConnectState, createConnectOnboardingUrl, getStripe } = await import("../stripe");
+      const { getArtistStripeConnectAccount, getUserById } = await import("../db");
       const { userId } = await verifyStripeConnectState(state);
-      const accountId = await exchangeStripeConnectCode(code);
-      await saveArtistStripeConnectAccount(userId, accountId);
+      const accountId = await getArtistStripeConnectAccount(userId);
+      if (!accountId) throw new Error("No Stripe Connect account on file for this user");
+
+      const account = await getStripe().accounts.retrieve(accountId);
+      if (!account.details_submitted) {
+        const resumeUrl = await createConnectOnboardingUrl(userId, accountId, `${req.protocol}://${req.get("host")}`);
+        res.redirect(resumeUrl);
+        return;
+      }
 
       // Internal ops alert — awaited (not fire-and-forget) so it can't be
       // orphaned by a server restart the way the admin welcome email was.
@@ -271,6 +282,27 @@ async function startServer() {
       res.redirect("/app/settings?stripe_connect=success");
     } catch (err: any) {
       console.error("[StripeConnect] Callback failed:", err.message);
+      res.redirect("/app/settings?stripe_connect=error");
+    }
+  });
+
+  // Stripe redirects here directly when an Account Link expires mid-flow.
+  app.get("/stripe-connect/refresh", async (req, res) => {
+    const { state } = req.query as { state?: string };
+    if (!state) {
+      res.redirect("/app/settings?stripe_connect=cancelled");
+      return;
+    }
+    try {
+      const { verifyStripeConnectState, createConnectOnboardingUrl } = await import("../stripe");
+      const { getArtistStripeConnectAccount } = await import("../db");
+      const { userId } = await verifyStripeConnectState(state);
+      const accountId = await getArtistStripeConnectAccount(userId);
+      if (!accountId) throw new Error("No Stripe Connect account on file for this user");
+      const url = await createConnectOnboardingUrl(userId, accountId, `${req.protocol}://${req.get("host")}`);
+      res.redirect(url);
+    } catch (err: any) {
+      console.error("[StripeConnect] Refresh failed:", err.message);
       res.redirect("/app/settings?stripe_connect=error");
     }
   });

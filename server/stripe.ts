@@ -502,38 +502,32 @@ export async function createClientSubscriptionCheckoutSession(
   return { url: session.url!, sessionId: session.id };
 }
 
-// ── Stripe Connect OAuth (artist payout onboarding) ─────────────────────────
-// The `state` param is a short-lived signed JWT carrying the artist's user ID
-// — no DB table or session lookup needed on the callback; the signature and
-// expiry are the only trust boundary. Stateless and CSRF-safe.
+// ── Stripe Connect onboarding (artist payout linking) ───────────────────────
+// Express accounts + Account Links — the flow Stripe actually recommends now.
+// Replaced the old "Standard" OAuth flow (connect.stripe.com/oauth/authorize)
+// on 2026-08-31 after Stripe auto-restricted it as a security measure; that
+// restriction can be lifted from the dashboard, but Standard OAuth is also
+// the more fragile of the two long-term, so this switches off it entirely
+// rather than just waiting out future restrictions.
+//
+// No `code` exchange here — we create the account ourselves and already know
+// its ID, so the `state` param only needs to carry the artist's user ID
+// through the redirect (still a short-lived signed JWT, same trust model as
+// before: stateless, CSRF-safe, no DB/session lookup needed on return).
 
 function connectStateSecret(): Uint8Array {
   if (!ENV.cookieSecret) throw new Error("JWT_SECRET is not configured");
   return new TextEncoder().encode(ENV.cookieSecret);
 }
 
-export async function createStripeConnectAuthorizeUrl(userId: number, origin: string): Promise<string> {
-  if (!ENV.stripeConnectClientId) {
-    throw new Error("STRIPE_CONNECT_CLIENT_ID is not configured");
-  }
-  const state = await new SignJWT({ userId })
+async function signConnectState(userId: number): Promise<string> {
+  return new SignJWT({ userId })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-    .setExpirationTime("15m")
+    .setExpirationTime("60m")
     .sign(connectStateSecret());
-
-  const redirectUri = `${origin}/stripe-connect/callback`;
-  const params = new URLSearchParams({
-    response_type: "code",
-    client_id: ENV.stripeConnectClientId,
-    scope: "read_write",
-    redirect_uri: redirectUri,
-    state,
-    "stripe_user[business_type]": "individual",
-  });
-  return `https://connect.stripe.com/oauth/authorize?${params.toString()}`;
 }
 
-/** Verifies + decodes the `state` param from a Connect OAuth callback. Throws if invalid/expired. */
+/** Verifies + decodes the `state` param from a Connect return/refresh redirect. Throws if invalid/expired. */
 export async function verifyStripeConnectState(state: string): Promise<{ userId: number }> {
   const { payload } = await jwtVerify(state, connectStateSecret(), { algorithms: ["HS256"] });
   const userId = payload.userId;
@@ -541,13 +535,39 @@ export async function verifyStripeConnectState(state: string): Promise<{ userId:
   return { userId };
 }
 
-/** Exchanges an OAuth `code` for the artist's connected Stripe account ID. */
-export async function exchangeStripeConnectCode(code: string): Promise<string> {
+/** Creates a new Express connected account for an artist. Call once per artist — reuse the ID after. */
+export async function createArtistExpressAccount(email: string): Promise<string> {
   const stripe = getStripe();
-  const response = await stripe.oauth.token({
-    grant_type: "authorization_code",
-    code,
-  } as any);
-  if (!(response as any).stripe_user_id) throw new Error("Stripe did not return a connected account ID");
-  return (response as any).stripe_user_id;
+  const account = await stripe.accounts.create({
+    type: "express",
+    email,
+    business_type: "individual",
+    // Stripe requires platform approval to request `transfers` without
+    // `card_payments` — confirmed live (2026-08-31), this platform isn't
+    // approved for transfers-only. Request both; card_payments goes unused
+    // since payments always run through the platform account, not the
+    // artist's, but Stripe won't create the account without it.
+    capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
+  });
+  return account.id;
+}
+
+/**
+ * Builds the onboarding (or resume-onboarding) link for an artist's Express
+ * account, and the matching signed state for the return/refresh redirects.
+ */
+export async function createConnectOnboardingUrl(
+  userId: number,
+  accountId: string,
+  origin: string
+): Promise<string> {
+  const stripe = getStripe();
+  const state = await signConnectState(userId);
+  const link = await stripe.accountLinks.create({
+    account: accountId,
+    type: "account_onboarding",
+    return_url: `${origin}/stripe-connect/callback?state=${encodeURIComponent(state)}`,
+    refresh_url: `${origin}/stripe-connect/refresh?state=${encodeURIComponent(state)}`,
+  });
+  return link.url;
 }

@@ -4144,14 +4144,23 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         return { connected: !!accountId };
       }),
 
-    /** Start the Stripe Connect OAuth flow so an artist can link their payout account. */
+    /** Start (or resume) Stripe Express onboarding so an artist can link their payout account. */
     createStripeConnectUrl: protectedProcedure
       .input(z.object({ origin: z.string().url() }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
-        const { createStripeConnectAuthorizeUrl } = await import("./stripe");
-        const url = await createStripeConnectAuthorizeUrl(user.id, input.origin);
+        if (!user.email) throw new Error("Account has no email on file");
+        const { createArtistExpressAccount, createConnectOnboardingUrl } = await import("./stripe");
+        const { saveArtistStripeConnectAccount } = await import("./db");
+
+        let accountId = await getArtistStripeConnectAccount(user.id);
+        if (!accountId) {
+          accountId = await createArtistExpressAccount(user.email);
+          await saveArtistStripeConnectAccount(user.id, accountId);
+        }
+
+        const url = await createConnectOnboardingUrl(user.id, accountId, input.origin);
         return { url };
       }),
   }),
