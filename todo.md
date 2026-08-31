@@ -792,3 +792,7 @@
 - [x] Install or reconcile dependency changes without overwriting lockfile intent
 - [x] Run TypeScript, deterministic tests, build checks, and visual smoke tests on key routes
 - [x] Save a reviewed checkpoint and document the before-and-after application state
+
+## Latest GitHub Asset Checkpoint Repair
+- [x] Move the oversized Artswrk orange source logo from the deployable project into managed file storage
+- [x] Verify the latest GitHub version and save a restorable checkpoint
