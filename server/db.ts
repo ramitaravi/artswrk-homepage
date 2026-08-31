@@ -1074,7 +1074,8 @@ export async function getPaymentsByClientId(
       bookingStartDate: bookings.startDate,
       bookingStatus: bookings.bookingStatus,
       bookingDescription: bookings.description,
-      // Artist fields
+      // Artist fields — null for payments with no linked booking (a
+      // subscription or a job unlock, not a payment to a person).
       artistFirstName: artistUser.firstName,
       artistLastName: artistUser.lastName,
       artistName: artistUser.name,
@@ -1083,7 +1084,15 @@ export async function getPaymentsByClientId(
     .from(payments)
     .leftJoin(bookings, eq(payments.bookingId, bookings.id))
     .leftJoin(artistUser, eq(bookings.artistUserId, artistUser.id))
-    .where(eq(payments.clientUserId, clientUserId))
+    .where(and(
+      eq(payments.clientUserId, clientUserId),
+      // Only money that actually moved. Bubble left behind $0
+      // "no_payment_required" checkout sessions with a null amount, and the
+      // wallet rendered each one as a transaction reading "—", so the list was
+      // padded with rows that never charged anyone anything.
+      inArray(payments.stripeStatus, ["paid", "succeeded"]),
+      isNotNull(payments.stripeAmount),
+    ))
     .orderBy(desc(payments.paymentDate))
     .limit(limit)
     .offset(offset);
@@ -1350,7 +1359,7 @@ export async function markConversationAsRead(conversationId: number, userId: num
  */
 export async function getWalletStatsByClientId(clientUserId: number) {
   const db = await getDb();
-  if (!db) return { totalSpent: 0, futurePayments: 0, pendingCount: 0, totalPaidAmount: 0 };
+  if (!db) return { totalSpent: 0, futurePayments: 0, futureCount: 0, pendingCount: 0, totalPaidAmount: 0 };
 
   const [totalRow] = await db
     .select({ total: sql<number>`SUM(COALESCE(clientRate, 0))` })
@@ -1376,17 +1385,29 @@ export async function getWalletStatsByClientId(clientUserId: number) {
       eq(bookings.bookingStatus, 'Pay Now')
     ));
 
+  // 'paid' and 'succeeded' are both settled — Stripe uses the first for
+  // Checkout Sessions and the second for PaymentIntents. Counting only
+  // 'succeeded' missed 17,899 of the 18,214 real payments in the table.
   const [paidRow] = await db
     .select({ total: sql<number>`SUM(COALESCE(stripeAmount, 0))` })
     .from(payments)
     .where(and(
       eq(payments.clientUserId, clientUserId),
-      eq(payments.stripeStatus, 'succeeded')
+      inArray(payments.stripeStatus, ['paid', 'succeeded'])
+    ));
+
+  const [futureCountRow] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(bookings)
+    .where(and(
+      eq(bookings.clientUserId, clientUserId),
+      eq(bookings.bookingStatus, 'Confirmed')
     ));
 
   return {
     totalSpent: Number(totalRow?.total ?? 0),
     futurePayments: Number(futureRow?.total ?? 0),
+    futureCount: Number(futureCountRow?.count ?? 0),
     pendingCount: Number(pendingRow?.count ?? 0),
     // stripeAmount is in cents — divide by 100 for dollars
     totalPaidAmount: Number(paidRow?.total ?? 0) / 100,
@@ -1406,7 +1427,10 @@ export async function getPendingPaymentsByClientId(clientUserId: number) {
       clientRate: bookings.clientRate,
       startDate: bookings.startDate,
       bookingStatus: bookings.bookingStatus,
-      stripeCheckoutUrl: bookings.stripeCheckoutUrl,
+      // stripeCheckoutUrl is deliberately NOT selected. It holds a Stripe
+      // Payment Link imported from Bubble that points at whatever product
+      // Bubble had configured — not at this booking, and not at this artist.
+      // Sending a client there charges them for someone else's booking.
       artistFirstName: artistUser.firstName,
       artistLastName: artistUser.lastName,
       artistName: artistUser.name,

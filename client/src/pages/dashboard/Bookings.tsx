@@ -28,7 +28,6 @@ type AnyBooking = {
   totalArtistRate?: number | null;
   grossProfit?: number | null;
   stripeFee?: number | null;
-  stripeCheckoutUrl?: string | null;
   externalPayment?: boolean | null;
   hours?: number | null;
   bubbleArtistId?: string | null;
@@ -196,16 +195,8 @@ function BookingRow({ booking }: { booking: AnyBooking }) {
             {booking.artistRate && (
               <p className="text-xs text-gray-400">Artist: {formatCurrency(booking.artistRate)}</p>
             )}
-            {booking.stripeCheckoutUrl && paymentStatus === "Unpaid" && (
-              <a
-                href={booking.stripeCheckoutUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs font-semibold text-white hirer-grad-bg px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
-              >
-                <CreditCard size={11} /> Pay Now
-              </a>
-            )}
+            {/* Pay Now removed — see dashboard/Payments.tsx. It linked to a
+                Bubble Payment Link that charges for a different booking. */}
             <button
               onClick={() => navigate(`/app/bookings/${booking.id}`)}
               className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"

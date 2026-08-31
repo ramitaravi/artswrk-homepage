@@ -333,12 +333,9 @@ function HistoryTab({ artistId }: { artistId: number }) {
                   {booking.startDate && <p className="text-xs text-gray-400">{formatDate(booking.startDate)}</p>}
                   {booking.locationAddress && <p className="text-xs text-gray-400 truncate mt-0.5">{booking.locationAddress}</p>}
                 </div>
-                {booking.stripeCheckoutUrl && (
-                  <a href={booking.stripeCheckoutUrl} target="_blank" rel="noopener noreferrer"
-                    className="flex-shrink-0 text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1">
-                    Receipt <ExternalLink size={10} />
-                  </a>
-                )}
+                {/* A "Receipt" link here pointed at bookings.stripeCheckoutUrl —
+                    a Bubble Payment Link, i.e. an unpaid checkout for some other
+                    product, not a receipt for this booking. */}
               </div>
             ))}
           </div>

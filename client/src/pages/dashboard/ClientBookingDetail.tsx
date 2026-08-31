@@ -189,16 +189,8 @@ export default function ClientBookingDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {b.stripeCheckoutUrl && paymentStatus === "Unpaid" && (
-              <a
-                href={b.stripeCheckoutUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-sm font-bold text-white hirer-grad-bg px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
-              >
-                <CreditCard size={14} /> Pay Now
-              </a>
-            )}
+            {/* Pay Now removed — see dashboard/Payments.tsx. It linked to a
+                Bubble Payment Link that charges for a different booking. */}
             <button
               onClick={() => setMsgOpen(true)}
               className="flex items-center gap-1.5 text-sm font-semibold text-[#111] border border-gray-200 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors"

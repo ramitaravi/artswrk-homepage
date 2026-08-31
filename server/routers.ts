@@ -1946,7 +1946,7 @@ export const appRouter = router({
     walletStats: protectedProcedure
       .query(async ({ ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
-        if (!user) return { totalSpent: 0, futurePayments: 0, pendingCount: 0, totalPaidAmount: 0 };
+        if (!user) return { totalSpent: 0, futurePayments: 0, futureCount: 0, pendingCount: 0, totalPaidAmount: 0 };
         return getWalletStatsByClientId(user.id);
       }),
 

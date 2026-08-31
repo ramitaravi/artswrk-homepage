@@ -3382,10 +3382,18 @@ function AdminBookingDetail({ bookingId, onBack, onViewJob, onViewPayment }: {
                 {b.interestedArtistId && <p className="text-xs text-gray-500">Application ID: <span className="font-mono text-gray-700">{b.interestedArtistId}</span></p>}
               </div>
               {b.stripeCheckoutUrl && (
-                <a href={b.stripeCheckoutUrl} target="_blank" rel="noopener noreferrer"
-                  className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-500 hover:underline">
-                  <ExternalLink size={11} /> Stripe Checkout
-                </a>
+                <div className="mt-4">
+                  <a href={b.stripeCheckoutUrl} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600 hover:underline">
+                    <ExternalLink size={11} /> Legacy Bubble payment link
+                  </a>
+                  {/* Kept for support lookups only. These are Bubble Payment
+                      Links whose product is unrelated to this booking — never
+                      send a client here to pay. */}
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    Imported from Bubble — bills for an unrelated product. Do not send to clients.
+                  </p>
+                </div>
               )}
             </div>
           </div>

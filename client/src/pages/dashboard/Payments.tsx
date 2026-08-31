@@ -6,6 +6,7 @@
  */
 
 import { Link } from "wouter";
+import { Receipt } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 
@@ -87,6 +88,7 @@ export default function Payments() {
   const totalSpent = wallet?.totalSpent ?? 0;
   const futurePayments = wallet?.futurePayments ?? 0;
   const pendingCount = wallet?.pendingCount ?? 0;
+  const futureCount = wallet?.futureCount ?? 0;
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
@@ -132,7 +134,9 @@ export default function Payments() {
             ) : (
               <p className="text-3xl font-black text-[#111]">{formatDollars(futurePayments)}</p>
             )}
-            <p className="text-xs text-gray-400 mt-1">{37} confirmed bookings upcoming</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {futureCount} confirmed booking{futureCount === 1 ? "" : "s"} upcoming
+            </p>
           </div>
 
           {/* Pending Payments */}
@@ -167,23 +171,30 @@ export default function Payments() {
                         <p className="text-sm font-semibold text-[#111] truncate">{artistName}</p>
                         <p className="text-xs text-gray-400">{formatDollars(b.clientRate ?? 0)}</p>
                       </div>
-                      {b.stripeCheckoutUrl ? (
-                        <a
-                          href={b.stripeCheckoutUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-4 py-1.5 rounded-full text-xs font-bold text-white artist-grad-bg hover:opacity-90 transition-opacity flex-shrink-0"
-                        >
-                          Pay Now
-                        </a>
-                      ) : (
-                        <button className="px-4 py-1.5 rounded-full text-xs font-bold text-white artist-grad-bg hover:opacity-90 transition-opacity flex-shrink-0">
-                          Pay Now
-                        </button>
-                      )}
+                      {/* No Pay Now button. It linked to bookings.stripeCheckoutUrl —
+                          a Stripe Payment Link imported from Bubble, pointing at
+                          whatever product Bubble had configured rather than at
+                          this booking. Clicking it billed the client for a
+                          stranger's booking; the money would not have reached
+                          the artist named on this row. Every one of these
+                          bookings came from Bubble and none has a checkout this
+                          app created, so there is nothing correct to link to
+                          yet — see the note below the list. */}
+                      <Link
+                        href={`/app/bookings/${b.id}`}
+                        className="px-4 py-1.5 rounded-full text-xs font-bold text-[#111] border border-gray-200 hover:bg-gray-50 transition-colors flex-shrink-0"
+                      >
+                        View booking
+                      </Link>
                     </div>
                   );
                 })}
+                <p className="pt-1 text-xs leading-relaxed text-gray-400">
+                  These bookings were made on the old Artswrk. To settle one, message
+                  the artist or email{" "}
+                  <a href="mailto:contact@artswrk.com" className="underline">contact@artswrk.com</a>{" "}
+                  and we'll invoice you directly.
+                </p>
               </div>
             )}
           </div>
@@ -222,37 +233,41 @@ export default function Payments() {
           ) : (
             <div className="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
               {recentPayments.map((p) => {
+                // A payment with no booking behind it was not a payment to a
+                // person — it's a subscription or a job unlock. Calling those
+                // "Unknown Artist" made every one look like a broken record of
+                // paying someone.
+                const paidAnArtist = !!(p.artistFirstName || p.artistName);
                 const artistName = p.artistFirstName && p.artistLastName
                   ? `${p.artistFirstName} ${p.artistLastName[0]}.`
-                  : p.artistName ?? "Unknown Artist";
+                  : p.artistName ?? "Artswrk";
                 const dateStr = formatDate(p.paymentDate ?? p.bubbleCreatedAt);
                 const amountStr = formatCents(p.stripeAmount);
+                const card = p.stripeCardLast4 ? `•••• ${p.stripeCardLast4}` : null;
 
                 return (
                   <div key={p.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors">
-                    <ArtistAvatar
-                      firstName={p.artistFirstName}
-                      lastName={p.artistLastName}
-                      name={p.artistName}
-                      profilePicture={p.artistProfilePicture}
-                      size="md"
-                    />
+                    {paidAnArtist ? (
+                      <ArtistAvatar
+                        firstName={p.artistFirstName}
+                        lastName={p.artistLastName}
+                        name={p.artistName}
+                        profilePicture={p.artistProfilePicture}
+                        size="md"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        <Receipt size={16} className="text-gray-400" />
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-[#111] truncate">{artistName}</p>
-                      <p className="text-xs text-gray-400">{dateStr}</p>
+                      <p className="text-xs text-gray-400">
+                        {dateStr}{card ? ` · ${card}` : ""}
+                      </p>
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className="text-sm font-bold text-[#111]">-{amountStr}</p>
-                      {p.stripeReceiptUrl && (
-                        <a
-                          href={p.stripeReceiptUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-[#F25722] hover:underline"
-                        >
-                          Receipt
-                        </a>
-                      )}
                     </div>
                   </div>
                 );
