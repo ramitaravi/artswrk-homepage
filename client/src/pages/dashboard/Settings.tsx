@@ -3,6 +3,7 @@
  * Tabs: Profile · Account · Subscription · Help
  */
 import { useState, useRef, useEffect } from "react";
+import { openPendingTab, type PendingTab } from "@/lib/openCheckoutTab";
 import {
   User, CreditCard, HelpCircle, ChevronRight,
   Camera, Loader2, CheckCircle2,
@@ -289,10 +290,17 @@ function SubscriptionTab() {
 
   const isPremium = artswrkUser?.planTier === "client_premium";
 
+  // New tab, opened during the click — see lib/openCheckoutTab.ts.
+  const portalTab = useRef<PendingTab | null>(null);
   const portalMutation = trpc.clientJobs.createPortalSession.useMutation({
-    // Same tab: window.open a tick after the click is what popup blockers eat.
-    onSuccess: ({ url }) => { window.location.href = url; },
-    onError: (err) => toast.error("Couldn't open billing portal", { description: err.message }),
+    onSuccess: ({ url }) => {
+      const t = portalTab.current; portalTab.current = null;
+      t ? t.go(url) : (window.location.href = url);
+    },
+    onError: (err) => {
+      portalTab.current?.cancel(); portalTab.current = null;
+      toast.error("Couldn't open billing portal", { description: err.message });
+    },
   });
 
   return (
@@ -364,7 +372,7 @@ function SubscriptionTab() {
         </div>
         {isPremium ? (
           <button
-            onClick={() => portalMutation.mutate({ origin: window.location.origin })}
+            onClick={() => { portalTab.current = openPendingTab(); portalMutation.mutate({ origin: window.location.origin }); }}
             disabled={portalMutation.isPending}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors disabled:opacity-50"
           >

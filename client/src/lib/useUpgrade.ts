@@ -15,14 +15,18 @@
  * Surfaces that want to make the case first — the plan pages, PremiumGate,
  * the PRO teaser — still do, and then call this.
  *
- * Two rules worth keeping:
- *   - Same-tab redirect. window.open fires a tick after the click, once the
- *     mutation resolves, which is exactly the shape popup blockers kill.
- *   - PRO is annual-only. The pricing source of truth is explicit that no
- *     monthly PRO exists; don't add an interval for artists.
+ * Checkout opens in a NEW TAB so nobody loses the page they were on. That
+ * needs care: window.open called after the mutation resolves is what popup
+ * blockers kill, so the tab is opened synchronously during the click and
+ * pointed at the URL when it arrives — see lib/openCheckoutTab.ts.
+ *
+ * PRO is annual-only. The pricing source of truth is explicit that no monthly
+ * PRO exists; don't add an interval for artists.
  */
+import { useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { openPendingTab, type PendingTab } from "@/lib/openCheckoutTab";
 
 export type UpgradeAudience = "artist" | "client";
 
@@ -39,12 +43,21 @@ export interface UpgradeRequest {
 }
 
 export function useUpgrade() {
-  const onError = (err: { message: string }) =>
+  // Holds the tab opened during the click until the session URL arrives.
+  const pending = useRef<PendingTab | null>(null);
+
+  const onError = (err: { message: string }) => {
+    pending.current?.cancel();
+    pending.current = null;
     toast.error("Couldn't open checkout", { description: err.message });
+  };
 
   const goTo = (url?: string | null) => {
-    if (url) window.location.href = url;
-    else toast.error("Couldn't open checkout", {
+    const tab = pending.current;
+    pending.current = null;
+    if (url) { tab ? tab.go(url) : (window.location.href = url); return; }
+    tab?.cancel();
+    toast.error("Couldn't open checkout", {
       description: "Please try again, or email contact@artswrk.com.",
     });
   };
@@ -62,12 +75,15 @@ export function useUpgrade() {
     onError,
   });
 
-  const pending = clientCheckout.isPending
+  const busy = clientCheckout.isPending
     || artistProCheckout.isPending
     || artistBasicCheckout.isPending;
 
   const start = (req: UpgradeRequest) => {
-    if (pending) return;
+    if (busy) return;
+    // Synchronously, before any await — this is the only moment the browser
+    // will let us open a tab.
+    pending.current = openPendingTab();
     const origin = window.location.origin;
     if (req.audience === "artist") {
       const returnPath = req.returnPath ?? window.location.pathname + window.location.search;
@@ -83,5 +99,5 @@ export function useUpgrade() {
     }
   };
 
-  return { start, pending };
+  return { start, pending: busy };
 }

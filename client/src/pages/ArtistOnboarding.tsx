@@ -1017,14 +1017,14 @@ export default function ArtistOnboarding() {
    * then never called. This is the last step of signup, so it's the worst
    * place on the site to lose someone who has already decided.
    */
-  async function choosePlan(tier: "basic" | "pro") {
+  function choosePlan(tier: "basic" | "pro") {
     setCheckoutLoading(true);
-    try {
-      await updateOnboarding.mutateAsync({ userSignedUp: true });
-      startUpgrade({ audience: "artist", tier, returnPath: "/app" });
-    } catch {
-      setCheckoutLoading(false);
-    }
+    // startUpgrade opens the checkout tab synchronously, so it has to run
+    // inside the click — awaiting the onboarding write first would put it a
+    // tick too late and the popup blocker would eat the tab. Marking them
+    // signed up doesn't need to finish before checkout starts.
+    updateOnboarding.mutate({ userSignedUp: true });
+    startUpgrade({ audience: "artist", tier, returnPath: "/app" });
   }
 
   const handleChooseBasic = () => choosePlan("basic");

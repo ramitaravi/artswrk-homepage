@@ -8,17 +8,38 @@
  * `/post-job/success` has its own dedicated verify calls (job activation vs.
  * boost need different success messaging), so it's skipped here to avoid a
  * redundant duplicate call.
+ *
+ * Checkout opens in a new tab, so the verify happens THERE — and the tab the
+ * user actually came from would sit on a stale, still-locked page until they
+ * reloaded it. On success we broadcast, and every other open tab refetches.
  */
 import { useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
+/** Same-origin channel name; only our own tabs can hear it. */
+const PLAN_CHANGED = "artswrk:plan-changed";
+
 export default function CheckoutSessionVerifier() {
   const utils = trpc.useUtils();
   const hasRun = useRef(false);
+
+  // Another tab finished a checkout — pick up the new plan without a reload.
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    const ch = new BroadcastChannel(PLAN_CHANGED);
+    ch.onmessage = () => { utils.invalidate(); };
+    return () => ch.close();
+  }, [utils]);
+
   const verifySession = trpc.checkout.verifySession.useMutation({
     onSuccess: () => {
       utils.invalidate();
+      if (typeof BroadcastChannel !== "undefined") {
+        const ch = new BroadcastChannel(PLAN_CHANGED);
+        ch.postMessage("verified");
+        ch.close();
+      }
     },
     onError: (err) => {
       console.error("[CheckoutSessionVerifier]", err.message);

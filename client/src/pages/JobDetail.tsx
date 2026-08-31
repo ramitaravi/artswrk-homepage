@@ -6,7 +6,8 @@
  *   logged in, free   → job shown fully, upgrade to basic CTA
  *   logged in, basic+ → full access, apply button
  */
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { openPendingTab, type PendingTab } from "@/lib/openCheckoutTab";
 import { Link, useParams, useLocation } from "wouter";
 import {
   MapPin, Calendar, DollarSign, ArrowLeft,
@@ -105,15 +106,23 @@ export default function JobDetail() {
   const proPrice = pricingData?.pro?.annual?.dollars ?? "$110";
   const trialDays = pricingData?.pro?.trialDays ?? 0;
 
-  // Same tab. window.open fires a tick after the click, once the mutation
-  // resolves — the exact shape popup blockers kill.
+  // New tab, opened during the click — see lib/openCheckoutTab.ts for why it
+  // can't wait for the mutation to resolve.
+  const checkoutTab = useRef<PendingTab | null>(null);
+  const openUnlock = (run: () => void) => { checkoutTab.current = openPendingTab(); run(); };
+  const onCheckoutUrl = ({ url }: { url: string }) => {
+    const tab = checkoutTab.current; checkoutTab.current = null;
+    tab ? tab.go(url) : (window.location.href = url);
+  };
+  const onCheckoutError = (err: { message: string }) => {
+    checkoutTab.current?.cancel(); checkoutTab.current = null;
+    toast.error("Checkout failed", { description: err.message });
+  };
   const createBasicCheckout = trpc.artistSubscription.createBasicCheckout.useMutation({
-    onSuccess: ({ url }) => { window.location.href = url; },
-    onError: (err) => toast.error("Checkout failed", { description: err.message }),
+    onSuccess: onCheckoutUrl, onError: onCheckoutError,
   });
   const createProCheckout = trpc.artistSubscription.createProCheckout.useMutation({
-    onSuccess: ({ url }) => { window.location.href = url; },
-    onError: (err) => toast.error("Checkout failed", { description: err.message }),
+    onSuccess: onCheckoutUrl, onError: onCheckoutError,
   });
   const unlockBusy = createBasicCheckout.isPending || createProCheckout.isPending;
 
@@ -248,7 +257,7 @@ export default function JobDetail() {
       </div>
       <div className="bg-white p-3.5 space-y-2.5">
         <button
-          onClick={() => createBasicCheckout.mutate({ origin: window.location.origin, returnPath: jobUrl })}
+          onClick={() => openUnlock(() => createBasicCheckout.mutate({ origin: window.location.origin, returnPath: jobUrl }))}
           disabled={unlockBusy}
           className="w-full text-left rounded-xl border border-gray-100 hover:border-pink-200 hover:bg-pink-50/30 transition-colors p-3.5 disabled:opacity-60"
         >
@@ -259,7 +268,7 @@ export default function JobDetail() {
           <p className="text-xs text-gray-400 mt-0.5">Apply to unlimited Artswrk jobs</p>
         </button>
         <button
-          onClick={() => createProCheckout.mutate({ origin: window.location.origin, returnPath: jobUrl })}
+          onClick={() => openUnlock(() => createProCheckout.mutate({ origin: window.location.origin, returnPath: jobUrl }))}
           disabled={unlockBusy}
           className="relative w-full text-left rounded-xl border-2 border-[#ec008c] bg-pink-50/50 p-3.5 disabled:opacity-60"
         >
@@ -470,7 +479,7 @@ export default function JobDetail() {
           </a>
         ) : !canApply ? (
           <button
-            onClick={() => createBasicCheckout.mutate({ origin: window.location.origin, returnPath: jobUrl })}
+            onClick={() => openUnlock(() => createBasicCheckout.mutate({ origin: window.location.origin, returnPath: jobUrl }))}
             disabled={unlockBusy}
             className="artist-grad-bg flex-shrink-0 flex items-center gap-1.5 px-5 py-3 rounded-xl text-sm font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-60"
           >

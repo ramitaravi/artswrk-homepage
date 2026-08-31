@@ -14,6 +14,12 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["server/**/*.test.ts", "server/**/*.spec.ts"],
+    // client/src/lib holds pure browser logic with no React — the checkout-tab
+    // opener in particular, whose whole contract is about *when* it runs.
+    include: [
+      "server/**/*.test.ts",
+      "server/**/*.spec.ts",
+      "client/src/lib/**/*.test.ts",
+    ],
   },
 });

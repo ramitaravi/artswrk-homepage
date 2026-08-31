@@ -6,9 +6,11 @@
  * quick links to PRO surfaces.
  */
 
+import { useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { openPendingTab, type PendingTab } from "@/lib/openCheckoutTab";
 
 type PlanTier = "free" | "basic" | "pro";
 
@@ -44,19 +46,29 @@ export default function ArtistSettingsPlan() {
   const { data: planData, isLoading: planLoading } = trpc.artistSubscription.getCurrentPlan.useQuery();
   const { data: pricingData, isLoading: pricingLoading } = trpc.artistSubscription.getPricing.useQuery();
 
+  // Checkout and the billing portal both open in a new tab, opened during the
+  // click — see lib/openCheckoutTab.ts.
+  const tab = useRef<PendingTab | null>(null);
+  const openTab = (run: () => void) => { tab.current = openPendingTab(); run(); };
+  const toUrl = ({ url }: { url: string }) => {
+    const t = tab.current; tab.current = null;
+    t ? t.go(url) : (window.location.href = url);
+  };
+  const failed = (label: string) => (err: { message: string }) => {
+    tab.current?.cancel(); tab.current = null;
+    toast.error(label, { description: err.message });
+  };
+
   const createBasicCheckout = trpc.artistSubscription.createBasicCheckout.useMutation({
-    onSuccess: ({ url }) => { window.location.href = url; },
-    onError: (err) => toast.error("Checkout failed", { description: err.message }),
+    onSuccess: toUrl, onError: failed("Checkout failed"),
   });
 
   const createProCheckout = trpc.artistSubscription.createProCheckout.useMutation({
-    onSuccess: ({ url }) => { window.location.href = url; },
-    onError: (err) => toast.error("Checkout failed", { description: err.message }),
+    onSuccess: toUrl, onError: failed("Checkout failed"),
   });
 
   const createPortal = trpc.artistSubscription.createPortalSession.useMutation({
-    onSuccess: ({ url }) => { window.location.href = url; },
-    onError: (err) => toast.error("Portal unavailable", { description: err.message }),
+    onSuccess: toUrl, onError: failed("Portal unavailable"),
   });
 
   const currentPlan: PlanTier = (planData?.plan as PlanTier) ?? "free";
@@ -64,13 +76,10 @@ export default function ArtistSettingsPlan() {
   const isBusy = createBasicCheckout.isPending || createProCheckout.isPending || createPortal.isPending;
 
   function handlePrimaryAction() {
-    if (currentPlan === "pro" && hasStripeCustomer) {
-      createPortal.mutate({ origin: window.location.origin });
-    } else if (currentPlan === "basic" && hasStripeCustomer) {
-      createPortal.mutate({ origin: window.location.origin });
-    } else {
-      createProCheckout.mutate({ origin: window.location.origin });
-    }
+    const managing = (currentPlan === "pro" || currentPlan === "basic") && hasStripeCustomer;
+    openTab(() => managing
+      ? createPortal.mutate({ origin: window.location.origin })
+      : createProCheckout.mutate({ origin: window.location.origin }));
   }
 
   const primaryLabel = currentPlan === "free" ? "Unlock PRO" : "Manage Subscription";
