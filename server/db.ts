@@ -942,14 +942,12 @@ export async function getBookingStatsByClientId(clientUserId: number) {
     .select({
       bookingStatus: bookings.bookingStatus,
       paymentStatus: bookings.paymentStatus,
-      paymentMethod: bookings.paymentMethod,
-      artswrkInvoiceSubmittedAt: bookings.artswrkInvoiceSubmittedAt,
       count: sql<number>`COUNT(*)`,
       sumClientRate: sql<number>`SUM(COALESCE(totalClientRate, clientRate, 0))`,
     })
     .from(bookings)
     .where(eq(bookings.clientUserId, clientUserId))
-    .groupBy(bookings.bookingStatus, bookings.paymentStatus, bookings.paymentMethod, bookings.artswrkInvoiceSubmittedAt);
+    .groupBy(bookings.bookingStatus, bookings.paymentStatus);
 
   const stats = { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, awaitingPayment: 0, totalRevenue: 0 };
   for (const row of statusResult) {
@@ -963,14 +961,12 @@ export async function getBookingStatsByClientId(clientUserId: number) {
       stats.totalRevenue += Number(row.sumClientRate ?? 0);
     }
     if (row.paymentStatus === 'Unpaid') stats.unpaid += count;
-    // "Awaiting payment" — genuinely actionable for the client, unlike `unpaid`
-    // above (which also counts bookings the artist hasn't invoiced yet, and
-    // even `direct`-pay bookings that never go through Artswrk checkout at
-    // all). The client can't pay until the artist invoices — this only
-    // counts bookings where that's actually happened.
-    if (row.paymentMethod === 'artswrk' && row.paymentStatus !== 'Paid' && row.artswrkInvoiceSubmittedAt) {
-      stats.awaitingPayment += count;
-    }
+    // Matches the old Bubble rule exactly: the "Pay Artists" prompt fired
+    // off bookingStatus = 'Pay Now', which is set the instant the artist
+    // invoices (markArtswrkInvoiceSubmitted) and cleared back to 'Confirmed'
+    // once paid (markInvoicePaid) — a `direct`-pay booking never passes
+    // through 'Pay Now' at all, so this naturally excludes those too.
+    if (row.bookingStatus === 'Pay Now') stats.awaitingPayment += count;
   }
   return stats;
 }
