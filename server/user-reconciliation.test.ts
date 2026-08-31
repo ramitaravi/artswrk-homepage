@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  findDemotedAdminIds,
   isSyntheticOpenId,
   limitText,
   normalizeEmail,
@@ -36,5 +37,21 @@ describe("user reconciliation helpers", () => {
     ]);
 
     expect(canonical?.id).toBe(5);
+  });
+
+  it("detects any administrator demoted or removed during reconciliation", () => {
+    const before = [
+      { id: 10, role: "admin" as const },
+      { id: 11, role: "admin" as const },
+      { id: 12, role: "user" as const },
+    ];
+    const after = [
+      { id: 10, role: "admin" as const },
+      { id: 11, role: "user" as const },
+      { id: 12, role: "user" as const },
+    ];
+
+    expect(findDemotedAdminIds(before, after)).toEqual([11]);
+    expect(findDemotedAdminIds(before, before)).toEqual([]);
   });
 });

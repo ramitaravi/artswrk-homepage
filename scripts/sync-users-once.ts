@@ -13,6 +13,16 @@ type ExistingUser = {
   role: "user" | "admin";
 };
 
+export function findDemotedAdminIds(
+  before: Array<Pick<ExistingUser, "id" | "role">>,
+  after: Array<Pick<ExistingUser, "id" | "role">>,
+): number[] {
+  const rolesAfter = new Map(after.map(user => [user.id, user.role]));
+  return before
+    .filter(user => user.role === "admin" && rolesAfter.get(user.id) !== "admin")
+    .map(user => user.id);
+}
+
 type BubbleUser = Record<string, unknown> & {
   _id: string;
   authentication?: { email?: { email?: string | null } };
@@ -338,6 +348,19 @@ async function main() {
     const validation = validationRows[0];
     if (Number(validation.flaggedRows) !== sourceUsers.length || Number(validation.distinctBubbleIds) !== sourceIds.size) {
       throw new Error(`Validation failed: ${JSON.stringify(validation)}`);
+    }
+
+    const existingAdmins = existingRows.filter(user => user.role === "admin");
+    if (existingAdmins.length > 0) {
+      const placeholders = existingAdmins.map(() => "?").join(", ");
+      const [adminRowsAfter] = await conn.execute<(ExistingUser & RowDataPacket)[]>(
+        `SELECT id, role FROM users WHERE id IN (${placeholders})`,
+        existingAdmins.map(user => user.id),
+      );
+      const demotedAdminIds = findDemotedAdminIds(existingAdmins, adminRowsAfter);
+      if (demotedAdminIds.length > 0) {
+        throw new Error(`Admin-role preservation failed for user IDs: ${demotedAdminIds.join(", ")}`);
+      }
     }
 
     await conn.commit();

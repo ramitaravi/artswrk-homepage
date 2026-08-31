@@ -796,3 +796,10 @@
 ## Latest GitHub Asset Checkpoint Repair
 - [x] Move the oversized Artswrk orange source logo from the deployable project into managed file storage
 - [x] Verify the latest GitHub version and save a restorable checkpoint
+
+## Admin Dashboard Data Loading Incident
+- [x] Capture the failing admin API requests, browser errors, authentication state, and production server logs
+- [x] Trace the failure through admin authorization, data queries, and the current database schema
+- [x] Apply the smallest safe fix and add regression coverage
+- [x] Verify Admin overview, Artists, Clients, Jobs, Bookings, and Payments data loading
+- [x] Save a validated checkpoint for the Admin dashboard repair
