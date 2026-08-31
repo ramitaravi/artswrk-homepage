@@ -5,7 +5,6 @@ import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
-import { getLoginUrl } from "./const";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -18,7 +17,11 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  window.location.href = getLoginUrl();
+  // A session that expires mid-use should drop someone on Artswrk's own
+  // login, not the Manus platform's OAuth portal — and bring them back to
+  // where they were instead of just the homepage.
+  const next = window.location.pathname + window.location.search;
+  window.location.href = `/login${next && next !== "/" ? `?next=${encodeURIComponent(next)}` : ""}`;
 };
 
 queryClient.getQueryCache().subscribe(event => {

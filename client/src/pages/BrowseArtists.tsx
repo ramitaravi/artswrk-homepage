@@ -10,7 +10,6 @@ import { Search, MapPin, Users, Loader2, ChevronRight, Sparkles, Star } from "lu
 import { trpc } from "@/lib/trpc";
 import { formatLocation } from "@/lib/utils";
 import Navbar from "@/components/Navbar";
-import { getLoginUrl } from "@/const";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -251,7 +250,7 @@ function ArtistCard({ artist, blurred }: { artist: any; blurred?: boolean }) {
   const color = getArtistColor(artist.firstName ?? artist.name);
 
   return (
-    <Link href={getLoginUrl()}>
+    <Link href="/join">
       <div className={`bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-lg transition-all group cursor-pointer relative ${blurred ? "opacity-60" : ""}`}>
         <div className="aspect-[3/4] relative overflow-hidden bg-gray-100">
           {artist.profilePicture ? (
@@ -351,7 +350,7 @@ export default function BrowseArtists() {
             )}
           </div>
           <Link
-            href={getLoginUrl()}
+            href="/join"
             className="inline-flex items-center gap-2 hirer-grad-bg text-white text-sm font-bold px-6 py-3 rounded-full hover:opacity-90 transition-opacity flex-shrink-0"
           >
             <Sparkles size={15} />
@@ -470,7 +469,7 @@ export default function BrowseArtists() {
                       </p>
                       <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                         <Link
-                          href={getLoginUrl()}
+                          href="/join"
                           className="bg-white text-[#F25722] font-bold text-sm px-8 py-3 rounded-full hover:bg-orange-50 transition-colors"
                         >
                           Join Free — It's Quick
@@ -548,7 +547,7 @@ export default function BrowseArtists() {
                 <p className="text-sm font-black text-[#111] mb-1">Ready to hire?</p>
                 <p className="text-xs text-gray-500 mb-4">Post a FREE job and get applicants fast.</p>
                 <Link
-                  href={getLoginUrl()}
+                  href="/post-job"
                   className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
                 >
                   ☆ Post a Job →

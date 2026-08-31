@@ -385,10 +385,22 @@ async function lookupDestination(resolution: Resolution): Promise<string | null>
         // reads the number — so the job still loads correctly.
         return row.slug ? `/jobs/${row.slug}` : `/jobs/job-${row.id}`;
       };
+      // /pro?uid=<id> wasn't only ever a job link — some of these are old
+      // artist profile links (the "uid" is the artist's bubbleId, not a
+      // job's). Neither job table matches those, so without this they fell
+      // through to the generic /pro listing with the id silently dropped.
+      const findArtist = async () => {
+        const [row] = await db
+          .select({ slug: users.slug })
+          .from(users)
+          .where(eq(users.bubbleId, resolution.bubbleId))
+          .limit(1);
+        return row?.slug ? `/book/${row.slug}` : null;
+      };
 
       destination = resolution.prefer === "pro"
-        ? (await findPro()) ?? (await findStandard())
-        : (await findStandard()) ?? (await findPro());
+        ? (await findPro()) ?? (await findStandard()) ?? (await findArtist())
+        : (await findStandard()) ?? (await findPro()) ?? (await findArtist());
     }
   } catch (err: any) {
     // A redirect must never take the page down with it.

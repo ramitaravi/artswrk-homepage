@@ -34,7 +34,6 @@ import {
 import { trpc } from "@/lib/trpc";
 import { formatLocation } from "@/lib/utils";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
 import Navbar from "@/components/Navbar";
 import DashboardLayout from "@/components/DashboardLayout";
 import {
@@ -574,7 +573,7 @@ export default function ApplyPage() {
 
   if (!isAuthenticated) {
     const jobUrl = toJobUrl(job);
-    const loginUrl = getLoginUrl();
+    const loginUrl = `/login?next=${encodeURIComponent(jobUrl)}`;
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4" style={{ fontFamily: "Poppins, sans-serif" }}>
         <div className="max-w-sm w-full bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
