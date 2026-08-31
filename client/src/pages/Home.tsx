@@ -125,7 +125,7 @@ function SignupCard() {
 
   return (
     <div
-      className="rounded-3xl bg-white"
+      className="rounded-3xl bg-white mt-8 md:mt-0"
       style={{
         border: `1px solid ${HAIRLINE}`,
         padding: "clamp(22px,2.5vw,28px)",

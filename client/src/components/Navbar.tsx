@@ -4,9 +4,9 @@
  * Login/Join buttons when logged out.
  */
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ChevronDown, Menu, X, LogOut, LayoutDashboard } from "lucide-react";
+import { Menu, X, LogOut, LayoutDashboard } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 
@@ -15,29 +15,8 @@ const LOGO_URL =
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [hirersOpen, setHirersOpen] = useState(false);
-  const [artistsOpen, setArtistsOpen] = useState(false);
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
-
-  // Timeout refs to delay closing so users can move mouse into the dropdown
-  const hirersTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const artistsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function openHirers() {
-    if (hirersTimeout.current) clearTimeout(hirersTimeout.current);
-    setHirersOpen(true);
-  }
-  function closeHirers() {
-    hirersTimeout.current = setTimeout(() => setHirersOpen(false), 120);
-  }
-  function openArtists() {
-    if (artistsTimeout.current) clearTimeout(artistsTimeout.current);
-    setArtistsOpen(true);
-  }
-  function closeArtists() {
-    artistsTimeout.current = setTimeout(() => setArtistsOpen(false), 120);
-  }
 
   const logout = trpc.auth.logout.useMutation({
     onSuccess: () => {
@@ -80,57 +59,7 @@ export default function Navbar() {
 
             <div className="hidden md:flex items-center gap-6">
               <Link href="/jobs" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">Jobs</Link>
-              <Link href="/browse" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">Browse Artists</Link>
               <Link href="/about" className="text-sm font-medium text-gray-700 hover:text-black transition-colors">About</Link>
-
-              {/* For Hirers dropdown */}
-              <div
-                className="relative"
-                onMouseEnter={openHirers}
-                onMouseLeave={closeHirers}
-              >
-                <button className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-black transition-colors py-2">
-                  For Hirers <ChevronDown size={14} className={`transition-transform ${hirersOpen ? "rotate-180" : ""}`} />
-                </button>
-                {hirersOpen && (
-                  <div
-                    className="absolute top-full left-0 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50"
-                    onMouseEnter={openHirers}
-                    onMouseLeave={closeHirers}
-                  >
-                    <a href="/post-job" className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">Post a Job</a>
-                    <a href="/jobs" className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">Browse Artists</a>
-                    <a href="/dance-competitions" className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">Dance Competitions</a>
-                    <a href="/dance-studios" className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">Dance Studios</a>
-                    <a href="/music-schools" className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">Music Schools</a>
-                  </div>
-                )}
-              </div>
-
-              {/* For Artists dropdown */}
-              <div
-                className="relative"
-                onMouseEnter={openArtists}
-                onMouseLeave={closeArtists}
-              >
-                <button className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-black transition-colors py-2">
-                  For Artists <ChevronDown size={14} className={`transition-transform ${artistsOpen ? "rotate-180" : ""}`} />
-                </button>
-                {artistsOpen && (
-                  <div
-                    className="absolute top-full left-0 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50"
-                    onMouseEnter={openArtists}
-                    onMouseLeave={closeArtists}
-                  >
-                    <a href="/login" className="block px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">Create Profile</a>
-                    <a href="/jobs" className="block px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">Find Jobs</a>
-                    <a href="/dance-teachers" className="block px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">Dance Teachers</a>
-                    <a href="/dance-judges" className="block px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">Dance Judges</a>
-                    <a href="/music-teachers" className="block px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">Music Teachers</a>
-                    <a href="/production" className="block px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">Production</a>
-                  </div>
-                )}
-              </div>
             </div>
 
             <div className="hidden md:flex items-center gap-3">
@@ -160,15 +89,7 @@ export default function Navbar() {
         {mobileOpen && (
           <div className="md:hidden bg-white border-t border-gray-100 px-5 py-4 space-y-3">
             <a href="/jobs" className="block text-sm font-medium text-gray-700 py-1">Jobs</a>
-            <a href="/browse" className="block text-sm font-medium text-gray-700 py-1">Browse Artists</a>
             <a href="/about" className="block text-sm font-medium text-gray-700 py-1">About</a>
-            <a href="/dance-competitions" className="block text-sm font-medium text-gray-700 py-1">Dance Competitions</a>
-            <a href="/dance-studios" className="block text-sm font-medium text-gray-700 py-1">Dance Studios</a>
-            <a href="/music-schools" className="block text-sm font-medium text-gray-700 py-1">Music Schools</a>
-            <a href="/dance-teachers" className="block text-sm font-medium text-gray-700 py-1">Dance Teachers</a>
-            <a href="/dance-judges" className="block text-sm font-medium text-gray-700 py-1">Dance Judges</a>
-            <a href="/music-teachers" className="block text-sm font-medium text-gray-700 py-1">Music Teachers</a>
-            <a href="/production" className="block text-sm font-medium text-gray-700 py-1">Production</a>
             <div className="flex gap-3 pt-2">
               {isAuthenticated && user ? (
                 <button
