@@ -9,7 +9,7 @@
  *   heading / subheading — override display text
  */
 import { useState, useRef, useEffect } from "react";
-import { ArrowRight, ArrowLeft, Eye, EyeOff, Loader2, Music, Building2 } from "lucide-react";
+import { ArrowRight, ArrowLeft, Eye, EyeOff, Loader2, Music, Building2, AlertTriangle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
 export interface AuthResult {
@@ -28,9 +28,18 @@ interface Props {
    *  role-neutral flows (e.g. the generic /login page). Pass "artist" when this form is
    *  rendered inside an artist-specific flow (e.g. "Join Artswrk to apply" on a job page). */
   variant?: "hirer" | "artist";
+  /**
+   * Set to "Artist" when this form is being used for a hiring/client flow
+   * (e.g. posting a job) — if the looked-up email belongs to an existing
+   * artist account, stops before the password stage and shows a message
+   * instead, rather than letting them log in here (logging in wouldn't get
+   * them what they came for — they can't post a job as an artist account).
+   * Does not apply to generic login — leave unset there.
+   */
+  blockRole?: "Artist";
 }
 
-type Stage = "email" | "password" | "set-password";
+type Stage = "email" | "password" | "set-password" | "blocked";
 
 interface UserInfo {
   firstName: string | null;
@@ -57,6 +66,7 @@ export default function InlineAuth({
   onSuccess,
   onNotFound,
   variant = "hirer",
+  blockRole,
 }: Props) {
   const gradientClass = variant === "artist" ? "artist-grad-bg" : "hirer-grad-bg";
   const [stage, setStage] = useState<Stage>("email");
@@ -108,6 +118,10 @@ export default function InlineAuth({
         profilePicture: data.profilePicture,
         clientCompanyName: data.clientCompanyName,
       });
+      if (blockRole && data.userRole === blockRole) {
+        setStage("blocked");
+        return;
+      }
       setStage(data.hasPassword ? "password" : "set-password");
     },
     onError: (err) => setError(err.message || "Something went wrong."),
@@ -193,6 +207,32 @@ export default function InlineAuth({
                 : <>Continue <ArrowRight size={15} /></>}
             </button>
           </form>
+        </>
+      )}
+
+      {/* ── Blocked stage (existing account has the disallowed role) ── */}
+      {stage === "blocked" && (
+        <>
+          <button type="button" onClick={goBack} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+            <ArrowLeft size={12} /> Different email
+          </button>
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-xl p-4">
+            <AlertTriangle size={18} className="text-amber-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-bold text-[#111] mb-1">
+                You already have {blockRole === "Artist" ? "an artist" : "a"} account with this email
+              </p>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Are you trying to hire as a client? You'll need to use a different email address to create a client account. If this is you, log in below instead.
+              </p>
+            </div>
+          </div>
+          <a
+            href={`/login?email=${encodeURIComponent(email.trim().toLowerCase())}`}
+            className={`w-full py-3.5 rounded-xl text-sm font-bold text-white ${gradientClass} hover:opacity-90 transition-opacity flex items-center justify-center gap-2`}
+          >
+            Log In Instead <ArrowRight size={15} />
+          </a>
         </>
       )}
 

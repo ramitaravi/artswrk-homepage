@@ -12,9 +12,9 @@ import { Link, useLocation } from "wouter";
 import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
 import { useLocationField, toLocationData, type LocationDataPayload } from "@/hooks/useLocationField";
 import SharedNavbar from "@/components/Navbar";
+import InlineAuth from "@/components/InlineAuth";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -322,26 +322,40 @@ function Step2({
   const companies = companiesQuery.data?.companies ?? [];
   const userFullName = companiesQuery.data?.userFullName ?? (user?.name || user?.firstName || "");
 
-  // ── Form state ──
-  const [form, setForm] = useState<FormData>(() => ({
-    description: parsed.description || rawText,
-    title: parsed.title || "",
-    studioName: user?.clientCompanyName || "",
-    selectedCompanyId: null,
-    locationAddress: parsed.locationAddress || user?.location || "",
-    dateType: (parsed.dateType as DateType) || "Single Date",
-    startDate: isoToLocalDatetimeInput(parsed.startDate),
-    endDate: isoToLocalDatetimeInput(parsed.endDate),
-    multipleDates: [],
-    hours: parsed.hours != null ? String(parsed.hours) : "",
-    isHourly: parsed.isHourly,
-    openRate: parsed.openRate,
-    clientHourlyRate: parsed.clientHourlyRate?.toString() || "",
-    clientFlatRate: parsed.clientFlatRate?.toString() || "",
-    transportation: parsed.transportation,
-    transportationInstructions: "",
-    serviceType: parsed.serviceType || "",
-  }));
+  // ── Form state ── restores a saved draft if one exists (the user got
+  // bounced through /login or /join partway through) — otherwise starts
+  // fresh from the AI-parsed job.
+  const [form, setForm] = useState<FormData>(() => {
+    const saved = sessionStorage.getItem("postJobDraft");
+    if (saved) {
+      sessionStorage.removeItem("postJobDraft");
+      try {
+        return JSON.parse(saved) as FormData;
+      } catch {
+        // fall through to the fresh-parse default below
+      }
+    }
+    return {
+      description: parsed.description || rawText,
+      title: parsed.title || "",
+      studioName: user?.clientCompanyName || "",
+      selectedCompanyId: null,
+      locationAddress: parsed.locationAddress || user?.location || "",
+      dateType: (parsed.dateType as DateType) || "Single Date",
+      startDate: isoToLocalDatetimeInput(parsed.startDate),
+      endDate: isoToLocalDatetimeInput(parsed.endDate),
+      multipleDates: [],
+      hours: parsed.hours != null ? String(parsed.hours) : "",
+      isHourly: parsed.isHourly,
+      openRate: parsed.openRate,
+      clientHourlyRate: parsed.clientHourlyRate?.toString() || "",
+      clientFlatRate: parsed.clientFlatRate?.toString() || "",
+      transportation: parsed.transportation,
+      transportationInstructions: "",
+      serviceType: parsed.serviceType || "",
+    };
+  });
+  const [showAuthGate, setShowAuthGate] = useState(false);
 
   // ── Auto-populate from last job for the selected company (only fills
   // blanks, never overwrites AI-parsed values). Re-runs whenever the
@@ -472,12 +486,7 @@ function Step2({
     return valid ? "" : "bg-red-50/50 border-l-[3px] border-l-red-300";
   }
 
-  function handlePostFree() {
-    if (!isAuthenticated) {
-      sessionStorage.setItem("postJobPending", JSON.stringify(form));
-      window.location.href = getLoginUrl();
-      return;
-    }
+  function submitJob() {
     createFreeJob.mutate({
       title: form.title,
       description: form.description,
@@ -497,6 +506,16 @@ function Step2({
       companyId: form.selectedCompanyId ?? undefined,
       serviceType: form.serviceType,
     });
+  }
+
+  function handlePostFree() {
+    if (!isAuthenticated) {
+      // Show the login/signup gate right here instead of bouncing away —
+      // the form is already filled out, no reason to lose it or leave the page.
+      setShowAuthGate(true);
+      return;
+    }
+    submitJob();
   }
 
   const isFlexible = form.dateType === "Dates Flexible" || form.dateType === "Ongoing";
@@ -1062,31 +1081,48 @@ function Step2({
         </div>
       </div>
 
-      <div className="flex gap-3 mt-5">
-        <Button variant="outline" onClick={onBack} className="flex-none px-5">
-          <ChevronLeft size={16} className="mr-1" />
-          Back
-        </Button>
-        <Button
-          onClick={handlePostFree}
-          disabled={!isFormValid || createFreeJob.isPending}
-          className="flex-1 py-5 font-bold rounded-xl hirer-grad-bg border-0 hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {createFreeJob.isPending ? (
-            <><Loader2 size={18} className="animate-spin mr-2" />Posting your job...</>
-          ) : (
-            <><CheckCircle2 size={18} className="mr-2" />Post Job Free<ChevronRight size={18} className="ml-2" /></>
-          )}
-        </Button>
-      </div>
+      {showAuthGate ? (
+        <div className="mt-5 border border-gray-100 rounded-2xl p-5 bg-gray-50/50">
+          <InlineAuth
+            heading="Log in to post this job"
+            subheading="Your job details are saved — you won't need to re-enter anything."
+            blockRole="Artist"
+            onSuccess={() => submitJob()}
+            onNotFound={(email) => {
+              sessionStorage.setItem("postJobDraft", JSON.stringify(form));
+              window.location.href = `/join?email=${encodeURIComponent(email)}&next=${encodeURIComponent("/post-job")}`;
+            }}
+          />
+        </div>
+      ) : (
+        <>
+          <div className="flex gap-3 mt-5">
+            <Button variant="outline" onClick={onBack} className="flex-none px-5">
+              <ChevronLeft size={16} className="mr-1" />
+              Back
+            </Button>
+            <Button
+              onClick={handlePostFree}
+              disabled={!isFormValid || createFreeJob.isPending}
+              className="flex-1 py-5 font-bold rounded-xl hirer-grad-bg border-0 hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {createFreeJob.isPending ? (
+                <><Loader2 size={18} className="animate-spin mr-2" />Posting your job...</>
+              ) : (
+                <><CheckCircle2 size={18} className="mr-2" />Post Job Free<ChevronRight size={18} className="ml-2" /></>
+              )}
+            </Button>
+          </div>
 
-      {!isFormValid && (
-        <p className="text-center text-xs text-red-400 mt-2 font-medium">
-          Fill in the highlighted fields above to post
-        </p>
-      )}
-      {isFormValid && (
-        <p className="text-center text-xs text-gray-400 mt-3">Free to post · No credit card required</p>
+          {!isFormValid && (
+            <p className="text-center text-xs text-red-400 mt-2 font-medium">
+              Fill in the highlighted fields above to post
+            </p>
+          )}
+          {isFormValid && (
+            <p className="text-center text-xs text-gray-400 mt-3">Free to post · No credit card required</p>
+          )}
+        </>
       )}
     </div>
   );
