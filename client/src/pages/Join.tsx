@@ -685,7 +685,7 @@ export default function Join() {
               {companyName ? `Welcome to Artswrk, ${companyName}. Ready to find your first artist?` : "Welcome to Artswrk! Ready to find your first artist?"}
             </p>
             <div className="space-y-3">
-              <button onClick={() => { window.location.href = "/post-job"; }}
+              <button onClick={() => { window.location.href = next || "/post-job"; }}
                 className="w-full py-4 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow-md">
                 <Sparkles size={16} /> Post My First Job
               </button>

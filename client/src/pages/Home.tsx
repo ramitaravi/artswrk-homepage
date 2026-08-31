@@ -16,6 +16,8 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Building2, Trophy, Music4 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { buildHomepageAuthDestination, HOMEPAGE_JOB_DRAFT_KEY } from "@/lib/homepageSignup";
+import { HOME_FAQS } from "@/data/homepageFaqs";
 import Navbar from "@/components/Navbar";
 
 // ─── Design tokens (from the artboard) ────────────────────────────────────────
@@ -91,15 +93,29 @@ function SignupCard() {
   const [mode, setMode] = useState<"client" | "artist">("client");
   const [email, setEmail] = useState("");
   const [hiringFor, setHiringFor] = useState("");
+  const [submitError, setSubmitError] = useState("");
   const [, navigate] = useLocation();
   const isArtist = mode === "artist";
+  const checkEmail = trpc.auth.checkEmailExists.useMutation();
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const params = new URLSearchParams({ role: mode });
-    if (email.trim()) params.set("email", email.trim());
-    if (!isArtist && hiringFor.trim()) params.set("hiringFor", hiringFor.trim());
-    navigate(`/join?${params.toString()}`);
+    setSubmitError("");
+
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) return;
+
+    try {
+      if (!isArtist && hiringFor.trim()) {
+        sessionStorage.setItem(HOMEPAGE_JOB_DRAFT_KEY, hiringFor.trim());
+      }
+
+      const { exists } = await checkEmail.mutateAsync({ email: normalizedEmail });
+      navigate(buildHomepageAuthDestination({ email: normalizedEmail, role: mode, exists }));
+    } catch (error) {
+      console.error("Unable to continue from the homepage signup card", error);
+      setSubmitError("We couldn't check your account. Please try again.");
+    }
   }
 
   const pill = (active: boolean) => ({
@@ -139,12 +155,12 @@ function SignupCard() {
         className="mt-6 font-bold"
         style={{ fontSize: "clamp(19px,2vw,22px)", letterSpacing: "-0.015em" }}
       >
-        {isArtist ? "Get booked at your rate" : "Post your first job free"}
+        {isArtist ? "Get booked at your rate" : "Post Your First Job - It's Free!"}
       </div>
       <p className="mt-2 text-sm leading-relaxed" style={{ color: BODY }}>
         {isArtist
           ? "One profile. Paid work near you, on the days you choose."
-          : "Tell us the role and the dates — matching artists see it immediately."}
+          : "Whether a last minute job or long term hire, share your role and dates — we'll share it with our artist network."}
       </p>
 
       <form onSubmit={submit} className="mt-5 flex flex-col gap-2.5">
@@ -158,22 +174,24 @@ function SignupCard() {
           style={{ border: `1px solid ${HAIRLINE}`, color: INK }}
         />
         {!isArtist && (
-          <input
-            type="text"
+          <textarea
             value={hiringFor}
             onChange={(e) => setHiringFor(e.target.value)}
-            placeholder="What are you hiring for?"
-            className="h-[52px] w-full rounded-xl px-[18px] text-[15px] outline-none focus:border-[#0E0E17]"
+            placeholder="Describe the role, dates, location, and rate..."
+            rows={4}
+            className="min-h-[112px] w-full resize-y rounded-xl px-[18px] py-4 text-[15px] leading-relaxed outline-none focus:border-[#0E0E17]"
             style={{ border: `1px solid ${HAIRLINE}`, color: INK }}
           />
         )}
         <button
           type="submit"
-          className="h-[52px] rounded-xl text-[15px] font-bold text-white transition-colors hover:bg-[#3D3D4A]"
+          disabled={checkEmail.isPending}
+          className="h-[52px] rounded-xl text-[15px] font-bold text-white transition-all active:scale-[0.97] disabled:cursor-wait disabled:opacity-65 hover:bg-[#3D3D4A]"
           style={{ background: INK }}
         >
-          {isArtist ? "Claim your profile" : "Post a job"} →
+          {checkEmail.isPending ? "Checking your account..." : isArtist ? "Claim Your Profile →" : "Post a Job →"}
         </button>
+        {submitError ? <p className="m-0 text-xs font-medium text-red-600" role="alert">{submitError}</p> : null}
       </form>
 
       <div className="mt-3 text-xs" style={{ color: MUTED }}>
@@ -193,9 +211,9 @@ const BIZ_TYPES = [
   {
     title: "Dance Studios",
     card: "/testimonials/studio-lambarri.png",
-    blurb: "Weekly classes, last-minute subs, guest artists and competition choreography.",
+    blurb: "Weekly classes, last-minute subs, guest artists and choreo",
     icon: Building2,
-    cta: "Post a studio job",
+    cta: "Post a Studio Job",
     href: "/dance-studios",
     tag: "RELIABLE TEACHERS",
     quote: "“We just wanted to follow up to tell you that we LOVE working with your teachers — they’re always reliable and committed.”",
@@ -204,9 +222,9 @@ const BIZ_TYPES = [
   {
     title: "Dance Competitions",
     card: "/testimonials/competition-imagine.png",
-    blurb: "Judges, emcees, tabulators and backstage crew — staffed city by city.",
+    blurb: "Judges, emcees, tabulators, crew and photo/video",
     icon: Trophy,
-    cta: "Post a competition job",
+    cta: "Post a Competition Job",
     href: "/dance-competitions",
     tag: "SAME-DAY JUDGE",
     quote: "“I posted a job at 7am and had a judge on a train to us by 10am — and she was absolutely AMAZING! I’m blown away by Artswrk.”",
@@ -215,9 +233,9 @@ const BIZ_TYPES = [
   {
     title: "Music Schools",
     card: "/testimonials/musicschool-ensemble.png",
-    blurb: "Instrument instructors, voice teachers and accompanists on your schedule.",
+    blurb: "Voice, piano, acting, and instrument teachers",
     icon: Music4,
-    cta: "Post a school job",
+    cta: "Post a School Job",
     href: "/music-schools",
     tag: "FILLED A 4-MONTH SEARCH",
     quote: "“After a difficult 4ish month search, we are sending an offer letter for our teaching position! We couldn’t have found this candidate without Artswrk.”",
@@ -233,41 +251,22 @@ const BIZ_TYPES = [
  * site's shop window.
  */
 const FALLBACK_JOBS = [
-  { title: "Emcee (Touring)", org: "REVEL Dance Convention", logo: "https://118d26995be0b113d0cb8cb06dbea400.cdn.bubble.io/f1773623236874x382468136169884900/REVEL%20Dance%20Convention.jpeg", city: "Work from anywhere", pay: "Competitive salary", posted: "PRO job" },
+  { title: "Emcee (Touring)", org: "REVEL Dance Convention", logo: "https://118d26995be0b113d0cb8cb06dbea400.cdn.bubble.io/f1773623236874x382468136169884900/REVEL%20Dance%20Convention.jpeg", city: "Remote", pay: "Remote", posted: "PRO job" },
   { title: "Judge", org: "Journey Dance Competition", logo: "https://118d26995be0b113d0cb8cb06dbea400.cdn.bubble.io/f1770425320895x475037908411778600/download.jpeg", city: "Work from anywhere", pay: "Per event", posted: "PRO job" },
-  { title: "Executive Assistant", org: "Ensemble Performing Arts", logo: "https://118d26995be0b113d0cb8cb06dbea400.cdn.bubble.io/f1787025383139x307662120689587800/EMS-square-logo%20%281%29.webp", city: "Work from anywhere", pay: "Competitive salary", posted: "PRO job" },
+  { title: "Executive Assistant", org: "Ensemble Performing Arts", logo: "https://118d26995be0b113d0cb8cb06dbea400.cdn.bubble.io/f1787025383139x307662120689587800/EMS-square-logo%20%281%29.webp", city: "Remote", pay: "Competitive salary", posted: "PRO job" },
   { title: "Competition Photographers", org: "Thunderstruck Dance Competition", logo: "https://118d26995be0b113d0cb8cb06dbea400.cdn.bubble.io/f1769117147013x594580362321450200/image_processing20220906-9-1hh0ccy%20%281%29.png", city: "Multiple dates", pay: "Per event", posted: "PRO job" },
 ];
 
 const CLIENT_STEPS = [
-  { n: "01", title: "Post a job", body: "The role, the dates, the rate. Live in about a minute." },
-  { n: "02", title: "Review vetted applicants", body: "Experience, references and availability already confirmed." },
-  { n: "03", title: "Hire and pay in one place", body: "Agreements, reminders and one invoice — all through Artswrk." },
+  { n: "01", title: "Post a Job", body: "The role, the dates, the rate. Live in about a minute." },
+  { n: "02", title: "View Submissions", body: "Receive emails with applicants resumes & profiles" },
+  { n: "03", title: "Hire and pay in one place", body: "Keep tabs on your hires in one seamless dashboard" },
 ];
 
 const ARTIST_STEPS = [
-  { n: "01", title: "Create your profile", body: "Your disciplines, your rate, the days you want to teach." },
-  { n: "02", title: "Apply in one tap", body: "Matching jobs land in your feed. No proposals to write." },
-  { n: "03", title: "Teach and get paid", body: "Bookings are confirmed in-app and paid out after the session." },
-];
-
-const FAQS = [
-  {
-    q: "What does Artswrk cost?",
-    a: "Browsing, profiles and job posts are free. Artswrk takes a flat service fee on completed bookings — no subscription, no listing fees.",
-  },
-  {
-    q: "How are artists vetted?",
-    a: "Every profile is reviewed before it goes live: teaching experience, references, and a background check where the role requires one.",
-  },
-  {
-    q: "How fast will I hear back?",
-    a: "Most jobs get their first qualified applicant within 48 hours. Last-minute subs are often filled the same day.",
-  },
-  {
-    q: "Who handles contracts and payment?",
-    a: "Artswrk does. Artists are paid after the session and you receive one invoice instead of chasing individual contractors.",
-  },
+  { n: "01", title: "Create your Artist Profile", body: "Your disciplines, your rates, your media" },
+  { n: "02", title: "Browse Jobs", body: "Matching jobs land in your feed. No proposals to write." },
+  { n: "03", title: "Get booked and paid", body: "Bookings are confirmed in-app and paid out after the session." },
 ];
 
 function Hero() {
@@ -391,9 +390,6 @@ function ForHirers() {
               {shown.cta} &rarr;
             </Link>
           </div>
-          <div className="mt-3 text-[13px]" style={{ color: MUTED }}>
-            Free to post · No subscription · First applicants within 48 hours
-          </div>
         </div>
 
         {/* The testimonial for whichever type is selected. Exports are cropped
@@ -476,9 +472,6 @@ function BrowseArtistsMarquee() {
         <h2 className="m-0 font-bold" style={{ fontSize: "clamp(24px,2.6vw,30px)", letterSpacing: "-0.02em" }}>
           Join or hire 6,000+ of the industry&rsquo;s best artists today
         </h2>
-        <Link href="/browse" className="text-sm font-bold" style={{ color: "#F25722" }}>
-          Browse all artists →
-        </Link>
       </div>
 
       <div
@@ -552,8 +545,7 @@ function ForArtists() {
             Find work you love.
           </h2>
           <p className="mt-4 max-w-[30em] text-[17px] leading-relaxed" style={{ color: BODY }}>
-            List once. Paid work near you lands in your feed and you apply with one tap — no
-            proposals, no undercutting, no chasing invoices.
+            Create your profile. Browse job notifications. Get paid to do the work you love to do.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
@@ -568,11 +560,8 @@ function ForArtists() {
               className="inline-flex items-center rounded-xl px-6 py-4 text-[15px] font-bold"
               style={{ border: "1px solid rgba(14,14,23,0.14)" }}
             >
-              Browse open wrk
+              Browse Jobs
             </Link>
-          </div>
-          <div className="mt-3.5 text-[13px]" style={{ color: MUTED }}>
-            Free to join. You keep your rate.
           </div>
         </div>
 
@@ -626,7 +615,7 @@ function ForArtists() {
             ))}
           </div>
           <div className="mt-5">
-            <Link href="/jobs" className="text-sm font-bold" style={{ color: "#F25722" }}>
+            <Link href="/jobs" className="text-sm font-bold" style={{ color: "#ec008c" }}>
               View all jobs →
             </Link>
           </div>
@@ -692,15 +681,53 @@ function HowItWorks() {
 // ─── FAQs ─────────────────────────────────────────────────────────────────────
 
 function FAQ() {
-  const [open, setOpen] = useState(-1);
+  const [audience, setAudience] = useState<keyof typeof HOME_FAQS>("hirers");
+  const [open, setOpen] = useState(0);
+  const faqs = HOME_FAQS[audience];
+
+  function selectAudience(next: keyof typeof HOME_FAQS) {
+    setAudience(next);
+    setOpen(0);
+  }
 
   return (
     <section id="faq" className={SECTION} style={SECTION_PAD}>
-      <h2 className="m-0 font-bold" style={{ fontSize: "clamp(26px,3vw,34px)", letterSpacing: "-0.025em" }}>
-        FAQs
-      </h2>
-      <div className="mt-6" style={{ borderTop: `1px solid ${HAIRLINE}` }}>
-        {FAQS.map((f, i) => (
+      <div className="grid items-start gap-10 lg:grid-cols-[minmax(280px,0.8fr)_minmax(420px,1.2fr)] lg:gap-16">
+        <div>
+          <Eyebrow color={audience === "hirers" ? "#F25722" : "#EC008C"}>FAQs</Eyebrow>
+          <h2 className="mt-4 font-bold" style={{ fontSize: "clamp(30px,3.6vw,42px)", lineHeight: 1.08, letterSpacing: "-0.03em" }}>
+            Frequently Asked Questions
+          </h2>
+          <p className="mt-4 max-w-[32em] text-sm leading-relaxed" style={{ color: BODY }}>
+            Couldn't find the answer you were looking for?{" "}
+            <a href="mailto:contact@artswrk.com" className="font-bold" style={{ color: audience === "hirers" ? "#F25722" : "#EC008C" }}>
+              Contact us at contact@artswrk.com
+            </a>
+          </p>
+          <div className="mt-7 inline-flex rounded-full p-1" style={{ background: "#F3F3FC" }} role="group" aria-label="FAQ audience">
+            {(["hirers", "artists"] as const).map((option) => {
+              const active = audience === option;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => selectAudience(option)}
+                  className="rounded-full px-5 py-2.5 text-sm font-bold transition-all duration-200 active:scale-[0.97]"
+                  style={{
+                    color: active ? "#fff" : MUTED,
+                    backgroundImage: active ? (option === "hirers" ? HIRER_GRAD : ARTIST_GRAD) : undefined,
+                  }}
+                >
+                  For {option === "hirers" ? "Hirers" : "Artists"}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-3xl bg-white px-5 sm:px-7" style={{ border: `1px solid ${HAIRLINE}`, boxShadow: "0 16px 40px rgba(14,14,23,0.06)" }}>
+          {faqs.map((f, i) => (
           <div key={f.q} style={{ borderBottom: `1px solid ${HAIRLINE}` }}>
             <button
               type="button"
@@ -720,6 +747,7 @@ function FAQ() {
             )}
           </div>
         ))}
+        </div>
       </div>
     </section>
   );
@@ -744,13 +772,13 @@ function CTABanner() {
           className="m-0 font-extrabold text-white"
           style={{ fontSize: "clamp(32px,4.4vw,52px)", letterSpacing: "-0.03em", textWrap: "balance" as any }}
         >
-          Hire artists. Find wrk.
+          Hire Artists. Find WRK.
         </h2>
         <p
           className="mx-auto mt-4 max-w-[30em] leading-relaxed"
           style={{ fontSize: "clamp(15px,1.5vw,17px)", color: "rgba(255,255,255,0.9)" }}
         >
-          Whichever side you're on, it starts the same way — one profile, one post.
+          Click below to join our network today!
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link
@@ -775,35 +803,7 @@ function CTABanner() {
 
 // ─── Footer ───────────────────────────────────────────────────────────────────
 
-const WORDMARK_PATH =
-  "M 12.008 0 C 5.377 0 0 5.376 0 12.009 L 0 92.285 C 0 98.916 5.375 104.291 12.007 104.291 L 228.849 104.291 C 235.482 104.291 240.858 98.915 240.858 92.283 L 240.858 12.009 C 240.858 5.376 235.482 0 228.849 0 L 12.008 0 Z M 50.879 22.729 L 65.578 22.729 L 75.569 60.676 L 75.953 60.676 L 85.56 22.729 L 101.315 22.729 L 85.464 83.252 L 68.075 83.252 L 57.988 45.017 L 57.604 45.017 L 47.517 83.252 L 30.417 83.252 L 14.566 22.729 L 30.897 22.729 L 40.504 60.676 L 40.888 60.676 L 50.879 22.729 Z M 157.642 69.322 C 158.506 78.353 158.795 81.042 160.812 83.252 L 144.288 83.252 C 143.039 81.619 142.271 77.872 141.791 71.628 C 141.31 64.711 138.332 63.174 132.856 63.174 L 122.001 63.174 L 122.001 83.252 L 105.957 83.252 L 105.957 22.729 L 136.507 22.729 C 152.166 22.729 159.947 30.126 159.947 41.943 C 159.947 50.781 154.471 56.545 147.074 57.506 C 153.319 58.755 156.969 62.309 157.642 69.322 Z M 122.001 35.794 L 122.001 50.589 L 133.625 50.589 C 140.542 50.589 144 48.86 144 43.288 C 144 38.388 140.542 35.794 133.625 35.794 L 122.001 35.794 Z M 200.557 48.475 L 225.054 83.252 L 205.552 83.252 L 188.741 59.139 L 183.457 64.903 L 183.457 83.252 L 167.126 83.252 L 167.126 22.729 L 183.457 22.729 L 183.457 47.226 L 205.168 22.729 L 223.902 22.729 L 200.557 48.475 Z";
-
-function Wordmark({ width, height, textSize, gradientId }: { width: number; height: number; textSize: number; gradientId: string }) {
-  return (
-    <div className="flex items-center gap-[5px]">
-      <span className="font-extrabold leading-none" style={{ fontSize: textSize, letterSpacing: "-0.02em" }}>
-        arts
-      </span>
-      <svg width={width} height={height} viewBox="0 0 240.858 104.291" fill="none" role="img" aria-label="wrk">
-        <defs>
-          <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#EF1187" />
-            <stop offset="100%" stopColor="#F25722" />
-          </linearGradient>
-        </defs>
-        <path d={WORDMARK_PATH} fill={`url(#${gradientId})`} fillRule="evenodd" />
-      </svg>
-    </div>
-  );
-}
-
 function Footer() {
-  const nav = [
-    { label: "Hire artists", href: "/post-job" },
-    { label: "Find wrk", href: "/jobs" },
-    { label: "How it works", href: "/about" },
-    { label: "FAQ", href: "#faq" },
-  ];
   const legal = [
     { label: "Terms", href: "/terms" },
     { label: "Privacy", href: "/privacy-policy" },
@@ -816,14 +816,7 @@ function Footer() {
         className={`${SECTION} flex flex-wrap items-center justify-between gap-6`}
         style={{ padding: "40px clamp(20px,4vw,32px) 20px" }}
       >
-        <Wordmark width={53} height={23} textSize={18} gradientId="aw-footer-grad" />
-        <div className="flex flex-wrap text-sm font-medium" style={{ gap: "clamp(16px,3vw,32px)" }}>
-          {nav.map((l) => (
-            <a key={l.label} href={l.href} style={{ color: BODY }}>
-              {l.label}
-            </a>
-          ))}
-        </div>
+        <img src="/manus-storage/artswrk-orange-source_39ee837b.png" alt="Artswrk" className="h-8 w-auto object-contain" />
       </div>
       <div
         className={`${SECTION} flex flex-wrap items-center justify-between gap-5`}

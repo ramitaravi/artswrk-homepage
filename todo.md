@@ -803,3 +803,14 @@
 - [x] Apply the smallest safe fix and add regression coverage
 - [x] Verify Admin overview, Artists, Clients, Jobs, Bookings, and Payments data loading
 - [x] Save a validated checkpoint for the Admin dashboard repair
+
+## Homepage Visual Editor Completion
+- [x] Apply and verify all requested homepage copy and capitalization changes
+- [x] Replace the one-line job description input with a larger multiline field
+- [x] Make the homepage email check route existing users to prefilled login and new users to prefilled join while preserving the job draft
+- [x] Add accessible For Hirers and For Artists FAQ tabs using the supplied reference questions and answers
+- [x] Hide the requested landing-page CTA and remove the requested footer element
+- [x] Replace the requested footer wordmark treatment with the uploaded Artswrk logo
+- [x] Fix malformed duplicate inline styles and remove empty placeholder containers
+- [x] Add regression coverage for the homepage email routing and draft handoff
+- [x] Verify the updated homepage on desktop and mobile and save a checkpoint

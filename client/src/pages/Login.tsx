@@ -5,8 +5,19 @@ import InlineAuth, { type AuthResult } from "@/components/InlineAuth";
 export default function Login() {
   const [, navigate] = useLocation();
   const searchStr = useSearch();
-  const next = new URLSearchParams(searchStr).get("next");
-  const prefillEmail = new URLSearchParams(searchStr).get("email") ?? "";
+  const params = new URLSearchParams(searchStr);
+  const next = params.get("next");
+  const prefillEmail = params.get("email") ?? "";
+  const prefillRole = params.get("role");
+
+  function getJoinUrl(email = prefillEmail) {
+    const joinParams = new URLSearchParams();
+    if (email) joinParams.set("email", email);
+    if (next) joinParams.set("next", next);
+    if (prefillRole === "client" || prefillRole === "artist") joinParams.set("role", prefillRole);
+    const query = joinParams.toString();
+    return `/join${query ? `?${query}` : ""}`;
+  }
 
   function getDestination(data: AuthResult) {
     if (next) return next;
@@ -27,7 +38,7 @@ export default function Login() {
             subheading="Enter your email to continue"
             onSuccess={(data) => { window.location.href = getDestination(data); }}
             onNotFound={(email) => {
-              window.location.href = `/join?email=${encodeURIComponent(email)}${next ? `&next=${encodeURIComponent(next)}` : ""}`;
+              window.location.href = getJoinUrl(email);
             }}
           />
         </div>
@@ -35,7 +46,7 @@ export default function Login() {
         <p className="text-center text-xs text-gray-400 mt-6">
           Don't have an account?{" "}
           <a
-            href={`/join${next ? `?next=${encodeURIComponent(next)}` : ""}`}
+            href={getJoinUrl()}
             className="font-semibold text-[#F25722] hover:opacity-70 transition-opacity"
           >
             Join Now
