@@ -205,138 +205,106 @@ export async function sendHtmlEmail({
 }
 
 // ─── Typed helper: Password Reset ───────────────────────────────────────────
+/**
+ * S1 — Password reset.
+ *
+ * The reset URL is built by the caller from APP_URL, never a request Origin —
+ * a real send on 2026-08-25 carried localhost:3000 and an April one carried the
+ * manus.space staging host.
+ */
 export async function sendPasswordResetEmail({
-  to,
-  firstName,
-  resetUrl,
-}: {
-  to: string;
-  firstName: string;
-  resetUrl: string;
-}): Promise<boolean> {
+  to, firstName, resetUrl,
+}: { to: string; firstName: string; resetUrl: string }): Promise<boolean> {
   if (!process.env.SENDGRID_API_KEY) {
     console.warn("[email] SENDGRID_API_KEY not set — skipping password reset email");
-    // In dev, log the reset URL so it can be used directly
-    console.log(`[email] DEV reset URL: ${resetUrl}`);
+    console.log("[email] DEV reset URL: " + resetUrl);
     return false;
   }
-
-  // Use a simple dynamic template or fall back to plain HTML email
-  try {
-    await sgMail.send({
-      to,
-      from: { email: FROM_EMAIL, name: FROM_NAME },
-      subject: "Reset your Artswrk password",
-      html: `
-        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
-          <div style="margin-bottom: 24px;">
-            <span style="font-weight: 900; font-size: 22px; color: #F25722;">ARTS</span><span style="font-weight: 900; font-size: 22px; background: #111; color: #fff; padding: 2px 6px; border-radius: 4px; margin-left: 2px;">WRK</span>
-          </div>
-          <h2 style="font-size: 20px; font-weight: 700; color: #111; margin-bottom: 8px;">Reset your password</h2>
-          <p style="color: #555; font-size: 15px; margin-bottom: 24px;">Hi ${firstName},<br><br>We received a request to reset your Artswrk password. Click the button below to choose a new one. This link expires in <strong>1 hour</strong>.</p>
-          <a href="${resetUrl}" style="display: inline-block; background: #F25722; color: #fff; font-weight: 700; font-size: 15px; padding: 14px 28px; border-radius: 8px; text-decoration: none;">Reset Password</a>
-          <p style="color: #999; font-size: 13px; margin-top: 24px;">If you didn't request this, you can safely ignore this email. Your password won't change.</p>
-          <p style="color: #ccc; font-size: 12px; margin-top: 16px;">Or copy this link: <a href="${resetUrl}" style="color: #F25722;">${resetUrl}</a></p>
-        </div>
-      `,
-    });
-    console.log(`[email] Sent password reset email to ${to}`);
-    return true;
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(`[email] Failed to send password reset email to ${to}:`, message);
-    return false;
-  }
+  const html = renderEmailShell({
+    accent: "artist",
+    headline: "Reset your password",
+    preheader: "This link expires in 1 hour.",
+    bodyHtml:
+      para("Hi " + b(firstName) + ",") +
+      para("We received a request to reset your Artswrk password. This link expires in " + b("1 hour") + "."),
+    ctaText: "Reset Password",
+    ctaUrl: resetUrl,
+    footerNote: "If you didn\u2019t request this, you can safely ignore this email — your password won\u2019t change.<br><br>Or copy this link: <span style=\"word-break:break-all;color:#9ca3af;\">" + resetUrl + "</span>",
+  });
+  return sendSimpleEmail({ to, subject: "Reset your Artswrk password", html });
 }
 
-// ─── Typed helper: Application Confirmation (to artist) ─────────────────────
 /**
- * Sent to the artist who just applied.
+ * A3 — Application confirmation. Doubles as the artist's own record of what
+ * they sent: the rate they pitched and their message are included, so the email
+ * answers "what did I actually say?" months later without opening the app.
  */
 export async function sendApplicationConfirmationEmail({
-  to,
-  artistName,
-  jobTitle,
-  jobLocation,
-  jobRate,
-  jobUrl,
+  to, artistName, jobTitle, jobLocation, jobRate, jobUrl,
+  jobDescription, pitchedRate, artistMessage,
 }: {
-  to: string;
-  artistName: string;
-  jobTitle: string;
-  jobLocation: string;
-  jobRate: string;
-  jobUrl: string;
-}): Promise<boolean> {
-  const TO = to;
-
-  const html = `
-    <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;">
-      <div style="margin-bottom:24px;">
-        <span style="font-weight:900;font-size:22px;color:#F25722;">ARTS</span><span style="font-weight:900;font-size:22px;background:#111;color:#fff;padding:2px 6px;border-radius:4px;margin-left:2px;">WRK</span>
-      </div>
-      <h2 style="font-size:20px;font-weight:700;color:#111;margin-bottom:8px;">You applied! 🎉</h2>
-      <p style="color:#555;font-size:15px;margin-bottom:20px;">Hi ${artistName},<br><br>Your application has been submitted. The hirer will review it and reach out if there's a match. Good luck!</p>
-      <div style="background:#f9f9f9;border-radius:12px;padding:20px;margin-bottom:24px;">
-        <p style="margin:0 0 6px;font-size:13px;color:#999;text-transform:uppercase;letter-spacing:.05em;">Job you applied to</p>
-        <p style="margin:0 0 4px;font-size:17px;font-weight:700;color:#111;">${jobTitle}</p>
-        <p style="margin:0 0 4px;font-size:14px;color:#555;">📍 ${jobLocation}</p>
-        <p style="margin:0;font-size:14px;color:#555;">💰 ${jobRate}</p>
-      </div>
-      <a href="${jobUrl}" style="display:inline-block;background:#F25722;color:#fff;font-weight:700;font-size:15px;padding:14px 28px;border-radius:8px;text-decoration:none;">View Job →</a>
-      <p style="color:#999;font-size:13px;margin-top:24px;">You'll hear from the hirer directly if they'd like to move forward. In the meantime, keep exploring jobs on <a href="https://artswrk.com/jobs" style="color:#F25722;">Artswrk</a>.</p>
-    </div>
-  `;
-
-  if (!process.env.SENDGRID_API_KEY) {
-    console.log(`[email] DEV — application confirmation would send to ${TO}`);
-    return false;
-  }
-  try {
-    await sgMail.send({ to: TO, from: { email: FROM_EMAIL, name: FROM_NAME }, subject: `You applied to: ${jobTitle}`, html });
-    console.log(`[email] Application confirmation sent to ${TO}`);
-    return true;
-  } catch (err: unknown) {
-    console.error("[email] Failed to send application confirmation:", err instanceof Error ? err.message : err);
-    return false;
-  }
-}
-
-// ─── Typed helper: New Applicant Alert (to Artswrk team) ─────────────────────
-/**
- * C3 — New applicant alert (regular job). Inline; replaces CLIENT_NEW_APPLICANT.
- *
- * jobUrl/resumeLink MUST be built from APP_URL by the caller, never the request
- * Origin — that is why live alerts on 2026-08-28 carried localhost:62958 links.
- */
-export async function sendNewApplicantAlertEmail({
-  to, artistName, artistEmail, jobTitle, jobLocation, jobRate, jobUrl, message, resumeLink, cc,
-}: {
-  to: string; artistName: string; artistEmail?: string; jobTitle: string;
+  to: string; artistName: string; jobTitle: string;
   jobLocation?: string; jobRate?: string; jobUrl: string;
-  message?: string; resumeLink?: string; cc?: string;
+  jobDescription?: string; pitchedRate?: string; artistMessage?: string;
 }): Promise<boolean> {
+  const note = sanitizeUserText(artistMessage, 400);
+  const html = renderEmailShell({
+    accent: "artist",
+    headline: "You applied! \u{1F389}",
+    preheader: "Your application is with the hirer: " + jobTitle,
+    bodyHtml:
+      para("Hi " + b(artistName) + ",") +
+      para("Your application has been submitted. The hirer will review it and reach out if there\u2019s a match. Good luck!") +
+      detailsCard([
+        { label: "Job", value: jobTitle },
+        { label: "Location", value: jobLocation },
+        { label: "Posted rate", value: jobRate },
+        { label: "Details", value: sanitizeUserText(jobDescription, 400) },
+      ]) +
+      // The artist's own submission, so the email is a record and not a receipt.
+      ((pitchedRate || note)
+        ? para(b("What you sent")) +
+          detailsCard([{ label: "Your rate", value: pitchedRate }]) +
+          (note ? quote(note) : "")
+        : ""),
+    ctaText: "View Job",
+    ctaUrl: jobUrl,
+    footerNote: 'You\u2019ll hear from the hirer directly if they\u2019d like to move forward. In the meantime, keep exploring jobs on <a href="' + APP_URL + '/jobs" style="color:#ec008c;font-weight:600;">Artswrk</a>.',
+  });
+  // Subject leads with the job title — it is what the artist recognises in a
+  // list of "You applied to:" emails.
+  return sendSimpleEmail({ to, subject: "You applied to: " + jobTitle, html });
+}
+export async function sendNewApplicantAlertEmail({
+  to, artistFirstName, artistLastInitial, jobTitle, jobLocation, jobRate, jobUrl, message, cc,
+}: {
+  to: string; artistFirstName: string; artistLastInitial?: string; jobTitle: string;
+  jobLocation?: string; jobRate?: string; jobUrl: string;
+  message?: string; cc?: string;
+}): Promise<boolean> {
+  // FirstName L. only \u2014 no email, no resume link. A client shouldn't be able
+  // to identify or contact an applicant well enough to circumvent the
+  // unlock/subscription paywall before actually unlocking or messaging them
+  // through Artswrk. Matches sendProJobApplicantAlertEmail's pattern.
+  const who = (artistFirstName + (artistLastInitial ? " " + artistLastInitial + "." : "")).trim();
   const note = sanitizeUserText(message, 500);
   const html = renderEmailShell({
     accent: "client",
-    headline: artistName + " is available for your job!",
-    preheader: artistName + " applied to " + jobTitle + ".",
+    headline: who + " is available for your job!",
+    preheader: who + " applied to " + jobTitle + ".",
     bodyHtml:
-      para("Hi there, " + b(artistName) + " is interested in the job below.") +
-      (note ? para("Message from " + b(artistName) + ":") + quote(note) : "") +
+      para("Hi there, " + b(who) + " is interested in the job below.") +
+      (note ? para("Message from " + b(who) + ":") + quote(note) : "") +
       detailsCard([
         { label: "Job", value: jobTitle },
         { label: "Location", value: jobLocation },
         { label: "Rate", value: jobRate },
-        { label: "Contact", value: artistEmail },
       ]),
     ctaText: "View Submission",
     ctaUrl: jobUrl,
-    footerNote: resumeLink
-      ? '<a href="' + resumeLink + '" style="color:#F25722;font-weight:600;">View ' + artistName + '\u2019s resume &rarr;</a>'
-      : undefined,
+    footerNote: "Unlock or subscribe to view full profiles, resumes, and contact info from your dashboard.",
   });
-  return sendSimpleEmail({ to, cc: cc ?? SUPPORT_EMAIL, subject: artistName + " is available for your job!", html });
+  return sendSimpleEmail({ to, cc: cc ?? SUPPORT_EMAIL, subject: who + " is available for your job!", html });
 }
 export async function sendSimpleEmail({
   to,
@@ -363,80 +331,46 @@ export async function sendSimpleEmail({
 }
 
 // ─── Artist Welcome Email ─────────────────────────────────────────────────────
-export async function sendArtistWelcomeEmail({
-  to,
-  firstName,
-}: {
-  to: string;
-  firstName: string;
-}): Promise<boolean> {
-  const appUrl = process.env.VITE_APP_URL || "https://artswrk.com";
-  return sendSimpleEmail({
-    to,
-    subject: "Welcome to Artswrk! 🎉",
-    html: `
-      <div style="font-family:'Helvetica Neue',sans-serif;max-width:580px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f0f0f0">
-        <!-- Header -->
-        <div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:32px 40px">
-          <div style="display:inline-flex;align-items:center;gap:6px">
-            <span style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-0.5px">ARTS</span>
-            <span style="font-size:22px;font-weight:900;background:#111;color:#fff;padding:2px 8px;border-radius:6px">WRK</span>
-          </div>
-        </div>
-
-        <!-- Body -->
-        <div style="padding:40px">
-          <h1 style="font-size:24px;font-weight:900;color:#111;margin:0 0 8px">Hey ${firstName},</h1>
-          <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 20px">
-            Thanks for joining Artswrk! We're so glad you're here.
-          </p>
-          <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 28px">
-            Artswrk was built <strong>for artists by artists</strong> — our mission is to shatter the starving artist stigma. We help you pay your bills with part-time work when you need it most.
-          </p>
-
-          <h2 style="font-size:16px;font-weight:800;color:#111;margin:0 0 16px">Here's how to get started:</h2>
-
-          <div style="border-left:3px solid #FFBC5D;padding:12px 16px;margin-bottom:16px;background:#fffdf9;border-radius:0 8px 8px 0">
-            <p style="margin:0 0 4px;font-weight:700;color:#111;font-size:14px">🎨 Create Your Profile</p>
-            <p style="margin:0;color:#666;font-size:13px;line-height:1.5">Build a custom profile with your bio, services, and skillsets. Share the link in your bio so potential employers can see what you do best!</p>
-          </div>
-
-          <div style="border-left:3px solid #F25722;padding:12px 16px;margin-bottom:16px;background:#fffbf9;border-radius:0 8px 8px 0">
-            <p style="margin:0 0 4px;font-weight:700;color:#111;font-size:14px">🔍 Browse Jobs</p>
-            <p style="margin:0;color:#666;font-size:13px;line-height:1.5">We have hundreds of jobs to choose from — from creative work to side jobs. Something new is posted every day.</p>
-          </div>
-
-          <div style="border-left:3px solid #FFBC5D;padding:12px 16px;margin-bottom:28px;background:#fffdf9;border-radius:0 8px 8px 0">
-            <p style="margin:0 0 4px;font-weight:700;color:#111;font-size:14px">💳 Choose Your Plan</p>
-            <p style="margin:0;color:#666;font-size:13px;line-height:1.5">Choose your plan: <strong>Basic ($30/year)</strong> or <strong>PRO ($110/year — annual only, and it starts with a 7-day free trial)</strong>. No commission on anything you earn, ever — discuss your rate freely with clients. Our average Basic booking is $250; on PRO it's $500+. One booking pays the year off.</p>
-          </div>
-
-          <a href="${appUrl}/app" style="display:inline-block;background:linear-gradient(90deg,#FFBC5D,#F25722);color:#fff;font-weight:800;font-size:14px;padding:14px 32px;border-radius:12px;text-decoration:none;margin-bottom:32px">
-            Go to My Dashboard →
-          </a>
-
-          <hr style="border:none;border-top:1px solid #f0f0f0;margin:0 0 24px" />
-
-          <p style="color:#888;font-size:13px;line-height:1.6;margin:0">
-            If you have questions, email us at <a href="mailto:contact@artswrk.com" style="color:#F25722">contact@artswrk.com</a>. We're happy to help or hear feedback to make your experience the best it can be.
-          </p>
-          <p style="color:#888;font-size:13px;margin:16px 0 0">
-            Best,<br />
-            <strong style="color:#111">Nick &amp; Rami</strong><br />
-            Co-Founders, Artswrk
-          </p>
-        </div>
-      </div>
-    `,
-  });
-}
-
-// ─── Job Posted Confirmation (regular jobs) ───────────────────────────────────
 /**
- * C1 — Job posted confirmation (regular). Inline; replaces the JOB_POSTED
- * dynamic template, which rendered literal "*Service:*" asterisks and empty
- * "()" rows for missing fields on 2026-08-28.
+ * A1 — Artist welcome. Restyled onto the shared shell; copy preserved, with the
+ * pricing paragraph corrected — PRO is $110/yr annual-only with a 7-day trial,
+ * the $10.99/mo plan having been discontinued 2026-08-28.
  */
+export async function sendArtistWelcomeEmail({
+  to, firstName,
+}: { to: string; firstName: string }): Promise<boolean> {
+  const step = (icon: string, title: string, body: string) =>
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;">' +
+      '<tr><td style="background:#f9f9f9;border-radius:12px;padding:14px 16px;">' +
+        '<div style="font-family:\'Poppins\',Arial,sans-serif;font-size:15px;font-weight:700;color:#111;margin-bottom:4px;">' +
+          icon + ' ' + title +
+        '</div>' +
+        '<div style="font-family:\'Poppins\',Arial,sans-serif;font-size:14px;line-height:1.6;color:#52525b;">' +
+          body +
+        '</div>' +
+      '</td></tr>' +
+    '</table>';
+
+  const html = renderEmailShell({
+    accent: "artist",
+    headline: "Welcome to Artswrk, " + firstName + "! \u{1F389}",
+    preheader: "Here\u2019s how to get started.",
+    bodyHtml:
+      para("Thanks for joining Artswrk — we\u2019re so glad you\u2019re here.") +
+      para("Artswrk was built " + b("for artists by artists") + ". Our mission is to shatter the starving artist stigma, and help you pay your bills with part-time work when you need it most.") +
+      para(b("Here\u2019s how to get started:")) +
+      step("\u{1F3A8}", "Create your profile",
+           "Build a profile with your bio, services and skillsets. Share the link in your bio so hirers can see what you do best.") +
+      step("\u{1F50D}", "Browse jobs",
+           "Hundreds of jobs, from creative work to side jobs. Something new is posted every day.") +
+      step("\u{1F4B3}", "Choose your plan",
+           "Basic ($30/year) or PRO ($110/year \u2014 annual only, starting with a 7-day free trial). No commission on anything you earn, ever \u2014 discuss your rate freely with clients. The average Basic booking is $250; on PRO it\u2019s $500+. One booking pays the year off."),
+    ctaText: "Go to My Dashboard",
+    ctaUrl: APP_URL + "/app",
+    footerNote: 'Questions? Email <a href="mailto:contact@artswrk.com" style="color:#ec008c;font-weight:600;">contact@artswrk.com</a> \u2014 we\u2019re happy to help, or to hear feedback.<br><br>Best,<br>Nick &amp; Rami<br>Co-Founders, Artswrk',
+  });
+  return sendSimpleEmail({ to, subject: "Welcome to Artswrk! \u{1F389}", html });
+}
 export async function sendJobPostedEmail(data: {
   to: string; firstName: string; serviceType: string; date: string;
   location: string; rate: string; description: string; jobLink: string;
@@ -463,120 +397,58 @@ export async function sendJobPostedEmail(data: {
   });
   return sendSimpleEmail({ to: data.to, cc: SUPPORT_EMAIL, subject: "Your job is live on Artswrk! \u{1F389}", html });
 }
+/** C2 — PRO job posted confirmation. Restyled onto the shell. */
 export async function sendProJobPostedEmail(data: {
-  to: string;
-  firstName: string;
-  company: string;
-  serviceType: string;
-  location: string | null;
-  description: string | null;
-  workFromAnywhere: boolean;
-  jobLink: string;
+  to: string; firstName: string; company: string; serviceType: string;
+  location: string | null; description: string | null;
+  workFromAnywhere: boolean; jobLink: string;
 }): Promise<boolean> {
-  const locationDisplay = data.workFromAnywhere
-    ? "Open to Traveling Applicants"
-    : data.location || "Location TBD";
-
-  // Keep basic formatting tags, strip everything else, then truncate to ~350 chars
-  const sanitizedDescription = data.description
-    ? data.description
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-        .replace(/<(?!\/?(?:p|br|strong|b|em|i|ul|ol|li|h[1-6])(?:\s|\/|>))[^>]*>/gi, " ")
-        .replace(/\s{2,}/g, " ")
-        .trim()
-    : null;
-
-  // Text-only version for truncation check
-  const plainLength = sanitizedDescription
-    ? sanitizedDescription.replace(/<[^>]*>/g, "").length
-    : 0;
-
-  // If description is long, show a truncated plain-text excerpt with ellipsis
-  const descriptionHtml = sanitizedDescription
-    ? plainLength > 400
-      ? `<p style="font-size:13px;color:#555;line-height:1.7;margin:0">${sanitizedDescription.replace(/<[^>]*>/g, "").slice(0, 380).trimEnd()}…</p>`
-      : `<div style="font-size:13px;color:#555;line-height:1.7">${sanitizedDescription}</div>`
-    : null;
-
+  const html = renderEmailShell({
+    accent: "client",
+    headline: "Your job is live! \u{1F389}",
+    preheader: "Artists can start applying now.",
+    bodyHtml:
+      para("Hey " + b(data.firstName) + ", your PRO job is posted and artists can start applying.") +
+      detailsCard([
+        { label: "Job", value: data.serviceType },
+        { label: "Company", value: data.company },
+        { label: "Location", value: data.workFromAnywhere ? "Work from anywhere" : data.location },
+        { label: "Details", value: sanitizeUserText(data.description, 400) },
+      ]),
+    ctaText: "View Your Job",
+    ctaUrl: data.jobLink,
+    footerNote: "Artists can now apply. You can manage applicants and job details from your enterprise dashboard.",
+  });
   return sendSimpleEmail({
-    to: data.to,
-    cc: "support@artswrk.com",
-    subject: `Your job has been posted — ${data.serviceType} at ${data.company}`,
-    html: `
-      <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:580px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f0f0f0">
-
-        <!-- Header -->
-        <div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:28px 36px">
-          <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/ArtswrkWhiteLogo_d14af74c.png"
-               alt="Artswrk" height="36" style="display:block;height:36px;width:auto;margin-bottom:8px" />
-          <p style="color:rgba(255,255,255,0.85);font-size:13px;margin:0;font-weight:500">Job Posted · ${data.company}</p>
-        </div>
-
-        <!-- Body -->
-        <div style="padding:36px">
-          <p style="font-size:15px;color:#111;margin:0 0 6px">Hey ${data.firstName},</p>
-          <p style="font-size:15px;font-weight:700;color:#111;margin:0 0 24px">Your job has been posted! See details below:</p>
-
-          <!-- Job card -->
-          <div style="background:#f9f9f9;border-radius:12px;padding:20px 24px;margin-bottom:28px">
-            <table style="width:100%;border-collapse:collapse">
-              <tr>
-                <td style="padding:5px 16px 5px 0;font-size:13px;font-weight:700;color:#111;vertical-align:top;white-space:nowrap;width:110px">Job</td>
-                <td style="padding:5px 0;font-size:14px;color:#333;font-weight:600">${data.serviceType}</td>
-              </tr>
-              <tr>
-                <td style="padding:5px 16px 5px 0;font-size:13px;font-weight:700;color:#111;vertical-align:top;white-space:nowrap">Company</td>
-                <td style="padding:5px 0;font-size:14px;color:#333">${data.company}</td>
-              </tr>
-              <tr>
-                <td style="padding:5px 16px 5px 0;font-size:13px;font-weight:700;color:#111;vertical-align:top;white-space:nowrap">Location</td>
-                <td style="padding:5px 0;font-size:14px;color:#333">${locationDisplay}</td>
-              </tr>
-              ${descriptionHtml ? `
-              <tr>
-                <td colspan="2" style="padding:12px 0 0">
-                  <div style="border-top:1px solid #e8e8e8;padding-top:12px">
-                    <p style="font-size:13px;font-weight:700;color:#111;margin:0 0 6px">Description</p>
-                    ${descriptionHtml}
-                  </div>
-                </td>
-              </tr>` : ""}
-            </table>
-          </div>
-
-          <!-- Big CTA button -->
-          <div style="text-align:center;margin-bottom:28px">
-            <a href="${data.jobLink}"
-               style="display:inline-block;background:linear-gradient(135deg,#FFBC5D,#F25722);color:#fff;font-size:15px;font-weight:800;text-decoration:none;padding:14px 36px;border-radius:100px;letter-spacing:-0.2px">
-              View Your Job →
-            </a>
-          </div>
-
-          <p style="font-size:14px;color:#666;line-height:1.6;margin:0 0 20px">
-            Artists are now able to apply. You can manage applicants and job details from your enterprise dashboard.
-          </p>
-
-          <p style="font-size:14px;color:#666;line-height:1.6;margin:0 0 28px">
-            Questions? Email us at <a href="mailto:contact@artswrk.com" style="color:#F25722;text-decoration:none;font-weight:600">contact@artswrk.com</a>.
-          </p>
-
-          <hr style="border:none;border-top:1px solid #f0f0f0;margin:0 0 20px" />
-          <p style="font-size:13px;color:#999;margin:0">— The Artswrk Team</p>
-        </div>
-      </div>
-    `,
+    to: data.to, cc: SUPPORT_EMAIL,
+    subject: "Your job has been posted — " + data.serviceType + " at " + data.company, html,
   });
 }
-
 /**
- * A5 — New message notification. Inline; replaces MESSAGE_RECEIVED.
- *
- * Two fixes carried over from the template: the sender name arrives as ONE
- * display string (the template concatenated first+last, producing "Street Beatz
- * Street Beatz"), and the preview appears exactly once — the template rendered
- * it in both the preheader and the body.
+ * Internal ops alert — an artist successfully linked Stripe Connect for
+ * payouts. Not artist- or client-facing; goes straight to SUPPORT_EMAIL so
+ * the team has a record of who's actually payable, without having to check
+ * the admin dashboard proactively.
  */
+export async function sendStripeConnectAlertEmail({
+  artistName, artistEmail, accountId,
+}: { artistName: string; artistEmail?: string | null; accountId: string }): Promise<boolean> {
+  const html = renderEmailShell({
+    accent: "internal",
+    headline: "Stripe Connect linked ✅",
+    preheader: artistName + " connected their Stripe payout account.",
+    bodyHtml:
+      para(b(artistName) + " just finished connecting their Stripe account for payouts.") +
+      detailsCard([
+        { label: "Artist", value: artistName },
+        { label: "Email", value: artistEmail },
+        { label: "Stripe account", value: accountId },
+      ]),
+    ctaText: "View in Admin",
+    ctaUrl: APP_URL + "/admin-dashboard",
+  });
+  return sendSimpleEmail({ to: SUPPORT_EMAIL, subject: artistName + " connected Stripe for payouts", html });
+}
 export async function sendNewMessageEmail({
   to, cc, recipientFirstName, senderName, messagePreview, dashboardUrl,
 }: {
@@ -628,54 +500,46 @@ export async function sendProJobApplicantAlertEmail(data: {
   });
   return sendSimpleEmail({ to: data.to, cc: SUPPORT_EMAIL, subject: who + " is available for your job!", html });
 }
+/**
+ * A4 — PRO submission confirmation. Same shape as A3 (the basic application
+ * confirmation): the artist's own message, pitched rate and resume link come
+ * back to them, so the email is a record of what they actually submitted.
+ *
+ * Safe to include here where it is not in the applicant ALERT: this goes to the
+ * artist about their own application, not to a client who hasn't unlocked it.
+ */
 export async function sendProJobSubmissionConfirmationEmail(data: {
-  to: string;
-  artistFirstName: string;
-  serviceType: string;
-  location: string;
-  description: string | null;
-  dashboardLink: string;
+  to: string; artistFirstName: string; serviceType: string;
+  location: string; description: string | null; dashboardLink: string;
+  pitchedRate?: string; artistMessage?: string; resumeLink?: string;
 }): Promise<boolean> {
-  const descriptionText = data.description
-    ? data.description.replace(/<[^>]*>/g, "").trim()
-    : null;
-
-  return sendSimpleEmail({
-    to: data.to,
-    cc: "support@artswrk.com",
-    subject: `Your submission has been received!`,
-    html: `
-      <div style="font-family:'Helvetica Neue',sans-serif;max-width:580px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f0f0f0">
-        <div style="background:linear-gradient(135deg,#FFBC5D,#F25722);padding:28px 36px">
-          <div style="display:inline-flex;align-items:center;gap:6px">
-            <span style="font-size:20px;font-weight:900;color:#fff;letter-spacing:-0.5px">ARTS</span>
-            <span style="font-size:20px;font-weight:900;background:#111;color:#fff;padding:2px 8px;border-radius:6px">WRK</span>
-          </div>
-        </div>
-        <div style="padding:36px">
-          <p style="font-size:16px;font-weight:700;color:#111;margin:0 0 6px">Hi ${data.artistFirstName},</p>
-          <p style="font-size:15px;color:#555;line-height:1.6;margin:0 0 28px">
-            Your submission to the job below has been sent over to the client — once they confirm you or request more information, you will receive a notification!
-          </p>
-          <div style="background:#f9f9f9;border-radius:12px;padding:20px 24px;margin-bottom:28px">
-            <p style="font-size:13px;font-weight:800;color:#111;margin:0 0 14px">Job Details</p>
-            <p style="font-size:14px;color:#111;margin:0 0 8px"><strong>Service:</strong> ${data.serviceType}</p>
-            <p style="font-size:14px;color:#111;margin:0 0 8px"><strong>Location:</strong> ${data.location}</p>
-            ${descriptionText ? `<p style="font-size:14px;color:#111;margin:0"><strong>Details:</strong> ${descriptionText}</p>` : ""}
-          </div>
-          <p style="font-size:14px;color:#555;line-height:1.6;margin:0 0 24px">
-            If you have any questions or concerns, don't hesitate to reach out to us. You can always check on your submissions in your <a href="${data.dashboardLink}" style="color:#F25722;font-weight:700">artist dashboard</a>.
-          </p>
-          <hr style="border:none;border-top:1px solid #f0f0f0;margin:0 0 20px" />
-          <p style="font-size:14px;color:#111;margin:0">Best,<br/>The Artswrk Team</p>
-        </div>
-      </div>
-    `,
+  const note = sanitizeUserText(data.artistMessage, 400);
+  const html = renderEmailShell({
+    accent: "artist",
+    headline: "Your submission has been received!",
+    preheader: "It\u2019s with the client now: " + data.serviceType,
+    bodyHtml:
+      para("Hi " + b(data.artistFirstName) + ",") +
+      para("Your submission to the job below has been sent to the client. Once they confirm you or ask for more information, you\u2019ll get a notification.") +
+      detailsCard([
+        { label: "Job", value: data.serviceType },
+        { label: "Location", value: data.location },
+        { label: "Details", value: sanitizeUserText(data.description, 400) },
+      ]) +
+      ((data.pitchedRate || note || data.resumeLink)
+        ? para(b("What you sent")) +
+          detailsCard([
+            { label: "Your rate", value: data.pitchedRate },
+            { label: "Resume", value: data.resumeLink ? "Attached" : undefined },
+          ]) +
+          (note ? quote(note) : "")
+        : ""),
+    ctaText: "View My Submissions",
+    ctaUrl: data.dashboardLink,
+    footerNote: "You can always check on your submissions from your artist dashboard.<br>Best,<br>The Artswrk Team",
   });
+  return sendSimpleEmail({ to: data.to, subject: "Your submission has been received!", html });
 }
-
-// ─── Booking confirmed: notify the artist ─────────────────────────────────────
-/** A6 — Booking confirmed, artist. Inline; replaces ARTIST_BOOKING_CONFIRMED. */
 export async function sendArtistBookingConfirmedEmail(data: {
   to: string; artistName: string; artistType?: string; clientName: string;
   date: string; details?: string; location: string; rate: string;

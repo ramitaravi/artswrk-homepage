@@ -23,6 +23,7 @@ import { Link } from "wouter";
 import RichTextEditor from "@/components/RichTextEditor";
 import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
 import { useLocationField } from "@/hooks/useLocationField";
+import { toast } from "sonner";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type AdminSection = "dashboard" | "artists" | "clients" | "jobs" | "pro-jobs" | "enterprise-clients" | "bookings" | "admin-bookings" | "payments" | "subscriptions" | "benefits" | "emails" | "settings";
@@ -156,9 +157,55 @@ function Sidebar({ active, onSelect, collapsed, onToggle }: {
               App Dashboard
             </button>
           </Link>
+          <SidebarLogout />
+        </div>
+      )}
+      {/* Collapsed rail still needs a way out — icon only. */}
+      {collapsed && (
+        <div className="p-2 border-t border-gray-100">
+          <SidebarLogout iconOnly />
         </div>
       )}
     </aside>
+  );
+}
+
+/**
+ * Sign out of the admin dashboard.
+ *
+ * Clears the session cookie server-side, then hard-navigates to "/" rather than
+ * doing a client-side route change — a soft navigation would leave the admin
+ * page's cached tRPC data sitting in memory, so the next person at the keyboard
+ * could still read it until something forced a refetch.
+ */
+function SidebarLogout({ iconOnly = false }: { iconOnly?: boolean }) {
+  const { logout } = useAuth();
+  const [busy, setBusy] = useState(false);
+
+  const signOut = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await logout();
+    } catch {
+      // Even a failed call should get them off this screen; the cookie is
+      // cleared server-side and the reload settles whatever state is left.
+    } finally {
+      window.location.href = "/";
+    }
+  };
+
+  return (
+    <button
+      onClick={signOut}
+      disabled={busy}
+      title="Log out"
+      aria-label="Log out"
+      className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 ${iconOnly ? "justify-center px-0" : ""}`}
+    >
+      <LogOut size={13} />
+      {!iconOnly && (busy ? "Logging out…" : "Log out")}
+    </button>
   );
 }
 
@@ -441,11 +488,13 @@ function AdminArtistForm({
   onSave,
   onCancel,
   isCreate,
+  isSaving,
 }: {
   initial?: any;
   onSave: (data: any) => void;
   onCancel: () => void;
   isCreate?: boolean;
+  isSaving?: boolean;
 }) {
   // masterArtistTypeNames/masterServiceTypeNames/masterStyleNames are resolved
   // server-side by admin.getArtist (ids -> names) — the raw masterArtistTypes/
@@ -480,8 +529,25 @@ function AdminArtistForm({
     `<p>Hey ${firstName || "there"},</p><p>The Artswrk Team here — so glad we connected!</p><p>Artswrk is the platform connecting artists to work. So excited to get you on our roster!</p><p>We've added you to our email list, so you'll get regular job updates from us. Below are your next steps:</p><ol><li><strong>Create your password:</strong> Using your email address, click here to set a password and login.</li><li><strong>Complete your profile:</strong> We added key details for you, but we want to know more! Add your resume, bio, and anything else that will help you get booked.</li><li><strong>Submit to open jobs:</strong> Check out the jobs board and send in a submission if you are interested and available. Not seeing any for you just yet? No worries — we are adding new clients every single day and will email you new opportunities.</li><li><strong>Once you're booked:</strong> Artswrk handles all payments &amp; 1099s on behalf of you and the client, so you can focus on WRK.</li><li><strong>Join Artswrk PRO:</strong> To get first dibs on higher-paying jobs, plus access to our health insurance and sick pay partners, upgrade your account for $110/year — annual only, and it starts with a 7-day free trial.</li></ol><p>If you have any questions, feel free to reply back to this email anytime. Artswrk is committed to innovating how you make money as an artist, and we are so thrilled to have you on the platform.</p><p>Talk soon,<br/>Nick Silverio &amp; Ramita Ravi<br/>Co-Founders, Artswrk</p>`
   );
 
+  // Picking an artist type auto-selects its associated service types as a
+  // convenience default — the admin can still freely deselect any of them
+  // afterward, since this only ever adds, never removes.
+  function handleTypesChange(nextTypes: string[]) {
+    const added = nextTypes.filter(t => !types.includes(t));
+    if (added.length) {
+      const impliedServices = masterServiceTypeOptions
+        .filter((s: any) => added.includes(s.artistTypeName))
+        .map((s: any) => s.name);
+      if (impliedServices.length) {
+        setServices(prev => Array.from(new Set([...prev, ...impliedServices])));
+      }
+    }
+    setTypes(nextTypes);
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (isSaving) return;
     onSave({
       firstName, lastName, email, pronouns, phoneNumber, location, bio, website,
       instagram, tiktok, youtube, portfolio, tagline, profilePicture, masterArtistTypes: types,
@@ -569,7 +635,7 @@ function AdminArtistForm({
       {/* Specialties */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
         <h3 className="text-sm font-black text-[#111] uppercase tracking-wider">Specialties</h3>
-        <ChipPicker label="Artist Types" options={masterArtistTypeOptions.map(t => t.name)} selected={types} onChange={setTypes} />
+        <ChipPicker label="Artist Types" options={masterArtistTypeOptions.map(t => t.name)} selected={types} onChange={handleTypesChange} />
         <ChipPicker label="Services" options={masterServiceTypeOptions.map(t => t.name)} selected={services} onChange={setServices} />
         <ChipPicker label="Styles" options={masterStyleOptions.map(t => t.name)} selected={styles} onChange={setStyles} />
       </div>
@@ -654,11 +720,16 @@ function AdminArtistForm({
 
       {/* Actions */}
       <div className="flex items-center justify-between pt-2">
-        <button type="button" onClick={onCancel} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+        <button type="button" onClick={onCancel} disabled={isSaving} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
           Cancel
         </button>
-        <button type="submit" className="px-6 py-2.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity">
-          {isCreate ? "Create Artist" : "Save Changes"}
+        <button
+          type="submit"
+          disabled={isSaving}
+          className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {isSaving && <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
+          {isSaving ? (isCreate ? "Creating…" : "Saving…") : (isCreate ? "Create Artist" : "Save Changes")}
         </button>
       </div>
     </form>
@@ -880,6 +951,15 @@ function AdminArtistDetail({ artistId, onBack, onEdit }: { artistId: number; onB
                 {artist.artswrkPro && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">PRO</span>}
                 {artist.artswrkBasic && !artist.artswrkPro && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Basic</span>}
                 {artist.priorityList && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">Featured</span>}
+                {artist.artistStripeAccountId ? (
+                  <span title={artist.artistStripeAccountId} className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-[#635bff]/10 text-[#635bff]">
+                    💳 Stripe Connected
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">
+                    Not connected to Stripe
+                  </span>
+                )}
               </div>
               {artist.tagline && <p className="text-sm text-gray-500 mb-1">{artist.tagline}</p>}
               <div className="flex items-center gap-4 flex-wrap text-xs text-gray-400">
@@ -1053,6 +1133,7 @@ function ArtistsSection() {
   const [affiliationId, setAffiliationId] = useState<number | undefined>(undefined);
   const [onboardingStep, setOnboardingStepFilter] = useState<number | undefined>(undefined);
   const [missingProfilePicture, setMissingProfilePicture] = useState(false);
+  const [stripeConnected, setStripeConnected] = useState(false);
   const [createdFrom, setCreatedFrom] = useState("");
   const [createdTo, setCreatedTo] = useState("");
   const [modifiedFrom, setModifiedFrom] = useState("");
@@ -1085,6 +1166,7 @@ function ArtistsSection() {
     affiliationId,
     onboardingStep,
     missingProfilePicture: missingProfilePicture || undefined,
+    stripeConnected: stripeConnected || undefined,
     createdFrom: createdFrom ? new Date(createdFrom) : undefined,
     createdTo: createdTo ? new Date(createdTo) : undefined,
     modifiedFrom: modifiedFrom ? new Date(modifiedFrom) : undefined,
@@ -1109,8 +1191,11 @@ function ArtistsSection() {
   });
 
   const createArtist = trpc.admin.createArtist.useMutation({
-    onSuccess: (created) => {
+    onSuccess: (created: any) => {
       utils.admin.artists.invalidate();
+      if (created?.emailSent === false) {
+        toast.warning("Artist created, but the welcome email failed to send — check server logs or resend it from their profile.");
+      }
       if (created) setView({ mode: "detail", id: created.id });
     },
     onError: (e) => alert("Create failed: " + e.message),
@@ -1157,10 +1242,10 @@ function ArtistsSection() {
   function resetFilters() {
     setSearch(""); setLocationSearch(""); setArtistType(""); setServiceType("");
     setState(""); setPlan(""); setAffiliationId(undefined); setOnboardingStepFilter(undefined);
-    setMissingProfilePicture(false); setCreatedFrom(""); setCreatedTo("");
+    setMissingProfilePicture(false); setStripeConnected(false); setCreatedFrom(""); setCreatedTo("");
     setModifiedFrom(""); setModifiedTo(""); setPage(1);
   }
-  const hasActiveFilters = !!(search || locationSearch || artistType || serviceType || state || plan || affiliationId || onboardingStep !== undefined || missingProfilePicture || createdFrom || createdTo || modifiedFrom || modifiedTo);
+  const hasActiveFilters = !!(search || locationSearch || artistType || serviceType || state || plan || affiliationId || onboardingStep !== undefined || missingProfilePicture || stripeConnected || createdFrom || createdTo || modifiedFrom || modifiedTo);
 
   const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
@@ -1206,6 +1291,7 @@ function ArtistsSection() {
           isCreate
           onCancel={() => setView({ mode: "list" })}
           onSave={(data: any) => createArtist.mutate(data)}
+          isSaving={createArtist.isPending}
         />
         {createArtist.isPending && (
           <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -1384,6 +1470,10 @@ function ArtistsSection() {
                 <input type="checkbox" checked={missingProfilePicture} onChange={e => { setMissingProfilePicture(e.target.checked); setPage(1); }} className="rounded border-gray-300 text-[#F25722] focus:ring-[#F25722]" />
                 Missing profile picture
               </label>
+              <label className="flex items-center gap-2 text-xs font-medium text-gray-600 cursor-pointer pb-2">
+                <input type="checkbox" checked={stripeConnected} onChange={e => { setStripeConnected(e.target.checked); setPage(1); }} className="rounded border-gray-300 text-[#F25722] focus:ring-[#F25722]" />
+                Stripe Connect linked
+              </label>
             </div>
           )}
       </div>
@@ -1408,6 +1498,7 @@ function ArtistsSection() {
                   affiliationId,
                   onboardingStep,
                   missingProfilePicture: missingProfilePicture || undefined,
+                  stripeConnected: stripeConnected || undefined,
                   createdFrom: createdFrom ? new Date(createdFrom) : undefined,
                   createdTo: createdTo ? new Date(createdTo) : undefined,
                   modifiedFrom: modifiedFrom ? new Date(modifiedFrom) : undefined,
@@ -1481,13 +1572,20 @@ function ArtistsSection() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        {a.artswrkPro ? (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">PRO</span>
-                        ) : a.artswrkBasic ? (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Basic</span>
-                        ) : (
-                          <span className="text-[10px] text-gray-400">Free</span>
-                        )}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {a.artswrkPro ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">PRO</span>
+                          ) : a.artswrkBasic ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Basic</span>
+                          ) : (
+                            <span className="text-[10px] text-gray-400">Free</span>
+                          )}
+                          {a.artistStripeAccountId && (
+                            <span title="Stripe Connect linked" className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#635bff]/10 text-[#635bff]">
+                              💳 Connected
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${stage?.value === 4 ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-500"}`}>
@@ -1547,6 +1645,9 @@ function ArtistsSection() {
                         </div>
                       )}
                       {a.artswrkPro && <span className="absolute top-2.5 right-2.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/70 text-white">PRO</span>}
+                      {a.artistStripeAccountId && (
+                        <span title="Stripe Connect linked" className="absolute bottom-2.5 right-2.5 text-[10px] px-1.5 py-0.5 rounded-full bg-[#635bff] text-white">💳</span>
+                      )}
                     </div>
                     <div className="p-3">
                       <p className="font-bold text-[#111] text-sm truncate">{displayName(a)}</p>
@@ -1680,7 +1781,7 @@ function AdminArtistEditWrapper({ artistId, onBack, onSave, isSaving }: {
         <h1 className="text-2xl font-black text-[#111]">Edit Artist</h1>
         <p className="text-sm text-gray-400 mt-0.5">{displayName(artist)} · {artist.email}</p>
       </div>
-      <AdminArtistForm initial={artist} onCancel={onBack} onSave={onSave} />
+      <AdminArtistForm initial={artist} onCancel={onBack} onSave={onSave} isSaving={isSaving} />
       {isSaving && (
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <div className="w-4 h-4 border-2 border-gray-300 border-t-[#F25722] rounded-full animate-spin" />

@@ -2719,27 +2719,22 @@ function EnterpriseBillingSettings({ onBack }: { onBack: () => void }) {
                   onClick={() => setSubInterval("year")}
                   className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${subInterval === "year" ? "bg-white shadow text-[#111]" : "text-gray-500"}`}
                 >
-                  Annual <span className="text-[#F25722] text-xs">–50%</span>
+                  Annual <span className="text-[#F25722] text-xs">–17%</span>
                 </button>
               </div>
 
               <div className="border-2 border-[#F25722] rounded-2xl p-5 mb-4">
-                <div className="flex items-end gap-2 mb-1">
-                  <span className="text-sm text-gray-400 line-through">
-                    {subInterval === "month" ? "$500" : "$417"}/mo
-                  </span>
-                </div>
                 <div className="flex items-baseline gap-1 mb-1">
                   <span className="text-4xl font-black text-[#111]">
-                    {subInterval === "month" ? "$250" : "$208"}
+                    {subInterval === "month" ? "$500" : "$417"}
                   </span>
                   <span className="text-gray-400 text-sm">/mo</span>
                 </div>
                 <p className="text-xs text-gray-400 mb-0.5">
-                  {subInterval === "year" ? "Billed $2,500/yr (list price $5,000)" : "Billed monthly · cancel anytime"}
+                  {subInterval === "year" ? "Billed $5,000/yr" : "Billed monthly · cancel anytime"}
                 </p>
                 <p className="text-xs text-[#F25722] font-semibold mb-4">
-                  Introductory pricing — locked in for life of subscription
+                  Have an OG discount code? Apply it at checkout for 50% off.
                 </p>
 
                 <ul className="space-y-2 mb-5">
@@ -2764,7 +2759,7 @@ function EnterpriseBillingSettings({ onBack }: { onBack: () => void }) {
                   {subscribing ? (
                     <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Redirecting…</>
                   ) : (
-                    <>Subscribe — {subInterval === "month" ? "$250/mo" : "$2,500/yr"}</>
+                    <>Subscribe — {subInterval === "month" ? "$500/mo" : "$5,000/yr"}</>
                   )}
                 </button>
               </div>
@@ -2781,13 +2776,13 @@ function EnterpriseBillingSettings({ onBack }: { onBack: () => void }) {
                   onClick={() => setSubInterval("month")}
                   className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${subInterval === "month" ? "bg-white shadow text-[#111]" : "text-gray-500"}`}
                 >
-                  Monthly — $250/mo
+                  Monthly — $500/mo
                 </button>
                 <button
                   onClick={() => setSubInterval("year")}
                   className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${subInterval === "year" ? "bg-white shadow text-[#111]" : "text-gray-500"}`}
                 >
-                  Annual — $2,500/yr <span className="text-[#F25722] text-xs">–17%</span>
+                  Annual — $5,000/yr <span className="text-[#F25722] text-xs">–17%</span>
                 </button>
               </div>
               <p className="text-xs text-gray-400 mb-3">

@@ -295,6 +295,7 @@ export const appRouter = router({
         affiliationId: z.number().optional(),
         onboardingStep: z.number().optional(),
         missingProfilePicture: z.boolean().optional(),
+        stripeConnected: z.boolean().optional(),
         createdFrom: z.coerce.date().optional(),
         createdTo: z.coerce.date().optional(),
         modifiedFrom: z.coerce.date().optional(),
@@ -321,6 +322,7 @@ export const appRouter = router({
         affiliationId: z.number().optional(),
         onboardingStep: z.number().optional(),
         missingProfilePicture: z.boolean().optional(),
+        stripeConnected: z.boolean().optional(),
         createdFrom: z.coerce.date().optional(),
         createdTo: z.coerce.date().optional(),
         modifiedFrom: z.coerce.date().optional(),
@@ -508,38 +510,45 @@ export const appRouter = router({
         const result = await db.insert(usersTable).values(values);
         const newId = (result as any).insertId as number;
 
+        // Awaited, not fire-and-forget — an un-awaited send here would still
+        // usually complete on its own, but it has nothing keeping it alive if
+        // the server process restarts (a dev-server bounce, or a Manus
+        // redeploy in production) before it finishes. It would vanish with no
+        // error, no retry, and no record anywhere — confirmed via SendGrid's
+        // own Activity log showing zero send attempt for exactly this case.
+        // null = no email was requested; true/false = attempted, and whether it worked.
+        let emailSent: boolean | null = null;
         if (input.sendWelcomeEmail) {
-          (async () => {
-            try {
-              // Admin-created accounts get no real password (passwordIsTemporary
-              // stays true) — always generate a real claim link so "create your
-              // password" isn't just decorative copy in a custom email.
-              const origin = input.origin ?? APP_URL;
-              const token = crypto.randomBytes(32).toString("hex");
-              const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-              await createPasswordResetToken(newId, token, expiresAt);
-              const claimUrl = `${origin}/reset-password?token=${token}`;
+          try {
+            // Admin-created accounts get no real password (passwordIsTemporary
+            // stays true) — always generate a real claim link so "create your
+            // password" isn't just decorative copy in a custom email.
+            const origin = input.origin ?? APP_URL;
+            const token = crypto.randomBytes(32).toString("hex");
+            const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+            await createPasswordResetToken(newId, token, expiresAt);
+            const claimUrl = `${origin}/reset-password?token=${token}`;
 
-              if (input.welcomeEmailSubject && input.welcomeEmailHtml) {
-                const ctaBlock = `
-                  <div style="text-align:center;margin-top:28px">
-                    <a href="${claimUrl}" style="display:inline-block;background:linear-gradient(135deg,#FFBC5D,#F25722);color:#fff;font-size:15px;font-weight:800;text-decoration:none;padding:14px 36px;border-radius:100px">Create Your Password →</a>
-                  </div>`;
-                await sendSimpleEmail({
-                  to: input.email,
-                  subject: input.welcomeEmailSubject,
-                  html: `<div style="font-family:'Helvetica Neue',sans-serif;max-width:580px;margin:0 auto">${input.welcomeEmailHtml}${ctaBlock}</div>`,
-                });
-              } else {
-                await sendArtistWelcomeEmail({ to: input.email, firstName: input.firstName });
-              }
-            } catch (err) {
-              console.error("[Admin] Welcome email failed:", err instanceof Error ? err.message : err);
+            if (input.welcomeEmailSubject && input.welcomeEmailHtml) {
+              const ctaBlock = `
+                <div style="text-align:center;margin-top:28px">
+                  <a href="${claimUrl}" style="display:inline-block;background:linear-gradient(135deg,#FFBC5D,#F25722);color:#fff;font-size:15px;font-weight:800;text-decoration:none;padding:14px 36px;border-radius:100px">Create Your Password →</a>
+                </div>`;
+              emailSent = await sendSimpleEmail({
+                to: input.email,
+                subject: input.welcomeEmailSubject,
+                html: `<div style="font-family:'Helvetica Neue',sans-serif;max-width:580px;margin:0 auto">${input.welcomeEmailHtml}${ctaBlock}</div>`,
+              });
+            } else {
+              emailSent = await sendArtistWelcomeEmail({ to: input.email, firstName: input.firstName });
             }
-          })();
+          } catch (err) {
+            console.error("[Admin] Welcome email failed:", err instanceof Error ? err.message : err);
+          }
         }
 
-        return getUserById(newId);
+        const created = await getUserById(newId);
+        return { ...created, emailSent };
       }),
 
     /** Send welcome email to an existing artist — admin only */
@@ -975,6 +984,75 @@ export const appRouter = router({
                                   updatedBy = VALUES(updatedBy), updatedAt = NOW()`);
         console.warn(`[job-alerts] master switch turned ${input.enabled ? "ON" : "OFF"} by ${who}`);
         return { enabled: input.enabled };
+      }),
+
+    /** Every account with admin access. */
+    listAdmins: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+      const { getDb } = await import("./db");
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      const rows: any = await db.execute(
+        `SELECT id, email, firstName, lastName, name, userRole, lastSignedIn
+         FROM users WHERE role = 'admin' ORDER BY id`
+      );
+      const list: any[] = Array.isArray(rows) ? (Array.isArray(rows[0]) ? rows[0] : rows) : [];
+      return list.map((r) => ({
+        id: r.id,
+        email: r.email ?? null,
+        name: (r.firstName ? `${r.firstName} ${r.lastName ?? ""}` : r.name || "").trim() || null,
+        userRole: r.userRole ?? null,
+        lastSignedIn: r.lastSignedIn ?? null,
+        /** The owner account can't be demoted here — ENV.ownerOpenId grants
+         *  access independently of this column, so revoking it would be a
+         *  no-op that looks like it worked. */
+        isOwner: r.id === ctx.user.id,
+      }));
+    }),
+
+    /** Find an account by email, to grant admin to. */
+    findUserByEmail: protectedProcedure
+      .input(z.object({ email: z.string().min(3) }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getDb } = await import("./db");
+        const db = await getDb();
+        if (!db) throw new Error("Database unavailable");
+        const esc = input.email.trim().toLowerCase().replace(/'/g, "''");
+        const rows: any = await db.execute(
+          `SELECT id, email, firstName, lastName, name, role, userRole, lastSignedIn
+           FROM users WHERE LOWER(email) LIKE '%${esc}%' ORDER BY (LOWER(email) = '${esc}') DESC, id LIMIT 8`
+        );
+        const list: any[] = Array.isArray(rows) ? (Array.isArray(rows[0]) ? rows[0] : rows) : [];
+        return list.map((r) => ({
+          id: r.id, email: r.email ?? null,
+          name: (r.firstName ? `${r.firstName} ${r.lastName ?? ""}` : r.name || "").trim() || null,
+          role: r.role, userRole: r.userRole ?? null, lastSignedIn: r.lastSignedIn ?? null,
+        }));
+      }),
+
+    /**
+     * Grant or revoke admin. Targeted by user id, never by email — three
+     * separate accounts share the name "Nick Silverio", and two accounts can
+     * share an email in this data.
+     */
+    setUserAdmin: protectedProcedure
+      .input(z.object({ userId: z.number(), admin: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        if (input.userId === ctx.user.id && !input.admin) {
+          throw new Error("You can't remove your own admin access.");
+        }
+        const { getDb } = await import("./db");
+        const db = await getDb();
+        if (!db) throw new Error("Database unavailable");
+        await db.execute(
+          `UPDATE users SET role = '${input.admin ? "admin" : "user"}' WHERE id = ${Number(input.userId)}`
+        );
+        console.warn(
+          `[admin] user ${input.userId} ${input.admin ? "GRANTED" : "REVOKED"} admin by ${ctx.user.email ?? ctx.user.openId}`
+        );
+        return { success: true };
       }),
 
     /** All applicants for a specific regular job — admin only */
@@ -1612,9 +1690,14 @@ export const appRouter = router({
         try {
           const job = await getJobDetailById(input.jobId);
           if (job) {
-            const jobTitle = job.description
-              ? job.description.split("\n")[0].slice(0, 80)
-              : "Open Position";
+            // job.title first. This used to read only the description's first
+            // line, which predates jobs having a title at all — so a job titled
+            // "Ballet Substitute Teacher" went out as "I'm hiring a ballet
+            // teacher for a sub on Monday!". Title is required at posting now;
+            // the description fallback is only for migrated Bubble rows.
+            const jobTitle = (job.title ?? "").trim()
+              || (job.description ? job.description.split("\n")[0].slice(0, 80) : "")
+              || "Open Position";
             const jobLocation = job.locationAddress ?? "Location TBD";
             const jobRate = job.openRate
               ? "Open rate"
@@ -1636,6 +1719,16 @@ export const appRouter = router({
                     jobLocation,
                     jobRate,
                     jobUrl,
+                    jobDescription: job.description ?? undefined,
+                    // What the artist actually pitched, so the email is a
+                    // record of their application and not just a receipt.
+                    pitchedRate:
+                      input.artistHourlyRate != null
+                        ? `$${input.artistHourlyRate}/hr`
+                        : input.artistFlatRate != null
+                        ? `$${input.artistFlatRate} flat`
+                        : undefined,
+                    artistMessage: input.message || undefined,
                   })
                 : Promise.resolve(false),
             ];
@@ -1645,14 +1738,13 @@ export const appRouter = router({
               emailTasks.push(
                 sendNewApplicantAlertEmail({
                   to: clientUser.email,
-                  artistName: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.name || user.email || "Unknown",
-                  artistEmail: user.email ?? "(no email)",
+                  artistFirstName: user.firstName || user.name?.split(" ")[0] || "An artist",
+                  artistLastInitial: user.lastName ? user.lastName[0] : (user.name?.split(" ").slice(-1)[0]?.[0] ?? undefined),
                   jobTitle,
                   jobLocation,
                   jobRate,
                   jobUrl: clientDashboardUrl,
                   message: input.message,
-                  resumeLink: input.resumeLink || undefined,
                 })
               );
             }
@@ -3705,6 +3797,11 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
                 location: locationDisplay,
                 description: job.description || null,
                 dashboardLink,
+                // The artist's own submission echoed back — same as the basic
+                // application confirmation. Their data, going to them.
+                pitchedRate: input.rate || undefined,
+                artistMessage: input.message || undefined,
+                resumeLink: input.resumeLink || undefined,
               });
             }
           } catch (err) {
@@ -4660,6 +4757,65 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         if (!job) throw new Error("Job not found");
         if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
         return getConfirmedBookingsForJob(input.jobId);
+      }),
+
+    /**
+     * Client self-service status control — Active / Paused / Archived.
+     * Writes the raw legacy requestStatus value the simplified status maps to
+     * (see shared/jobStatus.ts) so every existing status-reading query keeps
+     * working unchanged; the 3-way collapse happens only in how it's read.
+     */
+    updateStatus: protectedProcedure
+      .input(z.object({
+        jobId: z.number(),
+        status: z.enum(["Active", "Paused", "Archived"]),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const job = await getAdminJobById(input.jobId);
+        if (!job) throw new Error("Job not found");
+        if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
+        const { updateAdminJob } = await import("./db");
+        const { SIMPLE_STATUS_TO_RAW } = await import("../shared/jobStatus");
+        await updateAdminJob(input.jobId, { requestStatus: SIMPLE_STATUS_TO_RAW[input.status] });
+        return { success: true };
+      }),
+
+    /** Client self-service job edit — the general-purpose fields a studio would need to fix a typo or update details after posting. */
+    update: protectedProcedure
+      .input(z.object({
+        jobId: z.number(),
+        title: z.string().min(1).max(256).optional(),
+        description: z.string().optional(),
+        locationAddress: z.string().optional(),
+        locationData: locationInputSchema,
+        dateType: z.enum(["Single Date", "Weekly", "Multiple Dates", "Dates Flexible", "Ongoing", "Recurring"]).optional(),
+        startDate: z.string().nullable().optional(),
+        endDate: z.string().nullable().optional(),
+        isHourly: z.boolean().optional(),
+        openRate: z.boolean().optional(),
+        artistHourlyRate: z.number().nullable().optional(),
+        clientHourlyRate: z.number().nullable().optional(),
+        artistFlatRate: z.number().nullable().optional(),
+        clientFlatRate: z.number().nullable().optional(),
+        transportation: z.boolean().optional(),
+        transportationDetails: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const job = await getAdminJobById(input.jobId);
+        if (!job) throw new Error("Job not found");
+        if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
+
+        const { jobId, locationData, ...fields } = input;
+        const location = fields.locationAddress !== undefined
+          ? await resolveJobLocation({ locationAddress: fields.locationAddress, locationData })
+          : {};
+        const { updateAdminJob, getAdminJobById: refetch } = await import("./db");
+        await updateAdminJob(jobId, { ...fields, ...location });
+        return refetch(jobId);
       }),
   }),
   /** Public invoice payment page — fetches booking data by token for studio payment */

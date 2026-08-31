@@ -24,9 +24,9 @@ await E.sendJobPostedEmail({ to: "c@x.com", firstName: "Dana", serviceType: "Sub
   date: "Thu, Sep 4 · 4:30–6:00 pm", location: "Brooklyn, NY", rate: "$60/hr",
   description: BBCODE, jobLink: J, transportation: true, transportDetails: "Subway fare reimbursed" });
 
-await E.sendNewApplicantAlertEmail({ to: "c@x.com", artistName: "Marisa Lopez", artistEmail: "m@x.com",
+await E.sendNewApplicantAlertEmail({ to: "c@x.com", artistFirstName: "Marisa", artistLastInitial: "L",
   jobTitle: "Hip Hop Sub Teacher", jobLocation: "Brooklyn, NY", jobRate: "$60/hr", jobUrl: J,
-  message: "I teach hip hop at Broadway Dance Center and I'm free Tuesdays!", resumeLink: J + "/resume" });
+  message: "I teach hip hop at Broadway Dance Center and I'm free Tuesdays!" });
 
 await E.sendNewMessageEmail({ to: "a@x.com", recipientFirstName: "Marisa", senderName: "Street Beatz",
   messagePreview: "Hi! Are you available for a sub on the 12th?", dashboardUrl: "https://app.artswrk.com/app/messages" });
@@ -55,12 +55,31 @@ await E.sendClientPaymentReceiptEmail({ to: "c@x.com", firstName: "Dana", artist
   date: "Sep 4, 2026", rate: "$60/hr × 2 hrs", reimbursements: "$12.50", total: "132.50" });
 await E.sendPaymentReminderEmail({ to: "c@x.com", firstName: "Dana", artistName: "Marisa Lopez",
   date: "Sep 4, 2026", total: "132.50", payUrl: "https://app.artswrk.com/invoice/abc123" });
+await E.sendApplicationConfirmationEmail({ to: "a@x.com", artistName: "Rami",
+  jobTitle: "Ballet Substitute Teacher", jobLocation: "New York, NY, USA",
+  jobRate: "Open rate", jobUrl: "https://app.artswrk.com/jobs/ballet-substitute-teacher-2490001",
+  jobDescription: "I'm hiring a ballet teacher for a sub on Monday! Intermediate teens, 4:30-6pm.",
+  pitchedRate: "$75/hr",
+  artistMessage: "I teach ballet at Broadway Dance Center and I'm free Monday afternoon — happy to cover this." });
+await E.sendArtistWelcomeEmail({ to: "a@x.com", firstName: "Rami" });
+await E.sendPasswordResetEmail({ to: "a@x.com", firstName: "Rami",
+  resetUrl: "https://app.artswrk.com/reset-password?token=abc123" });
+await E.sendProJobPostedEmail({ to: "c@x.com", firstName: "Dana", company: "REVEL Dance Convention",
+  serviceType: "Emcee (Touring)", location: null, description: "Touring emcee for the 2027 season.",
+  workFromAnywhere: true, jobLink: "https://app.artswrk.com/pro/emcee-touring-1050240" });
+await E.sendProJobSubmissionConfirmationEmail({ to: "a@x.com", artistFirstName: "Rami",
+  serviceType: "Emcee (Touring)", location: "Work from anywhere",
+  description: "Touring emcee for the 2027 season.", dashboardLink: "https://app.artswrk.com/app",
+  pitchedRate: "$850/day", resumeLink: "https://app.artswrk.com/r/abc",
+  artistMessage: "I've emceed 40+ conventions and I'm available for the full spring tour." });
+
 await E.sendInternalSubscriptionAlert({ userName: "Marisa Lopez", userEmail: "m@x.com",
   plan: "Artswrk PRO ($110/yr)", role: "Artist" });
 
 const names = ["C1-job-posted","C3-applicant-alert","A5-new-message","C4-pro-applicant-alert",
                "A6-booking-confirmed-artist","C5-booking-confirmed-client","C6-pay-artist",
-               "A2-pro-welcome","A11-payout","C9-client-receipt","C7-payment-reminder","I3-subscription-alert"];
+               "A2-pro-welcome","A11-payout","C9-client-receipt","C7-payment-reminder","A3-application-confirmation","A1-welcome","S1-password-reset","C2-pro-job-posted","A4-pro-submission",
+               "I3-subscription-alert"];
 captured.forEach((m, i) => {
   fs.writeFileSync(path.join(OUT, names[i] + ".html"), m.html ?? "");
   const problems = [];

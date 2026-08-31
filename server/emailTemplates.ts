@@ -29,17 +29,37 @@ export const FROM_EMAIL = "contact@artswrk.com";
 export const FROM_NAME = "Artswrk";
 export const SUPPORT_EMAIL = "support@artswrk.com";
 
-const LOGO_WHITE =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/ArtswrkWhiteLogo_d14af74c.png";
-
+/**
+ * Logos, one per audience. PNG rather than SVG on purpose: Gmail strips SVG,
+ * Outlook ignores it, Apple Mail is inconsistent — an email logo has to be a
+ * raster image.
+ *
+ * Served from the app's own origin, so they only resolve once the build
+ * carrying client/public/logos is deployed. There is no fallback: an <img> in
+ * an email has no onError to lean on, so between merging this and shipping it,
+ * transactional emails will show a broken logo. Deploy them together.
+ */
 export type Accent = "artist" | "client" | "internal";
 
+const LOGO_BY_ACCENT: Record<Accent, string> = {
+  artist: `${APP_URL}/logos/artswrk-pink.png`,
+  client: `${APP_URL}/logos/artswrk-orange.png`,
+  // Internal team alerts: either works, so they follow the client mark.
+  internal: `${APP_URL}/logos/artswrk-orange.png`,
+};
+
+
+const PINK_BAND = "linear-gradient(90deg,#ec008c 0%,#ff7171 100%)";
+const ORANGE_BAND = "linear-gradient(90deg,#FFBC5D 0%,#F25722 100%)";
+
 const ACCENTS: Record<Accent, { band: string; flat: string }> = {
-  // Hot pink, artist-facing.
-  artist: { band: "linear-gradient(90deg,#ec008c 0%,#ff7171 100%)", flat: "#ec008c" },
-  // Orange, hirer-facing.
-  client: { band: "linear-gradient(90deg,#FFBC5D 0%,#F25722 100%)", flat: "#F25722" },
-  // Neutral, internal team alerts.
+  // Audience decides the gradient, and it matches the wordmark above it: pink
+  // for artists, orange for hirers. `flat` is the solid colour Outlook falls
+  // back to, since it drops background-image entirely — without it the band
+  // would render as a white gap.
+  artist: { band: PINK_BAND, flat: "#ec008c" },
+  client: { band: ORANGE_BAND, flat: "#F25722" },
+  // Internal team alerts stay neutral — they aren't brand moments.
   internal: { band: "#111111", flat: "#111111" },
 };
 
@@ -157,9 +177,10 @@ ${o.preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0
   <tr><td align="center">
     <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border:1px solid ${CARD_BORDER};border-radius:16px;overflow:hidden;">
 
-      <tr><td align="center" bgcolor="${accent.flat}" style="background:${accent.flat};background-image:${accent.band};padding:22px 24px;">
-        <img src="${LOGO_WHITE}" alt="Artswrk" width="132" style="display:block;width:132px;max-width:132px;height:auto;border:0;">
+      <tr><td align="center" style="padding:26px 24px 20px;">
+        <img src="${LOGO_BY_ACCENT[o.accent]}" alt="Artswrk" width="150" style="display:block;width:150px;max-width:150px;height:auto;border:0;">
       </td></tr>
+      <tr><td bgcolor="${accent.flat}" style="background:${accent.flat};background-image:${accent.band};height:5px;line-height:5px;font-size:0;">&nbsp;</td></tr>
 
       <tr><td style="padding:30px 28px 26px;">
         <h1 style="margin:0 0 14px;font-family:${FONT};font-size:22px;line-height:1.3;font-weight:700;color:${INK};">${esc(o.headline)}</h1>

@@ -246,10 +246,28 @@ async function startServer() {
 
     try {
       const { verifyStripeConnectState, exchangeStripeConnectCode } = await import("../stripe");
-      const { saveArtistStripeConnectAccount } = await import("../db");
+      const { saveArtistStripeConnectAccount, getUserById } = await import("../db");
       const { userId } = await verifyStripeConnectState(state);
       const accountId = await exchangeStripeConnectCode(code);
       await saveArtistStripeConnectAccount(userId, accountId);
+
+      // Internal ops alert — awaited (not fire-and-forget) so it can't be
+      // orphaned by a server restart the way the admin welcome email was.
+      // Failure here must never block the artist's own success redirect.
+      try {
+        const { sendStripeConnectAlertEmail } = await import("../email");
+        const artist = await getUserById(userId);
+        if (artist) {
+          await sendStripeConnectAlertEmail({
+            artistName: artist.name || artist.firstName || "An artist",
+            artistEmail: artist.email,
+            accountId,
+          });
+        }
+      } catch (notifyErr) {
+        console.error("[StripeConnect] Ops alert email failed (non-fatal):", notifyErr);
+      }
+
       res.redirect("/app/settings?stripe_connect=success");
     } catch (err: any) {
       console.error("[StripeConnect] Callback failed:", err.message);

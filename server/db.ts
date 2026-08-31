@@ -2468,6 +2468,7 @@ interface AdminArtistFilters {
   affiliationId?: number;
   onboardingStep?: number;
   missingProfilePicture?: boolean;
+  stripeConnected?: boolean;
   createdFrom?: Date;
   createdTo?: Date;
   modifiedFrom?: Date;
@@ -2507,6 +2508,7 @@ async function buildAdminArtistConditions(f: AdminArtistFilters) {
   if (f.plan === "Basic") conditions.push(eq(users.artswrkBasic, true));
   if (f.onboardingStep !== undefined) conditions.push(eq(users.onboardingStep, f.onboardingStep));
   if (f.missingProfilePicture) conditions.push(or(isNull(users.profilePicture), eq(users.profilePicture, ""))!);
+  if (f.stripeConnected) conditions.push(and(isNotNull(users.artistStripeAccountId), sql`${users.artistStripeAccountId} != ''`)!);
   if (f.createdFrom) conditions.push(sql`${users.createdAt} >= ${f.createdFrom}`);
   if (f.createdTo) conditions.push(sql`${users.createdAt} <= ${f.createdTo}`);
   if (f.modifiedFrom) conditions.push(sql`${users.updatedAt} >= ${f.modifiedFrom}`);
@@ -2534,6 +2536,7 @@ export async function getAdminArtists({
   affiliationId,
   onboardingStep,
   missingProfilePicture,
+  stripeConnected,
   createdFrom,
   createdTo,
   modifiedFrom,
@@ -2553,7 +2556,7 @@ export async function getAdminArtists({
 
   const where = and(...(await buildAdminArtistConditions({
     search, locationSearch, artistType, serviceType, state, plan, affiliationId,
-    onboardingStep, missingProfilePicture, createdFrom, createdTo, modifiedFrom, modifiedTo,
+    onboardingStep, missingProfilePicture, stripeConnected, createdFrom, createdTo, modifiedFrom, modifiedTo,
   })));
 
   const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(users).where(where);
@@ -2576,6 +2579,7 @@ export async function getAdminArtists({
       artswrkPro: users.artswrkPro,
       artswrkBasic: users.artswrkBasic,
       onboardingStep: users.onboardingStep,
+      artistStripeAccountId: users.artistStripeAccountId,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
       bubbleCreatedAt: users.bubbleCreatedAt,
