@@ -436,10 +436,19 @@ export default function Bookings() {
 
   const isLoading = statsLoading || bookingsLoading;
 
-  const filtered = (bookings ?? []).filter((b) => {
-    if (activeTab === "all") return true;
-    return b.bookingStatus === activeTab;
-  });
+  // "Pay Now" bookings float to the top regardless of tab — that's the one
+  // status that means the client actually owes money right now, so it
+  // should be the easiest thing on the page to spot and act on.
+  const filtered = (bookings ?? [])
+    .filter((b) => {
+      if (activeTab === "all") return true;
+      return b.bookingStatus === activeTab;
+    })
+    .sort((a, b) => {
+      const aPayNow = a.bookingStatus === "Pay Now" ? 0 : 1;
+      const bPayNow = b.bookingStatus === "Pay Now" ? 0 : 1;
+      return aPayNow - bPayNow;
+    });
 
   const tabs: { key: FilterTab; label: string; count: number }[] = [
     { key: "all", label: "All", count: stats?.total ?? 0 },
