@@ -307,7 +307,7 @@ function SubscriptionTab() {
         </div>
         <div className="inline-flex items-center gap-1 mb-4">
           <span className="px-3 py-1.5 rounded-full bg-orange-50 border border-orange-100 text-sm font-bold text-[#F25722]">
-            $30 Unlock
+            $40 Unlock
           </span>
         </div>
         <div className="space-y-1.5 mb-5">
@@ -335,15 +335,20 @@ function SubscriptionTab() {
         </div>
         <div className="inline-flex items-center gap-1 mb-4">
           <span className="px-3 py-1.5 rounded-full bg-orange-50 border border-orange-100 text-sm font-bold text-[#F25722]">
-            $50/month or $500/yr
+            $65/month or $650/yr
           </span>
         </div>
-        <p className="text-sm text-gray-500 mb-4">Unlock the entire Artswrk platform.</p>
+        <p className="text-sm text-gray-500 mb-1">Unlock the entire Artswrk platform.</p>
+        <p className="text-sm font-semibold text-[#F25722] mb-4">Posting more than 1 job? This plan saves you money.</p>
         <div className="space-y-1.5 mb-5">
-          <PlanFeature text="Unlimited job posts and applicant access" />
-          <PlanFeature text="Pay with Artswrk automated payroll" />
-          <PlanFeature text="Access a global network of artists" />
-          <PlanFeature text="1:1 with Artswrk Team" />
+          <PlanFeature text="Unlimited jobs unlocked" />
+          <PlanFeature text="Post unlimited jobs" />
+          <PlanFeature text="Browse and book 6,000+ artists" />
+          <PlanFeature text="Custom Hiring Profile" />
+          <PlanFeature text="Save & Favorite Artists" />
+          <PlanFeature text="Build Custom Sub Lists" />
+          <PlanFeature text="Dedicated recruiting support from Artswrk" />
+          <PlanFeature text="Access to $1,000+ in partner discounts (pays back 1.5x your annual membership)" />
         </div>
         {isPremium ? (
           <button

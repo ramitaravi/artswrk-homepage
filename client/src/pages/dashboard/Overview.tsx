@@ -1,42 +1,15 @@
 import { useState } from "react";
-import BoostJobModal from "@/components/BoostJobModal";
 import { Link, useLocation } from "wouter";
 import {
   Users, ChevronRight, Sparkles, MapPin,
   Loader2, ArrowRight, Briefcase, Plus, Wand2,
-  Bell, CalendarCheck, MessageSquare, Building2,
-  Heart, Zap,
+  CalendarCheck, MessageSquare, Building2,
+  Heart, UserCheck,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-
-// ── Boost Performance Bar ─────────────────────────────────────────────────────
-
-function BoostPerformanceBar({ applicantCount }: { applicantCount: number }) {
-  const tiers = [
-    { label: "Starting", min: 0, max: 1,  pct: 18, color: "bg-gray-300",   text: "text-gray-400" },
-    { label: "Good",     min: 1, max: 3,  pct: 42, color: "bg-yellow-400", text: "text-yellow-600" },
-    { label: "Great",    min: 3, max: 6,  pct: 68, color: "bg-[#F25722]",  text: "text-[#F25722]" },
-    { label: "Excellent",min: 6, max: Infinity, pct: 92, color: "bg-green-500", text: "text-green-600" },
-  ];
-  const tier = tiers.find(t => applicantCount >= t.min && applicantCount < t.max) ?? tiers[0];
-  return (
-    <div className="mt-2">
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Boost Performance</span>
-        <span className={`text-[9px] font-black ${tier.text}`}>{tier.label}</span>
-      </div>
-      <div className="h-1 w-full rounded-full bg-gray-100 overflow-hidden">
-        <div className={`h-full rounded-full transition-all duration-700 ${tier.color}`} style={{ width: `${tier.pct}%` }} />
-      </div>
-      <div className="flex justify-between mt-0.5">
-        {tiers.map(t => (
-          <span key={t.label} className={`text-[8px] font-semibold ${t.label === tier.label ? tier.text : "text-gray-200"}`}>{t.label}</span>
-        ))}
-      </div>
-    </div>
-  );
-}
+import { JobCard } from "@/components/ClientJobCard";
+import { toSimpleJobStatus } from "@shared/jobStatus";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -89,20 +62,6 @@ function getInitials(str: string | null | undefined, fallback = "?"): string {
   if (!str) return fallback;
   return str.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 }
-
-function fmtDate(d: string | Date | null | undefined): string | null {
-  if (!d) return null;
-  const date = new Date(d);
-  if (isNaN(date.getTime())) return null;
-  return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-}
-
-function jobLabel(job: any): string {
-  const desc = (job.description ?? "").split(/[\n.!?]/)[0].trim();
-  return desc.length > 55 ? desc.slice(0, 52) + "…" : desc || "Untitled Job";
-}
-
-const ACTIVE_STATUSES = new Set(["Active", "Awaiting Response", "Confirmed", "Submissions Paused", null, undefined]);
 
 // ── Post Job Box ───────────────────────────────────────────────────────────────
 
@@ -172,126 +131,51 @@ function PostJobBox() {
   );
 }
 
-// ── Notification Pills ─────────────────────────────────────────────────────────
+// ── Tasks Card ─────────────────────────────────────────────────────────────────
+// Mirrors the artist dashboard's "Your Tasks" pattern — same collapsible card,
+// same idea: only show what's actually actionable, nothing else.
 
-function NotificationPill({
-  icon, label, href, color,
-}: { icon: React.ReactNode; label: string; href: string; color: string }) {
+type TaskItem = { key: string; icon: React.ReactNode; label: string; sublabel?: string; href: string; upsell?: boolean };
+
+function TaskRow({ task }: { task: TaskItem }) {
   return (
-    <Link href={href}>
-      <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer hover:opacity-80 transition-opacity ${color}`}>
-        {icon}
-        {label}
+    <Link href={task.href}>
+      <div className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
+        task.upsell
+          ? "bg-gradient-to-r from-pink-50 to-orange-50 border border-orange-100 hover:border-orange-200"
+          : "bg-gray-50 hover:bg-gray-100"
+      }`}>
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${task.upsell ? "bg-white" : "bg-white"}`}>
+          {task.icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold text-[#111]">{task.label}</p>
+          {task.sublabel && <p className="text-xs text-gray-500 mt-0.5">{task.sublabel}</p>}
+        </div>
+        <ChevronRight size={14} className="text-gray-400 flex-shrink-0" />
       </div>
     </Link>
   );
 }
 
-// ── Avatar Stack ───────────────────────────────────────────────────────────────
-
-function AvatarStack({ applicants }: { applicants: any[] }) {
-  const visible = applicants.slice(0, 3);
-  const extra = applicants.length - visible.length;
-  if (!visible.length) return null;
+function TasksCard({ tasks }: { tasks: TaskItem[] }) {
+  const [open, setOpen] = useState(true);
+  if (!tasks.length) return null;
   return (
-    <div className="flex items-center">
-      {visible.map((a, i) => {
-        const url = fixUrl(a.artistProfilePicture);
-        const name = a.artistFirstName && a.artistLastName
-          ? `${a.artistFirstName} ${a.artistLastName[0]}.` : a.artistName ?? "?";
-        return (
-          <div key={a.id ?? i} className="w-8 h-8 rounded-full border-2 border-white -ml-2 first:ml-0 overflow-hidden flex-shrink-0 bg-gradient-to-br from-[#FFBC5D] to-[#F25722]">
-            {url
-              ? <img src={url} alt={name} className="w-full h-full object-cover" />
-              : <div className="w-full h-full flex items-center justify-center text-white text-[9px] font-bold">{getInitials(name)}</div>
-            }
-          </div>
-        );
-      })}
-      {extra > 0 && (
-        <span className="ml-1.5 text-xs font-semibold text-gray-500">+{extra}</span>
-      )}
-    </div>
-  );
-}
-
-// ── Job Logo ───────────────────────────────────────────────────────────────────
-
-function JobLogo({ profilePicture, companyName }: { profilePicture?: string | null; companyName?: string | null }) {
-  const url = fixUrl(profilePicture);
-  const label = getInitials(companyName, "JB");
-  if (url) {
-    return <img src={url} alt="company" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />;
-  }
-  return (
-    <div className="w-14 h-14 rounded-xl hirer-grad-bg flex items-center justify-center text-white font-black text-base flex-shrink-0">
-      {label}
-    </div>
-  );
-}
-
-// ── Job Card ───────────────────────────────────────────────────────────────────
-
-function JobCard({ job, applicants, companyName, profilePicture }: { job: any; applicants: any[]; companyName?: string | null; profilePicture?: string | null }) {
-  const [, navigate] = useLocation();
-  const [boostOpen, setBoostOpen] = useState(false);
-  const dateStr = fmtDate(job.startDate);
-  const descSnippet = (job.description ?? "").slice(0, 120).trim();
-  const jobTitle = job.title || jobLabel(job);
-
-  return (
-    <div
-      className="bg-white rounded-2xl border border-gray-100 p-5 flex items-start gap-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
-      onClick={() => navigate(`/app/jobs/${job.id}`)}
-    >
-      <JobLogo profilePicture={profilePicture} companyName={companyName} />
-
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-[#111] leading-snug mb-0.5">{jobTitle}</p>
-        {dateStr && (
-          <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
-            📅 {dateStr}
-            {job.locationAddress && (
-              <span className="flex items-center gap-0.5 ml-2 text-gray-400">
-                <MapPin size={10} /> {job.locationAddress.split(",")[0]}
-              </span>
-            )}
-          </p>
-        )}
-        {descSnippet && (
-          <p className="text-xs text-gray-400 italic line-clamp-2 leading-relaxed">{descSnippet}</p>
-        )}
-        <div className="flex items-center gap-2 mt-2">
-          {job.isBoosted ? (
-            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-200">⚡ Boosted</span>
-          ) : (
-            <button
-              onClick={(e) => { e.stopPropagation(); setBoostOpen(true); }}
-              className="flex items-center gap-1 text-[11px] font-bold px-3 py-1.5 rounded-full bg-orange-50 text-[#F25722] hover:bg-orange-100 transition-colors"
-            >
-              <Zap size={11} className="fill-[#F25722]" /> Boost this job
-            </button>
-          )}
+    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between px-5 py-4">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-[#111]">Your Tasks</span>
+          <span className="w-5 h-5 rounded-full bg-[#F25722] text-white text-[10px] font-semibold flex items-center justify-center">
+            {tasks.length}
+          </span>
         </div>
-        {job.isBoosted && (
-          <BoostPerformanceBar applicantCount={applicants.length} />
-        )}
-      </div>
-
-      <div className="flex flex-col items-end gap-2 flex-shrink-0 pt-0.5">
-        <AvatarStack applicants={applicants} />
-        <span className="text-[10px] font-semibold text-[#F25722] group-hover:opacity-70 transition-opacity flex items-center gap-0.5">
-          View Detail <ChevronRight size={10} />
-        </span>
-      </div>
-
-      {boostOpen && (
-        <BoostJobModal
-          jobId={job.id}
-          jobTitle={jobTitle}
-          open={boostOpen}
-          onClose={() => setBoostOpen(false)}
-        />
+        <ChevronRight size={16} className={`text-gray-400 transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+      {open && (
+        <div className="px-5 pb-4 space-y-2">
+          {tasks.map(t => <TaskRow key={t.key} task={t} />)}
+        </div>
       )}
     </div>
   );
@@ -682,9 +566,12 @@ function JobsTab({
     return acc;
   }, {});
 
-  const filtered = jobs.filter(j =>
-    filter === "active" ? ACTIVE_STATUSES.has(j.requestStatus) : !ACTIVE_STATUSES.has(j.requestStatus)
-  );
+  // Active tab includes Paused too — a paused job is still "yours to manage,"
+  // just flagged on its card (see ClientJobCard); Archived is its own bucket.
+  const filtered = jobs.filter(j => {
+    const simple = toSimpleJobStatus(j.requestStatus);
+    return filter === "active" ? simple !== "Archived" : simple === "Archived";
+  });
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
@@ -766,13 +653,53 @@ export default function Overview() {
 
   const { data: jobs, isLoading: jobsLoading } = trpc.jobs.myJobs.useQuery({ limit: 100 });
   const { data: applicants, isLoading: appsLoading } = trpc.applicants.myApplicants.useQuery({ limit: 500 });
-  const { data: applicantStats } = trpc.applicants.myStats.useQuery();
   const { data: bookingStats } = trpc.bookings.myStats.useQuery();
   const { data: messageStats } = trpc.messages.myStats.useQuery();
 
-  const newApplicants = applicantStats?.interested ?? 0;
+  // "Confirm Artists" = applicants still sitting unactioned on a job that's
+  // actually live right now — a job you archived or paused doesn't need a
+  // nudge, its leftover applicants aren't waiting on anything anymore.
+  const activeJobIds = new Set(
+    (jobs ?? []).filter((j: any) => toSimpleJobStatus(j.requestStatus) === "Active").map((j: any) => j.id)
+  );
+  const waitingToConfirm = (applicants ?? []).filter(
+    (a: any) => (!a.status || a.status === "Interested") && activeJobIds.has(a.jobId)
+  ).length;
+
   const unpaidBookings = (bookingStats as any)?.unpaid ?? 0;
   const unreadMessages = (messageStats as any)?.unreadMessages ?? 0;
+  const isPremium = (user as any)?.planTier === "client_premium";
+
+  const tasks: TaskItem[] = [
+    waitingToConfirm > 0 && {
+      key: "confirm",
+      icon: <UserCheck size={16} className="text-[#F25722]" />,
+      label: `Confirm ${waitingToConfirm} artist${waitingToConfirm !== 1 ? "s" : ""}`,
+      sublabel: "Available for your active jobs — not booked yet",
+      href: "/app/artists",
+    },
+    unpaidBookings > 0 && {
+      key: "pay",
+      icon: <CalendarCheck size={16} className="text-[#F25722]" />,
+      label: `Pay ${unpaidBookings} artist${unpaidBookings !== 1 ? "s" : ""}`,
+      sublabel: "Unpaid confirmed booking" + (unpaidBookings !== 1 ? "s" : ""),
+      href: "/app/bookings",
+    },
+    unreadMessages > 0 && {
+      key: "messages",
+      icon: <MessageSquare size={16} className="text-[#F25722]" />,
+      label: `${unreadMessages} new message${unreadMessages !== 1 ? "s" : ""}`,
+      href: "/app/messages",
+    },
+    !isPremium && {
+      key: "upgrade",
+      icon: <Sparkles size={16} className="text-[#F25722]" />,
+      label: "Upgrade to Artswrk Premium",
+      sublabel: "Unlimited jobs unlocked for one flat rate",
+      href: "/app/settings",
+      upsell: true,
+    },
+  ].filter(Boolean) as TaskItem[];
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "jobs", label: "My Jobs" },
@@ -806,36 +733,8 @@ export default function Overview() {
       {/* ── Post job box ─────────────────────────────────────────────────── */}
       <PostJobBox />
 
-      {/* ── Notification pills (only when there's something to do) ──────── */}
-      {(newApplicants > 0 || unpaidBookings > 0 || unreadMessages > 0) && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <Bell size={13} className="text-gray-400 flex-shrink-0" />
-          {newApplicants > 0 && (
-            <NotificationPill
-              icon={<Users size={11} />}
-              label={`${newApplicants} new applicant${newApplicants !== 1 ? "s" : ""}`}
-              href="/app/artists"
-              color="bg-[#fff3ee] text-[#F25722]"
-            />
-          )}
-          {unpaidBookings > 0 && (
-            <NotificationPill
-              icon={<CalendarCheck size={11} />}
-              label={`${unpaidBookings} unpaid booking${unpaidBookings !== 1 ? "s" : ""}`}
-              href="/app/bookings"
-              color="bg-blue-50 text-blue-700"
-            />
-          )}
-          {unreadMessages > 0 && (
-            <NotificationPill
-              icon={<MessageSquare size={11} />}
-              label={`${unreadMessages} unread message${unreadMessages !== 1 ? "s" : ""}`}
-              href="/app/messages"
-              color="bg-purple-50 text-purple-700"
-            />
-          )}
-        </div>
-      )}
+      {/* ── Tasks (only what's actually applicable) ──────────────────────── */}
+      <TasksCard tasks={tasks} />
 
       {/* ── Tab bar ──────────────────────────────────────────────────────── */}
       <div className="border-b border-gray-200">

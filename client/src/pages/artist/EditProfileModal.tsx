@@ -210,6 +210,7 @@ export default function EditProfilePage({ onClose, initialTab = "about" }: EditP
         firstName: about.firstName,
         lastName: about.lastName,
         pronouns: about.pronouns,
+        phoneNumber: about.phoneNumber,
         bio: about.bio,
         location: about.location,
         profilePicture: about.profilePicture,

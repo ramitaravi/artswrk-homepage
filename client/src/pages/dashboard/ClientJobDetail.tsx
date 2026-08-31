@@ -5,7 +5,7 @@
  *
  * Features:
  *  - Applicant cards matching admin design (photo, name, PRO badge, disciplines, message, rate, resume/profile links)
- *  - Locking: blurred preview + unlock paywall (per-job $30 or subscription $50/mo)
+ *  - Locking: blurred preview + unlock paywall (per-job $40 or subscription $65/mo)
  *  - Applicant drill-down with prev/next navigation
  *  - Message modal → sends message + opens Messages thread
  *  - Enterprise: also sends email to artist on message
@@ -15,7 +15,7 @@ import {
   ArrowLeft, ChevronLeft, ChevronRight, MapPin, DollarSign,
   Calendar, Lock, Unlock, ExternalLink, MessageCircle,
   CheckCircle2, Users, Loader2, Star, X, Send,
-  Building2, Instagram,
+  Building2, Instagram, Pencil,
   UserCheck, CreditCard, Banknote, Zap, Share2,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -28,6 +28,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import BoostJobModal from "@/components/BoostJobModal";
 import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
 import { useLocationField } from "@/hooks/useLocationField";
+import { toSimpleJobStatus, SIMPLE_JOB_STATUSES, type SimpleJobStatus } from "@shared/jobStatus";
 
 // ─── Boost Performance Bar ────────────────────────────────────────────────────
 
@@ -70,17 +71,6 @@ function fmtDate(d: Date | string | null | undefined): string {
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return "—";
   return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-function jobStatusColor(status: string | null | undefined) {
-  switch (status) {
-    case "Active": return "text-green-600 bg-green-50";
-    case "Confirmed": return "text-blue-600 bg-blue-50";
-    case "Completed": return "text-gray-600 bg-gray-100";
-    case "Submissions Paused": return "text-yellow-700 bg-yellow-50";
-    case "Deleted by Client": return "text-red-500 bg-red-50";
-    default: return "text-[#F25722] bg-orange-50";
-  }
 }
 
 function appStatusColor(status: string | null | undefined) {
@@ -566,10 +556,10 @@ function ApplicantsTab({
               </div>
               <span className="text-sm font-bold text-[#111]">Unlock This Job</span>
             </div>
-            <p className="text-3xl font-black text-[#111] mb-1">$30</p>
+            <p className="text-3xl font-black text-[#111] mb-1">$40</p>
             <p className="text-xs text-gray-400 mb-4">One-time · this job only</p>
             <ul className="space-y-1.5 mb-5 flex-1">
-              {["Full candidate list for this job", "View profiles & contact info", "Message applicants directly", "No recurring commitment"].map((f) => (
+              {["View and connect with candidates for this job only", "View profiles and resumes", "Message and book applicants"].map((f) => (
                 <li key={f} className="flex items-start gap-2 text-xs text-gray-600">
                   <CheckCircle2 size={12} className="text-[#F25722] mt-0.5 flex-shrink-0" />
                   {f}
@@ -583,7 +573,7 @@ function ApplicantsTab({
               size="sm"
             >
               {unlockMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Unlock size={14} />}
-              Unlock — $30
+              Unlock — $40
             </Button>
             <p className="text-[11px] text-gray-400 text-center mt-2">Secure checkout via Stripe</p>
           </div>
@@ -599,10 +589,22 @@ function ApplicantsTab({
               </div>
               <span className="text-sm font-bold text-[#111]">Artswrk Plan</span>
             </div>
-            <p className="text-3xl font-black text-[#111] mb-1">$50<span className="text-sm font-normal text-gray-400">/mo</span></p>
-            <p className="text-xs text-gray-400 mb-4">Unlimited jobs · cancel anytime</p>
+            <p className="text-3xl font-black text-[#111] mb-1">$65<span className="text-sm font-normal text-gray-400">/mo</span></p>
+            <p className="text-xs text-gray-400 mb-1">or $650/yr — 2 months free</p>
+            <p className="text-xs font-semibold text-[#F25722] mb-4">
+              Posting more than 1 job? This plan saves you money.
+            </p>
             <ul className="space-y-1.5 mb-5 flex-1">
-              {["Unlimited candidate access", "All current & future jobs", "Priority artist matching", "Dedicated account support"].map((f) => (
+              {[
+                "Unlimited jobs unlocked",
+                "Post unlimited jobs",
+                "Browse and book 6,000+ artists",
+                "Custom Hiring Profile",
+                "Save & Favorite Artists",
+                "Build Custom Sub Lists",
+                "Dedicated recruiting support from Artswrk",
+                "Access to $1,000+ in partner discounts (pays back 1.5x your annual membership)",
+              ].map((f) => (
                 <li key={f} className="flex items-start gap-2 text-xs text-gray-600">
                   <CheckCircle2 size={12} className="text-[#F25722] mt-0.5 flex-shrink-0" />
                   {f}
@@ -617,7 +619,7 @@ function ApplicantsTab({
               size="sm"
             >
               {subMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Star size={14} />}
-              Subscribe — $50/mo
+              Subscribe — $65/mo
             </Button>
             <p className="text-[11px] text-gray-400 text-center mt-2">
               {data.applicantCount >= 2 ? `Break-even at 2 jobs · you have ${data.applicantCount}+ waiting` : "Unlimited jobs · cancel anytime"}
@@ -1289,6 +1291,215 @@ function BookingsTab({ jobId }: { jobId: number }) {
   );
 }
 
+// ─── Status Dropdown ──────────────────────────────────────────────────────────
+
+const STATUS_PILL_STYLE: Record<SimpleJobStatus, string> = {
+  Active: "text-green-600 bg-green-50 border-green-200",
+  Paused: "text-amber-600 bg-amber-50 border-amber-200",
+  Archived: "text-gray-500 bg-gray-100 border-gray-200",
+};
+
+function JobStatusDropdown({ jobId, requestStatus }: { jobId: number; requestStatus: string | null | undefined }) {
+  const utils = trpc.useUtils();
+  const current = toSimpleJobStatus(requestStatus);
+  const updateStatus = trpc.clientJobs.updateStatus.useMutation({
+    onSuccess: () => {
+      utils.clientJobs.getDetail.invalidate({ jobId });
+      utils.jobs.myJobs.invalidate();
+      toast.success("Status updated");
+    },
+    onError: (e) => toast.error(e.message || "Failed to update status"),
+  });
+
+  return (
+    <div className="relative inline-block">
+      <select
+        value={current}
+        disabled={updateStatus.isPending}
+        onChange={(e) => updateStatus.mutate({ jobId, status: e.target.value as SimpleJobStatus })}
+        className={`appearance-none text-[11px] font-bold pl-2.5 pr-6 py-0.5 rounded-full border cursor-pointer focus:outline-none disabled:opacity-60 ${STATUS_PILL_STYLE[current]}`}
+      >
+        {SIMPLE_JOB_STATUSES.map((s) => (
+          <option key={s} value={s}>{s}</option>
+        ))}
+      </select>
+      {updateStatus.isPending ? (
+        <Loader2 size={10} className="animate-spin absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+      ) : (
+        <ChevronRight size={10} className="rotate-90 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+      )}
+    </div>
+  );
+}
+
+// ─── Job Edit Modal ───────────────────────────────────────────────────────────
+
+function JobEditModal({ job, jobId, onClose }: { job: any; jobId: number; onClose: () => void }) {
+  const utils = trpc.useUtils();
+  const [title, setTitle] = useState(job.title ?? "");
+  const [description, setDescription] = useState(job.description ?? "");
+  const location = useLocationField(job.locationAddress ?? "");
+  const [dateType, setDateType] = useState(job.dateType ?? "Single Date");
+  const toDateInput = (d: string | null | undefined) => d ? String(d).slice(0, 16) : "";
+  const [startDate, setStartDate] = useState(toDateInput(job.startDate));
+  const [endDate, setEndDate] = useState(toDateInput(job.endDate));
+  const [openRate, setOpenRate] = useState(!!job.openRate);
+  const [isHourly, setIsHourly] = useState(job.isHourly !== false);
+  const [rateInput, setRateInput] = useState(
+    String(job.isHourly ? (job.clientHourlyRate ?? "") : (job.clientFlatRate ?? ""))
+  );
+  const [transportation, setTransportation] = useState(!!job.transportation);
+  const [transportationDetails, setTransportationDetails] = useState(job.transportationDetails ?? "");
+
+  const updateJob = trpc.clientJobs.update.useMutation({
+    onSuccess: () => {
+      utils.clientJobs.getDetail.invalidate({ jobId });
+      utils.jobs.myJobs.invalidate();
+      toast.success("Job updated");
+      onClose();
+    },
+    onError: (e) => toast.error(e.message || "Failed to update job"),
+  });
+
+  const rateDollars = parseFloat(rateInput) || 0;
+  const fieldCls = "w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#F25722]/30 focus:border-[#F25722] transition";
+  const labelCls = "text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5";
+
+  function handleSave() {
+    updateJob.mutate({
+      jobId,
+      title: title.trim() || undefined,
+      description,
+      locationAddress: location.value || undefined,
+      locationData: location.locationData,
+      dateType,
+      startDate: startDate || null,
+      endDate: endDate || null,
+      openRate,
+      isHourly,
+      ...(openRate
+        ? {}
+        : isHourly
+        ? { clientHourlyRate: rateDollars || null, clientFlatRate: null }
+        : { clientFlatRate: rateDollars || null, clientHourlyRate: null }),
+      transportation,
+      transportationDetails: transportationDetails || undefined,
+    });
+  }
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-lg p-0 overflow-hidden max-h-[90vh] overflow-y-auto">
+        <div className="px-6 pt-5 pb-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+          <h2 className="text-base font-black text-[#111]">Edit Job</h2>
+          <p className="text-xs text-gray-400">Changes are visible to artists right away</p>
+        </div>
+
+        <div className="px-6 py-5 space-y-5">
+          <div>
+            <label className={labelCls}>Job Title</label>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} className={fieldCls} placeholder="e.g. Ballet Substitute Teacher" />
+          </div>
+
+          <div>
+            <label className={labelCls}>Description</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className={`${fieldCls} resize-none`} />
+          </div>
+
+          <div>
+            <label className={labelCls}>Location</label>
+            <LocationAutocompleteInput
+              value={location.value}
+              onChange={location.onChange}
+              kind="any"
+              placeholder="City, State or address"
+              icon={false}
+              inputClassName={fieldCls}
+            />
+          </div>
+
+          <div>
+            <label className={labelCls}>Date Type</label>
+            <select value={dateType} onChange={(e) => setDateType(e.target.value)} className={fieldCls}>
+              {["Single Date", "Weekly", "Multiple Dates", "Dates Flexible", "Ongoing", "Recurring"].map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+
+          {dateType !== "Dates Flexible" && dateType !== "Ongoing" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Start</label>
+                <input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={fieldCls} />
+              </div>
+              <div>
+                <label className={labelCls}>End <span className="font-normal text-gray-400">(opt)</span></label>
+                <input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={fieldCls} />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className={labelCls + " mb-0"}>Rate</label>
+              <button type="button" onClick={() => setOpenRate((v) => !v)} className="text-xs font-semibold text-[#F25722] hover:underline">
+                {openRate ? "Set a fixed rate instead" : "Let artists pitch their rate instead"}
+              </button>
+            </div>
+            {openRate ? (
+              <p className="text-xs text-gray-400 border border-dashed border-gray-200 rounded-xl px-3.5 py-2.5">Open rate — artists will pitch their own rate when applying.</p>
+            ) : (
+              <>
+                <div className="flex gap-2 mb-2">
+                  {(["hourly", "flat"] as const).map((t) => (
+                    <button key={t} type="button" onClick={() => setIsHourly(t === "hourly")}
+                      className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${isHourly === (t === "hourly") ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}>
+                      {t === "hourly" ? "Hourly Rate" : "Flat Rate"}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                  <input type="number" min="0" value={rateInput} onChange={(e) => setRateInput(e.target.value)}
+                    placeholder={isHourly ? "35" : "500"}
+                    className="w-full border border-gray-200 rounded-xl pl-7 pr-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#F25722]/30 focus:border-[#F25722] transition" />
+                </div>
+              </>
+            )}
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2.5 cursor-pointer">
+              <button type="button" onClick={() => setTransportation((v) => !v)}
+                className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${transportation ? "bg-[#F25722]" : "bg-gray-200"}`}>
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${transportation ? "translate-x-4" : ""}`} />
+              </button>
+              <span className="text-sm font-medium text-[#111]">Transportation reimbursed</span>
+            </label>
+            {transportation && (
+              <input value={transportationDetails} onChange={(e) => setTransportationDetails(e.target.value)}
+                placeholder="e.g. mileage reimbursed at $0.65/mi" className={`${fieldCls} mt-2`} />
+            )}
+          </div>
+        </div>
+
+        <div className="px-6 pb-5 flex gap-3 sticky bottom-0 bg-white pt-3 border-t border-gray-100">
+          <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+          <Button
+            className="flex-1 bg-[#111] hover:bg-gray-800 text-white"
+            disabled={!title.trim() || updateJob.isPending}
+            onClick={handleSave}
+          >
+            {updateJob.isPending ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <Pencil size={14} className="mr-1.5" />}
+            Save Changes
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /// ─── Main Component ────────────────────────────────────────────────────────────
 export default function ClientJobDetail() {
   // Read jobId from URL — works for both /app/jobs/:jobId and /app/enterprise/jobs/:jobId
@@ -1303,6 +1514,7 @@ export default function ClientJobDetail() {
   const [tab, setTab] = useState<Tab>("applicants");
   const [selectedApplicant, setSelectedApplicant] = useState<{ id: number; allIds: number[] } | null>(null);
   const [boostOpen, setBoostOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const { user } = useAuth();
   const isPremium = !!(user as any)?.clientPremium;
@@ -1429,9 +1641,7 @@ export default function ClientJobDetail() {
               {job.startDate ? ` | Posted ${fmtDate(job.startDate)}` : ""}
             </p>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${jobStatusColor(job.requestStatus)}`}>
-                {job.requestStatus || "Active"}
-              </span>
+              <JobStatusDropdown jobId={jobId} requestStatus={job.requestStatus} />
               {job.locationAddress && (
                 <span className="flex items-center gap-1 text-xs text-gray-400">
                   <MapPin size={10} /> {job.locationAddress}
@@ -1455,19 +1665,27 @@ export default function ClientJobDetail() {
             )}
           </div>
         </div>
-        <button
-          onClick={() => {
-            const url = job.slug ? `${window.location.origin}/jobs/${job.slug}` : window.location.href;
-            navigator.clipboard.writeText(url);
-            toast.success("Job link copied!");
-            if (navigator.share) {
-              navigator.share({ title: jobTitle, url }).catch(() => {});
-            }
-          }}
-          className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold text-gray-500 border border-gray-200 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors whitespace-nowrap"
-        >
-          <Share2 size={13} /> Share
-        </button>
+        <div className="flex-shrink-0 flex items-center gap-2">
+          <button
+            onClick={() => setEditOpen(true)}
+            className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 border border-gray-200 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors whitespace-nowrap"
+          >
+            <Pencil size={13} /> Edit
+          </button>
+          <button
+            onClick={() => {
+              const url = job.slug ? `${window.location.origin}/jobs/${job.slug}` : window.location.href;
+              navigator.clipboard.writeText(url);
+              toast.success("Job link copied!");
+              if (navigator.share) {
+                navigator.share({ title: jobTitle, url }).catch(() => {});
+              }
+            }}
+            className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 border border-gray-200 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors whitespace-nowrap"
+          >
+            <Share2 size={13} /> Share
+          </button>
+        </div>
         </div>
         {(job.description || job.clientHourlyRate || job.artistHourlyRate || !job.openRate) && (
           <div className="mt-4 pt-4 border-t border-gray-100">
@@ -1530,6 +1748,9 @@ export default function ClientJobDetail() {
           open={boostOpen}
           onClose={() => setBoostOpen(false)}
         />
+      )}
+      {editOpen && (
+        <JobEditModal job={job} jobId={jobId} onClose={() => setEditOpen(false)} />
       )}
     </div>
   );

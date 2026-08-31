@@ -334,7 +334,7 @@ function ProJobCard({
       href={job.detailUrl}
       borderVariant="pro"
       avatarUrl={job.logo}
-      avatarFallbackText={showCompany ? (job.company ?? job.title) : "?"}
+      avatarFallbackText={showCompany ? (job.company ?? job.title) : job.title}
       avatarBlurred={!showCompany}
       title={job.title}
       subtitle={showCompany ? job.company : null}
@@ -372,7 +372,7 @@ const APP_STATUS_CONFIG: Record<
   Interested: {
     label: "Applied",
     icon: <Briefcase size={11} />,
-    className: "text-blue-600 bg-blue-50",
+    className: "text-green-700 bg-green-50 border border-green-200",
   },
   Confirmed: {
     label: "Confirmed",
@@ -1027,7 +1027,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
                         borderVariant="pro"
                         href={`/pro/${(app.serviceType ?? "open-position").toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-")}-${app.premiumJobId}`}
                         avatarUrl={app.logo}
-                        avatarFallbackText={app.company ?? "?"}
+                        avatarFallbackText={app.company ?? app.serviceType ?? "Open Position"}
                         title={app.serviceType ?? "Open Position"}
                         subtitle={app.company}
                         location={app.workFromAnywhere ? "Work From Anywhere" : (formatLocation(app.location) ?? "Location TBD")}

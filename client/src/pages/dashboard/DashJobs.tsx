@@ -10,7 +10,8 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import CompanyManager from "@/components/CompanyManager";
-import JobListCard from "@/components/JobListCard";
+import { JobCard } from "@/components/ClientJobCard";
+import { toSimpleJobStatus } from "@shared/jobStatus";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -27,15 +28,6 @@ function getInitials(name?: string | null): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-function formatJobDate(d: string | Date | null | undefined) {
-  if (!d) return null;
-  const dt = new Date(d);
-  if (isNaN(dt.getTime())) return null;
-  return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-const ACTIVE_STATUSES = ["Active", "Confirmed"];
-
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function DashJobs() {
@@ -46,12 +38,25 @@ export default function DashJobs() {
   const [copied, setCopied] = useState(false);
 
   const { data: jobs, isLoading: jobsLoading } = trpc.jobs.myJobs.useQuery({ limit: 100 });
+  // Same feed as the dashboard home tab, so cards match 1:1 — see ClientJobCard.
+  const { data: applicants } = trpc.applicants.myApplicants.useQuery({ limit: 500 });
+  const applicantsByJob = useMemo(() => {
+    const map: Record<number, any[]> = {};
+    for (const a of (applicants as any[] ?? [])) {
+      if (a.jobId != null) { map[a.jobId] = map[a.jobId] ?? []; map[a.jobId].push(a); }
+    }
+    return map;
+  }, [applicants]);
 
+  // Active tab includes Paused too — a paused job is still yours to manage,
+  // just flagged on its own card; Archived is its own bucket. Same rule as
+  // the dashboard home tab.
   const filteredJobs = useMemo(() => {
     if (!jobs) return [];
-    let list = jobs.filter((j: any) =>
-      activeTab === "active" ? ACTIVE_STATUSES.includes(j.requestStatus) : !ACTIVE_STATUSES.includes(j.requestStatus)
-    );
+    let list = jobs.filter((j: any) => {
+      const simple = toSimpleJobStatus(j.requestStatus);
+      return activeTab === "active" ? simple !== "Archived" : simple === "Archived";
+    });
     if (selectedCompanyId !== null) list = list.filter((j: any) => j.clientCompanyId === selectedCompanyId);
     return list;
   }, [jobs, activeTab, selectedCompanyId]);
@@ -147,41 +152,15 @@ export default function DashJobs() {
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredJobs.map((job: any) => {
-                const rate = job.clientHourlyRate ? `$${job.clientHourlyRate}/hr` : job.openRate ? "Open rate" : null;
-                return (
-                  <JobListCard
-                    key={job.id}
-                    href={`/app/jobs/${job.id}`}
-                    avatarUrl={fixUrl(job.companyLogo)}
-                    avatarFallbackText={job.companyName || "My Studio"}
-                    avatarGradient="client"
-                    title={job.title || job.description?.slice(0, 60) || "Job Posting"}
-                    subtitle={job.companyName || "My Studio"}
-                    location={job.locationAddress}
-                    dateLabel={job.dateType}
-                    rate={rate}
-                    postedAgo={formatJobDate(job.bubbleCreatedAt)}
-                    topBadge={
-                      job.applicantCount > 0 ? (
-                        <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
-                          <Briefcase size={10} /> {job.applicantCount} applicant{job.applicantCount === 1 ? "" : "s"}
-                        </span>
-                      ) : undefined
-                    }
-                    cta={
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                        job.requestStatus === "Active" ? "text-green-600 bg-green-50" :
-                        job.requestStatus === "Confirmed" ? "text-blue-600 bg-blue-50" :
-                        job.requestStatus === "Completed" ? "text-gray-500 bg-gray-100" :
-                        "text-[#F25722] bg-orange-50"
-                      }`}>
-                        {job.requestStatus || "—"}
-                      </span>
-                    }
-                  />
-                );
-              })}
+              {filteredJobs.map((job: any) => (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  applicants={applicantsByJob[job.id] ?? []}
+                  companyName={job.companyName || "My Studio"}
+                  profilePicture={fixUrl(job.companyLogo)}
+                />
+              ))}
             </div>
           )}
         </div>

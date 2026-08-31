@@ -234,7 +234,7 @@ export default function Join() {
   // Client: biz type → details
   async function handleBizType(type: string) {
     setBizType(type);
-    try { await onboardingMutation.mutateAsync({ hiringCategory: type as any, onboardingStep: 2 }); } catch {}
+    try { await onboardingMutation.mutateAsync({ hiringCategory: type as any, businessType: type as any, onboardingStep: 2 }); } catch {}
     setStage("client-details");
   }
 
@@ -616,12 +616,12 @@ export default function Join() {
               <div className="border-2 border-gray-100 rounded-2xl p-5 hover:border-[#FFBC5D] transition-all">
                 <div className="flex items-start justify-between mb-2">
                   <div>
-                    <p className="font-bold text-[#111] text-sm">Pay to Post</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Post jobs one at a time</p>
+                    <p className="font-bold text-[#111] text-sm">Job Unlock</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Post free, pay to unlock applicants</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-black text-2xl text-[#111]">${isEnterprise(bizType) ? "100" : "30"}</p>
-                    <p className="text-xs text-gray-400">per job post</p>
+                    <p className="font-black text-2xl text-[#111]">${isEnterprise(bizType) ? "100" : "40"}</p>
+                    <p className="text-xs text-gray-400">per job unlock</p>
                   </div>
                 </div>
                 <ul className="space-y-1.5 text-xs text-gray-600">
@@ -637,16 +637,16 @@ export default function Join() {
                     <Star size={9} /> Best Value
                   </span>
                   <div className="text-right">
-                    <p className="font-black text-2xl text-[#111]">${isEnterprise(bizType) ? "250" : "50"}</p>
+                    <p className="font-black text-2xl text-[#111]">${isEnterprise(bizType) ? "500" : "65"}</p>
                     <p className="text-xs text-gray-400">per month</p>
                   </div>
                 </div>
                 <div className="mb-2">
                   <p className="font-bold text-[#111] text-sm">Subscribe &amp; Save</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Unlimited posts, cancel anytime</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Unlimited applicant unlocks, cancel anytime</p>
                 </div>
                 <ul className="space-y-1.5 text-xs text-gray-600">
-                  <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500" /> Unlimited job posts</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500" /> Unlimited applicant unlocks</li>
                   <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500" /> PRO badge on all posts</li>
                   <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-green-500" /> Priority placement in search</li>
                 </ul>

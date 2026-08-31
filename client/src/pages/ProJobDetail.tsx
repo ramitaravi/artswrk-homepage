@@ -10,7 +10,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import {
   MapPin, Clock, ArrowLeft, Star, Loader2, AlertCircle, CheckCircle2,
-  FileText, Upload, DollarSign, Share2, ExternalLink,
+  FileText, Upload, DollarSign, Share2, ExternalLink, Lock,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -494,8 +494,8 @@ export default function ProJobDetail() {
               </>
             ) : isAuthenticated ? (
               <>
-                <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
-                  {j.logo && <img src={j.logo} alt="" className="w-full h-full object-cover blur-md scale-125" />}
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center flex-shrink-0">
+                  <Lock size={14} className="text-white" />
                 </div>
                 <span className="text-sm text-gray-400 select-none">
                   {businessType ?? "Company hidden"} · <button onClick={scrollToApply} className="text-[#F25722] font-semibold hover:underline">Unlock PRO to see</button>
@@ -503,8 +503,8 @@ export default function ProJobDetail() {
               </>
             ) : (
               <>
-                <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
-                  {j.logo && <img src={j.logo} alt="" className="w-full h-full object-cover blur-md scale-125" />}
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center flex-shrink-0">
+                  <Lock size={14} className="text-white" />
                 </div>
                 <span className="text-sm text-gray-400 select-none">
                   {businessType ?? "Company hidden"} · <a href="/join" className="text-[#F25722] font-semibold hover:underline">Join to see</a>
@@ -654,42 +654,30 @@ export default function ProJobDetail() {
                 onNotFound={(email) => { window.location.href = `/join?next=${encodeURIComponent(jobUrl)}&email=${encodeURIComponent(email)}`; }}
               />
             ) : !isPro ? (
-              <div className="rounded-xl border border-gray-100 overflow-hidden">
-                {/* Compact blurred preview of the real application form fields */}
-                <div className="relative px-5 py-4 select-none pointer-events-none">
-                  <div className="blur-[3px] opacity-50 flex items-center gap-3">
-                    <div className="flex-1">
-                      <p className="text-[11px] font-bold text-[#111] mb-1">Resume</p>
-                      <div className="h-9 bg-gray-100 border border-gray-200 rounded-lg" />
-                    </div>
-                    <div className="w-28 flex-shrink-0">
-                      <p className="text-[11px] font-bold text-[#111] mb-1">Your rate</p>
-                      <div className="h-9 bg-gray-100 border border-gray-200 rounded-lg" />
-                    </div>
-                  </div>
-                  <div className="absolute inset-0 bg-white/45" />
+              <div className="rounded-2xl overflow-hidden border border-pink-100 shadow-sm">
+                <div className="artist-grad-bg px-5 py-4">
+                  <p className="text-white font-black text-sm flex items-center gap-1.5">
+                    <Star size={13} className="fill-white" /> Unlock to apply
+                  </p>
+                  <p className="text-white/80 text-xs mt-0.5">PRO jobs are exclusive to Artswrk PRO members.</p>
                 </div>
-                <div className="bg-[#111] px-5 py-4 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Star size={15} className="text-yellow-400 fill-yellow-400 flex-shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-white font-black text-sm leading-tight">ArtswrkPRO</p>
-                      <p className="text-white/60 text-[11px] leading-tight truncate">Unlock to apply to high-paying PRO jobs</p>
-                    </div>
-                  </div>
+                <div className="bg-white p-3.5">
                   <button
                     onClick={() => proCheckoutMutation.mutate({
                       origin: window.location.origin,
                       returnPath: jobUrl,
                     })}
                     disabled={proCheckoutMutation.isPending}
-                    className="flex-shrink-0 px-4 py-2.5 rounded-lg text-sm font-bold text-[#111] bg-white hover:bg-gray-100 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                    className="w-full text-left rounded-xl border border-gray-100 hover:border-pink-200 hover:bg-pink-50/30 transition-colors p-3.5 disabled:opacity-60"
                   >
-                    {proCheckoutMutation.isPending ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      "🔒 Unlock"
-                    )}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-bold text-[#111]">Artswrk PRO</span>
+                      <span className="text-sm font-black text-[#ec008c] flex-shrink-0 flex items-center gap-1.5">
+                        {proCheckoutMutation.isPending && <Loader2 size={13} className="animate-spin" />}
+                        Unlock →
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">PRO jobs, partner discounts &amp; more</p>
                   </button>
                 </div>
               </div>

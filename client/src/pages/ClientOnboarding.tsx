@@ -317,7 +317,7 @@ export default function ClientOnboarding() {
   // ── Step 2: Business type ─────────────────────────────────────────────────
   async function handleBusinessType(type: string) {
     setForm(prev => ({ ...prev, hiringCategory: type }));
-    await save({ hiringCategory: type as any, onboardingStep: 3 });
+    await save({ hiringCategory: type as any, businessType: type as any, onboardingStep: 3 });
     setStep(3);
   }
 

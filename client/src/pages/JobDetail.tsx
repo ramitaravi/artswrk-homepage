@@ -53,7 +53,12 @@ function formatDate(date: Date | string | null | undefined): string {
   if (!date) return "Flexible";
   const d = new Date(date);
   if (isNaN(d.getTime())) return "Flexible";
-  return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const dateStr = d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  // A midnight timestamp usually means only a date was picked, not a real
+  // time — showing "12:00 AM" there would read as wrong, not helpful.
+  const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0;
+  if (!hasTime) return dateStr;
+  return `${dateStr} at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
 }
 
 function timeAgo(date: Date | string | null | undefined): string {
@@ -219,8 +224,10 @@ export default function JobDetail() {
   const company = job.clientCompanyName ?? job.clientName ?? "Artswrk Client";
   const dateLabel = job.dateType === "Ongoing" ? "Ongoing"
     : job.dateType === "Recurring" ? "Recurring"
-    : job.dateType === "Dates Flexible" ? "Flexible"
-    : formatDate(job.startDate);
+    : job.dateType === "Dates Flexible" ? "Flexible — dates TBD"
+    : job.dateType === "Weekly" ? `Weekly${job.startDate ? " — starting " + formatDate(job.startDate) : ""}`
+    : job.dateType === "Multiple Dates" ? "Multiple Dates"
+    : formatDate(job.startDate); // Single Date (default) — full date, and time when one was set
 
   // ── Sidebar / bottom CTA ─────────────────────────────────────────────────
 

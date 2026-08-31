@@ -4,7 +4,7 @@
  * renderer. Output is sanitized with the same allowlist before it's ever
  * persisted or sent, so a compromised/careless paste can't inject scripts.
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -102,14 +102,32 @@ export default function RichTextEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
+  // Native window.prompt() gets silently blocked in some embedded/iframed
+  // contexts (no dialog appears, prompt() just returns null) — which reads
+  // as "the link button does nothing." An in-app popover always works.
+  const [linkPopoverOpen, setLinkPopoverOpen] = useState(false);
+  const [linkDraft, setLinkDraft] = useState("");
+
   if (!editor) return null;
 
-  function setLink() {
-    const prev = editor!.getAttributes("link").href as string | undefined;
-    const url = window.prompt("Link URL", prev || "https://");
-    if (url === null) return;
-    if (url === "") { editor!.chain().focus().unsetLink().run(); return; }
-    editor!.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+  function openLinkPopover() {
+    setLinkDraft((editor!.getAttributes("link").href as string) || "https://");
+    setLinkPopoverOpen(true);
+  }
+
+  function applyLink() {
+    const url = linkDraft.trim();
+    if (!url) {
+      editor!.chain().focus().unsetLink().run();
+    } else {
+      editor!.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+    }
+    setLinkPopoverOpen(false);
+  }
+
+  function removeLink() {
+    editor!.chain().focus().unsetLink().run();
+    setLinkPopoverOpen(false);
   }
 
   function setImage() {
@@ -179,7 +197,35 @@ export default function RichTextEditor({
 
         <span className="w-px h-4 bg-gray-200 mx-1" />
 
-        <ToolbarButton title="Link" active={editor.isActive("link")} onClick={setLink}><LinkIcon size={14} /></ToolbarButton>
+        <span className="relative">
+          <ToolbarButton title="Link" active={editor.isActive("link")} onClick={openLinkPopover}><LinkIcon size={14} /></ToolbarButton>
+          {linkPopoverOpen && (
+            <div className="absolute z-20 top-full left-0 mt-1 w-64 bg-white rounded-xl border border-gray-200 shadow-lg p-3 space-y-2">
+              <label className="text-xs font-semibold text-gray-500 block">Link URL</label>
+              <input
+                type="text"
+                autoFocus
+                value={linkDraft}
+                onChange={e => setLinkDraft(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter") { e.preventDefault(); applyLink(); }
+                  if (e.key === "Escape") { e.preventDefault(); setLinkPopoverOpen(false); }
+                }}
+                placeholder="https://"
+                className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#F25722]"
+              />
+              <div className="flex items-center justify-between gap-2 pt-0.5">
+                {editor.isActive("link") ? (
+                  <button type="button" onClick={removeLink} className="text-xs font-semibold text-red-500 hover:underline">Remove link</button>
+                ) : <span />}
+                <div className="flex items-center gap-2 ml-auto">
+                  <button type="button" onClick={() => setLinkPopoverOpen(false)} className="text-xs font-semibold text-gray-500 hover:text-[#111]">Cancel</button>
+                  <button type="button" onClick={applyLink} className="text-xs font-bold text-white bg-[#F25722] px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity">Apply</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </span>
         <ToolbarButton title="Image" onClick={setImage}><ImageIcon size={14} /></ToolbarButton>
         <ToolbarButton title="Clear formatting" onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()}><RemoveFormatting size={14} /></ToolbarButton>
       </div>

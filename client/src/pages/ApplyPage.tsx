@@ -410,10 +410,7 @@ export default function ApplyPage() {
     }
   }, [job]);
 
-  // Default the rate-type toggle to match the job's listed type; stays user-changeable after.
-  useEffect(() => {
-    if (job) setIsHourlyPitch(!!job.isHourly);
-  }, [job]);
+  // Hourly is the default pitch type (preference) — stays user-changeable after.
 
   // SEO: title + meta
   useEffect(() => {
@@ -581,7 +578,7 @@ export default function ApplyPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4" style={{ fontFamily: "Poppins, sans-serif" }}>
         <div className="max-w-sm w-full bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
-          <div className="w-14 h-14 rounded-2xl hirer-grad-bg flex items-center justify-center mx-auto mb-5">
+          <div className="w-14 h-14 rounded-2xl artist-grad-bg flex items-center justify-center mx-auto mb-5">
             <FileText size={24} className="text-white" />
           </div>
           <h1 className="text-xl font-black text-[#111] mb-2">Sign in to apply</h1>
@@ -625,7 +622,7 @@ export default function ApplyPage() {
     return shell(
       <div className="min-h-[60vh] flex items-center justify-center px-4">
         <div className="max-w-sm w-full bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
-          <div className="w-16 h-16 rounded-full hirer-grad-bg flex items-center justify-center mx-auto mb-5 shadow-lg">
+          <div className="w-16 h-16 rounded-full artist-grad-bg flex items-center justify-center mx-auto mb-5 shadow-lg">
             <CheckCircle2 size={32} className="text-white" />
           </div>
           <h1 className="text-2xl font-black text-[#111] mb-2">
@@ -873,17 +870,6 @@ export default function ApplyPage() {
                     <div className="flex gap-2 mb-3">
                       <button
                         type="button"
-                        onClick={() => setIsHourlyPitch(false)}
-                        className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
-                          !isHourlyPitch
-                            ? "bg-[#F25722] text-white border-[#F25722]"
-                            : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
-                        }`}
-                      >
-                        Flat Rate
-                      </button>
-                      <button
-                        type="button"
                         onClick={() => setIsHourlyPitch(true)}
                         className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
                           isHourlyPitch
@@ -892,6 +878,17 @@ export default function ApplyPage() {
                         }`}
                       >
                         Hourly Rate
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsHourlyPitch(false)}
+                        className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                          !isHourlyPitch
+                            ? "bg-[#F25722] text-white border-[#F25722]"
+                            : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        Flat Rate
                       </button>
                     </div>
                     <div className="relative">
@@ -922,7 +919,7 @@ export default function ApplyPage() {
                     !message.trim() ||
                     (isOpenRate && !rateInput.trim())
                   }
-                  className="w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity h-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-3.5 rounded-xl text-sm font-bold text-white artist-grad-bg hover:opacity-90 transition-opacity h-auto disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {applyMutation.isPending ? (
                     <span className="flex items-center justify-center gap-2">
@@ -956,7 +953,7 @@ export default function ApplyPage() {
                           }}
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-white text-base font-black hirer-grad-bg">
+                        <div className="w-full h-full flex items-center justify-center text-white text-base font-black artist-grad-bg">
                           {company[0]?.toUpperCase()}
                         </div>
                       )}

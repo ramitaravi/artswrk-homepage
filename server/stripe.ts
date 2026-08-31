@@ -399,7 +399,7 @@ export async function createArtistPortalSession(
 }
 
 /**
- * Create a Stripe Checkout Session for a client to unlock a single job ($30, on-demand).
+ * Create a Stripe Checkout Session for a client to unlock a single job ($40, on-demand).
  */
 export async function createClientJobUnlockCheckoutSession(
   opts: CreateCheckoutOptions & { jobId: number; jobTitle?: string }
@@ -449,7 +449,7 @@ export async function createClientJobUnlockCheckoutSession(
 
 /**
  * Create a Stripe Checkout Session for Artswrk Premium client subscription.
- * Monthly: $50/mo  |  Annual: $500/yr (save 2 months)
+ * Monthly: $65/mo  |  Annual: $650/yr
  */
 export async function createClientSubscriptionCheckoutSession(
   opts: CreateCheckoutOptions & { jobId?: number; interval?: "month" | "year" }

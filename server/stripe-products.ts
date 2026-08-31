@@ -114,6 +114,13 @@ export const STRIPE_PRODUCTS = {
    * Client on-demand job unlock — $40/job. Confirmed correct by Ramita
    * 2026-08-29 (a deliberate price increase, not a bug) — reverted my
    * earlier mistaken "fix" to $30 back to $40.
+   *
+   * The hardcoded fallback ID below is LIVE-mode — verified 2026-08-31 by
+   * calling stripe.prices.retrieve() against the test key, which throws
+   * "a similar object exists in live mode." A real STRIPE_TEST_ price was
+   * created via the API and added to .env so this actually works in dev —
+   * the comment this replaced claimed it had been verified in test mode;
+   * it hadn't.
    */
   CLIENT_JOB_UNLOCK: {
     productId: undefined as string | undefined,
@@ -125,12 +132,9 @@ export const STRIPE_PRODUCTS = {
     mode: "payment" as const,
   },
   /**
-   * Client Premium subscription — $65/mo or $650/yr, up from $50/$500.
-   * Previously this had NO real Stripe Price object either — same
-   * price_data-every-time pattern as the job unlock above. Now uses real,
-   * trackable prices.
-   * Verified via API against the DEV/test key on 2026-08-28: $65/mo and
-   * $650/yr, both active. ✓
+   * Client Premium subscription — $65/mo or $650/yr.
+   * Same fallback-was-live-mode issue as CLIENT_JOB_UNLOCK above, same fix:
+   * real STRIPE_TEST_ prices created via the API and added to .env 2026-08-31.
    */
   CLIENT_PREMIUM: {
     productId: undefined as string | undefined,
