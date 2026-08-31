@@ -7,15 +7,60 @@
  * BOOST          – Dynamic pricing: dailyBudget × durationDays
  */
 
-// Auto-detects test vs. live mode from the configured secret key so the same
-// code works in both — dev/local always has a test key, production has live.
-// Falls back to the live ID if the matching test env var isn't set, so this
-// is safe to deploy even before test products exist.
-const IS_TEST_MODE = (process.env.STRIPE_SECRET_KEY ?? "").startsWith("sk_test_");
-function envOrLive(testEnvVar: string, liveValue: string): string {
-  if (!IS_TEST_MODE) return liveValue;
-  return process.env[testEnvVar] || liveValue;
+// Auto-detects test vs. live mode from the configured secret key so one build
+// can safely run in either environment. A test key must NEVER fall back to a
+// live price ID: Stripe objects are mode-scoped and that checkout would fail.
+export type StripeMode = "test" | "live" | "unknown";
+
+export function getStripeMode(secret = process.env.STRIPE_SECRET_KEY ?? ""): StripeMode {
+  if (secret.startsWith("sk_test_") || secret.startsWith("rk_test_")) return "test";
+  if (secret.startsWith("sk_live_") || secret.startsWith("rk_live_")) return "live";
+  return "unknown";
 }
+
+export function selectStripeModeValue({
+  secret,
+  testOverride,
+  testFallback,
+  liveValue,
+}: {
+  secret: string;
+  testOverride?: string;
+  testFallback: string;
+  liveValue: string;
+}): string {
+  return getStripeMode(secret) === "test" ? (testOverride || testFallback) : liveValue;
+}
+
+function envOrLive(testEnvVar: string, testFallback: string, liveValue: string): string {
+  return selectStripeModeValue({
+    secret: process.env.STRIPE_SECRET_KEY ?? "",
+    testOverride: process.env[testEnvVar],
+    testFallback,
+    liveValue,
+  });
+}
+
+// Verified with read-only Stripe API calls against the configured test account
+// on 2026-08-31. These identifiers are public configuration, not credentials.
+export const STRIPE_TEST_FALLBACKS = {
+  ARTIST_BASIC_PRODUCT: "prod_V9VrVvzmT0pbGw",
+  ARTIST_BASIC_ANNUAL: "price_1U9CpjA91H1fWNkKoCL3vMss",
+  ARTIST_BASIC_LEGACY_MONTHLY: "price_1Q5TV3A91H1fWNkKgMlvjVKw",
+  ARTIST_PRO_PRODUCT: "prod_V9VrBXDwB8Qb3m",
+  ARTIST_PRO_ANNUAL: "price_1U9CpkA91H1fWNkKz13Q9r0z",
+  ARTIST_PRO_LEGACY_MONTHLY: "price_1U9CpkA91H1fWNkK7KqhnTAE",
+  CLIENT_JOB_UNLOCK: "price_1UAHuvA91H1fWNkK6PuuU8nv",
+  CLIENT_PREMIUM_MONTHLY: "price_1UAHuvA91H1fWNkK2eY7GKWg",
+  CLIENT_PREMIUM_ANNUAL: "price_1UAHuwA91H1fWNkKNLPxiSGR",
+  ENTERPRISE_ON_DEMAND_PRODUCT: "prod_V9VrQo8i6FY7Is",
+  ENTERPRISE_ON_DEMAND: "price_1U9CpkA91H1fWNkKCv4dbBzQ",
+  ENTERPRISE_SUBSCRIPTION_PRODUCT: "prod_V9Vrjw5wgJAjiP",
+  // No matching $500/$5,000 test prices exist yet. Empty forces the checkout
+  // helper's verified price_data fallback at the correct configured amount.
+  ENTERPRISE_SUBSCRIPTION_MONTHLY: "",
+  ENTERPRISE_SUBSCRIPTION_ANNUAL: "",
+} as const;
 
 export const STRIPE_PRODUCTS = {
   /** Posting a job is free (corrected 2026-08-29 per Ramita — was $30).
@@ -60,20 +105,20 @@ export const STRIPE_PRODUCTS = {
    * double-check against the Stripe live dashboard before this ships.
    */
   ARTIST_BASIC: {
-    productId: envOrLive("STRIPE_TEST_ARTIST_BASIC_PRODUCT_ID", "prod_Qcyd0J11o6fNHz"),
+    productId: envOrLive("STRIPE_TEST_ARTIST_BASIC_PRODUCT_ID", STRIPE_TEST_FALLBACKS.ARTIST_BASIC_PRODUCT, "prod_Qcyd0J11o6fNHz"),
     name: "Artswrk Basic",
     description: "Apply to unlimited Artswrk jobs.",
     currency: "usd",
     mode: "subscription" as const,
     annual: {
-      priceId: envOrLive("STRIPE_TEST_ARTIST_BASIC_ANNUAL_PRICE_ID", "price_1TW3qOA91H1fWNkK1nxKUvgR"),
+      priceId: envOrLive("STRIPE_TEST_ARTIST_BASIC_ANNUAL_PRICE_ID", STRIPE_TEST_FALLBACKS.ARTIST_BASIC_ANNUAL, "price_1TW3qOA91H1fWNkK1nxKUvgR"),
       interval: "year" as const,
     },
     /** Not offered at checkout anymore — kept only so admin reporting
      * (admin.subscriptions) can still see existing grandfathered monthly
      * subscribers. Never reference this for a new checkout. */
     legacyMonthly: {
-      priceId: envOrLive("STRIPE_TEST_ARTIST_BASIC_MONTHLY_PRICE_ID", "price_1Plig7A91H1fWNkKnH5qb40M"),
+      priceId: envOrLive("STRIPE_TEST_ARTIST_BASIC_MONTHLY_PRICE_ID", STRIPE_TEST_FALLBACKS.ARTIST_BASIC_LEGACY_MONTHLY, "price_1Plig7A91H1fWNkKnH5qb40M"),
       interval: "month" as const,
     },
   },
@@ -87,13 +132,13 @@ export const STRIPE_PRODUCTS = {
    * LIVE value matches what was already hardcoded here before today — unchanged.
    */
   ARTIST_PRO: {
-    productId: envOrLive("STRIPE_TEST_ARTIST_PRO_PRODUCT_ID", "prod_OvKXdVHLUpHLCn"),
+    productId: envOrLive("STRIPE_TEST_ARTIST_PRO_PRODUCT_ID", STRIPE_TEST_FALLBACKS.ARTIST_PRO_PRODUCT, "prod_OvKXdVHLUpHLCn"),
     name: "Artswrk PRO",
     description: "PRO jobs ($500+ bookings), direct client messaging, priority placement, and partner discounts.",
     currency: "usd",
     mode: "subscription" as const,
     annual: {
-      priceId: envOrLive("STRIPE_TEST_ARTIST_PRO_ANNUAL_PRICE_ID", "price_1O7Ts6A91H1fWNkKVlYhqdAi"),
+      priceId: envOrLive("STRIPE_TEST_ARTIST_PRO_ANNUAL_PRICE_ID", STRIPE_TEST_FALLBACKS.ARTIST_PRO_ANNUAL, "price_1O7Ts6A91H1fWNkKVlYhqdAi"),
       paymentLinkId: "plink_1RJFokA91H1fWNkKYbrlxLUH",
       interval: "year" as const,
       /** Free trial length in days. 0/undefined = no trial. Set here so both
@@ -105,7 +150,7 @@ export const STRIPE_PRODUCTS = {
      * (admin.subscriptions) can still see existing grandfathered monthly
      * subscribers. Never reference this for a new checkout. */
     legacyMonthly: {
-      priceId: envOrLive("STRIPE_TEST_ARTIST_PRO_MONTHLY_PRICE_ID", "price_1O7U0HA91H1fWNkKa9wA0v6X"),
+      priceId: envOrLive("STRIPE_TEST_ARTIST_PRO_MONTHLY_PRICE_ID", STRIPE_TEST_FALLBACKS.ARTIST_PRO_LEGACY_MONTHLY, "price_1O7U0HA91H1fWNkKa9wA0v6X"),
       paymentLinkId: "plink_1OKZtSA91H1fWNkKgr12Dkow",
       interval: "month" as const,
     },
@@ -124,7 +169,7 @@ export const STRIPE_PRODUCTS = {
    */
   CLIENT_JOB_UNLOCK: {
     productId: undefined as string | undefined,
-    priceId: envOrLive("STRIPE_TEST_CLIENT_JOB_UNLOCK_PRICE_ID", "price_1U9Xp0A91H1fWNkK8maYo0vu"),
+    priceId: envOrLive("STRIPE_TEST_CLIENT_JOB_UNLOCK_PRICE_ID", STRIPE_TEST_FALLBACKS.CLIENT_JOB_UNLOCK, "price_1U9Xp0A91H1fWNkK8maYo0vu"),
     name: "Artswrk Job Unlock",
     description: "Unlock all applicants for this job — no recurring charge.",
     amount: 4000, // $40 in cents (price_data fallback only — priceId above is what's actually used)
@@ -143,12 +188,12 @@ export const STRIPE_PRODUCTS = {
     currency: "usd",
     mode: "subscription" as const,
     monthly: {
-      priceId: envOrLive("STRIPE_TEST_CLIENT_PREMIUM_MONTHLY_PRICE_ID", "price_1U9XllA91H1fWNkKpfoRcNHt"),
+      priceId: envOrLive("STRIPE_TEST_CLIENT_PREMIUM_MONTHLY_PRICE_ID", STRIPE_TEST_FALLBACKS.CLIENT_PREMIUM_MONTHLY, "price_1U9XllA91H1fWNkKpfoRcNHt"),
       amount: 6500, // $65/mo in cents (price_data fallback only)
       interval: "month" as const,
     },
     annual: {
-      priceId: envOrLive("STRIPE_TEST_CLIENT_PREMIUM_ANNUAL_PRICE_ID", "price_1U9XmUA91H1fWNkKWASXTggj"),
+      priceId: envOrLive("STRIPE_TEST_CLIENT_PREMIUM_ANNUAL_PRICE_ID", STRIPE_TEST_FALLBACKS.CLIENT_PREMIUM_ANNUAL, "price_1U9XmUA91H1fWNkKWASXTggj"),
       amount: 65000, // $650/yr in cents (price_data fallback only)
       interval: "year" as const,
     },
@@ -159,9 +204,9 @@ export const STRIPE_PRODUCTS = {
    * Price ID: price_1SzOVLA91H1fWNkK5rX69GBU (set via ENTERPRISE_JOB_UNLOCK_PRICE_ID env var)
    */
   ENTERPRISE_ON_DEMAND: {
-    productId: envOrLive("STRIPE_TEST_ENTERPRISE_ON_DEMAND_PRODUCT_ID", "prod_TxJ7FkYDtKrFS1"),
+    productId: envOrLive("STRIPE_TEST_ENTERPRISE_ON_DEMAND_PRODUCT_ID", STRIPE_TEST_FALLBACKS.ENTERPRISE_ON_DEMAND_PRODUCT, "prod_TxJ7FkYDtKrFS1"),
     paymentLinkId: "plink_1SzOVjA91H1fWNkKiqwN8q1j",
-    priceId: envOrLive("STRIPE_TEST_ENTERPRISE_ON_DEMAND_PRICE_ID", process.env.ENTERPRISE_JOB_UNLOCK_PRICE_ID ?? ""),
+    priceId: envOrLive("STRIPE_TEST_ENTERPRISE_ON_DEMAND_PRICE_ID", STRIPE_TEST_FALLBACKS.ENTERPRISE_ON_DEMAND, process.env.ENTERPRISE_JOB_UNLOCK_PRICE_ID ?? ""),
     name: "Artswrk Enterprise — View Candidates",
     description: "Unlock candidate list for one PRO job posting.",
     amount: 10000, // $100 in cents (fallback if priceId not set)
@@ -185,18 +230,18 @@ export const STRIPE_PRODUCTS = {
    * amounts. Do not treat dev testing of this tier as validating live.
    */
   ENTERPRISE_SUBSCRIPTION: {
-    productId: envOrLive("STRIPE_TEST_ENTERPRISE_SUBSCRIPTION_PRODUCT_ID", "prod_Tmmk8mzn4uw8G8"),
+    productId: envOrLive("STRIPE_TEST_ENTERPRISE_SUBSCRIPTION_PRODUCT_ID", STRIPE_TEST_FALLBACKS.ENTERPRISE_SUBSCRIPTION_PRODUCT, "prod_Tmmk8mzn4uw8G8"),
     name: "Artswrk Enterprise Subscription",
     description: "Unlimited PRO job postings and candidate access.",
     currency: "usd",
     mode: "subscription" as const,
     monthly: {
-      priceId: envOrLive("STRIPE_TEST_ENTERPRISE_SUB_MONTHLY_PRICE_ID", "price_1SpDBOA91H1fWNkKcTd35SHv"),
+      priceId: envOrLive("STRIPE_TEST_ENTERPRISE_SUB_MONTHLY_PRICE_ID", STRIPE_TEST_FALLBACKS.ENTERPRISE_SUBSCRIPTION_MONTHLY, "price_1SpDBOA91H1fWNkKcTd35SHv"),
       amount: 50000, // $500 in cents (price_data fallback only)
       interval: "month" as const,
     },
     annual: {
-      priceId: envOrLive("STRIPE_TEST_ENTERPRISE_SUB_ANNUAL_PRICE_ID", "price_1SpDB0A91H1fWNkKIZKyxi6P"),
+      priceId: envOrLive("STRIPE_TEST_ENTERPRISE_SUB_ANNUAL_PRICE_ID", STRIPE_TEST_FALLBACKS.ENTERPRISE_SUBSCRIPTION_ANNUAL, "price_1SpDB0A91H1fWNkKIZKyxi6P"),
       amount: 500000, // $5,000 in cents (price_data fallback only)
       interval: "year" as const,
     },

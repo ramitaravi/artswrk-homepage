@@ -814,3 +814,12 @@
 - [x] Fix malformed duplicate inline styles and remove empty placeholder containers
 - [x] Add regression coverage for the homepage email routing and draft handoff
 - [x] Verify the updated homepage on desktop and mobile and save a checkpoint
+
+## Stripe Secret and Payment Readiness Audit
+- [x] Verify the updated Stripe secret authenticates and identify whether it is test or live mode without exposing the key
+- [x] Confirm every Stripe client reads managed environment variables rather than hardcoded credentials
+- [x] Verify all configured subscription, unlock, and boost price IDs are accessible to the active Stripe account
+- [x] Audit checkout, subscription, portal, Connect, payment-link, and webhook paths for configuration consistency
+- [x] Add or update regression coverage for Stripe environment and price configuration
+- [x] Run non-mutating Stripe smoke tests, TypeScript, and deterministic payment tests
+- [x] Save a validated checkpoint if code changes are required
