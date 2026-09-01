@@ -148,13 +148,17 @@ export function resolveLegacyRoute(pathname: string, query: Query = {}): Resolut
   const rest = segments.slice(1);
   const path = "/" + [head, ...rest].join("/");
 
-  // ── Old Bubble system URLs: /version-test/* is the Bubble staging prefix ──
-  if (head === "version-test") {
+  // ── Old Bubble system URLs ──
+  // /version-test/* is Bubble's staging prefix; /version-live/* is its LIVE
+  // one — the prefix every link in an already-sent Brevo campaign carries, e.g.
+  // /version-live/app?tab=jobs&uid=<bubbleId>. Only the staging prefix was
+  // handled, so real recipients clicking a real email got a hard 404.
+  if (head === "version-test" || head === "version-live") {
     const inner = "/" + rest.join("/");
     const innerResolution = rest.length ? resolveLegacyRoute(inner, query) : null;
     if (innerResolution) {
-      // Every /version-test link is a dead Bubble staging URL, so give even the
-      // lookup-based results somewhere to land instead of a raw 404.
+      // These are dead Bubble URLs either way, so give even the lookup-based
+      // results somewhere to land instead of a raw 404.
       return innerResolution.kind === "static" || innerResolution.fallback
         ? innerResolution
         : { ...innerResolution, fallback: "/" };

@@ -184,6 +184,22 @@ describe("P2/P3 — malformed and stray URLs", () => {
     });
     expect(resolveLegacyRoute("/version-test")).toEqual({ kind: "static", to: "/" });
   });
+
+  it("sends old Bubble /version-live/* links somewhere real", () => {
+    // This is the prefix real, already-sent Brevo campaigns carry — a recipient
+    // clicking one got a hard 404 while only /version-test was handled.
+    expect(resolveLegacyRoute("/version-live/app", { tab: "jobs" }))
+      .toEqual({ kind: "static", to: "/app/jobs" });
+    expect(resolveLegacyRoute("/version-live/jobs")).toEqual({ kind: "static", to: "/jobs" });
+    expect(resolveLegacyRoute("/version-live/reset_pw")).toEqual({ kind: "static", to: "/forgot-password" });
+    // Unknown tail lands on the homepage rather than 404ing.
+    expect(resolveLegacyRoute("/version-live/whatever")).toEqual({
+      kind: "artist-by-slug",
+      slug: "whatever",
+      fallback: "/",
+    });
+    expect(resolveLegacyRoute("/version-live")).toEqual({ kind: "static", to: "/" });
+  });
 });
 
 describe("P1 — root vanity URLs", () => {
