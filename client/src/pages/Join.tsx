@@ -271,7 +271,6 @@ export default function Join() {
           <div>
             <h1 className="text-3xl font-black text-[#111] mb-8 leading-tight">
               Join as an Artist<br />or Client
-              <span className="inline-block ml-2 text-2xl" style={{ transform: "scaleX(-1) rotate(-10deg)", display: "inline-block" }}>↵</span>
             </h1>
 
             <div className="grid grid-cols-2 gap-3 mb-5">

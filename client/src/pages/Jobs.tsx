@@ -104,16 +104,20 @@ function formatDatetime(
   if (start) {
     const s = new Date(start);
     if (!isNaN(s.getTime())) {
-      return (
-        s.toLocaleDateString("en-US", {
-          weekday: "short",
-          month: "numeric",
-          day: "numeric",
-          year: "2-digit",
-        }) +
-        ", " +
-        s.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-      );
+      // Stored job times are the wall-clock the hirer meant, held in UTC — not
+      // instants to re-localize. Formatting in the viewer's zone shifted every
+      // job on the board (a 9am class read "2:00 AM"), so format in UTC. A
+      // midnight value means only a date was picked, so show no time at all.
+      const dateStr = s.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "numeric",
+        day: "numeric",
+        year: "2-digit",
+        timeZone: "UTC",
+      });
+      const hasTime = s.getUTCHours() !== 0 || s.getUTCMinutes() !== 0;
+      if (!hasTime) return dateStr;
+      return `${dateStr}, ${s.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" })}`;
     }
   }
   return dateType ?? "Flexible";

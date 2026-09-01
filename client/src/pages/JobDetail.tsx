@@ -54,12 +54,16 @@ function formatDate(date: Date | string | null | undefined): string {
   if (!date) return "Flexible";
   const d = new Date(date);
   if (isNaN(d.getTime())) return "Flexible";
-  const dateStr = d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  // Job times are stored as the wall-clock the hirer meant, in UTC — they are
+  // NOT instants to re-localize. Rendering them in the viewer's zone shifted
+  // every job (a 9am class showed as 2:00 AM) and pushed midnight ones onto
+  // the previous day, so read and format them in UTC throughout.
+  const dateStr = d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
   // A midnight timestamp usually means only a date was picked, not a real
   // time — showing "12:00 AM" there would read as wrong, not helpful.
-  const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0;
+  const hasTime = d.getUTCHours() !== 0 || d.getUTCMinutes() !== 0;
   if (!hasTime) return dateStr;
-  return `${dateStr} at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+  return `${dateStr} at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" })}`;
 }
 
 function timeAgo(date: Date | string | null | undefined): string {

@@ -18,6 +18,7 @@ import { handleUnsubscribeGet, handleUnsubscribePost } from "../jobAlerts/unsubs
 import { handleScheduledBookingCompletionReminders } from "../bookingReminders";
 import { registerStorageProxy } from "./storageProxy";
 import { registerLegacyRedirects } from "../redirects";
+import { registerSitemap } from "../sitemap";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -333,6 +334,7 @@ async function startServer() {
   // These are 301s for old URLs still live in Google's index and in already-sent
   // email. Must sit ahead of the Vite/static catch-all, which answers everything.
   registerLegacyRedirects(app);
+  registerSitemap(app);
 
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
