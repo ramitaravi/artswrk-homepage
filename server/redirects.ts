@@ -70,6 +70,8 @@ const STATIC_REDIRECTS: Record<string, string> = {
   "/map": "/",
   "/contact": "/",
   "/pricing": "/join",
+  // Old inbound links use /privacy; the real page (and the footer) is /privacy-policy.
+  "/privacy": "/privacy-policy",
 
   // P2 — old landing pages folded into one
   "/dance-schools": "/dance-studios",
