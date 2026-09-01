@@ -691,7 +691,9 @@ export default function Overview() {
       icon: <UserCheck size={16} className="text-[#F25722]" />,
       label: `Confirm ${waitingToConfirm} artist${waitingToConfirm !== 1 ? "s" : ""}`,
       sublabel: "Available for your active jobs — not booked yet",
-      href: "/app/artists",
+      // My Jobs, not /app/artists: confirming happens against a specific job's
+      // applicants, so the job list is where the task can actually be finished.
+      href: "/app/jobs",
     },
     unpaidBookings > 0 && {
       key: "pay",
