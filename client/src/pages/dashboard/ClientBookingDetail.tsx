@@ -166,7 +166,9 @@ export default function ClientBookingDetail() {
   const artistName = b.artistFirstName && b.artistLastName
     ? `${b.artistFirstName} ${b.artistLastName}`
     : b.artistName ?? "Artist";
-  const isHourly = b.hours != null && b.hours > 0;
+  // Only ever gates the "N hours" line. The real hourly/flat flag lives on
+  // the applicant record and is read server-side in buildClientPricing.
+  const hasHours = b.hours != null && b.hours > 0;
 
   // The whole money breakdown is computed server-side (see buildClientPricing)
   // so no artist-side figure is ever sent to the browser. Labels stay neutral —
@@ -281,13 +283,13 @@ export default function ClientBookingDetail() {
                 <span>{formatDateTimeRange(b.startDate, b.endDate)}</span>
               </div>
             )}
-            {isHourly && (
+            {hasHours && (
               <div className="flex items-center gap-2 text-gray-600">
                 <Clock size={14} className="text-gray-400 flex-shrink-0" />
                 <span>{b.hours} hours{b.isRecurring && b.recurringCadence ? ` · ${b.recurringCadence}` : ""}</span>
               </div>
             )}
-            {!isHourly && !!b.isRecurring && b.recurringCadence && (
+            {!hasHours && !!b.isRecurring && b.recurringCadence && (
               <div className="flex items-center gap-2 text-gray-600">
                 <Clock size={14} className="text-gray-400 flex-shrink-0" />
                 <span>Recurring · {b.recurringCadence}</span>

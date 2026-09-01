@@ -34,7 +34,13 @@ export default function InvoicePayment() {
   );
 
   const isPeriodInvoice = !!(booking as any)?.isPeriodInvoice;
-  const isHourly = isPeriodInvoice ? true : (booking?.hours != null && booking.hours > 0);
+  // Recurring period invoices are always billed hourly. For a regular booking,
+  // read the applicant record's real isHourlyRate flag — inferring "hourly"
+  // from `hours` being set treats the 365 flat bookings that also record hours
+  // as hourly, and this page is where the studio approves the charge.
+  const isHourly = isPeriodInvoice
+    ? true
+    : ((booking as any)?.isHourlyRate === 1 || (booking as any)?.isHourlyRate === true);
   const initialHours = isPeriodInvoice ? (booking as any)?.actualHours : booking?.hours;
 
   const [hoursInput, setHoursInput] = useState<string>("");

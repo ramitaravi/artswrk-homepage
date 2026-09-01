@@ -4842,10 +4842,18 @@ export async function getBookingByInvoiceToken(token: string) {
       artistName: users.name,
       artistFirstName: users.firstName,
       artistPhoto: users.profilePicture,
+      // The REAL hourly/flat flag and per-unit rates, from the applicant record.
+      // bookings has no such flag, so callers used to infer "hourly" from
+      // `hours` being set — which is wrong for the 365 flat bookings that also
+      // record hours, and drove the amount actually charged.
+      isHourlyRate: interestedArtists.isHourlyRate,
+      artistHourlyRate: interestedArtists.artistHourlyRate,
+      artistFlatRate: interestedArtists.artistFlatRate,
     })
     .from(bookings)
     .leftJoin(jobs, eq(bookings.jobId, jobs.id))
     .leftJoin(users, eq(bookings.artistUserId, users.id))
+    .leftJoin(interestedArtists, eq(bookings.interestedArtistId, interestedArtists.id))
     .where(eq(bookings.invoicePaymentToken, token))
     .limit(1);
   if (result.length === 0) return undefined;

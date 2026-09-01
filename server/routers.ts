@@ -4953,9 +4953,22 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
             throw new Error("The artist's payout account isn't connected yet — contact Artswrk support.");
           }
 
-          const isHourly = booking.hours != null && booking.hours > 0;
+          // Read the REAL hourly/flat flag from the applicant record — never
+          // infer it from `hours` being set, which is also true for 365 flat
+          // bookings and made this over-charge them. This is the amount the
+          // studio's card is actually charged, so it must not guess.
+          const isHourly = !!booking.isHourlyRate;
           const finalHours = input.hours ?? booking.hours ?? 0;
-          const baseAmount = isHourly ? (booking.artistRate ?? 0) * finalHours : (booking.artistRate ?? 0);
+          const storedTotal = booking.artistRate ?? 0;
+          // bookings.artistRate is the booking TOTAL, not a unit rate, so the
+          // stored total is used as-is. It's only recomputed when the studio
+          // actually changed the hours on an hourly booking, and then only from
+          // the real per-hour rate — never by multiplying the total again.
+          const unitRate = booking.artistHourlyRate ?? null;
+          const hoursChanged = input.hours != null && booking.hours != null && input.hours !== booking.hours;
+          const baseAmount = isHourly && hoursChanged && unitRate != null
+            ? Math.round(unitRate * finalHours)
+            : storedTotal;
           const totalReimb = booking.reimbursementsTotal ?? 0;
           const processingFee = Math.round((baseAmount + totalReimb) * 0.04);
           const totalDollars = baseAmount + totalReimb + processingFee;
