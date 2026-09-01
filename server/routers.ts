@@ -2093,7 +2093,6 @@ export const appRouter = router({
                   senderName,
                   messagePreview: input.content,
                   dashboardUrl: `${appUrl}/app/messages`,
-                  cc: recipientId === conv.clientUserId ? "support@artswrk.com" : undefined,
                 }).catch((err) => console.error("[Messages] Email send failed:", err.message));
               }
             }
@@ -2152,7 +2151,6 @@ export const appRouter = router({
               senderName,
               messagePreview: input.initialMessage,
               dashboardUrl: `${appUrl}/app/messages`,
-              cc: !isClient ? "support@artswrk.com" : undefined,
             }).catch((err) => console.error("[Messages] Email send failed:", err.message));
           }
         }

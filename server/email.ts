@@ -273,7 +273,7 @@ export async function sendApplicationConfirmationEmail({
   });
   // Subject leads with the job title — it is what the artist recognises in a
   // list of "You applied to:" emails.
-  return sendSimpleEmail({ to, subject: "You applied to: " + jobTitle, html });
+  return sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject: "You applied to: " + jobTitle, html });
 }
 export async function sendNewApplicantAlertEmail({
   to, artistFirstName, artistLastInitial, jobTitle, jobLocation, jobRate, jobUrl, message, cc,
@@ -369,7 +369,7 @@ export async function sendArtistWelcomeEmail({
     ctaUrl: APP_URL + "/app",
     footerNote: 'Questions? Email <a href="mailto:contact@artswrk.com" style="color:#ec008c;font-weight:600;">contact@artswrk.com</a> \u2014 we\u2019re happy to help, or to hear feedback.<br><br>Best,<br>Nick &amp; Rami<br>Co-Founders, Artswrk',
   });
-  return sendSimpleEmail({ to, subject: "Welcome to Artswrk! \u{1F389}", html });
+  return sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject: "Welcome to Artswrk! \u{1F389}", html });
 }
 export async function sendJobPostedEmail(data: {
   to: string; firstName: string; serviceType: string; date: string;
@@ -496,7 +496,7 @@ export async function sendNewMessageEmail({
     ctaUrl: dashboardUrl || (APP_URL + "/app/messages"),
     footerNote: "Please keep communication on Artswrk \u2014 it\u2019s covered by the Terms &amp; Conditions and protects both sides.",
   });
-  return sendSimpleEmail({ to, cc, subject: senderName + " just sent you a message!", html });
+  return sendSimpleEmail({ to, cc: cc ?? SUPPORT_EMAIL, subject: senderName + " just sent you a message!", html });
 }
 /**
  * C4 — New applicant alert (PRO/enterprise). Inline; replaces
@@ -566,7 +566,7 @@ export async function sendProJobSubmissionConfirmationEmail(data: {
     ctaUrl: data.dashboardLink,
     footerNote: "You can always check on your submissions from your artist dashboard.<br>Best,<br>The Artswrk Team",
   });
-  return sendSimpleEmail({ to: data.to, subject: "Your submission has been received!", html });
+  return sendSimpleEmail({ to: data.to, cc: SUPPORT_EMAIL, subject: "Your submission has been received!", html });
 }
 export async function sendArtistBookingConfirmedEmail(data: {
   to: string; artistName: string; artistType?: string; clientName: string;
@@ -594,7 +594,7 @@ export async function sendArtistBookingConfirmedEmail(data: {
     ctaUrl: data.bookingUrl,
     footerNote: "If anything looks off, message the client on Artswrk or email us.",
   });
-  return sendSimpleEmail({ to: data.to, subject: "You\u2019re confirmed for " + data.serviceType + "!", html });
+  return sendSimpleEmail({ to: data.to, cc: SUPPORT_EMAIL, subject: "You\u2019re confirmed for " + data.serviceType + "!", html });
 }
 /** C5 — Booking confirmed, client. Inline; replaces CLIENT_BOOKING_CONFIRMED. */
 export async function sendClientBookingConfirmedEmail(data: {
@@ -682,7 +682,7 @@ export async function sendProWelcomeEmail({
     ctaUrl: `${APP_URL}/app/pro`,
     footerNote: `Or head straight to the <a href="${APP_URL}/app/benefits" style="color:#ec008c;font-weight:600;">Benefits Portal &rarr;</a><br><br>Questions? Just reply to this email — a human reads it.<br>Best,<br>Nick &amp; Rami, Co-Founders, Artswrk`,
   });
-  return sendSimpleEmail({ to, subject: "Welcome to Artswrk PRO \u{1F48E}", html });
+  return sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject: "Welcome to Artswrk PRO \u{1F48E}", html });
 }
 
 /**
@@ -714,7 +714,7 @@ export async function sendPayoutOnTheWayEmail({
     ctaUrl: `${APP_URL}/app/payments`,
     footerNote: "Best,<br>The Artswrk Team",
   });
-  return sendSimpleEmail({ to, subject: "Your payment is on its way! \u{1F4B8}", html });
+  return sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject: "Your payment is on its way! \u{1F4B8}", html });
 }
 
 /**
@@ -744,7 +744,7 @@ export async function sendArtistPaymentReceivedEmail({
     ctaUrl: `${APP_URL}/app/payments`,
     footerNote: "Best,<br>The Artswrk Team",
   });
-  return sendSimpleEmail({ to, subject: `Payment Received — ${bookingLabel}`, html });
+  return sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject: `Payment Received — ${bookingLabel}`, html });
 }
 
 /**
@@ -829,7 +829,7 @@ export async function sendCompleteBookingReminderEmail({
     ctaUrl: bookingUrl,
     footerNote: "Best,<br>The Artswrk Team",
   });
-  return sendSimpleEmail({ to, subject: "Artswrk: Complete Your Booking", html });
+  return sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject: "Artswrk: Complete Your Booking", html });
 }
 
 /**
@@ -853,7 +853,7 @@ export async function sendConfirmDirectPaymentReminderEmail({
     ctaUrl: bookingUrl,
     footerNote: "Haven’t been paid yet? No action needed — just confirm once it comes through.<br><br>Best,<br>The Artswrk Team",
   });
-  return sendSimpleEmail({ to, subject: "Artswrk: Complete Your Booking", html });
+  return sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject: "Artswrk: Complete Your Booking", html });
 }
 
 /**
