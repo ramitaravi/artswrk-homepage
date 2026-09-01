@@ -4286,7 +4286,7 @@ export async function isClientJobUnlocked(clientUserId: number, jobId: number): 
   const db = await getDb();
   if (!db) return false;
   const userRows = await db.execute(
-    `SELECT planTier FROM users WHERE id = ${clientUserId} LIMIT 1`
+    `SELECT planTier, role FROM users WHERE id = ${clientUserId} LIMIT 1`
   );
   const user = (userRows[0] as unknown as any[])[0];
   if (user?.role === "admin") return true;

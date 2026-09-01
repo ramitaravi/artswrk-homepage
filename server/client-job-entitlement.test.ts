@@ -17,6 +17,10 @@ describe("client job entitlement gates", () => {
   it("grants subscription-wide access only through active unified plan tiers", () => {
     const dbSource = fs.readFileSync(path.join(root, "server/db.ts"), "utf8");
 
+    expect(dbSource).toMatch(
+      /SELECT planTier, role FROM users WHERE id = \$\{clientUserId\} LIMIT 1/,
+    );
+    expect(dbSource).toContain('if (user?.role === "admin") return true;');
     expect(dbSource).toContain('user?.planTier === "client_premium"');
     expect(dbSource).toContain('user?.planTier === "enterprise_subscription"');
     expect(dbSource).not.toMatch(

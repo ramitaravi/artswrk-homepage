@@ -834,3 +834,11 @@
 - [x] Make both final CTA buttons full-width on mobile while preserving suitable desktop widths
 - [x] Verify desktop and mobile rendering, tests, and TypeScript
 - [x] Save a validated checkpoint for the responsive homepage repair
+
+## Latest GitHub to Live Release Review
+- [x] Inventory the newly merged commits, changed files, dependencies, and migration files
+- [x] Review all incoming schema and SQL changes before applying anything to the live database
+- [x] Verify authentication, Stripe, email, webhook, and data-access changes remain production-safe
+- [x] Fix and test the client job-unlock helper so its intended Admin bypass actually selects the Admin role
+- [x] Run deterministic tests, TypeScript, production build, and key-route smoke checks
+- [x] Save or confirm a validated checkpoint and provide the exact user-approved Publish step for live domains
