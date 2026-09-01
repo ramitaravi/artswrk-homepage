@@ -26,8 +26,8 @@ const calls = [
   ["NewMessage", () => E.sendNewMessageEmail({ to: "a@x.com", recipientFirstName: "A", senderName: "S", messagePreview: "hi", dashboardUrl: "" })],
   ["FirstLoginAlert", () => E.sendFirstLoginAlertEmail({ name: "A", email: "a@x.com", userId: 1 })],
   ["StripeConnectAlert", () => E.sendStripeConnectAlertEmail({ artistName: "A", accountId: "acct_1" })],
-  ["InquiryAlert", () => E.sendEnterpriseInquiryAlertEmail({ email: "a@x.com", source: "dance-competitions" })],
-  ["InquiryConfirm", () => E.sendEnterpriseInquiryConfirmationEmail({ to: "a@x.com" })],
+  ["InquiryIntro (judge)", () => E.sendInquiryIntroEmail({ email: "a@x.com", source: "judge-experience" })],
+  ["InquiryIntro (comp)", () => E.sendInquiryIntroEmail({ email: "a@x.com", company: "Comp", source: "dance-competitions" })],
 ];
 
 let bad = 0;

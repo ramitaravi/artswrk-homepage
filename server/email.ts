@@ -312,6 +312,7 @@ export async function sendSimpleEmail({
   html,
   cc,
   replyTo,
+  fromName,
 }: {
   to: string;
   subject: string;
@@ -321,6 +322,10 @@ export async function sendSimpleEmail({
    *  the team's copy replies to the enquirer, and the enquirer's copy replies
    *  to support — instead of both bouncing to the no-reply from address. */
   replyTo?: string;
+  /** Overrides the "Artswrk" display name for mail that should read as coming
+   *  from a person. The ADDRESS never changes — it stays the SendGrid-verified
+   *  sender, so only the friendly name differs. */
+  fromName?: string;
 }): Promise<boolean> {
   if (!process.env.SENDGRID_API_KEY) {
     console.warn("[email] SENDGRID_API_KEY not set — skipping email send");
@@ -329,7 +334,7 @@ export async function sendSimpleEmail({
   try {
     await sgMail.send({
       to,
-      from: { email: FROM_EMAIL, name: FROM_NAME },
+      from: { email: FROM_EMAIL, name: fromName ?? FROM_NAME },
       subject,
       html,
       ...(cc ? { cc } : {}),
@@ -512,8 +517,8 @@ export async function sendInquiryIntroEmail({
           : "Thanks for reaching out about hiring on Artswrk. I've put our team on this thread so we can pick up from here."
       ) +
       (note ? para(b("What you sent:")) + quote(note) : "") +
-      para("Just reply here and we'll take it from there."),
-    footerNote: "Best,<br>The Artswrk Team",
+      para("Do you have times available to chat? Feel free to share availability or I will reach out to share mine."),
+    footerNote: "Best,<br>Nick Silverio<br>Co-Founder, Artswrk",
     showUnsubscribe: false,
   });
 
@@ -525,6 +530,9 @@ export async function sendInquiryIntroEmail({
     subject: "Let's Connect: Artswrk / " + topic,
     html,
     replyTo: CONTACT_EMAIL,
+    // Reads as a note from a co-founder rather than a form autoresponder —
+    // which is what it is, and what makes a reply likely.
+    fromName: "Nick Silverio",
   });
 }
 
