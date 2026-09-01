@@ -289,8 +289,7 @@ function Hero() {
           Find&nbsp;
           <span style={{ backgroundImage: HIRER_GRAD, backgroundClip: "text", WebkitBackgroundClip: "text", color: "transparent" }}>
             WRK
-          </span>{" "}
-          on Artswrk
+          </span>
         </h1>
         <h2
           className="mt-6 max-w-[34em] font-medium leading-relaxed"
@@ -298,9 +297,6 @@ function Hero() {
         >
           Hire Dance Teachers, Dance Competition Staff, Photographers, Videographers and more on Artswrk.
         </h2>
-        <p className="mt-3 max-w-[40em] text-sm leading-relaxed sm:text-[15px]" style={{ color: MUTED }}>
-          From ballet teachers and choreographers to judges and music instructors, Artswrk helps hirers find local talent and artists discover dance teacher jobs, competition jobs, judging jobs, and other performing arts work.
-        </p>
       </div>
 
       <SignupCard />

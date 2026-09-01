@@ -902,8 +902,8 @@
 - [x] Verify the GitHub-main design on desktop/mobile and save a corrective checkpoint
 
 ## Homepage Hero Copy Simplification
-- [ ] Change the visible H1 to “Hire Artists, Find WRK”
-- [ ] Keep the visible H2 covering dance teachers, competition staff, photographers, and videographers
-- [ ] Remove the extra visible paragraph beginning “From ballet teachers…”
-- [ ] Preserve broader search terms in metadata and structured data
-- [ ] Update regression coverage, verify desktop/mobile rendering, and save a checkpoint
+- [x] Change the visible H1 to “Hire Artists, Find WRK”
+- [x] Keep the visible H2 covering dance teachers, competition staff, photographers, and videographers
+- [x] Remove the extra visible paragraph beginning “From ballet teachers…”
+- [x] Preserve broader search terms in metadata and structured data
+- [x] Update regression coverage, verify desktop/mobile rendering, and save a checkpoint

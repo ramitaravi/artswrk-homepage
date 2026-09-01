@@ -95,13 +95,17 @@ describe("homepage search metadata", () => {
     "utf8",
   );
 
-  it("uses the requested hiring and job-search headings", () => {
-    expect(homeSource).toContain("on Artswrk");
+  it("keeps the visible hero to the requested H1 and H2 only", () => {
+    const heroHeading = homeSource.match(/<h1[\s\S]*?<\/h1>/)?.[0] ?? "";
+
+    expect(heroHeading).toContain("Artists");
+    expect(heroHeading).toContain("Find&nbsp;");
+    expect(heroHeading).toContain("WRK");
+    expect(heroHeading).not.toContain("on Artswrk");
     expect(homeSource).toContain(
       "Hire Dance Teachers, Dance Competition Staff, Photographers, Videographers and more on Artswrk.",
     );
-    expect(homeSource).toContain("ballet teachers and choreographers");
-    expect(homeSource).toContain("dance teacher jobs, competition jobs, judging jobs");
+    expect(homeSource).not.toContain("From ballet teachers");
   });
 
   it("keeps the title and description concise while covering both search intents", () => {
@@ -115,6 +119,10 @@ describe("homepage search metadata", () => {
     expect(description.length).toBeGreaterThanOrEqual(120);
     expect(description.length).toBeLessThanOrEqual(160);
     expect(description).toContain("Hire dance teachers");
+    expect(description).toContain("competition staff");
+    expect(description).toContain("judges");
+    expect(description).toContain("music teachers");
+    expect(description).toContain("dance, judging and performing arts jobs");
     expect(description).toContain("performing arts jobs");
   });
 
