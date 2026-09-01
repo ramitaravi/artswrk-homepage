@@ -1166,7 +1166,8 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                       {booking.hours > 0 && (
                         <div className="flex justify-between text-gray-600"><span>Hours</span><span>{booking.hours} hrs</span></div>
                       )}
-                      <div className="flex justify-between text-gray-600"><span>Reimbursements</span><span>${totalReimb}</span></div>
+                      <div className="flex justify-between text-gray-600"><span>Your rate</span><span>${earnedAmount.toFixed(2)}</span></div>
+                      <div className="flex justify-between text-gray-600"><span>Reimbursements</span><span>${totalReimb.toFixed(2)}</span></div>
                       <div className="flex justify-between font-bold text-[#111] border-t border-pink-100 pt-1.5">
                         <span>You'll receive</span><span className="text-[#ec008c]">${(earnedAmount + totalReimb).toFixed(2)}</span>
                       </div>
@@ -1570,7 +1571,10 @@ function ConfirmationCard({ booking }: { booking: any }) {
                       </div>
                     )}
                     <div className="flex justify-between text-gray-600">
-                      <span>Reimbursements</span><span>${totalReimb}</span>
+                      <span>Your rate</span><span>${earnedAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Reimbursements</span><span>${totalReimb.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between font-bold text-[#111] border-t border-pink-100 pt-1.5 mt-1.5">
                       <span>You'll receive</span><span className="text-[#ec008c]">${(earnedAmount + totalReimb).toFixed(2)}</span>

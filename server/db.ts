@@ -1027,6 +1027,14 @@ export async function getClientBookingDetail(bookingId: number, clientUserId: nu
        b.isAdminBooking, b.isRecurring, b.recurringCadence,
        b.createdAt, b.updatedAt,
        COALESCE((SELECT SUM(r.value) FROM reimbursements r WHERE r.bookingId = b.id), 0) AS reimbursementsTotal,
+       -- Internal-only, stripped below before returning. Needed to work out the
+       -- unit rate line and, on new bookings, the processing fee.
+       b.artistRate AS _artistRate,
+       b.bubbleId AS _bubbleId,
+       ia.isHourlyRate AS _isHourlyRate,
+       ia.clientHourlyRate AS _clientHourlyRate,
+       ia.clientFlatRate AS _clientFlatRate,
+       ia.totalHours AS _iaHours,
        a.firstName AS artistFirstName, a.lastName AS artistLastName, a.name AS artistName,
        a.profilePicture AS artistProfilePicture, a.slug AS artistSlug, a.location AS artistLocation,
        a.ratingScore AS artistRatingScore, a.bookingCount AS artistBookingCount,
@@ -1034,11 +1042,79 @@ export async function getClientBookingDetail(bookingId: number, clientUserId: nu
      FROM bookings b
      LEFT JOIN users a ON b.artistUserId = a.id
      LEFT JOIN jobs j ON b.jobId = j.id
+     LEFT JOIN interested_artists ia ON ia.id = b.interestedArtistId
      WHERE b.id = ${bookingId} AND b.clientUserId = ${clientUserId}
      LIMIT 1`
   );
   const arr = rows[0] as unknown as any[];
-  return arr[0] ?? null;
+  const row = arr[0] ?? null;
+  if (!row) return null;
+
+  const {
+    _artistRate, _bubbleId, _isHourlyRate, _clientHourlyRate, _clientFlatRate, _iaHours,
+    ...safe
+  } = row;
+
+  return { ...safe, pricing: buildClientPricing(row) };
+}
+
+/**
+ * The money breakdown a CLIENT is shown for a booking, computed here so the
+ * artist-side figures never leave the server.
+ *
+ * Two shapes, because the commercial model changed at cutover:
+ *
+ *  - Legacy (Bubble) bookings carried Artswrk's margin inside the client rate
+ *    and had no separate fee. The client was billed clientRate, full stop — so
+ *    that IS the subtotal and there is no fee line. Critically the artist rate
+ *    must NOT be shown here: the gap between the two is the old margin.
+ *  - New bookings are commission-free. The agreed rate is the subtotal and the
+ *    5% sits on top as an explicit processing fee (clientRate = rate × 1.05 at
+ *    confirm time). Showing the subtotal is not a margin leak — it's the same
+ *    number the artist receives, which is the point of being commission-free.
+ *
+ * Rates on `bookings` are booking TOTALS, so the per-unit figure for the
+ * "$50 × 2 hrs" line comes from the interested_artists record.
+ */
+function buildClientPricing(row: any): {
+  isHourly: boolean;
+  unitRate: number | null;
+  hours: number | null;
+  subtotal: number;
+  processingFee: number;
+  reimbursements: number;
+  total: number;
+  hasProcessingFee: boolean;
+} {
+  const isLegacy = !!row._bubbleId;
+  const reimbursements = Number(row.reimbursementsTotal ?? 0);
+  const clientRate = Number(row.clientRate ?? 0);
+  const artistRate = Number(row._artistRate ?? 0);
+
+  // Legacy: what they were billed is the subtotal, no fee was ever charged.
+  // New: the agreed rate is the subtotal and the difference is the 5% fee.
+  const subtotal = isLegacy ? clientRate : (artistRate || clientRate);
+  const processingFee = isLegacy ? 0 : Math.max(clientRate - subtotal, 0);
+
+  const isHourly = row._isHourlyRate === 1 || row._isHourlyRate === true;
+  const hours = row.hours != null ? Number(row.hours) : (row._iaHours != null ? Number(row._iaHours) : null);
+  // Prefer the stored per-unit rate; fall back to deriving it from the total so
+  // the line still renders for rows whose applicant record didn't carry one.
+  const storedUnit = isHourly ? row._clientHourlyRate : row._clientFlatRate;
+  const unitRate = storedUnit != null
+    ? Number(storedUnit)
+    : (isHourly && hours ? Number((subtotal / hours).toFixed(2)) : subtotal || null);
+
+  return {
+    isHourly,
+    unitRate,
+    hours,
+    subtotal,
+    processingFee,
+    reimbursements,
+    total: subtotal + processingFee + reimbursements,
+    hasProcessingFee: !isLegacy,
+  };
 }
 
 /**

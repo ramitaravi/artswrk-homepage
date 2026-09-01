@@ -168,14 +168,18 @@ export default function ClientBookingDetail() {
     : b.artistName ?? "Artist";
   const isHourly = b.hours != null && b.hours > 0;
 
-  // Everything below is what the CLIENT pays. totalClientRate already includes
-  // reimbursements, so the subtotal is derived by backing them out rather than
-  // by touching any artist-side figure (which this page no longer receives).
-  const reimbursements = Number(b.reimbursementsTotal ?? 0);
-  const total = Number(
-    b.totalClientRate ?? (b.invoiceTotalCents != null ? b.invoiceTotalCents / 100 : null) ?? b.clientRate ?? 0
-  );
-  const subtotal = Math.max(total - reimbursements, 0);
+  // The whole money breakdown is computed server-side (see buildClientPricing)
+  // so no artist-side figure is ever sent to the browser. Labels stay neutral —
+  // never "artist rate" / "client rate", which reads like we mark work up.
+  const pricing = (b.pricing ?? {
+    isHourly: false, unitRate: null, hours: null,
+    subtotal: 0, processingFee: 0, reimbursements: 0, total: 0, hasProcessingFee: false,
+  }) as {
+    isHourly: boolean; unitRate: number | null; hours: number | null;
+    subtotal: number; processingFee: number; reimbursements: number;
+    total: number; hasProcessingFee: boolean;
+  };
+  const total = pricing.total;
 
   // Legacy Bubble bookings have no paymentMethod at all (5,185 of them) — in
   // Bubble everything ran through Artswrk unless it was flagged as an external
@@ -324,24 +328,43 @@ export default function ClientBookingDetail() {
               profit are Artswrk's margin — they are not fetched for this page
               (see getClientBookingDetail), so there is nothing to leak here. */}
           <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+            {/* The rate × hours line is context for the subtotal, not a
+                calculation done here — bookings store totals, and the per-unit
+                figure comes from the applicant record. */}
+            {pricing.unitRate != null && pricing.isHourly && pricing.hours ? (
+              <div className="flex justify-between text-xs text-gray-400">
+                <span>{formatCurrency(pricing.unitRate)}/hr × {pricing.hours} hrs</span>
+              </div>
+            ) : null}
             <div className="flex justify-between">
-              {/* clientRate is the booking TOTAL, not an hourly rate — Bubble's
-                  own data proves it (Client Rate 260 + $20.60 reimbursements =
-                  Total Client Rate 280.60, with hours=4). Never render it as
-                  "/hr" or multiply it by hours; hours is shown separately in
-                  Booking Details as context only. */}
-              <span className="text-gray-500">Subtotal</span>
-              <span className="font-semibold text-[#111]">{formatCurrency(subtotal)}</span>
+              <span className="text-gray-500">{pricing.hasProcessingFee ? "Rate subtotal" : "Booking rate"}</span>
+              <span className="font-semibold text-[#111]">{formatCurrency(pricing.subtotal)}</span>
             </div>
-            {reimbursements > 0 && (
+            {/* Legacy bookings never had a fee — the old margin sat inside the
+                rate — so this line only appears on new, commission-free ones. */}
+            {pricing.hasProcessingFee && pricing.processingFee > 0 && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Processing fee (5%)</span>
+                <span className="font-semibold text-[#111]">{formatCurrency(pricing.processingFee)}</span>
+              </div>
+            )}
+            {pricing.hasProcessingFee && pricing.processingFee > 0 && (
+              // Says plainly that Artswrk takes no cut — without this the fee
+              // reads like commission, which is the opposite of the model.
+              <p className="text-[11px] text-gray-400 leading-relaxed pt-0.5">
+                Your artist receives 100% of the {formatCurrency(pricing.subtotal)} rate. The processing fee
+                covers payment processing and credit card costs — Artswrk takes no commission.
+              </p>
+            )}
+            {pricing.reimbursements > 0 && (
               <div className="flex justify-between">
                 <span className="text-gray-500">Reimbursements</span>
-                <span className="font-semibold text-[#111]">{formatCurrency(reimbursements)}</span>
+                <span className="font-semibold text-[#111]">{formatCurrency(pricing.reimbursements)}</span>
               </div>
             )}
             <div className="flex justify-between border-t border-gray-200 pt-2 mt-1">
               <span className="text-gray-900 font-semibold">Total</span>
-              <span className="font-bold text-[#111]">{formatCurrency(total)}</span>
+              <span className="font-bold text-[#111]">{formatCurrency(pricing.total)}</span>
             </div>
           </div>
 
