@@ -492,7 +492,7 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
           </div>
         )}
 
-        {isArtist && <RefreshAnnouncementBanner variant="artist" />}
+        <RefreshAnnouncementBanner variant={isArtist ? "artist" : "client"} />
 
         {/* Page content */}
         <main className={`flex-1 ${fullHeight ? "overflow-hidden flex flex-col" : "overflow-y-auto"}`}>

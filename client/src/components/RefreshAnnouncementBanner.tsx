@@ -87,7 +87,30 @@ export default function RefreshAnnouncementBanner({ variant }: { variant: "artis
               </li>
             </ul>
           ) : (
-            <p className="text-sm text-gray-400 italic">(Client copy not set yet)</p>
+            <ul className="space-y-2.5 text-sm text-gray-700 leading-relaxed">
+              <li>
+                <strong className="text-[#111]">No more commission</strong> — in an effort to connect you with the best artists, Artswrk is now completely commission free. Talk rates and details freely, directly with the artists you hire.
+              </li>
+              <li>
+                <strong className="text-[#111]">Posting a job is easier:</strong> type what you need and we'll do the rest — no long forms.{" "}
+                <PlanLink href="/post-job" accent={accent}>Post a job →</PlanLink>
+              </li>
+              <li>
+                <strong className="text-[#111]">Boost your jobs</strong> to get more visibility and reach more artists, faster.
+              </li>
+              <li>
+                <strong className="text-[#111]">Your own hiring page:</strong> a customizable, shareable page for your business that shows who you are and what you're hiring for.{" "}
+                <PlanLink href="/app/company" accent={accent}>Set up your page →</PlanLink>
+              </li>
+              <li>
+                <strong className="text-[#111]">Browse artists sitewide</strong> and save your favorites to build a go-to roster you can rehire in a click. <span className="text-gray-500">Premium members only.</span>{" "}
+                <PlanLink href="/app/artists" accent={accent}>Browse artists →</PlanLink>
+              </li>
+              <li>
+                <strong className="text-[#111]">Benefits Portal:</strong> partner discounts valuable enough to pay back your annual subscription three times over. <span className="text-gray-500">Premium members only.</span>{" "}
+                <PlanLink href="/app/benefits" accent={accent}>Explore the Benefits Portal →</PlanLink>
+              </li>
+            </ul>
           )}
 
           <p className="text-xs text-gray-500 mt-4">
