@@ -25,6 +25,7 @@ import {
   Lock,
   Unlock,
   Settings,
+  LogOut,
   Zap,
   AlertCircle,
   UserCheck,
@@ -233,55 +234,19 @@ function Sidebar({
   onNavigate: (section: string) => void;
 }) {
   const [, navigate] = useLocation();
+  const { logout } = useAuth();
 
+  // Trimmed to Dashboard + Log out for launch. Messages, My Artists, Browse
+  // Artists, Bookings, Company Page, Sub Lists and Settings are hidden until
+  // they're wired up for enterprise — Browse Artists in particular navigated to
+  // /app/artists, dropping enterprise users into the client app shell. Restore
+  // entries here as each one is finished.
   const items: SidebarItem[] = [
     {
       icon: <LayoutDashboard size={18} />,
       label: "Dashboard",
       onClick: () => onNavigate("dashboard"),
       active: activeSection === "dashboard",
-    },
-    {
-      icon: <MessageCircle size={18} />,
-      label: "Messages",
-      onClick: () => navigate("/app/messages"),
-      active: false,
-    },
-    {
-      icon: <Users size={18} />,
-      label: "My Artists",
-      onClick: () => onNavigate("artists"),
-      active: activeSection === "artists",
-    },
-    {
-      icon: <BookOpen size={18} />,
-      label: "Browse Artists",
-      onClick: () => navigate("/app/artists"),
-      active: false,
-    },
-    {
-      icon: <CalendarDays size={18} />,
-      label: "Bookings",
-      onClick: () => onNavigate("bookings"),
-      active: activeSection === "bookings",
-    },
-    {
-      icon: <Building2 size={18} />,
-      label: "Company Page",
-      onClick: () => onNavigate("company"),
-      active: activeSection === "company",
-    },
-    {
-      icon: <List size={18} />,
-      label: "Sub Lists",
-      onClick: () => onNavigate("lists"),
-      active: activeSection === "lists",
-    },
-    {
-      icon: <Settings size={18} />,
-      label: "Settings",
-      onClick: () => onNavigate("settings"),
-      active: activeSection === "settings",
     },
   ];
 
@@ -314,6 +279,16 @@ function Sidebar({
           </button>
         ))}
       </nav>
+
+      <div className="pb-6 pt-2 border-t border-white/10 mt-2">
+        <button
+          onClick={async () => { await logout(); navigate("/login"); }}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors text-left"
+        >
+          <LogOut size={18} />
+          Log out
+        </button>
+      </div>
     </aside>
   );
 }

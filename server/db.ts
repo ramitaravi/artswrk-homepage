@@ -889,12 +889,11 @@ export async function getBookingsByClientId(
       bookingStatus: bookings.bookingStatus,
       paymentStatus: bookings.paymentStatus,
       clientRate: bookings.clientRate,
-      artistRate: bookings.artistRate,
       totalClientRate: bookings.totalClientRate,
-      totalArtistRate: bookings.totalArtistRate,
-      grossProfit: bookings.grossProfit,
-      stripeFee: bookings.stripeFee,
-      postFeeRevenue: bookings.postFeeRevenue,
+      // artistRate, totalArtistRate, grossProfit, stripeFee and postFeeRevenue
+      // are deliberately NOT selected: this is the client's own booking list,
+      // and those columns are Artswrk's margin. They were being sent to the
+      // browser and rendered as an "Artist: $X" line on every booking card.
       hours: bookings.hours,
       externalPayment: bookings.externalPayment,
       startDate: bookings.startDate,
@@ -1005,8 +1004,29 @@ export async function getBookingById(id: number) {
 export async function getClientBookingDetail(bookingId: number, clientUserId: number) {
   const db = await getDb();
   if (!db) return null;
+  // Explicit column list, NOT b.* — Artswrk's margin must never reach a client.
+  // artistRate, totalArtistRate, grossProfit, stripeFee and postFeeRevenue are
+  // deliberately absent: `b.*` shipped all of them in the response payload, so
+  // hiding them in the UI alone still left the margin readable in devtools.
+  // reimbursementsTotal is summed here so the client can see their own
+  // subtotal + reimbursements = total breakdown without any artist-side figure.
   const rows = await db.execute(
-    `SELECT b.*,
+    `SELECT
+       b.id, b.jobId, b.interestedArtistId, b.clientUserId, b.artistUserId,
+       b.bookingStatus, b.paymentStatus,
+       b.clientRate, b.totalClientRate,
+       b.hours, b.externalPayment, b.startDate, b.endDate,
+       b.locationAddress, b.locationCity, b.locationState,
+       -- stripeCheckoutUrl deliberately excluded: it holds a legacy Bubble
+       -- Payment Link that charges for a DIFFERENT booking. Only
+       -- invoiceStripeCheckoutUrl (generated here, for this booking) is safe.
+       b.description,
+       b.paymentMethod, b.directPayConfirmedAt,
+       b.artswrkInvoiceSubmittedAt, b.invoicePaymentToken,
+       b.invoiceStripeCheckoutUrl, b.invoiceTotalCents, b.invoicePaidAt,
+       b.isAdminBooking, b.isRecurring, b.recurringCadence,
+       b.createdAt, b.updatedAt,
+       COALESCE((SELECT SUM(r.value) FROM reimbursements r WHERE r.bookingId = b.id), 0) AS reimbursementsTotal,
        a.firstName AS artistFirstName, a.lastName AS artistLastName, a.name AS artistName,
        a.profilePicture AS artistProfilePicture, a.slug AS artistSlug, a.location AS artistLocation,
        a.ratingScore AS artistRatingScore, a.bookingCount AS artistBookingCount,
@@ -3845,12 +3865,10 @@ export async function setEnterprisePlan(
   // actually gate on — this function previously only touched the legacy
   // enterprisePlan column, leaving planTier stale. An admin manually setting
   // someone to "Subscriber" here now correctly grants unlimited candidate
-  // access via planTier. NOTE: confirmApplicant's subscriber bypass also
-  // requires a real enterpriseStripeSubscriptionId — an admin-comped
-  // subscriber with no real Stripe subscription will see the unlocked
-  // candidate list but still needs a per-job unlock (or an admin override
-  // via adminUnlockEnterpriseJob) to confirm a booking. That's a separate,
-  // narrower gap than the one this fixes.
+  // access via planTier. An admin-comped subscriber (no real Stripe
+  // subscription) can also confirm bookings: confirmApplicant's own bypass
+  // still wants an enterpriseStripeSubscriptionId, but it falls through to
+  // isJobUnlocked, which now treats the subscription planTier as unlocked.
   updates.planTier = plan === "subscriber" ? "enterprise_subscription" : "enterprise_on_demand";
   await db.update(users).set(updates).where(eq(users.id, userId));
 }
@@ -3946,6 +3964,19 @@ export async function getUnlockedJobIds(clientUserId: number): Promise<number[]>
 export async function isJobUnlocked(clientUserId: number, jobId: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
+
+  // A subscription is unlimited access — it must not require a per-job unlock
+  // row. Without this, every enterprise SUBSCRIBER saw all of their premium
+  // jobs locked and was told to "unlock or subscribe" despite already paying,
+  // because this only ever consulted the per-job table. Mirrors the same
+  // planTier check isClientJobUnlocked has always made.
+  const userRows = await db.execute(
+    `SELECT planTier, role FROM users WHERE id = ${clientUserId} LIMIT 1`
+  );
+  const user = (userRows[0] as unknown as any[])[0];
+  if (user?.role === "admin") return true;
+  if (user?.planTier === "enterprise_subscription" || user?.planTier === "client_premium") return true;
+
   const rows = await db
     .select({ id: enterpriseJobUnlocks.id })
     .from(enterpriseJobUnlocks)
@@ -4182,12 +4213,21 @@ export async function isClientJobUnlocked(clientUserId: number, jobId: number): 
     `SELECT planTier FROM users WHERE id = ${clientUserId} LIMIT 1`
   );
   const user = (userRows[0] as unknown as any[])[0];
+  if (user?.role === "admin") return true;
   if (user?.planTier === "client_premium" || user?.planTier === "enterprise_subscription") return true;
   // Check per-job unlock
   const unlockRows = await db.execute(
     `SELECT id FROM client_job_unlocks WHERE clientUserId = ${clientUserId} AND jobId = ${jobId} LIMIT 1`
   );
-  return (unlockRows[0] as unknown as any[]).length > 0;
+  if ((unlockRows[0] as unknown as any[]).length > 0) return true;
+
+  // Honour unlocks bought in Bubble. That history migrated onto jobs.unlocked
+  // rather than into client_job_unlocks, and nothing read it — so clients who
+  // had already paid (in Bubble) saw their own job locked again here.
+  const legacyRows = await db.execute(
+    `SELECT id FROM jobs WHERE id = ${jobId} AND clientUserId = ${clientUserId} AND unlocked = 1 LIMIT 1`
+  );
+  return (legacyRows[0] as unknown as any[]).length > 0;
 }
 
 /**

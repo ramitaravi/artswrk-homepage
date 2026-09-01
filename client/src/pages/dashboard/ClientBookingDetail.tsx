@@ -15,9 +15,41 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
+// Booking times are stored as the wall-clock everyone agreed on, held in UTC —
+// they are not instants to re-localize, so read and format them in UTC. Same
+// convention as the jobs board; formatting in the viewer's zone shifted every
+// booking and pushed midnight (date-only) ones onto the previous day.
 function formatDate(d: string | Date | null | undefined) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  return new Date(d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
+/** Time of day, or null when the value is midnight (i.e. only a date was set). */
+function formatTime(d: string | Date | null | undefined) {
+  if (!d) return null;
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return null;
+  if (date.getUTCHours() === 0 && date.getUTCMinutes() === 0) return null;
+  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
+}
+
+/** "September 4, 2026 · 4:30 PM – 7:30 PM", collapsing whatever isn't set. */
+function formatDateTimeRange(start: string | Date | null | undefined, end: string | Date | null | undefined) {
+  if (!start) return "—";
+  const startDay = formatDate(start);
+  const endDay = end ? formatDate(end) : null;
+  const startTime = formatTime(start);
+  const endTime = formatTime(end);
+  const sameDay = !endDay || endDay === startDay;
+
+  if (sameDay) {
+    const times = [startTime, endTime].filter(Boolean).join(" – ");
+    return times ? `${startDay} · ${times}` : startDay;
+  }
+  return [
+    startTime ? `${startDay} · ${startTime}` : startDay,
+    endTime ? `${endDay} · ${endTime}` : endDay,
+  ].join(" – ");
 }
 
 function formatCurrency(n: number | null | undefined) {
@@ -136,6 +168,23 @@ export default function ClientBookingDetail() {
     : b.artistName ?? "Artist";
   const isHourly = b.hours != null && b.hours > 0;
 
+  // Everything below is what the CLIENT pays. totalClientRate already includes
+  // reimbursements, so the subtotal is derived by backing them out rather than
+  // by touching any artist-side figure (which this page no longer receives).
+  const reimbursements = Number(b.reimbursementsTotal ?? 0);
+  const total = Number(
+    b.totalClientRate ?? (b.invoiceTotalCents != null ? b.invoiceTotalCents / 100 : null) ?? b.clientRate ?? 0
+  );
+  const subtotal = Math.max(total - reimbursements, 0);
+
+  // "Pay Now" is the status that means the client owes money right now.
+  const needsPayment = bookingStatus === "Pay Now" && paymentStatus !== "Paid" && !b.invoicePaidAt;
+  // ONLY invoiceStripeCheckoutUrl — the link this app generates for THIS
+  // booking. Never fall back to bookings.stripeCheckoutUrl: 2,622 rows carry a
+  // legacy Bubble Payment Link that charges for a different artist's booking
+  // entirely (a client clicking it is shown someone else's name and amount).
+  const payUrl: string | null = b.invoiceStripeCheckoutUrl || null;
+
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto">
       {msgOpen && (
@@ -215,17 +264,34 @@ export default function ClientBookingDetail() {
               </div>
             )}
             {b.startDate && (
-              <div className="flex items-center gap-2 text-gray-600">
-                <Calendar size={14} className="text-gray-400 flex-shrink-0" />
-                <span>{formatDate(b.startDate)}{b.endDate && b.endDate !== b.startDate ? ` – ${formatDate(b.endDate)}` : ""}</span>
+              <div className="flex items-start gap-2 text-gray-600">
+                <Calendar size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                <span>{formatDateTimeRange(b.startDate, b.endDate)}</span>
               </div>
             )}
             {isHourly && (
               <div className="flex items-center gap-2 text-gray-600">
                 <Clock size={14} className="text-gray-400 flex-shrink-0" />
-                <span>{b.hours} hours</span>
+                <span>{b.hours} hours{b.isRecurring && b.recurringCadence ? ` · ${b.recurringCadence}` : ""}</span>
               </div>
             )}
+            {!isHourly && b.isRecurring && b.recurringCadence && (
+              <div className="flex items-center gap-2 text-gray-600">
+                <Clock size={14} className="text-gray-400 flex-shrink-0" />
+                <span>Recurring · {b.recurringCadence}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 text-gray-600">
+              <CreditCard size={14} className="text-gray-400 flex-shrink-0" />
+              <span>
+                {b.paymentMethod === "direct"
+                  ? "Paid directly to the artist"
+                  : b.paymentMethod === "artswrk"
+                  ? "Paid through Artswrk"
+                  : "Payment method not set"}
+                {b.directPayConfirmedAt ? ` · confirmed ${formatDate(b.directPayConfirmedAt)}` : ""}
+              </span>
+            </div>
             {b.locationAddress && (
               <div className="flex items-start gap-2 text-gray-600">
                 <MapPin size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
@@ -250,35 +316,55 @@ export default function ClientBookingDetail() {
         {/* Financials */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Financials</p>
+          {/* Client-facing figures ONLY. Artist rate, Stripe fee and gross
+              profit are Artswrk's margin — they are not fetched for this page
+              (see getClientBookingDetail), so there is nothing to leak here. */}
           <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-500">{isHourly ? "Client Rate" : "Total"}</span>
-              <span className="font-semibold text-[#111]">
-                {formatCurrency(b.totalClientRate ?? b.clientRate)}{isHourly && b.clientRate ? "/hr" : ""}
-              </span>
+              {/* clientRate is the booking TOTAL, not an hourly rate — Bubble's
+                  own data proves it (Client Rate 260 + $20.60 reimbursements =
+                  Total Client Rate 280.60, with hours=4). Never render it as
+                  "/hr" or multiply it by hours; hours is shown separately in
+                  Booking Details as context only. */}
+              <span className="text-gray-500">Subtotal</span>
+              <span className="font-semibold text-[#111]">{formatCurrency(subtotal)}</span>
             </div>
-            {b.artistRate != null && (
+            {reimbursements > 0 && (
               <div className="flex justify-between">
-                <span className="text-gray-500">Artist Rate</span>
-                <span className="font-semibold text-[#111]">
-                  {formatCurrency(b.totalArtistRate ?? b.artistRate)}{isHourly ? "/hr" : ""}
-                </span>
+                <span className="text-gray-500">Reimbursements</span>
+                <span className="font-semibold text-[#111]">{formatCurrency(reimbursements)}</span>
               </div>
             )}
-            {b.stripeFee != null && (
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-400">Stripe Fee</span>
-                <span className="text-gray-400">{formatCurrency(b.stripeFee)}</span>
-              </div>
-            )}
-            {b.grossProfit != null && (
-              <div className="flex justify-between border-t border-gray-200 pt-2 mt-1">
-                <span className="text-gray-500 font-semibold">Gross Profit</span>
-                <span className="font-bold text-green-600">{formatCurrency(b.grossProfit)}</span>
-              </div>
-            )}
+            <div className="flex justify-between border-t border-gray-200 pt-2 mt-1">
+              <span className="text-gray-900 font-semibold">Total</span>
+              <span className="font-bold text-[#111]">{formatCurrency(total)}</span>
+            </div>
           </div>
-          {b.externalPayment && (
+
+          {/* Pay Now bookings previously showed the amount owed with no way to
+              pay it — the invoice link exists on the booking but was never
+              surfaced here, so the client was stuck. */}
+          {needsPayment && (
+            payUrl ? (
+              <a href={payUrl} target="_blank" rel="noopener noreferrer" className="block mt-3">
+                <button className="w-full py-3 rounded-xl bg-[#F25722] text-white text-sm font-bold hover:bg-[#d94a1a] transition-colors flex items-center justify-center gap-2">
+                  Pay {formatCurrency(total)} now
+                </button>
+              </a>
+            ) : (
+              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs text-amber-800">
+                  This booking is awaiting payment, but no invoice has been generated yet —
+                  the artist submits it after completing the booking. Email{" "}
+                  <a href="mailto:contact@artswrk.com" className="font-semibold underline">contact@artswrk.com</a>{" "}
+                  if you need to settle it now.
+                </p>
+              </div>
+            )
+          )}
+          {/* Coerced: externalPayment is a tinyint, so `{0 && …}` rendered a
+              bare "0" under the financials box. */}
+          {!!b.externalPayment && (
             <p className="text-xs text-gray-400 flex items-center gap-1 mt-3">
               <ExternalLink size={11} /> Paid externally (outside Stripe)
             </p>

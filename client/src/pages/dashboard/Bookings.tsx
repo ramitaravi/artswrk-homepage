@@ -192,9 +192,9 @@ function BookingRow({ booking }: { booking: AnyBooking }) {
             <p className="text-lg font-black text-[#111]">
               {formatCurrency(booking.totalClientRate ?? booking.clientRate)}
             </p>
-            {booking.artistRate && (
-              <p className="text-xs text-gray-400">Artist: {formatCurrency(booking.artistRate)}</p>
-            )}
+            {/* Artist rate removed: this row renders for CLIENTS too, and the
+                artist's rate next to the client's is Artswrk's margin. The
+                field is no longer even fetched for clients. */}
             {/* Pay Now removed — see dashboard/Payments.tsx. It linked to a
                 Bubble Payment Link that charges for a different booking. */}
             <button
@@ -349,6 +349,10 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
               </div>
             </div>
             <div className="text-right flex-shrink-0 flex flex-col items-end gap-2">
+              {/* AdminBookingCard only — admin/recurring bookings DO store an
+                  hourly rate (the period invoice is rate × hours server-side).
+                  Bubble-migrated bookings are the opposite: their rate is the
+                  booking total, which is why BookingRow above shows no "/hr". */}
               <p className="text-sm font-black text-[#111]">${isArtist ? booking.artistRate : booking.clientRate}/hr</p>
               <p className="text-[10px] text-gray-400">{paidPeriods.length}/{periods.length} paid</p>
               {isArtist && openPeriods.length > 0 && (

@@ -2,6 +2,22 @@ import bcrypt from "bcryptjs";
 import { APP_URL } from "./emailTemplates";
 import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ONE_YEAR_MS } from "@shared/const";
 import { isJobPubliclyLive } from "@shared/jobStatus";
+import { getPasswordError, PASSWORD_MAX_LENGTH } from "@shared/password";
+
+/**
+ * Shared by every flow where a user SETS a password (signup, reset, first
+ * login, studio onboard, admin-created accounts). Login itself deliberately
+ * keeps a bare min(1) — an existing password predating this policy must still
+ * be able to sign in, and rejecting it at the login form would lock people out
+ * rather than prompt them to change it.
+ */
+const passwordSchema = z
+  .string()
+  .max(PASSWORD_MAX_LENGTH)
+  .superRefine((value, ctx) => {
+    const error = getPasswordError(value);
+    if (error) ctx.addIssue({ code: z.ZodIssueCode.custom, message: error });
+  });
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -135,7 +151,7 @@ export const appRouter = router({
     resetPassword: publicProcedure
       .input(z.object({
         token: z.string().min(1),
-        password: z.string().min(8, "Password must be at least 8 characters"),
+        password: passwordSchema,
       }))
       .mutation(async ({ input }) => {
         const record = await getPasswordResetToken(input.token);
@@ -209,7 +225,7 @@ export const appRouter = router({
     setInitialPassword: publicProcedure
       .input(z.object({
         email: z.string().email(),
-        password: z.string().min(8, "Password must be at least 8 characters"),
+        password: passwordSchema,
       }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByEmail(input.email.toLowerCase().trim());
@@ -263,7 +279,7 @@ export const appRouter = router({
     setPassword: protectedProcedure
       .input(z.object({
         email: z.string().email(),
-        password: z.string().min(6, "Password must be at least 6 characters"),
+        password: passwordSchema,
         isTemporary: z.boolean().default(true),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -431,7 +447,7 @@ export const appRouter = router({
         email: z.string().email(),
         firstName: z.string().min(1),
         lastName: z.string().min(1),
-        password: z.string().min(8).optional(),
+        password: passwordSchema.optional(),
         pronouns: z.string().optional(),
         phoneNumber: z.string().optional(),
         location: z.string().optional(),
@@ -730,7 +746,7 @@ export const appRouter = router({
         email: z.string().email(),
         firstName: z.string().min(1),
         lastName: z.string().min(1),
-        password: z.string().min(8).optional(),
+        password: passwordSchema.optional(),
         phoneNumber: z.string().optional(),
         clientCompanyName: z.string().optional(),
         location: z.string().optional(),
@@ -2789,7 +2805,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         firstName: z.string().min(1),
         lastName: z.string().min(1),
         email: z.string().email(),
-        password: z.string().min(8, "Password must be at least 8 characters"),
+        password: passwordSchema,
       }))
       .mutation(async ({ input, ctx }) => {
         const email = input.email.toLowerCase().trim();
@@ -3489,10 +3505,11 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         // but never touch the legacy enterprisePlan column, so checking that
         // column here left those accounts unable to ever pay the $100 unlock.
         if (user.planTier !== "enterprise_on_demand") throw new Error("Job unlock is only for on-demand plan");
-        // Never take money to unlock a job that isn't live — this endpoint takes
-        // any jobId, so without it an archived job's applicants stay purchasable.
-        const unlockTarget = await getJobDetailById(input.jobId);
-        if (!unlockTarget || !isJobPubliclyLive(unlockTarget.requestStatus)) {
+        // Never take money to unlock a job that isn't live. NOTE: this id is a
+        // premium_jobs id, not a jobs id — looking it up in `jobs` matched
+        // nothing and rejected every enterprise unlock.
+        const unlockTarget = await getPremiumJobById(input.jobId);
+        if (!unlockTarget || !isJobPubliclyLive(unlockTarget.status)) {
           throw new Error("This job is no longer available to unlock.");
         }
         // Prevent double-paying
@@ -4191,7 +4208,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
       .input(z.object({
         fullName: z.string().min(1),
         email: z.string().email(),
-        password: z.string().min(8),
+        password: passwordSchema,
         companyName: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {

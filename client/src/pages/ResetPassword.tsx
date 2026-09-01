@@ -4,8 +4,9 @@
  */
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react";
+import { Eye, EyeOff, CheckCircle2, XCircle, Check, Circle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { PASSWORD_RULES, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH, isPasswordValid, getPasswordError } from "@shared/password";
 import Navbar from "@/components/Navbar";
 
 export default function ResetPassword() {
@@ -43,8 +44,9 @@ export default function ResetPassword() {
     e.preventDefault();
     setError("");
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    const pwError = getPasswordError(password);
+    if (pwError) {
+      setError(pwError);
       return;
     }
     if (password !== confirm) {
@@ -94,7 +96,7 @@ export default function ResetPassword() {
             <>
               <h1 className="text-2xl font-black text-[#111] mb-1">Set new password</h1>
               <p className="text-gray-500 text-sm mb-7">
-                Choose a strong password — at least 8 characters.
+                Choose a strong password.
               </p>
 
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -111,6 +113,8 @@ export default function ResetPassword() {
                       placeholder="At least 8 characters"
                       required
                       autoFocus
+                      minLength={PASSWORD_MIN_LENGTH}
+                      maxLength={PASSWORD_MAX_LENGTH}
                       className="w-full px-4 py-3 pr-11 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
                     />
                     <button
@@ -121,6 +125,19 @@ export default function ResetPassword() {
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
+                  {password.length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {PASSWORD_RULES.map((rule) => {
+                        const met = rule.test(password);
+                        return (
+                          <li key={rule.id} className={`flex items-center gap-1.5 text-[11px] ${met ? "text-green-600" : "text-gray-400"}`}>
+                            {met ? <Check size={11} className="flex-shrink-0" /> : <Circle size={11} className="flex-shrink-0" />}
+                            {rule.label}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                 </div>
 
                 {/* Confirm password */}
@@ -153,7 +170,7 @@ export default function ResetPassword() {
 
                 <button
                   type="submit"
-                  disabled={loading || !password || !confirm}
+                  disabled={loading || !password || !confirm || !isPasswordValid(password)}
                   className="w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? "Updating…" : "Update password"}

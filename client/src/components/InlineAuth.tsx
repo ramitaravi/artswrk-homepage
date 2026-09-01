@@ -9,8 +9,9 @@
  *   heading / subheading — override display text
  */
 import { useState, useRef, useEffect } from "react";
-import { ArrowRight, ArrowLeft, Eye, EyeOff, Loader2, Music, Building2, AlertTriangle } from "lucide-react";
+import { ArrowRight, ArrowLeft, Eye, EyeOff, Loader2, Music, Building2, AlertTriangle, Check, Circle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { PASSWORD_RULES, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH, isPasswordValid } from "@shared/password";
 
 export interface AuthResult {
   isAdmin?: boolean;
@@ -312,7 +313,8 @@ export default function InlineAuth({
                   value={password}
                   onChange={e => { setPassword(e.target.value); setError(""); }}
                   placeholder="At least 8 characters"
-                  minLength={8}
+                  minLength={PASSWORD_MIN_LENGTH}
+                  maxLength={PASSWORD_MAX_LENGTH}
                   required
                   className="w-full px-4 py-3.5 pr-11 rounded-xl border border-gray-200 text-sm text-[#111] placeholder-gray-300 focus:outline-none focus:border-[#FFBC5D] transition-all"
                 />
@@ -320,6 +322,21 @@ export default function InlineAuth({
                   {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
+              {/* Shown as soon as they start typing, so the rules are visible
+                  before submitting rather than as a rejection afterwards. */}
+              {password.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {PASSWORD_RULES.map(rule => {
+                    const met = rule.test(password);
+                    return (
+                      <li key={rule.id} className={`flex items-center gap-1.5 text-[11px] ${met ? "text-green-600" : "text-gray-400"}`}>
+                        {met ? <Check size={11} className="flex-shrink-0" /> : <Circle size={11} className="flex-shrink-0" />}
+                        {rule.label}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1.5">Confirm Password*</label>
@@ -340,7 +357,7 @@ export default function InlineAuth({
             {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
             <button
               type="submit"
-              disabled={isPending || !password || !confirmPassword}
+              disabled={isPending || !password || !confirmPassword || !isPasswordValid(password)}
               className={`w-full py-3.5 rounded-xl text-sm font-bold text-white ${gradientClass} hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60`}
             >
               {setInitialPassword.isPending
