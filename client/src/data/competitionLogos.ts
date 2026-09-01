@@ -16,7 +16,7 @@ export const COMPETITION_LOGOS: CompetitionLogo[] = [
     name: "Thunderstruck Dance Competition",
     // Supplied by Thunderstruck as a white-background lockup, cropped to the
     // artwork. Replaces the dark-background export, which needed a black chip.
-    src: "/logos/competitions/thunderstruck.png",
+    src: "/manus-storage/thunderstruck_e3815cc7.png",
     surface: "light",
     sizing: "wide",
   },

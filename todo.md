@@ -842,3 +842,68 @@
 - [x] Fix and test the client job-unlock helper so its intended Admin bypass actually selects the Admin role
 - [x] Run deterministic tests, TypeScript, production build, and key-route smoke checks
 - [x] Save or confirm a validated checkpoint and provide the exact user-approved Publish step for live domains
+
+## Dance Competitions GitHub Freshness Investigation
+- [x] Compare local HEAD, checkpoint state, and `user_github/main` against the newest remote commit
+- [x] Inspect recent Git history and branch changes affecting `DanceCompetitions.tsx`
+- [x] Compare the current source and rendered Dance Competitions page for stale content
+- [x] Resync, restart, or merge the correct source without overwriting reviewed work
+- [x] Validate the corrected page and save a restorable checkpoint
+- [x] Move the newly merged Dance Competitions and page-specific SEO images from `client/public` to managed storage and update all references
+- [x] Remove only the migrated public copies after verifying every managed asset returns successfully
+- [x] Restore the live “The #1 Platform” Dance Competitions layout from the verified branch source
+- [x] Preserve current inquiry email, existing-account routing, managed logos, route metadata, and Brevo chatbot behavior in the restored layout
+- [x] Visually compare the restored desktop/mobile preview with the current live production page before checkpointing
+
+## Default Homepage SEO Image
+- [x] Inspect `ArtswrkSEOTiles.zip` and identify the orange-gradient "Find WRK / Hire Artists" tile
+- [x] Upload the selected SEO tile to managed project storage
+- [x] Set the selected tile as the homepage and global fallback Open Graph and Twitter image
+- [x] Verify rendered metadata, tests, TypeScript, and production build
+- [x] Save a validated checkpoint for the default SEO image
+
+## Homepage Search Optimization
+- [x] Audit the homepage H1/H2 structure, title, description, canonical URL, robots, sitemap, and structured data
+- [x] Set the visible H1 to "Hire Artists, Find WRK on Artswrk"
+- [x] Set an optimized visible H2 covering dance teachers, competition staff, photographers, videographers, music teachers, and related hiring intent
+- [x] Optimize title and meta/social descriptions for both hiring and performing-arts job-search intent without keyword stuffing
+- [x] Add natural supporting copy or structured data for ballet teachers, dance teacher jobs, competition jobs, judging jobs, and nearby artist searches where appropriate
+- [x] Add SEO regression coverage and validate rendered HTML, tests, TypeScript, and production build
+- [x] Save a validated homepage SEO checkpoint
+
+## SEO Merge and Brevo Conversations Widget
+- [x] Complete the active GitHub merge while preserving the newest inquiry flow and optimized homepage SEO
+- [x] Move newly merged Dance Competitions and route-specific SEO images to managed storage and update all references
+- [x] Remove only the successfully migrated public media copies after validating their managed URLs
+- [x] Add the Brevo Conversations widget globally with asynchronous, non-blocking loading
+- [x] Add regression coverage for the widget ID, loader source, and route-specific SEO metadata
+- [x] Run deterministic tests, TypeScript, production build, metadata checks, asset checks, and desktop/mobile smoke tests
+- [x] Save a validated merged SEO and chatbot checkpoint
+
+## Temporary Homepage Hirer CTA Routing
+- [x] Route the Dance Studios homepage CTA directly to `/join?role=client`
+- [x] Route the Music Schools homepage CTA directly to `/join?role=client`
+- [x] Leave the Dance Competitions homepage route unchanged
+- [x] Add regression coverage for the temporary CTA destinations
+- [x] Verify desktop/mobile links and save a checkpoint
+
+## Dance Competitions Production Parity Incident
+- [ ] Compare `/dance-competitions` across `artswrk.com`, `www.artswrk.com`, `app.artswrk.com`, the Manus deployment domain, and the current checkpoint
+- [ ] Identify whether the mismatch is caused by source divergence, unpublished code, domain routing, deployment version, service worker, or CDN/browser cache
+- [ ] Correct the actual production-parity cause without regressing the verified live layout, inquiry routing, SEO, managed assets, or Brevo chatbot
+- [ ] Verify the corrected page across every live domain and a fresh uncached browser session
+- [ ] Save a restorable checkpoint and report the exact root cause
+
+## GitHub Main Source-of-Truth Correction
+- [x] Recover the exact last correct GitHub redesign of `DanceCompetitions.tsx` and prepare it to become the newest `user_github/main`
+- [x] Remove the mistakenly restored historical/live-branch layout from the Manus working tree
+- [x] Reconcile only compatible managed asset URLs, SEO metadata, inquiry behavior, and the global chatbot without redesigning the GitHub page
+- [x] Add a GitHub-main parity check that detects future local divergence before checkpointing
+- [x] Verify the GitHub-main design on desktop/mobile and save a corrective checkpoint
+
+## Homepage Hero Copy Simplification
+- [x] Change the visible H1 to “Hire Artists, Find WRK”
+- [x] Keep the visible H2 covering dance teachers, competition staff, photographers, and videographers
+- [x] Remove the extra visible paragraph beginning “From ballet teachers…”
+- [x] Preserve broader search terms in metadata and structured data
+- [x] Update regression coverage, verify desktop/mobile rendering, and save a checkpoint

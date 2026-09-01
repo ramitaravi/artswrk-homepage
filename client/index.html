@@ -4,24 +4,81 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <!-- Defaults for every route. server/seoMeta.ts swaps these per landing page
-         before the HTML is served, because crawlers don't run the SPA's JS. -->
-    <title>Artswrk | Hire Artists, Find WRK</title>
-    <meta name="description" content="Jobs for dance teachers, competition staff, musicians, photographers and more. Post a job free, or find work that pays what you're worth." />
+         before the HTML is served, because social crawlers do not run the SPA's JS. -->
+    <title>Hire Artists &amp; Find Performing Arts Jobs | Artswrk</title>
+    <meta name="description" content="Hire dance teachers, competition staff, judges, photographers, videographers and music teachers, or find dance, judging and performing arts jobs on Artswrk." />
+    <link rel="canonical" href="https://artswrk.com/" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Artswrk" />
     <meta property="og:url" content="https://artswrk.com/" />
-    <meta property="og:title" content="Artswrk | Hire Artists, Find WRK" />
-    <meta property="og:description" content="Jobs for dance teachers, competition staff, musicians, photographers and more. Post a job free, or find work that pays what you're worth." />
-    <meta property="og:image" content="https://artswrk.com/og/home.png" />
+    <meta property="og:title" content="Hire Artists &amp; Find Performing Arts Jobs | Artswrk" />
+    <meta property="og:description" content="Hire dance teachers, competition staff, judges, photographers, videographers and music teachers, or find dance, judging and performing arts jobs on Artswrk." />
+    <meta property="og:image" content="https://artswrk.com/manus-storage/artswrk-og-home_85a4ee93.png" />
+    <meta property="og:image:secure_url" content="https://artswrk.com/manus-storage/artswrk-og-home_85a4ee93.png" />
+    <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Artswrk — Hire Artists. Find WRK." />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Artswrk | Hire Artists, Find WRK" />
-    <meta name="twitter:description" content="Jobs for dance teachers, competition staff, musicians, photographers and more. Post a job free, or find work that pays what you're worth." />
-    <meta name="twitter:image" content="https://artswrk.com/og/home.png" />
+    <meta name="twitter:title" content="Hire Artists &amp; Find Performing Arts Jobs | Artswrk" />
+    <meta name="twitter:description" content="Hire dance teachers, competition staff, judges, photographers, videographers and music teachers, or find dance, judging and performing arts jobs on Artswrk." />
+    <meta name="twitter:image" content="https://artswrk.com/manus-storage/artswrk-og-home_85a4ee93.png" />
+    <meta name="twitter:image:alt" content="Artswrk — Hire Artists. Find WRK." />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://artswrk.com/#organization",
+            "name": "Artswrk",
+            "url": "https://artswrk.com/",
+            "logo": "https://artswrk.com/manus-storage/artswrk-orange-source_39ee837b.png"
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://artswrk.com/#website",
+            "url": "https://artswrk.com/",
+            "name": "Artswrk",
+            "publisher": { "@id": "https://artswrk.com/#organization" },
+            "description": "Hire artists and find dance, competition, judging, music, photography, videography, and performing arts jobs."
+          },
+          {
+            "@type": "Service",
+            "@id": "https://artswrk.com/#artist-hiring",
+            "name": "Artist Hiring and Performing Arts Jobs",
+            "provider": { "@id": "https://artswrk.com/#organization" },
+            "areaServed": { "@type": "Country", "name": "United States" },
+            "serviceType": [
+              "Dance teacher hiring",
+              "Dance competition staffing",
+              "Dance judge hiring",
+              "Music teacher hiring",
+              "Photography and videography hiring",
+              "Performing arts jobs"
+            ]
+          }
+        ]
+      }
+    </script>
+
+    <!-- Brevo Conversations -->
+    <script>
+      (function(d, w, c) {
+        w.BrevoConversationsID = "65ef06fa68c404139515292a";
+        w[c] = w[c] || function() {
+          (w[c].q = w[c].q || []).push(arguments);
+        };
+        var s = d.createElement("script");
+        s.async = true;
+        s.src = "https://conversations-widget.brevo.com/brevo-conversations.js";
+        if (d.head) d.head.appendChild(s);
+      })(document, window, "BrevoConversations");
+    </script>
+    <!-- /Brevo Conversations -->
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

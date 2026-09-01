@@ -451,7 +451,7 @@ export default function DanceCompetitions() {
             style={{ aspectRatio: "1 / 1", backgroundImage: "linear-gradient(150deg, #E8C4D8 0%, #C9B6E4 100%)" }}
           >
             <img
-              src="/testimonials/competition-dancer.png"
+              src="/manus-storage/dance-competition-dancer_4c9a27e5.png"
               alt="A dancer mid-leap"
               loading="lazy"
               decoding="async"
@@ -470,7 +470,7 @@ export default function DanceCompetitions() {
               How it WRKs
             </h2>
             <img
-              src="/testimonials/competition-imagine.png"
+              src="/manus-storage/dance-competition-imagine_d2ac6e89.png"
               alt="“I posted a job at 7am and had a judge on a train to us by 10am — and she was absolutely AMAZING! I’m blown away by Artswrk.” — Shaun M., Imagine Dance Challenge, Dance One"
               loading="lazy"
               decoding="async"
@@ -568,7 +568,7 @@ export default function DanceCompetitions() {
           {/* Dancer photo, dimmed, with a left-to-right scrim so the copy keeps
               its contrast over the brightest part of the image. */}
           <img
-            src="/judge/judge-experience-bg.png"
+            src="/manus-storage/judge-experience-bg_9e9b0dc6.png"
             alt=""
             aria-hidden="true"
             loading="lazy"
@@ -629,7 +629,7 @@ export default function DanceCompetitions() {
             }}
           >
             <img
-              src="/judge/judge-experience-card.png"
+              src="/manus-storage/judge-experience-card_e60a685f.png"
               alt="The Judge Experience — Dance Adjudicator Certification with Jodie Points and Nick Silverio"
               loading="lazy"
               decoding="async"
