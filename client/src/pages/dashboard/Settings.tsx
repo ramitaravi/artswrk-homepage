@@ -474,8 +474,16 @@ function HelpTab() {
 
 // ─── Main ──────────────────────────────────────────────────────────────────────
 
+const VALID_TABS: Tab[] = ["profile", "account", "subscription", "help"];
+
 export default function Settings() {
-  const [tab, setTab] = useState<Tab>("profile");
+  // Deep-linkable so things like /app/settings?tab=subscription (the
+  // refresh banner's "Annual Unlock" link) land on the right tab instead
+  // of always opening to Profile.
+  const [tab, setTab] = useState<Tab>(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    return (VALID_TABS as string[]).includes(requested ?? "") ? (requested as Tab) : "profile";
+  });
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto">
