@@ -9,16 +9,22 @@ describe("competition logo marquee", () => {
     expect(new Set(COMPETITION_LOGOS.map((logo) => logo.src)).size).toBe(10);
   });
 
-  it("uses deployable storage paths and declares presentation metadata", () => {
+  it("uses deployable asset paths and declares presentation metadata", () => {
     for (const logo of COMPETITION_LOGOS) {
-      expect(logo.src).toMatch(/^\/manus-storage\/[a-z0-9-]+_[a-f0-9]{8}\.(png|webp)$/);
+      // Either the storage proxy or a file committed under client/public.
+      // Anything else (a remote URL, a relative path) wouldn't survive deploy.
+      expect(logo.src).toMatch(
+        /^(\/manus-storage\/[a-z0-9-]+_[a-f0-9]{8}\.(png|webp)|\/logos\/competitions\/[a-z0-9-]+\.(png|webp|svg))$/,
+      );
       expect(["light", "dark"]).toContain(logo.surface);
       expect(["wide", "standard", "compact"]).toContain(logo.sizing);
     }
+  });
 
-    expect(COMPETITION_LOGOS.some((logo) => logo.surface === "dark")).toBe(true);
-    expect(COMPETITION_LOGOS.some((logo) => logo.sizing === "wide")).toBe(true);
-    expect(COMPETITION_LOGOS.some((logo) => logo.sizing === "compact")).toBe(true);
+  it("keeps every mark legible on the white strip", () => {
+    // The strip renders bare on white with no chip behind any logo, so no
+    // entry may be dark-surface artwork — it would disappear.
+    expect(COMPETITION_LOGOS.filter((logo) => logo.surface === "dark")).toHaveLength(0);
   });
 
   it("keeps the marquee accessible and motion-safe", async () => {
