@@ -13,7 +13,6 @@ import {
   CreditCard,
   Users,
   MessageSquare,
-  Building2,
   List,
   Gift,
   Users2,
@@ -35,6 +34,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { isNavItemActive } from "@shared/nav";
+import RefreshAnnouncementBanner from "./RefreshAnnouncementBanner";
 
 interface NavItem {
   label: string;
@@ -77,7 +77,8 @@ const ARTIST_CORE_NAV: NavItem[] = [
 
 const ARTIST_PREMIUM_NAV: NavItem[] = [
   { label: "PRO Jobs", icon: <Star size={18} />, href: "/app/pro-jobs", premium: true },
-  { label: "Browse Companies", icon: <Building2 size={18} />, href: "/app/companies", premium: true },
+  // Browse Companies hidden 2026-08-31 per Ramita — content needs an update
+  // pass this week. Route/page still exist, just not linked from the nav.
   { label: "Benefits", icon: <Gift size={18} />, href: "/app/benefits", premium: true },
 ];
 
@@ -490,6 +491,8 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
             </button>
           </div>
         )}
+
+        {isArtist && <RefreshAnnouncementBanner variant="artist" />}
 
         {/* Page content */}
         <main className={`flex-1 ${fullHeight ? "overflow-hidden flex flex-col" : "overflow-y-auto"}`}>
