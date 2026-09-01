@@ -894,6 +894,7 @@ export const appRouter = router({
     updateJob: protectedProcedure
       .input(z.object({
         id: z.number(),
+        title: z.string().optional(),
         description: z.string().optional(),
         requestStatus: z.string().optional(),
         locationAddress: z.string().optional(),

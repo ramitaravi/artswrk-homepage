@@ -2858,7 +2858,7 @@ function AdminJobDetail({ jobId, onBack, onEdit }: { jobId: number; onBack: () =
       <div className="flex items-center gap-2 text-sm">
         <button onClick={onBack} className="text-gray-400 hover:text-[#F25722] font-medium transition-colors flex items-center gap-1"><ChevronLeft size={14} /> Jobs</button>
         <span className="text-gray-300">/</span>
-        <span className="text-[#111] font-semibold line-clamp-1 max-w-xs">{job.description?.slice(0, 50) || `Job #${job.id}`}</span>
+        <span className="text-[#111] font-semibold line-clamp-1 max-w-xs">{job.title || job.description?.slice(0, 50) || `Job #${job.id}`}</span>
       </div>
 
       {/* Hero */}
@@ -2873,8 +2873,12 @@ function AdminJobDetail({ jobId, onBack, onEdit }: { jobId: number; onBack: () =
               </div>
             )}
             <div>
-              <p className="text-xs text-gray-400 font-medium mb-0.5">Posted by</p>
-              <h2 className="text-xl font-black text-[#111]">{clientName}</h2>
+              {job.title ? (
+                <h2 className="text-xl font-black text-[#111]">{job.title}</h2>
+              ) : (
+                <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded bg-red-50 text-red-600 mb-1">No title set</span>
+              )}
+              <p className="text-xs text-gray-400 font-medium mb-0.5">Posted by {clientName}</p>
               <div className="flex items-center gap-3 mt-2 flex-wrap">
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${jobStatusColor(job.requestStatus)}`}>{job.requestStatus || "—"}</span>
                 {job.hiringCategory && <span className="text-[10px] px-2 py-0.5 rounded-full bg-pink-50 text-pink-600 font-semibold">{job.hiringCategory}</span>}
@@ -2933,6 +2937,7 @@ function AdminJobDetail({ jobId, onBack, onEdit }: { jobId: number; onBack: () =
 // ─── Admin Job Edit Wrapper ───────────────────────────────────────────────────
 function AdminJobEditWrapper({ jobId, onBack, onSave, isSaving }: { jobId: number; onBack: () => void; onSave: (d: any) => void; isSaving: boolean }) {
   const { data: job, isLoading } = trpc.admin.getJob.useQuery({ id: jobId });
+  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [requestStatus, setRequestStatus] = useState("");
   const location = useLocationField();
@@ -2943,6 +2948,7 @@ function AdminJobEditWrapper({ jobId, onBack, onSave, isSaving }: { jobId: numbe
 
   useEffect(() => {
     if (job) {
+      setTitle(job.title || "");
       setDescription(job.description || "");
       setRequestStatus(job.requestStatus || "");
       location.reset(job.locationAddress);
@@ -2967,8 +2973,9 @@ function AdminJobEditWrapper({ jobId, onBack, onSave, isSaving }: { jobId: numbe
         <span className="text-[#111] font-semibold">Edit</span>
       </div>
       <h1 className="text-2xl font-black text-[#111]">Edit Job #{jobId}</h1>
-      <form onSubmit={e => { e.preventDefault(); onSave({ description, requestStatus, locationAddress: location.value, locationData: location.locationData, hiringCategory, clientHourlyRate: clientHourlyRate ? Number(clientHourlyRate) : null, artistHourlyRate: artistHourlyRate ? Number(artistHourlyRate) : null, openRate }); }} className="space-y-5">
+      <form onSubmit={e => { e.preventDefault(); onSave({ title, description, requestStatus, locationAddress: location.value, locationData: location.locationData, hiringCategory, clientHourlyRate: clientHourlyRate ? Number(clientHourlyRate) : null, artistHourlyRate: artistHourlyRate ? Number(artistHourlyRate) : null, openRate }); }} className="space-y-5">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
+          <div><label className={labelCls}>Title</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Ballet Substitute Teacher" className={inputCls} /></div>
           <div><label className={labelCls}>Description</label><textarea value={description} onChange={e => setDescription(e.target.value)} rows={5} className={`${inputCls} resize-none`} /></div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className={labelCls}>Status</label>
@@ -3111,7 +3118,7 @@ function JobsSection() {
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Client / Company</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Description</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Title / Description</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Rate</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Status</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Job alerts</th>
@@ -3129,8 +3136,13 @@ function JobsSection() {
                     <p className="font-semibold text-[#111] text-xs">{j.clientName || j.clientFirstName ? displayName({ name: j.clientName, firstName: j.clientFirstName, lastName: j.clientLastName }) : "—"}</p>
                     <p className="text-[10px] text-gray-400">{j.clientCompanyName || j.clientEmail || "—"}</p>
                   </td>
-                  <td className="px-4 py-3 max-w-[200px]">
-                    <p className="text-xs text-gray-700 line-clamp-2">{j.description || "—"}</p>
+                  <td className="px-4 py-3 max-w-[220px]">
+                    {(j as any).title ? (
+                      <p className="text-xs font-semibold text-[#111] line-clamp-1">{(j as any).title}</p>
+                    ) : (
+                      <span className="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-600 mb-0.5">No title</span>
+                    )}
+                    <p className="text-[10px] text-gray-400 line-clamp-1">{j.description || "—"}</p>
                     {j.locationAddress && <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5"><MapPin size={9} />{j.locationAddress}</p>}
                   </td>
                   <td className="px-4 py-3 text-xs font-semibold text-[#111]">{j.openRate ? "Open Rate" : j.clientHourlyRate ? `$${j.clientHourlyRate}/hr` : "—"}</td>
