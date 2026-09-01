@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ChevronDown, ArrowRight, Check } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { ChevronDown, ArrowRight, Check, X } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { COMPETITION_LOGOS, type CompetitionLogo } from "@/data/competitionLogos";
 import { trpc } from "@/lib/trpc";
@@ -123,6 +123,146 @@ function CompetitionLogoMarquee() {
   );
 }
 
+/** Pre-filled so nobody faces a blank box, but fully editable — most people
+ *  send it as-is, and the rest say what they actually need. */
+const JUDGE_TRAINING_DEFAULT_MESSAGE =
+  "Hi there, I'm interested in learning more about The Judge Experience to train my staff this season...";
+
+function JudgeTrainingModal({ onClose }: { onClose: () => void }) {
+  const [email, setEmail] = useState("");
+  const [competitionName, setCompetitionName] = useState("");
+  const [message, setMessage] = useState(JUDGE_TRAINING_DEFAULT_MESSAGE);
+  const [error, setError] = useState("");
+  const [sent, setSent] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => emailRef.current?.focus(), 60);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    // Stop the page scrolling behind the dialog.
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  // Deliberately does NOT route existing customers to the post-job flow the way
+  // the main form does: this is "tell me about training", not "post a job", so
+  // everyone gets the same reply-from-the-team confirmation.
+  const submit = trpc.inquiry.submit.useMutation({
+    onSuccess: () => setSent(true),
+    onError: (err) => setError(err.message || "Something went wrong — please try again."),
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    setError("");
+    submit.mutate({
+      email: email.trim(),
+      company: competitionName.trim() || undefined,
+      message: message.trim() || undefined,
+      source: "judge-experience",
+    });
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="The Judge Experience — train my staff"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6 md:p-8"
+      >
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#F25722]">Judge Training</p>
+            <h2 className="mt-1 text-xl font-black text-[#111]">The Judge Experience</h2>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="-mr-1 -mt-1 rounded-full p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {sent ? (
+          <div className="space-y-3 py-6 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-50">
+              <Check size={24} className="text-green-500" />
+            </div>
+            <h3 className="text-lg font-black text-[#111]">Our team has received your inquiry</h3>
+            <p className="text-sm text-gray-500">
+              We'll be in touch shortly about training your staff. We've sent a confirmation to{" "}
+              <span className="font-semibold text-[#111]">{email.trim()}</span>.
+            </p>
+            <button onClick={onClose} className="pt-1 text-sm font-bold text-[#F25722] hover:underline">
+              Close
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div>
+              <label className={LABEL}>Email</label>
+              <input
+                ref={emailRef}
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                placeholder="you@competition.com"
+                className={FIELD}
+              />
+            </div>
+            <div>
+              <label className={LABEL}>Competition Name</label>
+              <input
+                type="text"
+                value={competitionName}
+                onChange={(e) => setCompetitionName(e.target.value)}
+                placeholder="e.g. REVEL Dance Convention"
+                className={FIELD}
+              />
+            </div>
+            <div>
+              <label className={LABEL}>Message</label>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={5}
+                maxLength={2000}
+                className={`${FIELD} min-h-[120px] resize-y leading-relaxed`}
+              />
+            </div>
+            {error && <p className="text-xs text-red-500">{error}</p>}
+            <button
+              type="submit"
+              disabled={submit.isPending}
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl py-3.5 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60 hirer-grad-bg"
+            >
+              {submit.isPending ? "Sending…" : <>Send Inquiry <ArrowRight size={15} /></>}
+            </button>
+            <p className="text-center text-[11px] text-gray-400">
+              Our team will reach out — usually within one business day.
+            </p>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DanceCompetitions() {
   const [activeStaff, setActiveStaff] = useState(0);
   const [competitionName, setCompetitionName] = useState("");
@@ -130,6 +270,7 @@ export default function DanceCompetitions() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [trainingOpen, setTrainingOpen] = useState(false);
 
   const submitInquiry = trpc.inquiry.submit.useMutation({
     onSuccess: (data) => {
@@ -165,6 +306,7 @@ export default function DanceCompetitions() {
   return (
     <div className="bg-white min-h-screen font-[Poppins,sans-serif]">
       <Navbar />
+      {trainingOpen && <JudgeTrainingModal onClose={() => setTrainingOpen(false)} />}
       {/* ── Hero — pitch + enterprise job form ──────────────────────────── */}
       <section id="top" className="px-5 pt-28 pb-20 lg:px-10">
         <div className="mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-2">
@@ -469,12 +611,13 @@ export default function DanceCompetitions() {
             <div className="mt-8 flex flex-wrap gap-3">
               {/* Straight to the enquiry form — this is the same conversation,
                   and the design's own link points back up the page. */}
-              <a
-                href="#get-started"
+              <button
+                type="button"
+                onClick={() => setTrainingOpen(true)}
                 className="rounded-xl bg-white px-8 py-4 text-[15px] font-bold text-[#08090c] transition-colors hover:bg-gray-100"
               >
                 Train My Staff
-              </a>
+              </button>
             </div>
           </div>
 

@@ -1,7 +1,7 @@
 import sgMail from "@sendgrid/mail";
 import {
   renderEmailShell, detailsCard, sanitizeUserText, p as para, b, quote,
-  APP_URL, SUPPORT_EMAIL,
+  APP_URL, SUPPORT_EMAIL, CONTACT_EMAIL,
 } from "./emailTemplates";
 
 // Initialize SendGrid with API key
@@ -503,7 +503,8 @@ export async function sendEnterpriseInquiryAlertEmail({
     footerNote: "Reply straight to " + email + " to follow up.",
   });
   return sendSimpleEmail({
-    to: SUPPORT_EMAIL,
+    // contact@ is the watched inbox, not the support@ alerts firehose.
+    to: CONTACT_EMAIL,
     subject: "New inquiry — " + who,
     html,
     // Hitting reply goes straight to the competition, so the team can answer
@@ -533,10 +534,12 @@ export async function sendEnterpriseInquiryConfirmationEmail({
   // party continues one thread rather than starting a dead end.
   return sendSimpleEmail({
     to,
-    cc: SUPPORT_EMAIL,
+    // cc'd, not bcc'd: the enquirer can see who they're talking to, and a
+    // reply-all from either side keeps the team on the thread.
+    cc: CONTACT_EMAIL,
     subject: "New inquiry — " + (company || name || to),
     html,
-    replyTo: SUPPORT_EMAIL,
+    replyTo: CONTACT_EMAIL,
   });
 }
 
