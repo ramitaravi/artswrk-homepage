@@ -82,21 +82,12 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 /**
  * Bare logo on white — no card, no border, no shadow. That's the design: the
  * marks sit directly on the page at a fixed 180x90 box, `contain` so nothing
- * crops.
- *
- * The two dark-surface marks (Thunderstruck, Storm) are light artwork built for
- * a dark backdrop and would vanish on white, so those alone keep a dark chip.
- * Everything else is bare.
+ * crops. Every logo now ships artwork that holds up on white, so there's no
+ * dark-chip fallback here any more.
  */
 function CompetitionLogoCard({ logo, duplicate = false }: { logo: CompetitionLogo; duplicate?: boolean }) {
-  const needsDarkChip = logo.surface === "dark";
   return (
-    <div
-      className={`relative h-[90px] w-[180px] flex-none ${
-        needsDarkChip ? "rounded-xl bg-[#08090c] p-2.5" : ""
-      }`}
-      aria-hidden={duplicate || undefined}
-    >
+    <div className="relative h-[90px] w-[180px] flex-none" aria-hidden={duplicate || undefined}>
       <img
         src={logo.src}
         alt={duplicate ? "" : logo.name}

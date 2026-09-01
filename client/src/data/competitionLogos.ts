@@ -14,14 +14,18 @@ export const COMPETITION_LOGOS: CompetitionLogo[] = [
   },
   {
     name: "Thunderstruck Dance Competition",
-    src: "/manus-storage/thunderstruck-dance-competition_ee0dcba3.webp",
-    surface: "dark",
+    // Supplied by Thunderstruck as a white-background lockup, cropped to the
+    // artwork. Replaces the dark-background export, which needed a black chip.
+    src: "/logos/competitions/thunderstruck.png",
+    surface: "light",
     sizing: "wide",
   },
   {
     name: "Storm Dance Challenge",
     src: "/manus-storage/storm-dance-challenge_5cc3f094.webp",
-    surface: "dark",
+    // The wordmark is white but carries a heavy black outline, so it holds up
+    // on the white strip without a dark chip behind it.
+    surface: "light",
     sizing: "standard",
   },
   {
