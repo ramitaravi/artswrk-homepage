@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import Navbar from "@/components/Navbar";
 import { COMPETITION_LOGOS, type CompetitionLogo } from "@/data/competitionLogos";
 import { trpc } from "@/lib/trpc";
+import { saveInquiryDraft } from "@/lib/inquiryDraft";
 
 // How it works screenshots (from the existing artist strip CDN images)
 const HOW_IT_WORKS = [
@@ -92,12 +93,16 @@ function CompetitionLogoCard({ logo, duplicate = false }: { logo: CompetitionLog
       }`}
       aria-hidden={duplicate || undefined}
     >
+      {/* rounded-xl on the image itself, not just the card: several of these
+          logos are full-bleed exports with their own baked-in background, so
+          without it they render as a hard-edged rectangle inside a rounded
+          card. object-contain means it's a no-op for transparent marks. */}
       <img
         src={logo.src}
         alt={duplicate ? "" : logo.name}
         loading="lazy"
         decoding="async"
-        className="h-full w-full object-contain"
+        className="h-full w-full rounded-xl object-contain"
       />
     </div>
   );
@@ -139,7 +144,18 @@ export default function DanceCompetitions() {
   const [submitted, setSubmitted] = useState(false);
 
   const submitInquiry = trpc.inquiry.submit.useMutation({
-    onSuccess: () => setSubmitted(true),
+    onSuccess: (data) => {
+      // Existing customers can post the job themselves right now — telling them
+      // "we'll be in touch" would stall a booking they're ready to make. Their
+      // draft rides along so the login round-trip doesn't lose it.
+      if (data.existingAccount) {
+        saveInquiryDraft({ company: competitionName.trim(), description: message.trim() });
+        const next = data.isEnterprise ? "/enterprise?postJob=1" : "/post-job";
+        window.location.href = `/login?email=${encodeURIComponent(email.trim())}&next=${encodeURIComponent(next)}`;
+        return;
+      }
+      setSubmitted(true);
+    },
     onError: (err) => setError(err.message || "Something went wrong — please try again."),
   });
 

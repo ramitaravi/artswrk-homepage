@@ -311,18 +311,30 @@ export async function sendSimpleEmail({
   subject,
   html,
   cc,
+  replyTo,
 }: {
   to: string;
   subject: string;
   html: string;
   cc?: string | string[];
+  /** Where a reply should land. Used to open a real back-and-forth thread —
+   *  the team's copy replies to the enquirer, and the enquirer's copy replies
+   *  to support — instead of both bouncing to the no-reply from address. */
+  replyTo?: string;
 }): Promise<boolean> {
   if (!process.env.SENDGRID_API_KEY) {
     console.warn("[email] SENDGRID_API_KEY not set — skipping email send");
     return false;
   }
   try {
-    await sgMail.send({ to, from: { email: FROM_EMAIL, name: FROM_NAME }, subject, html, ...(cc ? { cc } : {}) });
+    await sgMail.send({
+      to,
+      from: { email: FROM_EMAIL, name: FROM_NAME },
+      subject,
+      html,
+      ...(cc ? { cc } : {}),
+      ...(replyTo ? { replyTo } : {}),
+    });
     return true;
   } catch (err: unknown) {
     console.error("[email] Failed to send simple email:", err instanceof Error ? err.message : err);
@@ -494,6 +506,9 @@ export async function sendEnterpriseInquiryAlertEmail({
     to: SUPPORT_EMAIL,
     subject: "New inquiry — " + who,
     html,
+    // Hitting reply goes straight to the competition, so the team can answer
+    // from the inbox and the whole exchange stays in one thread.
+    replyTo: email,
   });
 }
 
@@ -514,7 +529,15 @@ export async function sendEnterpriseInquiryConfirmationEmail({
     ctaUrl: APP_URL + "/browse",
     footerNote: 'Questions in the meantime? Just reply to this email or reach us at <a href="mailto:contact@artswrk.com" style="color:#F25722;font-weight:600;">contact@artswrk.com</a>.<br><br>Best,<br>The Artswrk Team',
   });
-  return sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject: "We've received your inquiry — Artswrk", html });
+  // Same subject on both sides plus a real reply-to means a reply from either
+  // party continues one thread rather than starting a dead end.
+  return sendSimpleEmail({
+    to,
+    cc: SUPPORT_EMAIL,
+    subject: "New inquiry — " + (company || name || to),
+    html,
+    replyTo: SUPPORT_EMAIL,
+  });
 }
 
 export async function sendStripeConnectAlertEmail({

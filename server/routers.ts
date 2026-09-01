@@ -2462,7 +2462,19 @@ export const appRouter = router({
           }).catch((e) => { console.error("[inquiry] confirmation failed:", e); return false; }),
         ]);
         if (!alerted) console.error("[inquiry] NOT DELIVERED to the team:", email, input.company);
-        return { success: true, confirmationSent: confirmed };
+
+        // An existing customer shouldn't be told "we'll be in touch" — they
+        // already have an account and can post the job themselves right now.
+        // Only the booleans are returned, never profile data: this is a public
+        // endpoint, so anything richer would make it an account-enumeration
+        // oracle for anyone who can guess an email.
+        const existing = await getUserByEmail(email);
+        return {
+          success: true,
+          confirmationSent: confirmed,
+          existingAccount: !!existing,
+          isEnterprise: !!(existing as any)?.enterprise,
+        };
       }),
   }),
 

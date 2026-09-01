@@ -20,6 +20,7 @@ captured.forEach((m, i) => {
   console.log("  to:     ", m.to);
   console.log("  cc:     ", m.cc ?? "(none)");
   console.log("  subject:", m.subject);
+  console.log("  replyTo:", m.replyTo ?? "(none)");
   fs.writeFileSync(`/tmp/inquiry-${i + 1}.html`, m.html);
 });
 console.log("\nprevews written to /tmp/inquiry-1.html and /tmp/inquiry-2.html");

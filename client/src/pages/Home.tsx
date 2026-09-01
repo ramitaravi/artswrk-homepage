@@ -380,8 +380,12 @@ function ForHirers() {
           </div>
 
           <div className="mt-7 flex flex-wrap items-center gap-3">
+            {/* Goes to the selected vertical's own landing page, which is where
+                the pitch and the inquiry form for that audience live. This used
+                to send all three straight to /join, skipping the page that does
+                the actual convincing. */}
             <Link
-              href="/join?role=client"
+              href={shown.href ?? "/join?role=client"}
               className="rounded-xl px-7 py-4 text-[15px] font-bold text-white transition-colors hover:bg-[#3D3D4A]"
               style={{ background: INK }}
             >
