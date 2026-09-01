@@ -125,7 +125,7 @@ function SignupCard() {
 
   return (
     <div
-      className="rounded-3xl bg-white mt-8 md:mt-0"
+      className="rounded-3xl bg-white"
       style={{
         border: `1px solid ${HAIRLINE}`,
         padding: "clamp(22px,2.5vw,28px)",
@@ -155,7 +155,7 @@ function SignupCard() {
         className="mt-6 font-bold"
         style={{ fontSize: "clamp(19px,2vw,22px)", letterSpacing: "-0.015em" }}
       >
-        {isArtist ? "Get booked at your rate" : "Post Your First Job - It's Free!"}
+        {isArtist ? "Get Hired on Artswrk!" : "Post Your First Job - It's Free!"}
       </div>
       <p className="mt-2 text-sm leading-relaxed" style={{ color: BODY }}>
         {isArtist
@@ -189,7 +189,7 @@ function SignupCard() {
           className="h-[52px] rounded-xl text-[15px] font-bold text-white transition-all active:scale-[0.97] disabled:cursor-wait disabled:opacity-65 hover:bg-[#3D3D4A]"
           style={{ background: INK }}
         >
-          {checkEmail.isPending ? "Checking your account..." : isArtist ? "Claim Your Profile →" : "Post a Job →"}
+          {checkEmail.isPending ? "Checking your account..." : isArtist ? "Join Now →" : "Post a Job →"}
         </button>
         {submitError ? <p className="m-0 text-xs font-medium text-red-600" role="alert">{submitError}</p> : null}
       </form>
@@ -273,17 +273,15 @@ function Hero() {
   return (
     <section
       id="top"
-      className={`${SECTION} grid items-center`}
+      className={`${SECTION} grid items-center gap-5 px-5 pt-32 sm:gap-9 sm:px-8 sm:pt-[104px] lg:gap-[72px]`}
       style={{
-        padding: "clamp(56px,8vw,104px) clamp(20px,4vw,32px) 0",
-        gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))",
-        gap: "clamp(36px,5vw,72px)",
+        gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,340px),1fr))",
       }}
     >
       <div>
         <h1
-          className="m-0 font-extrabold"
-          style={{ fontSize: "clamp(40px,6.4vw,76px)", lineHeight: 1.02, letterSpacing: "-0.035em" }}
+          className="m-0 text-[clamp(46px,13vw,56px)] font-extrabold sm:text-[clamp(48px,8vw,76px)]"
+          style={{ lineHeight: 1.02, letterSpacing: "-0.035em" }}
         >
           Hire{" "}
           <span style={{ backgroundImage: ARTIST_GRAD, backgroundClip: "text", WebkitBackgroundClip: "text", color: "transparent" }}>
@@ -780,17 +778,17 @@ function CTABanner() {
         >
           Click below to join our network today!
         </p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
+        <div className="mx-auto mt-8 flex w-full max-w-[320px] flex-col justify-center gap-3 sm:max-w-none sm:flex-row sm:flex-wrap">
           <Link
             href="/join?role=client"
-            className="rounded-full bg-white px-[34px] py-4 text-base font-bold"
+            className="inline-flex w-full items-center justify-center rounded-full bg-white px-[34px] py-4 text-base font-bold sm:w-[140px]"
             style={{ color: INK }}
           >
             Post Job
           </Link>
           <Link
             href="/join?role=artist"
-            className="rounded-full px-[34px] py-4 text-base font-bold text-white transition-colors hover:bg-white/15"
+            className="inline-flex w-full items-center justify-center rounded-full px-[34px] py-4 text-base font-bold text-white transition-colors hover:bg-white/15 sm:w-[140px]"
             style={{ border: "1px solid rgba(255,255,255,0.6)" }}
           >
             Get Hired

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { HOME_FAQS } from "../client/src/data/homepageFaqs";
 import {
   buildHomepageAuthDestination,
@@ -47,5 +48,29 @@ describe("homepage audience FAQs", () => {
       "How do taxes work?",
       "Who are the Artswrk clients?",
     ]);
+  });
+});
+
+describe("homepage responsive hero and CTA", () => {
+  const source = readFileSync(
+    new URL("../client/src/pages/Home.tsx", import.meta.url),
+    "utf8",
+  );
+
+  it("keeps valid responsive hero typography and compact mobile spacing", () => {
+    expect(source).not.toContain("fontSize: 'px'");
+    expect(source).not.toContain("fontSize: \"px\"");
+    expect(source).toContain("text-[clamp(46px,13vw,56px)]");
+    expect(source).toContain("gap-5 px-5 pt-32 sm:gap-9");
+  });
+
+  it("keeps both final CTA buttons full-width on mobile", () => {
+    expect(source.match(/w-full items-center justify-center rounded-full/g)).toHaveLength(2);
+    expect(source.match(/sm:w-\[140px\]/g)).toHaveLength(2);
+  });
+
+  it("uses the requested artist signup headline and button copy", () => {
+    expect(source).toContain('"Get Hired on Artswrk!"');
+    expect(source).toContain('"Join Now →"');
   });
 });

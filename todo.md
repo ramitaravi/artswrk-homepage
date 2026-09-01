@@ -823,3 +823,14 @@
 - [x] Add or update regression coverage for Stripe environment and price configuration
 - [x] Run non-mutating Stripe smoke tests, TypeScript, and deterministic payment tests
 - [x] Save a validated checkpoint if code changes are required
+
+## Homepage Mobile Hero and CTA Repair
+- [x] Restore the hero heading typography after malformed empty-unit visual-editor styles
+- [x] Add substantially more mobile top spacing so the hero heading is not clipped
+- [x] Increase the mobile hero heading scale so it fills most of the available width without overflow
+- [x] Tighten the mobile gap between the hero copy and the job form while preserving desktop spacing
+- [x] Change the artist signup-card headline from "Get booked at your rate" to "Get Hired on Artswrk!"
+- [x] Change the artist signup-card button from "Claim Your Profile →" to "Join Now →"
+- [x] Make both final CTA buttons full-width on mobile while preserving suitable desktop widths
+- [x] Verify desktop and mobile rendering, tests, and TypeScript
+- [x] Save a validated checkpoint for the responsive homepage repair
