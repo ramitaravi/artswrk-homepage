@@ -471,73 +471,58 @@ export async function sendFirstLoginAlertEmail({
 }
 
 /**
- * Enterprise / competition inquiry from a public landing page (e.g.
- * /dance-competitions). Two emails go out: this internal one so the team can
- * pick it up, and a confirmation to the person who submitted so they know it
- * landed. The submitter usually has no account yet, so these are the whole
- * handshake — nothing in-app would reach them.
+ * Inquiry from a public landing page (/dance-competitions, The Judge
+ * Experience) — ONE email that introduces the two parties, not a receipt plus
+ * a separate internal alert.
+ *
+ * It goes TO the person who enquired with contact@ cc'd, so both sides are on
+ * the same thread from the first message and either can just hit reply. That
+ * beats the old pattern — a branded "We've got your inquiry ✅" confirmation
+ * that started no conversation, plus a second internal copy that lived in its
+ * own thread — because the point of the form is to start talking, and most
+ * people who fill it in have no account for anything in-app to reach.
+ *
+ * Written like a person sent it: no CTA button, no marketing block. Their own
+ * message is quoted back so the team has the context to reply directly.
  */
-export async function sendEnterpriseInquiryAlertEmail({
+export async function sendInquiryIntroEmail({
   name, email, company, source, message, phone,
 }: {
   name?: string | null; email: string; company?: string | null;
   source: string; message?: string | null; phone?: string | null;
 }): Promise<boolean> {
-  const who = company || name || email;
-  const html = renderEmailShell({
-    accent: "internal",
-    headline: "New enterprise inquiry 📨",
-    preheader: who + " submitted an inquiry from " + source + ".",
-    bodyHtml:
-      para(b(who) + " just submitted an inquiry from the " + b(source) + " page.") +
-      detailsCard([
-        { label: "Company", value: company },
-        { label: "Name", value: name },
-        { label: "Email", value: email },
-        { label: "Phone", value: phone },
-        { label: "Page", value: source },
-      ]) +
-      (message ? para(b("What they said")) + quote(sanitizeUserText(message, 1000)) : ""),
-    ctaText: "View in Admin",
-    ctaUrl: APP_URL + "/admin-dashboard",
-    footerNote: "Reply straight to " + email + " to follow up.",
-  });
-  return sendSimpleEmail({
-    // contact@ is the watched inbox, not the support@ alerts firehose.
-    to: CONTACT_EMAIL,
-    subject: "New inquiry — " + who,
-    html,
-    // Hitting reply goes straight to the competition, so the team can answer
-    // from the inbox and the whole exchange stays in one thread.
-    replyTo: email,
-  });
-}
-
-/** Confirmation to whoever submitted the inquiry above. */
-export async function sendEnterpriseInquiryConfirmationEmail({
-  to, name, company,
-}: { to: string; name?: string | null; company?: string | null }): Promise<boolean> {
+  const isJudgeTraining = source === "judge-experience";
+  // "Artswrk / <the thing they asked about>" — the competition's own name where
+  // we have it, so the thread is findable later by either side.
+  const topic = isJudgeTraining
+    ? "The Judge Experience"
+    : (company || name || "Hiring on Artswrk");
   const greeting = name ? "Hi " + b(name) + "," : "Hi there,";
+  const note = message ? sanitizeUserText(message, 1000) : "";
+
   const html = renderEmailShell({
     accent: "client",
-    headline: "We've got your inquiry ✅",
-    preheader: "Our team has received your inquiry — we'll be in touch shortly.",
+    headline: "Let's connect \u{1F44B}",
+    preheader: "Connecting you with the Artswrk team" + (isJudgeTraining ? " about The Judge Experience." : "."),
     bodyHtml:
       para(greeting) +
-      para("Our team has received your inquiry" + (company ? " for " + b(company) : "") + " and we'll be in touch shortly.") +
-      para("In the meantime, you can browse the artists already on Artswrk — judges, emcees, backstage staff, photographers and more."),
-    ctaText: "Browse Artists",
-    ctaUrl: APP_URL + "/browse",
-    footerNote: 'Questions in the meantime? Just reply to this email or reach us at <a href="mailto:contact@artswrk.com" style="color:#F25722;font-weight:600;">contact@artswrk.com</a>.<br><br>Best,<br>The Artswrk Team',
+      para(
+        isJudgeTraining
+          ? "Thanks for your interest in " + b("The Judge Experience") + " — our dance adjudicator certification. I've put our team on this thread so we can find a time to talk through training your panel this season."
+          : "Thanks for reaching out about hiring on Artswrk. I've put our team on this thread so we can pick up from here."
+      ) +
+      (note ? para(b("What you sent:")) + quote(note) : "") +
+      para("Just reply here and we'll take it from there."),
+    footerNote: "Best,<br>The Artswrk Team",
+    showUnsubscribe: false,
   });
-  // Same subject on both sides plus a real reply-to means a reply from either
-  // party continues one thread rather than starting a dead end.
+
   return sendSimpleEmail({
-    to,
-    // cc'd, not bcc'd: the enquirer can see who they're talking to, and a
-    // reply-all from either side keeps the team on the thread.
+    to: email,
+    // cc, not bcc: the enquirer can see who they're talking to, and reply-all
+    // from either side keeps everyone on the one thread.
     cc: CONTACT_EMAIL,
-    subject: "New inquiry — " + (company || name || to),
+    subject: "Let's Connect: Artswrk / " + topic,
     html,
     replyTo: CONTACT_EMAIL,
   });

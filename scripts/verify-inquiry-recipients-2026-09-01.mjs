@@ -15,15 +15,16 @@ const sent = [];
 sgMail.send = async (msg) => { sent.push(msg); return [{ headers: {} }, {}]; };
 
 const E = await import("../server/email.ts");
-await E.sendEnterpriseInquiryAlertEmail({
+await E.sendInquiryIntroEmail({
   email: "qa-synthetic@example.com", company: "QA Competition", source: "judge-experience",
   message: "Hi there, I'm interested in learning more about The Judge Experience...",
 });
-await E.sendEnterpriseInquiryConfirmationEmail({
-  to: "qa-synthetic@example.com", company: "QA Competition",
+await E.sendInquiryIntroEmail({
+  email: "qa-synthetic@example.com", company: "QA Competition", source: "dance-competitions",
+  message: "Need 3 judges for our Orlando regional.",
 });
 
-const labels = ["Team alert", "Sender confirmation"];
+const labels = ["Judge Experience intro", "Competition inquiry intro"];
 sent.forEach((m, i) => {
   console.log(`\n${labels[i]}`);
   console.log("  to:      ", m.to);
@@ -31,6 +32,9 @@ sent.forEach((m, i) => {
   console.log("  replyTo: ", m.replyTo ?? "(none)");
   console.log("  subject: ", m.subject);
 });
-console.log("\nsame subject on both (threads together):",
-  sent[0].subject === sent[1].subject ? "YES ✓" : "NO ✗");
+// One email per inquiry now, so the two above are different threads by design.
+// What matters is that each puts both parties on the same message.
+const ok = sent.every((m) => m.cc === "contact@artswrk.com" && m.replyTo === "contact@artswrk.com");
+console.log("\nboth parties on every thread (to=enquirer, cc=contact@):", ok ? "YES ✓" : "NO ✗");
+console.log("no separate receipt sent:", sent.length === 2 ? "YES ✓ (1 per inquiry)" : "NO ✗");
 process.exit(0);
