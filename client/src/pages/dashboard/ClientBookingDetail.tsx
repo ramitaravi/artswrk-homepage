@@ -177,6 +177,11 @@ export default function ClientBookingDetail() {
   );
   const subtotal = Math.max(total - reimbursements, 0);
 
+  // Legacy Bubble bookings have no paymentMethod at all (5,185 of them) — in
+  // Bubble everything ran through Artswrk unless it was flagged as an external
+  // payment, so derive it rather than showing "Payment method not set".
+  const paidDirectly = b.paymentMethod === "direct" || (!b.paymentMethod && !!b.externalPayment);
+
   // "Pay Now" is the status that means the client owes money right now.
   const needsPayment = bookingStatus === "Pay Now" && paymentStatus !== "Paid" && !b.invoicePaidAt;
   // ONLY invoiceStripeCheckoutUrl — the link this app generates for THIS
@@ -213,8 +218,11 @@ export default function ClientBookingDetail() {
             )}
             <div>
               <div className="flex items-center gap-2 mb-1 flex-wrap">
+                {/* "Pay Now" implies the client can act, but until the artist
+                    submits an invoice there is nothing to pay — say what's
+                    actually true instead. */}
                 <span className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${statusCfg.className}`}>
-                  {statusCfg.icon} {statusCfg.label}
+                  {statusCfg.icon} {needsPayment && !payUrl ? "Awaiting Payment" : statusCfg.label}
                 </span>
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${payCfg.className}`}>
                   {payCfg.label}
@@ -275,7 +283,7 @@ export default function ClientBookingDetail() {
                 <span>{b.hours} hours{b.isRecurring && b.recurringCadence ? ` · ${b.recurringCadence}` : ""}</span>
               </div>
             )}
-            {!isHourly && b.isRecurring && b.recurringCadence && (
+            {!isHourly && !!b.isRecurring && b.recurringCadence && (
               <div className="flex items-center gap-2 text-gray-600">
                 <Clock size={14} className="text-gray-400 flex-shrink-0" />
                 <span>Recurring · {b.recurringCadence}</span>
@@ -284,11 +292,7 @@ export default function ClientBookingDetail() {
             <div className="flex items-center gap-2 text-gray-600">
               <CreditCard size={14} className="text-gray-400 flex-shrink-0" />
               <span>
-                {b.paymentMethod === "direct"
-                  ? "Paid directly to the artist"
-                  : b.paymentMethod === "artswrk"
-                  ? "Paid through Artswrk"
-                  : "Payment method not set"}
+                {paidDirectly ? "Paid directly to the artist" : "Paid through Artswrk"}
                 {b.directPayConfirmedAt ? ` · confirmed ${formatDate(b.directPayConfirmedAt)}` : ""}
               </span>
             </div>
@@ -354,10 +358,8 @@ export default function ClientBookingDetail() {
             ) : (
               <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
                 <p className="text-xs text-amber-800">
-                  This booking is awaiting payment, but no invoice has been generated yet —
-                  the artist submits it after completing the booking. Email{" "}
-                  <a href="mailto:contact@artswrk.com" className="font-semibold underline">contact@artswrk.com</a>{" "}
-                  if you need to settle it now.
+                  {artistName} will upload any reimbursements and invoice you — you'll be able to
+                  pay right here once they do.
                 </p>
               </div>
             )
