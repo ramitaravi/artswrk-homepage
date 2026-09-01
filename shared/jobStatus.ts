@@ -29,3 +29,15 @@ export const SIMPLE_STATUS_TO_RAW: Record<SimpleJobStatus, string> = {
   Paused: "Submissions Paused",
   Archived: "Archived",
 };
+
+/**
+ * The requestStatus values a job must hold to be publicly visible and open to
+ * applications — the same pair getPublicJobs lists by. Archiving a job was only
+ * ever a list filter, so anything that renders a job, accepts an application,
+ * or takes money for one must check this too, or a direct URL still works.
+ */
+export const PUBLICLY_LIVE_JOB_STATUSES = ["Active", "Confirmed"] as const;
+
+export function isJobPubliclyLive(requestStatus: string | null | undefined): boolean {
+  return !!requestStatus && (PUBLICLY_LIVE_JOB_STATUSES as readonly string[]).includes(requestStatus);
+}

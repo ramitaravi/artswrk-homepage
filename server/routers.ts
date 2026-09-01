@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { APP_URL } from "./emailTemplates";
 import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ONE_YEAR_MS } from "@shared/const";
+import { isJobPubliclyLive } from "@shared/jobStatus";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -1657,6 +1658,11 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const job = await getJobDetailById(input.id);
         if (!job) return null;
+        // Archived/paused/completed jobs stay reachable by direct URL otherwise,
+        // which also renders the apply form. Clients read their own jobs through
+        // the separate protected clientJobs.getDetail, so this only hides them
+        // from the public board.
+        if (!isJobPubliclyLive(job.requestStatus)) return null;
         return job;
       }),
 
@@ -1688,6 +1694,10 @@ export const appRouter = router({
         if (!user) throw new Error("User not found");
         if (!["artist_basic", "artist_pro"].includes((user as any).planTier)) {
           throw new Error("Upgrade to Artswrk Basic or PRO to apply to jobs.");
+        }
+        const targetJob = await getJobDetailById(input.jobId);
+        if (!targetJob || !isJobPubliclyLive(targetJob.requestStatus)) {
+          throw new Error("This job is no longer accepting applications.");
         }
         const id = await applyToJob({
           jobId: input.jobId,
@@ -3463,6 +3473,12 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         // but never touch the legacy enterprisePlan column, so checking that
         // column here left those accounts unable to ever pay the $100 unlock.
         if (user.planTier !== "enterprise_on_demand") throw new Error("Job unlock is only for on-demand plan");
+        // Never take money to unlock a job that isn't live — this endpoint takes
+        // any jobId, so without it an archived job's applicants stay purchasable.
+        const unlockTarget = await getJobDetailById(input.jobId);
+        if (!unlockTarget || !isJobPubliclyLive(unlockTarget.requestStatus)) {
+          throw new Error("This job is no longer available to unlock.");
+        }
         // Prevent double-paying
         const alreadyUnlocked = await isJobUnlocked(ctx.user.id, input.jobId);
         if (alreadyUnlocked) return { alreadyUnlocked: true, url: null };
@@ -4491,6 +4507,10 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const job = await getAdminJobById(input.jobId);
         if (!job) throw new Error("Job not found");
         if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
+        // Don't charge for unlocking a job the client already archived.
+        if (user.role !== "admin" && !isJobPubliclyLive(job.requestStatus)) {
+          throw new Error("This job is no longer active — reactivate it before unlocking applicants.");
+        }
         const alreadyUnlocked = await isClientJobUnlocked(user.id, input.jobId);
         if (alreadyUnlocked) return { alreadyUnlocked: true, url: null };
         const jobTitle = (job.description ?? "").split("\n")[0].slice(0, 60);
