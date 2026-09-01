@@ -886,3 +886,24 @@
 - [x] Leave the Dance Competitions homepage route unchanged
 - [x] Add regression coverage for the temporary CTA destinations
 - [x] Verify desktop/mobile links and save a checkpoint
+
+## Dance Competitions Production Parity Incident
+- [ ] Compare `/dance-competitions` across `artswrk.com`, `www.artswrk.com`, `app.artswrk.com`, the Manus deployment domain, and the current checkpoint
+- [ ] Identify whether the mismatch is caused by source divergence, unpublished code, domain routing, deployment version, service worker, or CDN/browser cache
+- [ ] Correct the actual production-parity cause without regressing the verified live layout, inquiry routing, SEO, managed assets, or Brevo chatbot
+- [ ] Verify the corrected page across every live domain and a fresh uncached browser session
+- [ ] Save a restorable checkpoint and report the exact root cause
+
+## GitHub Main Source-of-Truth Correction
+- [x] Recover the exact last correct GitHub redesign of `DanceCompetitions.tsx` and prepare it to become the newest `user_github/main`
+- [x] Remove the mistakenly restored historical/live-branch layout from the Manus working tree
+- [x] Reconcile only compatible managed asset URLs, SEO metadata, inquiry behavior, and the global chatbot without redesigning the GitHub page
+- [x] Add a GitHub-main parity check that detects future local divergence before checkpointing
+- [x] Verify the GitHub-main design on desktop/mobile and save a corrective checkpoint
+
+## Homepage Hero Copy Simplification
+- [ ] Change the visible H1 to “Hire Artists, Find WRK”
+- [ ] Keep the visible H2 covering dance teachers, competition staff, photographers, and videographers
+- [ ] Remove the extra visible paragraph beginning “From ballet teachers…”
+- [ ] Preserve broader search terms in metadata and structured data
+- [ ] Update regression coverage, verify desktop/mobile rendering, and save a checkpoint

@@ -7,13 +7,13 @@ const pageSource = readFileSync(
 );
 
 describe("Dance Competitions live design", () => {
-  it("preserves the live hero and inquiry form copy", () => {
-    expect(pageSource).toContain("The #1 Platform");
-    expect(pageSource).toContain("to Hire Dance");
-    expect(pageSource).toContain("Competition Staff");
-    expect(pageSource).toContain("Tell us what you need");
-    expect(pageSource).toContain("What do you need? (optional)");
-    expect(pageSource).toContain("Post your first job in under a minute");
+  it("preserves the correct GitHub redesign hero and enterprise inquiry form", () => {
+    expect(pageSource).toContain("Hire Dance<br />Competition Staff on");
+    expect(pageSource).toContain("Post Your Competition Job");
+    expect(pageSource).toContain("Competition Name");
+    expect(pageSource).toContain("Job Description");
+    expect(pageSource).not.toContain("The #1 Platform");
+    expect(pageSource).not.toContain("Tell us what you need");
   });
 
   it("retains the current inquiry email and existing-account handoff", () => {
@@ -24,17 +24,22 @@ describe("Dance Competitions live design", () => {
     expect(pageSource).toContain('/login?email=${encodeURIComponent(email.trim())}');
   });
 
-  it("keeps managed logos and the complete live page sections", () => {
+  it("keeps managed assets and the complete GitHub redesign sections", () => {
     expect(pageSource).toContain("COMPETITION_LOGOS.map");
-    expect(pageSource).toContain("Hire Competition Staff");
-    expect(pageSource).toContain("One tool to find, hire, and pay artists");
+    expect(pageSource).toContain("How it WRKs");
+    expect(pageSource).toContain("The Judge Experience");
+    expect(pageSource).toContain("Train My Staff");
     expect(pageSource).toContain("Frequently Asked Questions");
     expect(pageSource).toContain("Ready to staff your next competition?");
+    expect(pageSource).toContain("/manus-storage/dance-competition-dancer_4c9a27e5.png");
+    expect(pageSource).toContain("/manus-storage/dance-competition-imagine_d2ac6e89.png");
+    expect(pageSource).toContain("/manus-storage/judge-experience-bg_9e9b0dc6.png");
+    expect(pageSource).toContain("/manus-storage/judge-experience-card_e60a685f.png");
   });
 
-  it("does not restore the stale enterprise dashboard and Judge Experience layout", () => {
-    expect(pageSource).not.toContain("BOARD_JOBS");
-    expect(pageSource).not.toContain("JudgeTrainingModal");
-    expect(pageSource).not.toContain("Hire Dance<br />Competition Staff on");
+  it("locks the correct GitHub redesign against the mistaken historical-layout restore", () => {
+    expect(pageSource).toContain("BOARD_JOBS");
+    expect(pageSource).toContain("JudgeTrainingModal");
+    expect(pageSource).toContain("Hire Dance<br />Competition Staff on");
   });
 });

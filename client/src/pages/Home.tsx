@@ -218,7 +218,7 @@ const BIZ_TYPES = [
   },
   {
     title: "Dance Competitions",
-    card: "/testimonials/competition-imagine.png",
+    card: "/manus-storage/dance-competition-imagine_d2ac6e89.png",
     blurb: "Judges, emcees, tabulators, crew and photo/video",
     icon: Trophy,
     cta: "Post a Competition Job",
