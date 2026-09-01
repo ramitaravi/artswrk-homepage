@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { ChevronDown, ArrowRight, Check } from "lucide-react";
-import { useLocation } from "wouter";
 import Navbar from "@/components/Navbar";
 import { COMPETITION_LOGOS, type CompetitionLogo } from "@/data/competitionLogos";
 import { trpc } from "@/lib/trpc";
@@ -56,22 +55,28 @@ const FAQS = [
   },
 ];
 
+const LABEL = "mb-1.5 block text-xs font-bold uppercase tracking-[0.05em] text-gray-500";
+const FIELD =
+  "w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition-colors focus:border-[#F25722]";
+
 function FaqItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="border-b border-gray-100 last:border-0">
+    <div className="border-b border-[#0E0E17]/10 pt-2 last:border-0">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between py-5 text-left"
+        aria-expanded={open}
+        className="flex w-full cursor-pointer items-center justify-between gap-6 py-[18px] text-left"
       >
-        <h5 className="text-sm font-bold text-[#111] pr-4">{q}</h5>
+        <span className="text-base font-bold tracking-[-0.01em] text-[#0E0E17] md:text-[19px]">{q}</span>
         <ChevronDown
-          size={18}
-          className={`text-gray-400 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+          size={22}
+          strokeWidth={2}
+          className={`flex-none text-[#0E0E17] transition-transform duration-200 ${open ? "rotate-180" : ""}`}
         />
       </button>
       {open && (
-        <p className="text-sm text-gray-500 leading-relaxed pb-5">{a}</p>
+        <p className="pb-6 text-base leading-relaxed text-[#6E7690]">{a}</p>
       )}
     </div>
   );
@@ -136,7 +141,6 @@ function CompetitionLogoMarquee() {
 
 export default function DanceCompetitions() {
   const [activeStaff, setActiveStaff] = useState(0);
-  const [, navigate] = useLocation();
   const [competitionName, setCompetitionName] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
@@ -177,30 +181,31 @@ export default function DanceCompetitions() {
   return (
     <div className="bg-white min-h-screen font-[Poppins,sans-serif]">
       <Navbar />
-      {/* ── Hero — split screen: pitch + quick-start job post ──────────────────── */}
-      <section className="pt-28 pb-20 px-5 lg:px-10">
-        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-14 items-center">
-          {/* Left: pitch */}
+      {/* ── Hero — pitch + enterprise job form ──────────────────────────── */}
+      <section id="top" className="px-5 pt-28 pb-20 lg:px-10">
+        <div className="mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-2">
           <div>
-            <p className="text-sm font-semibold hirer-grad-text uppercase tracking-widest mb-4">
+            <p className="mb-4 text-sm font-semibold uppercase tracking-[0.12em] hirer-grad-text">
               For Dance Competitions
             </p>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#111] leading-tight mb-5">
-              The #1 Platform<br />to Hire Dance<br />Competition Staff
+            <h1 className="mb-7 text-4xl font-black leading-[1.12] text-[#111] md:text-5xl lg:text-6xl">
+              Hire Dance<br />Competition Staff on{" "}
+              <span className="hirer-grad-text">Artswrk</span>
             </h1>
-            <p className="text-gray-500 text-lg mb-2 max-w-md">
+            <p className="max-w-md text-lg leading-relaxed text-gray-500">
               Find judges, emcees, and event staff on Artswrk.
-            </p>
-            <p className="text-gray-400 text-sm max-w-md">
-              Post your first job in under a minute — no account needed to get started.
             </p>
           </div>
 
-          {/* Right: quick-start job post */}
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-7 md:p-8">
+          {/* Enterprise inquiry form */}
+          <div
+            id="get-started"
+            className="rounded-3xl border border-gray-100 bg-white p-7 md:p-8"
+            style={{ boxShadow: "0 20px 45px rgba(15,23,42,0.10)" }}
+          >
             {submitted ? (
-              <div className="py-6 text-center space-y-3">
-                <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center mx-auto">
+              <div className="space-y-3 py-6 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-50">
                   <Check size={24} className="text-green-500" />
                 </div>
                 <h2 className="text-xl font-black text-[#111]">Our team has received your inquiry</h2>
@@ -213,60 +218,56 @@ export default function DanceCompetitions() {
                 </a>
               </div>
             ) : (
-            <>
-            <p className="text-xs font-bold uppercase tracking-widest text-[#F25722] mb-1.5">Get Started</p>
-            <h2 className="text-xl font-black text-[#111] mb-6">Tell us what you need</h2>
-            <form onSubmit={handleGetStarted} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
-                  Competition Name
-                </label>
-                <input
-                  type="text"
-                  value={competitionName}
-                  onChange={(e) => setCompetitionName(e.target.value)}
-                  placeholder="e.g. Starpower Dance Competition"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-colors"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => { setEmail(e.target.value); setError(""); }}
-                  placeholder="you@competition.com"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-colors"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
-                  What do you need? <span className="font-medium normal-case tracking-normal text-gray-400">(optional)</span>
-                </label>
-                <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  rows={3}
-                  maxLength={2000}
-                  placeholder="Roles, dates, cities — whatever you already know."
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm resize-none focus:outline-none focus:border-[#F25722] transition-colors"
-                />
-              </div>
-              {error && <p className="text-xs text-red-500">{error}</p>}
-              <button
-                type="submit"
-                disabled={submitInquiry.isPending}
-                className="w-full hirer-grad-bg text-white text-sm font-bold py-3.5 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5 disabled:opacity-60"
-              >
-                {submitInquiry.isPending ? "Sending…" : <>Get Started <ArrowRight size={15} /></>}
-              </button>
-              <p className="text-[11px] text-gray-400 text-center">
-                Our team will reach out — usually within one business day.
-              </p>
-            </form>
-            </>
+              <>
+                <p className="mb-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[#F25722]">
+                  Artswrk Enterprise
+                </p>
+                <h2 className="mb-6 text-xl font-black text-[#111]">Post Your Competition Job</h2>
+                <form onSubmit={handleGetStarted} className="flex flex-col gap-4">
+                  <div>
+                    <label className={LABEL}>Email</label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                      placeholder="you@competition.com"
+                      className={FIELD}
+                    />
+                  </div>
+                  <div>
+                    <label className={LABEL}>Competition Name</label>
+                    <input
+                      type="text"
+                      value={competitionName}
+                      onChange={(e) => setCompetitionName(e.target.value)}
+                      placeholder="e.g. REVEL Dance Convention"
+                      className={FIELD}
+                    />
+                  </div>
+                  <div>
+                    <label className={LABEL}>Job Description</label>
+                    <textarea
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      rows={6}
+                      maxLength={2000}
+                      placeholder="e.g. Looking for 3 judges for our Orlando regional, Mar 14–16. Travel and hotel covered — must have national competition experience."
+                      className={`${FIELD} min-h-[150px] resize-y leading-relaxed`}
+                    />
+                  </div>
+                  {error && <p className="text-xs text-red-500">{error}</p>}
+                  <button
+                    type="submit"
+                    disabled={submitInquiry.isPending}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-xl py-3.5 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60 hirer-grad-bg"
+                  >
+                    {submitInquiry.isPending ? "Sending…" : <>Get Started <ArrowRight size={15} /></>}
+                  </button>
+                  <p className="text-center text-[11px] text-gray-400">
+                    Our team will reach out — usually within one business day.
+                  </p>
+                </form>
+              </>
             )}
           </div>
         </div>
@@ -281,117 +282,95 @@ export default function DanceCompetitions() {
       </section>
 
       {/* ── Hire Competition Staff ──────────────────────────────────────── */}
-      <section className="py-20 px-5 lg:px-10 max-w-7xl mx-auto">
-        <div className="grid lg:grid-cols-2 gap-16 items-start">
+      <section id="staff" className="mx-auto max-w-[1200px] px-5 pt-20 lg:px-8 lg:pt-28">
+        <div className="grid items-start gap-10 lg:grid-cols-2 lg:gap-20">
           <div>
-            <h2 className="text-3xl md:text-4xl font-black text-[#111] mb-8">
+            <h2 className="text-[28px] font-bold tracking-[-0.02em] text-[#0E0E17] md:text-[38px]">
               Hire Competition Staff
             </h2>
-            <div className="space-y-1">
-              {STAFF_TYPES.map((s, i) => (
-                <button
-                  key={i}
-                  onClick={() => setActiveStaff(i)}
-                  className={`w-full text-left px-5 py-4 rounded-2xl transition-all ${
-                    activeStaff === i
-                      ? "bg-orange-50 border border-orange-100"
-                      : "hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{s.emoji}</span>
-                    <div>
-                      <p
-                        className={`font-bold text-sm ${
-                          activeStaff === i ? "text-[#F25722]" : "text-gray-400"
-                        }`}
-                      >
-                        {s.label}
-                      </p>
-                      {activeStaff === i && (
-                        <p className="text-xs text-gray-500 mt-0.5">{s.desc}</p>
-                      )}
+            {/* Reads as a list, not a set of buttons: only the open row carries
+                its description, the rest stay quiet until chosen. */}
+            <div className="mt-8 border-t border-[#0E0E17]/10">
+              {STAFF_TYPES.map((s, i) => {
+                const open = activeStaff === i;
+                return (
+                  <button
+                    key={s.label}
+                    onClick={() => setActiveStaff(i)}
+                    aria-expanded={open}
+                    className="w-full cursor-pointer border-b border-[#0E0E17]/10 py-5 text-left"
+                  >
+                    <div
+                      className={`flex items-center gap-2.5 text-lg font-bold tracking-[-0.01em] transition-colors md:text-[22px] ${
+                        open ? "text-[#0E0E17]" : "text-[#9AA0AE]"
+                      }`}
+                    >
+                      <span className="flex-none">{s.emoji}</span>
+                      <span>{s.label}</span>
                     </div>
-                  </div>
-                </button>
-              ))}
+                    {open && (
+                      <div className="mt-2.5 text-base leading-relaxed text-[#6E7690]">{s.desc}</div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
-          <div className="relative flex flex-col gap-4">
-            <div className="rounded-3xl bg-orange-50 border border-orange-100 p-8">
-              <p className="text-4xl font-black text-[#F25722] mb-1">6,000+</p>
-              <p className="text-sm font-semibold text-gray-600">Vetted performing arts professionals ready to work</p>
-            </div>
-            <div className="rounded-3xl bg-gray-50 border border-gray-100 p-8">
-              <p className="text-4xl font-black text-[#111] mb-1">3</p>
-              <p className="text-sm font-semibold text-gray-600">Average applicants within 24 hours of posting</p>
-            </div>
-            <div className="rounded-3xl bg-gray-50 border border-gray-100 p-8">
-              <p className="text-4xl font-black text-[#111] mb-1">Free</p>
-              <p className="text-sm font-semibold text-gray-600">To post unlimited jobs — only pay to unlock applicants</p>
-            </div>
-            <div className="rounded-3xl hirer-grad-bg p-8">
-              <p className="text-4xl font-black text-white mb-1">50+</p>
-              <p className="text-sm font-semibold text-white/80">Cities with active artists on the platform</p>
-            </div>
+
+          <div
+            className="relative w-full overflow-hidden rounded-3xl"
+            style={{ aspectRatio: "1 / 1", backgroundImage: "linear-gradient(150deg, #E01B1B 0%, #8E0B0B 100%)" }}
+          >
+            <img
+              src="/testimonials/competition-imagine.png"
+              alt="A competition hiring judges and staff on Artswrk"
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
           </div>
         </div>
       </section>
 
-      {/* ── How It Works ────────────────────────────────────────────────── */}
-      <section className="py-20 bg-gray-50 px-5 lg:px-10">
-        <div className="max-w-7xl mx-auto">
-          <p className="text-sm font-semibold hirer-grad-text uppercase tracking-widest mb-3 text-center">
-            HOW IT WORKS
-          </p>
-          <h2 className="text-3xl md:text-4xl font-black text-[#111] text-center mb-12">
-            One tool to find, hire, and pay artists
-          </h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {HOW_IT_WORKS.map((step) => (
-              <div key={step.step} className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100">
-                <div className="aspect-[4/3] overflow-hidden bg-gray-100">
-                  <img
-                    src={step.img}
-                    alt={step.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="p-6">
-                  <h3 className="text-base font-black text-[#111] mb-2">
-                    {step.title}
-                  </h3>
-                  <p className="text-sm text-gray-500 leading-relaxed">
-                    {step.desc}
-                  </p>
-                </div>
+      {/* ── How it WRKs ─────────────────────────────────────────────────── */}
+      <section id="how" className="mx-auto max-w-[1200px] px-5 pt-20 lg:px-8 lg:pt-28">
+        <p className="text-[15px] font-semibold text-[#F25722]">For Competitions</p>
+        <h2 className="mt-3.5 text-[30px] font-extrabold tracking-[-0.02em] text-[#F25722] md:text-[44px]">
+          How it WRKs
+        </h2>
+        <div className="mt-10 grid gap-8 md:grid-cols-3">
+          {HOW_IT_WORKS.map((step) => (
+            <div key={step.step} className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+              <div className="aspect-[4/3] overflow-hidden bg-gray-100">
+                <img src={step.img} alt={step.title} loading="lazy" decoding="async" className="h-full w-full object-cover" />
               </div>
-            ))}
-          </div>
+              <div className="p-6">
+                <h3 className="mb-2 text-base font-black text-[#111]">{step.title}</h3>
+                <p className="text-sm leading-relaxed text-gray-500">{step.desc}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
       {/* ── FAQs ────────────────────────────────────────────────────────── */}
-      <section className="py-20 px-5 lg:px-10 max-w-7xl mx-auto">
-        <div className="grid lg:grid-cols-2 gap-16 items-start">
-          <div>
-            <p className="text-sm font-semibold hirer-grad-text uppercase tracking-widest mb-3">
-              FAQs
-            </p>
-            <h2 className="text-3xl md:text-4xl font-black text-[#111] mb-4">
+      <section id="faq" className="mx-auto max-w-[1200px] px-5 pt-20 lg:px-8 lg:pt-28">
+        <div className="grid items-start gap-9 lg:grid-cols-2 lg:gap-16">
+          <div className="flex min-h-full flex-col">
+            <p className="text-[15px] font-semibold text-[#F25722]">FAQs</p>
+            <h2 className="mt-5 text-[30px] font-bold leading-[1.45] tracking-[-0.02em] text-[#0E0E17] md:text-[44px]">
               Frequently Asked Questions
             </h2>
-            <p className="text-gray-500 text-sm">
-              Couldn't find the answer you were looking for?{" "}
-              <a
-                href="mailto:contact@artswrk.com"
-                className="text-[#F25722] font-semibold hover:underline"
-              >
-                Contact us at contact@artswrk.com
+            {/* mt-auto pins this to the bottom of the column, matching the
+                design's balance against the taller FAQ list beside it. */}
+            <p className="mb-0 mt-auto pt-12 text-base leading-relaxed text-[#525252]">
+              Couldn't find the answer you were looking for? Contact us at{" "}
+              <a href="mailto:contact@artswrk.com" className="font-semibold text-[#F25722] hover:underline">
+                contact@artswrk.com
               </a>
             </p>
           </div>
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm px-6">
+          <div>
             {FAQS.map((faq, i) => (
               <FaqItem key={i} q={faq.q} a={faq.a} />
             ))}
@@ -400,17 +379,17 @@ export default function DanceCompetitions() {
       </section>
 
       {/* ── CTA Banner ──────────────────────────────────────────────────── */}
-      <section className="py-20 px-5 lg:px-10">
-        <div className="max-w-4xl mx-auto hirer-grad-bg rounded-3xl p-12 text-center">
-          <h2 className="text-3xl md:text-4xl font-black text-white mb-4">
+      <section className="mx-auto max-w-[1200px] px-5 py-20 lg:px-8 lg:py-28">
+        <div className="mx-auto max-w-4xl rounded-[28px] px-6 py-11 text-center md:px-12 md:py-16 hirer-grad-bg">
+          <h2 className="text-[28px] font-extrabold tracking-[-0.02em] text-white text-balance md:text-[40px]">
             Ready to staff your next competition?
           </h2>
-          <p className="text-white/80 mb-8">
-            Join hundreds of competitions already hiring on Artswrk
+          <p className="mx-auto mt-4 max-w-[30em] text-base leading-relaxed text-white/85">
+            Join the industry's best competitions hiring on Artswrk!
           </p>
           <a
-            href="/jobs"
-            className="inline-block bg-white text-[#F25722] text-sm font-bold px-8 py-4 rounded-full hover:bg-gray-50 transition-colors"
+            href="#get-started"
+            className="mt-7 inline-block rounded-full bg-white px-8 py-4 text-[15px] font-bold text-[#F25722] transition-colors hover:bg-gray-50"
           >
             Post a Job — It's Free
           </a>
