@@ -430,6 +430,34 @@ export async function sendProJobPostedEmail(data: {
  * the team has a record of who's actually payable, without having to check
  * the admin dashboard proactively.
  */
+/**
+ * Internal alert — a legacy Bubble user just set their password for the
+ * first time (setInitialPassword) and logged in. Useful signal on its own
+ * (99.9% of artists have no password yet, so this is the whole "claim your
+ * account" moment) and doubles as an early-warning if that flow breaks for
+ * someone — no confirmation email means nobody's actually getting through.
+ */
+export async function sendFirstLoginAlertEmail({
+  name, email, userRole, userId,
+}: { name: string; email: string; userRole?: string | null; userId: number }): Promise<boolean> {
+  const html = renderEmailShell({
+    accent: "internal",
+    headline: "First login — password just set 🔑",
+    preheader: name + " (" + (userRole ?? "unknown role") + ") set their password and logged in.",
+    bodyHtml:
+      para(b(name) + " just set a password for the first time and logged in — this was a legacy Bubble account with no password on file.") +
+      detailsCard([
+        { label: "Name", value: name },
+        { label: "Email", value: email },
+        { label: "Role", value: userRole ?? "unknown" },
+        { label: "User ID", value: String(userId) },
+      ]),
+    ctaText: "View in Admin",
+    ctaUrl: APP_URL + "/admin-dashboard",
+  });
+  return sendSimpleEmail({ to: SUPPORT_EMAIL, subject: name + " just logged in for the first time", html });
+}
+
 export async function sendStripeConnectAlertEmail({
   artistName, artistEmail, accountId,
 }: { artistName: string; artistEmail?: string | null; accountId: string }): Promise<boolean> {

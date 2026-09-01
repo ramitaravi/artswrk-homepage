@@ -218,6 +218,19 @@ export const appRouter = router({
         const hash = await bcrypt.hash(input.password, SALT_ROUNDS);
         await setUserPassword(user.id, hash, false);
 
+        // Internal signal, not user-facing — never block their login on it.
+        try {
+          const { sendFirstLoginAlertEmail } = await import("./email");
+          await sendFirstLoginAlertEmail({
+            name: user.name || user.firstName || "Someone",
+            email: user.email ?? input.email,
+            userRole: user.userRole,
+            userId: user.id,
+          });
+        } catch (notifyErr) {
+          console.error("[setInitialPassword] Internal alert email failed (non-fatal):", notifyErr);
+        }
+
         const sessionToken = await sdk.createSessionToken(user.openId, {
           name: user.name || user.firstName || "User",
           expiresInMs: ONE_YEAR_MS,
