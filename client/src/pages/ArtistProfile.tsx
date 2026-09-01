@@ -8,7 +8,7 @@ import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import {
   MapPin, Calendar, Share2, Star, Loader2,
-  Globe, Instagram, Youtube, ExternalLink, MessageCircle, Pencil,
+  Globe, Instagram, Youtube, ExternalLink, MessageCircle, Pencil, Lock,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -247,6 +247,18 @@ export default function ArtistProfile() {
     { enabled: !!slug }
   );
 
+  // Must sit above this component's loading/not-found early returns — putting it
+  // lower makes the hook conditional and React throws on the second render.
+  // Only queried when signed in; the button is an email-capture form otherwise.
+  const artistUserId = (profile as any)?.id as number | undefined;
+  const { data: messagePermission } = trpc.artists.canMessage.useQuery(
+    { artistId: artistUserId ?? 0 },
+    { enabled: !!user && !!artistUserId }
+  );
+  // Default to locked while loading, so an enabled button never flashes and
+  // then fails on click.
+  const canMessage = messagePermission?.allowed ?? false;
+
   const handleShare = () => {
     const url = window.location.href;
     if (navigator.share) {
@@ -467,11 +479,32 @@ export default function ArtistProfile() {
                     </button>
                   </a>
                 ) : user ? (
-                  <a href="/app/messages">
-                    <button className="w-full py-3 rounded-xl bg-[#ec008c] text-white text-sm font-bold hover:bg-[#c40075] transition-colors flex items-center justify-center gap-2 mt-1">
-                      <MessageCircle size={15} /> Contact
-                    </button>
-                  </a>
+                  canMessage ? (
+                    <a href="/app/messages">
+                      <button className="w-full py-3 rounded-xl bg-[#ec008c] text-white text-sm font-bold hover:bg-[#c40075] transition-colors flex items-center justify-center gap-2 mt-1">
+                        <MessageCircle size={15} /> Contact
+                      </button>
+                    </a>
+                  ) : (
+                    // Locked for free/on-demand clients with no existing thread —
+                    // same rule the server enforces on send.
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-2 mt-1">
+                      <button
+                        disabled
+                        className="w-full py-3 rounded-xl bg-gray-200 text-gray-500 text-sm font-bold flex items-center justify-center gap-2 cursor-not-allowed"
+                      >
+                        <Lock size={15} /> Contact
+                      </button>
+                      <p className="text-xs text-gray-500 text-center">
+                        Messaging artists is a Premium feature.
+                      </p>
+                      <a href="/app/settings">
+                        <button className="w-full py-2 rounded-lg bg-[#F25722] text-white text-xs font-bold hover:bg-[#d94a1a] transition-colors">
+                          Upgrade to Premium
+                        </button>
+                      </a>
+                    </div>
+                  )
                 ) : (
                   <form onSubmit={handleConnectSubmit} className="pt-3 mt-1 border-t border-gray-100 space-y-2">
                     <p className="text-sm font-bold text-[#111]">Want to connect with {firstName}?</p>

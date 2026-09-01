@@ -4176,12 +4176,15 @@ export async function isClientJobUnlocked(clientUserId: number, jobId: number): 
 }
 
 /**
- * Whether a client is allowed to open a NEW conversation with a given artist.
- * Premium/Enterprise clients can message anyone. Free/on-demand clients can only
- * message an artist who has applied to a job of theirs that they've actually
- * unlocked (regular job unlock, or a premium job they created as enterprise) —
- * otherwise messaging would be a free backdoor around the applicant-unlock paywall.
- * Existing conversations are never revoked by this check (only gates starting new ones).
+ * Whether a client is allowed to message a given artist.
+ *
+ * Subscribers (client_premium / enterprise_subscription) and admins can message
+ * anyone. Everyone else — free AND on-demand — can only reply inside a
+ * conversation that already exists with that artist. Notably an unlocked job no
+ * longer grants this: on-demand clients pay per job for applicant access, and
+ * messaging is a subscriber feature, so unlocking must not also buy outbound
+ * contact. An artist who messages a client first still opens a thread the
+ * client can answer.
  */
 export async function canClientMessageArtist(clientUserId: number, artistUserId: number): Promise<boolean> {
   const db = await getDb();
@@ -4191,26 +4194,12 @@ export async function canClientMessageArtist(clientUserId: number, artistUserId:
   const u = user as any;
   if (user.role === "admin" || u.planTier === "client_premium" || u.planTier === "enterprise_subscription") return true;
 
-  const jobRows = await db.execute(
-    `SELECT ia.jobId AS jobId FROM interested_artists ia INNER JOIN jobs j ON j.id = ia.jobId WHERE ia.artistUserId = ${artistUserId} AND j.clientUserId = ${clientUserId}`
+  // An existing thread is the only other way in — never revoke a conversation
+  // that's already underway.
+  const convoRows = await db.execute(
+    `SELECT id FROM conversations WHERE clientUserId = ${clientUserId} AND artistUserId = ${artistUserId} LIMIT 1`
   );
-  const jobIds: number[] = (jobRows[0] as unknown as any[]).map((r: any) => r.jobId);
-  for (const jobId of jobIds) {
-    if (await isClientJobUnlocked(clientUserId, jobId)) return true;
-  }
-
-  // Owning a premium job is NOT proof it's paid for — posting only requires
-  // an enterprise account, the $100 unlock is a separate action. Only count
-  // it if this specific job has actually been unlocked (matches the same
-  // check enterprise.confirmApplicant now uses).
-  const premiumJobRows = await db.execute(
-    `SELECT pia.premiumJobId AS jobId FROM premium_job_interested_artists pia INNER JOIN premium_jobs pj ON pj.id = pia.premiumJobId WHERE pia.artistUserId = ${artistUserId} AND pj.createdByUserId = ${clientUserId}`
-  );
-  const premiumJobIds: number[] = (premiumJobRows[0] as unknown as any[]).map((r: any) => r.jobId);
-  for (const jobId of premiumJobIds) {
-    if (await isJobUnlocked(clientUserId, jobId)) return true;
-  }
-  return false;
+  return ((convoRows[0] as unknown as any[]) ?? []).length > 0;
 }
 
 /**

@@ -409,7 +409,7 @@ export default function ArtistProfile() {
   const search = useSearch();
   const queryTab = new URLSearchParams(search).get("tab") as Tab | null;
   const [activeTab, setActiveTab] = useState<Tab>(
-    queryTab && ["about", "reviews", "history"].includes(queryTab) ? queryTab : "about"
+    queryTab && ["about", "reviews"].includes(queryTab) ? queryTab : "about"
   );
   const [, navigate] = useLocation();
 
@@ -417,6 +417,14 @@ export default function ArtistProfile() {
     { userId: artistId },
     { enabled: artistId > 0 }
   );
+
+  const { data: messagePermission } = trpc.artists.canMessage.useQuery(
+    { artistId },
+    { enabled: artistId > 0 }
+  );
+  // Default to locked while it loads — better to briefly show the gate than to
+  // flash an enabled button that then fails on click.
+  const canMessage = messagePermission?.allowed ?? false;
 
   const { start: startUpgrade, pending: upgradePending } = useUpgrade();
 
@@ -504,10 +512,12 @@ export default function ArtistProfile() {
   const ratingDisplay = p.ratingScore ? p.ratingScore / 10 : 5;
   const joinDate = p.bubbleCreatedAt || p.joinedAt || null;
 
+  // "History with You" is hidden for now. HistoryTab and its query are left in
+  // place so it can come back by restoring this one entry; the tab-state guard
+  // below also drops ?tab=history so the deep link can't reach it meanwhile.
   const TABS: { key: Tab; label: string }[] = [
     { key: "about",   label: "About" },
     { key: "reviews", label: "Reviews" },
-    { key: "history", label: "History with You" },
   ];
 
   return (
@@ -570,12 +580,32 @@ export default function ArtistProfile() {
               </div>
             )}
 
-            {/* Message button */}
-            <Link href="/app/messages">
-              <button className="w-full py-3 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors flex items-center justify-center gap-2">
-                <MessageSquare size={14} /> Message
-              </button>
-            </Link>
+            {/* Message button — locked unless the client subscribes or already
+                has a thread with this artist (same rule the server enforces). */}
+            {canMessage ? (
+              <Link href="/app/messages">
+                <button className="w-full py-3 rounded-xl bg-[#111] text-white text-sm font-bold hover:bg-gray-800 transition-colors flex items-center justify-center gap-2">
+                  <MessageSquare size={14} /> Message
+                </button>
+              </Link>
+            ) : (
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-2">
+                <button
+                  disabled
+                  className="w-full py-3 rounded-xl bg-gray-200 text-gray-500 text-sm font-bold flex items-center justify-center gap-2 cursor-not-allowed"
+                >
+                  <Lock size={14} /> Message
+                </button>
+                <p className="text-xs text-gray-500 text-center">
+                  Messaging artists is a Premium feature.
+                </p>
+                <Link href="/app/settings">
+                  <button className="w-full py-2 rounded-lg bg-[#F25722] text-white text-xs font-bold hover:bg-[#d94a1a] transition-colors">
+                    Upgrade to Premium
+                  </button>
+                </Link>
+              </div>
+            )}
 
             {/* Public profile link */}
             {p.slug && (

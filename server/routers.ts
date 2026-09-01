@@ -2132,7 +2132,7 @@ export const appRouter = router({
         if (isClient) {
           const allowed = await canClientMessageArtist(clientUserId, artistUserId);
           if (!allowed) {
-            throw new Error("Unlock this artist's job (or upgrade to Premium) to message them.");
+            throw new Error("Upgrade to Premium to message artists.");
           }
         } else {
           const allowed = await canArtistMessageClient(artistUserId, clientUserId);
@@ -2215,6 +2215,22 @@ export const appRouter = router({
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
         return getArtistHistoryForClient(input.artistId, user.id);
+      }),
+
+    /**
+     * Whether the logged-in client may message this artist — so the profile can
+     * show a locked state up front instead of letting them write a message and
+     * only then hit the same rule as an error. Mirrors canClientMessageArtist
+     * exactly; that remains the enforcement point.
+     */
+    canMessage: protectedProcedure
+      .input(z.object({ artistId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) return { allowed: false };
+        // Artists reach this page too; the client-side rule doesn't apply to them.
+        if (((user as any).planTier ?? "").startsWith("artist_")) return { allowed: true };
+        return { allowed: await canClientMessageArtist(user.id, input.artistId) };
       }),
 
     /**
