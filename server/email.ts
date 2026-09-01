@@ -458,6 +458,65 @@ export async function sendFirstLoginAlertEmail({
   return sendSimpleEmail({ to: SUPPORT_EMAIL, subject: name + " just logged in for the first time", html });
 }
 
+/**
+ * Enterprise / competition inquiry from a public landing page (e.g.
+ * /dance-competitions). Two emails go out: this internal one so the team can
+ * pick it up, and a confirmation to the person who submitted so they know it
+ * landed. The submitter usually has no account yet, so these are the whole
+ * handshake — nothing in-app would reach them.
+ */
+export async function sendEnterpriseInquiryAlertEmail({
+  name, email, company, source, message, phone,
+}: {
+  name?: string | null; email: string; company?: string | null;
+  source: string; message?: string | null; phone?: string | null;
+}): Promise<boolean> {
+  const who = company || name || email;
+  const html = renderEmailShell({
+    accent: "internal",
+    headline: "New enterprise inquiry 📨",
+    preheader: who + " submitted an inquiry from " + source + ".",
+    bodyHtml:
+      para(b(who) + " just submitted an inquiry from the " + b(source) + " page.") +
+      detailsCard([
+        { label: "Company", value: company },
+        { label: "Name", value: name },
+        { label: "Email", value: email },
+        { label: "Phone", value: phone },
+        { label: "Page", value: source },
+      ]) +
+      (message ? para(b("What they said")) + quote(sanitizeUserText(message, 1000)) : ""),
+    ctaText: "View in Admin",
+    ctaUrl: APP_URL + "/admin-dashboard",
+    footerNote: "Reply straight to " + email + " to follow up.",
+  });
+  return sendSimpleEmail({
+    to: SUPPORT_EMAIL,
+    subject: "New inquiry — " + who,
+    html,
+  });
+}
+
+/** Confirmation to whoever submitted the inquiry above. */
+export async function sendEnterpriseInquiryConfirmationEmail({
+  to, name, company,
+}: { to: string; name?: string | null; company?: string | null }): Promise<boolean> {
+  const greeting = name ? "Hi " + b(name) + "," : "Hi there,";
+  const html = renderEmailShell({
+    accent: "client",
+    headline: "We've got your inquiry ✅",
+    preheader: "Our team has received your inquiry — we'll be in touch shortly.",
+    bodyHtml:
+      para(greeting) +
+      para("Our team has received your inquiry" + (company ? " for " + b(company) : "") + " and we'll be in touch shortly.") +
+      para("In the meantime, you can browse the artists already on Artswrk — judges, emcees, backstage staff, photographers and more."),
+    ctaText: "Browse Artists",
+    ctaUrl: APP_URL + "/browse",
+    footerNote: 'Questions in the meantime? Just reply to this email or reach us at <a href="mailto:contact@artswrk.com" style="color:#F25722;font-weight:600;">contact@artswrk.com</a>.<br><br>Best,<br>The Artswrk Team',
+  });
+  return sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject: "We've received your inquiry — Artswrk", html });
+}
+
 export async function sendStripeConnectAlertEmail({
   artistName, artistEmail, accountId,
 }: { artistName: string; artistEmail?: string | null; accountId: string }): Promise<boolean> {

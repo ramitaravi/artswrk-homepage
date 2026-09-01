@@ -26,7 +26,7 @@ import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
 import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, approveArtswrkInvoice, approveBookingPeriodInvoice, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink } from "./db";
 import { invokeLLM } from "./_core/llm";
-import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail, sendArtistBookingConfirmedEmail, sendClientBookingConfirmedEmail, sendClientPayArtistEmail } from "./email";
+import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail, sendArtistBookingConfirmedEmail, sendClientBookingConfirmedEmail, sendClientPayArtistEmail, sendEnterpriseInquiryAlertEmail, sendEnterpriseInquiryConfirmationEmail } from "./email";
 import crypto from "crypto";
 import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistBasicCheckoutSession, createArtistPortalSession, createEnterpriseJobUnlockCheckoutSession, createEnterpriseSubscriptionCheckoutSession, createClientJobUnlockCheckoutSession, createClientSubscriptionCheckoutSession } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
@@ -2423,6 +2423,48 @@ export const appRouter = router({
   }),
 
   // ── Job Posting (Post a Job flow) ─────────────────────────────────────────
+  // ── Public inquiry form (enterprise / competition landing pages) ──────────
+  inquiry: router({
+    /**
+     * Public: someone asks us to get in touch from a landing page. Emails the
+     * team and confirms back to them. Public on purpose — most people filling
+     * this in don't have an account, so requiring one would defeat the form.
+     */
+    submit: publicProcedure
+      .input(z.object({
+        email: z.string().email(),
+        name: z.string().max(200).optional(),
+        company: z.string().max(256).optional(),
+        phone: z.string().max(64).optional(),
+        message: z.string().max(2000).optional(),
+        /** Which page it came from, for routing/attribution. */
+        source: z.string().max(120).default("website"),
+      }))
+      .mutation(async ({ input }) => {
+        const email = input.email.trim().toLowerCase();
+        // Both sends are awaited but individually guarded: a SendGrid hiccup on
+        // the confirmation must not lose the team's copy of the lead (or make
+        // the form look broken to someone who did nothing wrong).
+        const [alerted, confirmed] = await Promise.all([
+          sendEnterpriseInquiryAlertEmail({
+            email,
+            name: input.name?.trim() || null,
+            company: input.company?.trim() || null,
+            phone: input.phone?.trim() || null,
+            message: input.message?.trim() || null,
+            source: input.source,
+          }).catch((e) => { console.error("[inquiry] team alert failed:", e); return false; }),
+          sendEnterpriseInquiryConfirmationEmail({
+            to: email,
+            name: input.name?.trim() || null,
+            company: input.company?.trim() || null,
+          }).catch((e) => { console.error("[inquiry] confirmation failed:", e); return false; }),
+        ]);
+        if (!alerted) console.error("[inquiry] NOT DELIVERED to the team:", email, input.company);
+        return { success: true, confirmationSent: confirmed };
+      }),
+  }),
+
   postJob: router({
     /**
      * Parse a natural language job description using AI and return structured fields.

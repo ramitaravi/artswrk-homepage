@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { ChevronDown, ArrowRight } from "lucide-react";
+import { ChevronDown, ArrowRight, Check } from "lucide-react";
 import { useLocation } from "wouter";
 import Navbar from "@/components/Navbar";
 import { COMPETITION_LOGOS, type CompetitionLogo } from "@/data/competitionLogos";
+import { trpc } from "@/lib/trpc";
 
 // How it works screenshots (from the existing artist strip CDN images)
 const HOW_IT_WORKS = [
@@ -133,7 +134,14 @@ export default function DanceCompetitions() {
   const [, navigate] = useLocation();
   const [competitionName, setCompetitionName] = useState("");
   const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+
+  const submitInquiry = trpc.inquiry.submit.useMutation({
+    onSuccess: () => setSubmitted(true),
+    onError: (err) => setError(err.message || "Something went wrong — please try again."),
+  });
 
   function handleGetStarted(e: React.FormEvent) {
     e.preventDefault();
@@ -141,13 +149,13 @@ export default function DanceCompetitions() {
       setError("Please enter a valid email address.");
       return;
     }
-    const params = new URLSearchParams({
-      role: "client",
-      next: "/post-job",
+    setError("");
+    submitInquiry.mutate({
       email: email.trim(),
+      company: competitionName.trim() || undefined,
+      message: message.trim() || undefined,
+      source: "dance-competitions",
     });
-    if (competitionName.trim()) params.set("company", competitionName.trim());
-    navigate(`/join?${params.toString()}`);
   }
 
   return (
@@ -174,8 +182,24 @@ export default function DanceCompetitions() {
 
           {/* Right: quick-start job post */}
           <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-7 md:p-8">
+            {submitted ? (
+              <div className="py-6 text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center mx-auto">
+                  <Check size={24} className="text-green-500" />
+                </div>
+                <h2 className="text-xl font-black text-[#111]">Our team has received your inquiry</h2>
+                <p className="text-sm text-gray-500">
+                  We'll be in touch shortly{competitionName.trim() ? ` about ${competitionName.trim()}` : ""}. We've sent a
+                  confirmation to <span className="font-semibold text-[#111]">{email.trim()}</span>.
+                </p>
+                <a href="/browse" className="inline-block pt-1 text-sm font-bold text-[#F25722] hover:underline">
+                  Browse artists in the meantime →
+                </a>
+              </div>
+            ) : (
+            <>
             <p className="text-xs font-bold uppercase tracking-widest text-[#F25722] mb-1.5">Get Started</p>
-            <h2 className="text-xl font-black text-[#111] mb-6">Post your job in minutes</h2>
+            <h2 className="text-xl font-black text-[#111] mb-6">Tell us what you need</h2>
             <form onSubmit={handleGetStarted} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
@@ -200,15 +224,34 @@ export default function DanceCompetitions() {
                   placeholder="you@competition.com"
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-colors"
                 />
-                {error && <p className="mt-1.5 text-xs text-red-500">{error}</p>}
               </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                  What do you need? <span className="font-medium normal-case tracking-normal text-gray-400">(optional)</span>
+                </label>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={3}
+                  maxLength={2000}
+                  placeholder="Roles, dates, cities — whatever you already know."
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm resize-none focus:outline-none focus:border-[#F25722] transition-colors"
+                />
+              </div>
+              {error && <p className="text-xs text-red-500">{error}</p>}
               <button
                 type="submit"
-                className="w-full hirer-grad-bg text-white text-sm font-bold py-3.5 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
+                disabled={submitInquiry.isPending}
+                className="w-full hirer-grad-bg text-white text-sm font-bold py-3.5 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5 disabled:opacity-60"
               >
-                Get Started <ArrowRight size={15} />
+                {submitInquiry.isPending ? "Sending…" : <>Get Started <ArrowRight size={15} /></>}
               </button>
+              <p className="text-[11px] text-gray-400 text-center">
+                Our team will reach out — usually within one business day.
+              </p>
             </form>
+            </>
+            )}
           </div>
         </div>
       </section>
