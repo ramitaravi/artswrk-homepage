@@ -849,8 +849,11 @@
 - [x] Compare the current source and rendered Dance Competitions page for stale content
 - [x] Resync, restart, or merge the correct source without overwriting reviewed work
 - [x] Validate the corrected page and save a restorable checkpoint
-- [ ] Move the newly merged Dance Competitions and page-specific SEO images from `client/public` to managed storage and update all references
-- [ ] Remove only the migrated public copies after verifying every managed asset returns successfully
+- [x] Move the newly merged Dance Competitions and page-specific SEO images from `client/public` to managed storage and update all references
+- [x] Remove only the migrated public copies after verifying every managed asset returns successfully
+- [x] Restore the live “The #1 Platform” Dance Competitions layout from the verified branch source
+- [x] Preserve current inquiry email, existing-account routing, managed logos, route metadata, and Brevo chatbot behavior in the restored layout
+- [x] Visually compare the restored desktop/mobile preview with the current live production page before checkpointing
 
 ## Default Homepage SEO Image
 - [x] Inspect `ArtswrkSEOTiles.zip` and identify the orange-gradient "Find WRK / Hire Artists" tile
@@ -869,10 +872,10 @@
 - [x] Save a validated homepage SEO checkpoint
 
 ## SEO Merge and Brevo Conversations Widget
-- [ ] Complete the active GitHub merge while preserving the newest inquiry flow and optimized homepage SEO
-- [ ] Move newly merged Dance Competitions and route-specific SEO images to managed storage and update all references
-- [ ] Remove only the successfully migrated public media copies after validating their managed URLs
-- [ ] Add the Brevo Conversations widget globally with asynchronous, non-blocking loading
-- [ ] Add regression coverage for the widget ID, loader source, and route-specific SEO metadata
-- [ ] Run deterministic tests, TypeScript, production build, metadata checks, asset checks, and desktop/mobile smoke tests
-- [ ] Save a validated merged SEO and chatbot checkpoint
+- [x] Complete the active GitHub merge while preserving the newest inquiry flow and optimized homepage SEO
+- [x] Move newly merged Dance Competitions and route-specific SEO images to managed storage and update all references
+- [x] Remove only the successfully migrated public media copies after validating their managed URLs
+- [x] Add the Brevo Conversations widget globally with asynchronous, non-blocking loading
+- [x] Add regression coverage for the widget ID, loader source, and route-specific SEO metadata
+- [x] Run deterministic tests, TypeScript, production build, metadata checks, asset checks, and desktop/mobile smoke tests
+- [x] Save a validated merged SEO and chatbot checkpoint
