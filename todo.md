@@ -842,3 +842,10 @@
 - [x] Fix and test the client job-unlock helper so its intended Admin bypass actually selects the Admin role
 - [x] Run deterministic tests, TypeScript, production build, and key-route smoke checks
 - [x] Save or confirm a validated checkpoint and provide the exact user-approved Publish step for live domains
+
+## Dance Competitions GitHub Freshness Investigation
+- [ ] Compare local HEAD, checkpoint state, and `user_github/main` against the newest remote commit
+- [ ] Inspect recent Git history and branch changes affecting `DanceCompetitions.tsx`
+- [ ] Compare the current source and rendered Dance Competitions page for stale content
+- [ ] Resync, restart, or merge the correct source without overwriting reviewed work
+- [ ] Validate the corrected page and save a restorable checkpoint
