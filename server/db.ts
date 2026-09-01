@@ -602,12 +602,26 @@ export async function getAdminJobBookings(jobId: number) {
 /**
  * Admin: update a regular job's editable fields.
  */
+const JOB_DATE_COLUMNS = ["startDate", "endDate", "boostStartDate", "boostEndDate"] as const;
+
 export async function updateAdminJob(jobId: number, fields: Record<string, any>) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   const { eq } = await import("drizzle-orm");
   const { jobs: jobsTable } = await import("../drizzle/schema");
-  await db.update(jobsTable).set(fields).where(eq(jobsTable.id, jobId));
+  // Belt and braces on the date columns: Drizzle calls .toISOString() on
+  // whatever it's handed, so a stray "YYYY-MM-DD" string throws and takes the
+  // entire update with it. Callers should pass Dates; this makes a slip a
+  // no-op rather than a failed save.
+  const safe: Record<string, any> = { ...fields };
+  for (const col of JOB_DATE_COLUMNS) {
+    const v = safe[col];
+    if (typeof v === "string") {
+      const d = new Date(v);
+      safe[col] = isNaN(d.getTime()) ? null : d;
+    }
+  }
+  await db.update(jobsTable).set(safe).where(eq(jobsTable.id, jobId));
 }
 
 /**

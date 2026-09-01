@@ -17,6 +17,7 @@ import {
   CheckCircle2, Users, Loader2, Star, X, Send,
   Building2, Instagram, Pencil,
   UserCheck, CreditCard, Banknote, Zap, Share2,
+  Archive, PauseCircle, PlayCircle,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useUpgrade } from "@/lib/useUpgrade";
@@ -1328,6 +1329,68 @@ function JobStatusDropdown({ jobId, requestStatus }: { jobId: number; requestSta
   );
 }
 
+
+/**
+ * Pause / Archive as a named button beside Edit and Share.
+ *
+ * These actions existed only inside the status pill, which reads as a badge
+ * rather than a control — people couldn't find them. The pill stays (it's the
+ * quickest way to switch between all three states); this surfaces the two
+ * actions someone actually goes looking for.
+ */
+function JobStatusActions({ jobId, requestStatus }: { jobId: number; requestStatus: string | null | undefined }) {
+  const utils = trpc.useUtils();
+  const current = toSimpleJobStatus(requestStatus);
+  const updateStatus = trpc.clientJobs.updateStatus.useMutation({
+    onSuccess: (_d, vars) => {
+      utils.clientJobs.getDetail.invalidate({ jobId });
+      utils.jobs.myJobs.invalidate();
+      toast.success(
+        vars.status === "Paused" ? "Job paused — artists can't apply for now"
+        : vars.status === "Archived" ? "Job archived"
+        : "Job is live again",
+      );
+    },
+    onError: (e) => toast.error(e.message || "Failed to update status"),
+  });
+
+  const btn = "flex items-center gap-1.5 text-xs font-semibold text-gray-500 border border-gray-200 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors whitespace-nowrap disabled:opacity-60";
+
+  return (
+    <>
+      {current === "Active" ? (
+        <button
+          onClick={() => updateStatus.mutate({ jobId, status: "Paused" })}
+          disabled={updateStatus.isPending}
+          className={btn}
+          title="Stop new applications without removing the job"
+        >
+          <PauseCircle size={13} /> Pause
+        </button>
+      ) : (
+        <button
+          onClick={() => updateStatus.mutate({ jobId, status: "Active" })}
+          disabled={updateStatus.isPending}
+          className={btn}
+          title="Let artists apply again"
+        >
+          <PlayCircle size={13} /> Reopen
+        </button>
+      )}
+      {current !== "Archived" && (
+        <button
+          onClick={() => updateStatus.mutate({ jobId, status: "Archived" })}
+          disabled={updateStatus.isPending}
+          className={btn}
+          title="Close this job and hide it from artists"
+        >
+          <Archive size={13} /> Archive
+        </button>
+      )}
+    </>
+  );
+}
+
 // ─── Job Edit Modal ───────────────────────────────────────────────────────────
 
 function JobEditModal({ job, jobId, onClose }: { job: any; jobId: number; onClose: () => void }) {
@@ -1661,7 +1724,8 @@ export default function ClientJobDetail() {
             )}
           </div>
         </div>
-        <div className="flex-shrink-0 flex items-center gap-2">
+        <div className="flex-shrink-0 flex items-center gap-2 flex-wrap justify-end">
+          <JobStatusActions jobId={jobId} requestStatus={job.requestStatus} />
           <button
             onClick={() => setEditOpen(true)}
             className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 border border-gray-200 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors whitespace-nowrap"

@@ -4918,12 +4918,20 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         if (!job) throw new Error("Job not found");
         if (user.role !== "admin" && job.clientUserId !== user.id) throw new Error("Access denied");
 
-        const { jobId, locationData, ...fields } = input;
+        const { jobId, locationData, startDate, endDate, ...fields } = input;
         const location = fields.locationAddress !== undefined
           ? await resolveJobLocation({ locationAddress: fields.locationAddress, locationData })
           : {};
+        // startDate/endDate arrive as "YYYY-MM-DD" strings but land in Drizzle
+        // timestamp columns, which call .toISOString() on whatever they're
+        // given — a string threw "value.toISOString is not a function" and
+        // failed the whole save. The edit form always sends both fields, so
+        // this broke EVERY edit of a job that has a date, even a title-only one.
+        const dates: Record<string, Date | null> = {};
+        if (startDate !== undefined) dates.startDate = startDate ? new Date(startDate) : null;
+        if (endDate !== undefined) dates.endDate = endDate ? new Date(endDate) : null;
         const { updateAdminJob, getAdminJobById: refetch } = await import("./db");
-        await updateAdminJob(jobId, { ...fields, ...location });
+        await updateAdminJob(jobId, { ...fields, ...dates, ...location });
         return refetch(jobId);
       }),
   }),
