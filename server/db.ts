@@ -2365,7 +2365,22 @@ export async function getAllMasterServiceTypes() {
     })
     .from(masterServiceTypes)
     .leftJoin(masterArtistTypes, eq(masterServiceTypes.masterArtistTypeId, masterArtistTypes.id))
-    .orderBy(masterArtistTypes.name, masterServiceTypes.listingOrder, masterServiceTypes.name);
+    // Order by the PARENT's listingOrder, not its name: the intended order puts
+    // Dance Educator and Dance Competition Staff (and their sub-services) first,
+    // which alphabetical-by-parent buried behind Acting Coach. Parentless rows
+    // sort last rather than first — MySQL puts NULL ahead of everything, which
+    // otherwise leads the whole list with orphaned, merged-away entries.
+    // Deliberately NOT filtered by isPublic: that flag is set on 21 types that
+    // 7,000+ artists still hold (Voice Teacher, Piano Teacher, Customer Service
+    // among them), so it does not mean "retired" and filtering on it would drop
+    // live options and those artists' saved job-alert preferences.
+    .orderBy(
+      sql`CASE WHEN ${masterArtistTypes.listingOrder} IS NULL THEN 1 ELSE 0 END`,
+      masterArtistTypes.listingOrder,
+      masterArtistTypes.name,
+      masterServiceTypes.listingOrder,
+      masterServiceTypes.name
+    );
 }
 
 /**

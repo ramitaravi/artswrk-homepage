@@ -620,8 +620,11 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
                 >
                   <div className="aspect-[3/4] relative overflow-hidden bg-gray-100">
                     {a.profilePicture ? (
+                      // Deliberately NOT blurred: blurring the photo itself read
+                      // as a low-quality image rather than locked content. The
+                      // frosted scrim below does the gating instead.
                       <img src={a.profilePicture} alt={displayName}
-                        className={`w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500 ${!canConnect ? "blur-[2px]" : ""}`}
+                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
                         onError={(e) => {
                           const el = e.currentTarget;
                           el.style.display = "none";
@@ -642,9 +645,15 @@ function BrowseArtistsTab({ initialRole }: { initialRole?: string }) {
                       </div>
                     )}
                     {!canConnect && (
-                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2.5 py-2 flex items-center gap-1">
-                        <Lock size={11} className="text-white flex-shrink-0" />
-                        <span className="text-[10px] font-bold text-white">Subscribe to connect</span>
+                      // A crisp chip rather than a scrim over the photo: any
+                      // blur/wash over a headshot reads as a low-quality image,
+                      // not as locked content. What's actually gated is the
+                      // click-through, so the lock is signalled, not simulated.
+                      <div className="absolute bottom-2.5 left-2.5">
+                        <span className="flex items-center gap-1 bg-white/95 backdrop-blur-sm shadow-sm text-[#111] text-[10px] font-bold px-2 py-1 rounded-full">
+                          <Lock size={10} className="flex-shrink-0" />
+                          Subscribe to connect
+                        </span>
                       </div>
                     )}
                   </div>
