@@ -3681,8 +3681,15 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           if (!unlocked) throw new Error("Unlock this job before confirming an applicant.");
         }
 
-        // artistRateCents → dollars for storage (booking table uses integer dollars)
-        const artistRateDollars = input.artistRateCents ? Math.round(input.artistRateCents / 100) : null;
+        // bookings.artistRate/clientRate hold the TOTAL for the booking, not a
+        // unit rate — that's what all 5,679 migrated Bubble rows contain
+        // ($50/hr × 5 hrs stored as 250). Storing the raw hourly rate here gave
+        // the column two meanings and under-billed every hourly booking: $60/hr
+        // × 3 hrs was saved as 60, so the studio was invoiced $63 instead of $189.
+        const unitRate = input.artistRateCents ? Math.round(input.artistRateCents / 100) : null;
+        const artistRateDollars = unitRate !== null && input.rateType === "hourly" && input.hours
+          ? Math.round(unitRate * input.hours)
+          : unitRate;
         const clientRateDollars = artistRateDollars !== null && input.paymentMethod === "artswrk"
           ? Math.round(artistRateDollars * 1.05)
           : artistRateDollars;
@@ -4750,7 +4757,15 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         if (!unlocked) throw new Error("Job must be unlocked to confirm artists");
         const existing = await getBookingByApplicantId(input.applicantId);
         if (existing) return { success: true, bookingId: existing.id, alreadyConfirmed: true };
-        const artistRateDollars = input.artistRateCents ? Math.round(input.artistRateCents / 100) : (applicant.artistHourlyRate ?? applicant.artistFlatRate ?? null);
+        // Store the TOTAL, not the unit rate — see the enterprise confirm above.
+        const unitRate = input.artistRateCents
+          ? Math.round(input.artistRateCents / 100)
+          : (applicant.artistHourlyRate ?? applicant.artistFlatRate ?? null);
+        const bookingHours = input.hours ?? applicant.totalHours ?? null;
+        const isHourly = input.rateType === "hourly" || (!input.artistRateCents && applicant.artistHourlyRate != null);
+        const artistRateDollars = unitRate !== null && isHourly && bookingHours
+          ? Math.round((unitRate as number) * bookingHours)
+          : unitRate;
         const clientRateDollars = artistRateDollars !== null && input.paymentMethod === "artswrk"
           ? Math.round((artistRateDollars as number) * 1.05)
           : artistRateDollars;

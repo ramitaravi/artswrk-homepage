@@ -867,11 +867,12 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
   });
 
   const totalReimb = (reimbursements ?? []).reduce((s: number, r: any) => s + (r.value ?? 0), 0);
-  const isHourlyBooking = booking.hours != null && booking.hours > 0;
-  // `rate` is the per-hour (or flat) rate the artist can edit — the actual
-  // amount owed multiplies by hours for hourly bookings. This was previously
-  // sent straight through unmultiplied, silently undercounting hourly pay.
-  const earnedAmount = isHourlyBooking ? rate * booking.hours : rate;
+  // `rate` is bookings.artistRate, which is ALREADY the total for the booking
+  // (Bubble stored $50/hr × 5 hrs as 250, and native confirms now do the same).
+  // Multiplying by hours here double-counted every hourly booking, and because
+  // "hourly" was inferred from `hours` being set at all, it also multiplied 365
+  // FLAT-rate bookings that happen to record hours. Never multiply.
+  const earnedAmount = rate;
   const processingFee = Math.round((earnedAmount + totalReimb) * 0.04);
   const invoiceTotal = earnedAmount + totalReimb + processingFee;
 
@@ -1095,16 +1096,17 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
 
             {/* Rate summary — always visible when there's a non-zero rate or reimbursements */}
             {(booking.artistRate > 0 || totalReimb > 0) && (() => {
-              const isHourlyBooking = booking.hours != null && booking.hours > 0;
-              // Hours were previously shown but never actually multiplied into
-              // the total — the number just sat there unused. Fixed.
-              const baseAmount = isHourlyBooking ? booking.artistRate * booking.hours : booking.artistRate;
+              // artistRate is already the booking TOTAL, so hours is context,
+              // not a multiplier. Multiplying here double-counted hourly
+              // bookings and inflated flat ones that merely record hours.
+              const hasHours = booking.hours != null && booking.hours > 0;
+              const baseAmount = booking.artistRate;
               return (
                 <div className="border-t border-gray-50 pt-4 space-y-1.5 text-sm">
-                  {isHourlyBooking && (
+                  {hasHours && (
                     <div className="flex justify-between text-gray-500 text-xs">
-                      <span>Hourly rate</span>
-                      <span>${booking.artistRate}/hr × {booking.hours} hrs = ${baseAmount.toFixed(2)}</span>
+                      <span>Hours</span>
+                      <span>{booking.hours} hrs</span>
                     </div>
                   )}
                   <div className="flex justify-between font-bold text-[#111] text-base pt-1">
@@ -1161,8 +1163,8 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                   />
                   {rate > 0 && (
                     <div className="bg-pink-50 rounded-xl p-3 space-y-1.5 text-xs">
-                      {isHourlyBooking && (
-                        <div className="flex justify-between text-gray-600"><span>Rate</span><span>${rate}/hr × {booking.hours} hrs</span></div>
+                      {booking.hours > 0 && (
+                        <div className="flex justify-between text-gray-600"><span>Hours</span><span>{booking.hours} hrs</span></div>
                       )}
                       <div className="flex justify-between text-gray-600"><span>Reimbursements</span><span>${totalReimb}</span></div>
                       <div className="flex justify-between font-bold text-[#111] border-t border-pink-100 pt-1.5">
@@ -1191,8 +1193,8 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                     <CheckCircle2 size={15} /> Invoice submitted on {new Date(booking.artswrkInvoiceSubmittedAt).toLocaleDateString()}
                   </div>
                   <div className="border-t border-green-100 pt-2.5 space-y-1.5 text-xs">
-                    {isHourlyBooking && (
-                      <div className="flex justify-between text-gray-600"><span>Rate</span><span>${booking.artistRate}/hr × {booking.hours} hrs</span></div>
+                    {booking.hours > 0 && (
+                      <div className="flex justify-between text-gray-600"><span>Hours</span><span>{booking.hours} hrs</span></div>
                     )}
                     {totalReimb > 0 && (
                       <div className="flex justify-between text-gray-600"><span>Reimbursements</span><span>${totalReimb.toFixed(2)}</span></div>
@@ -1391,8 +1393,12 @@ function ConfirmationCard({ booking }: { booking: any }) {
 
   const totalReimb = (reimbursements ?? []).reduce((s: number, r: any) => s + (r.value ?? 0), 0);
   const rate = parseFloat(artistRate) || 0;
-  const isHourlyBooking = booking.hours != null && booking.hours > 0;
-  const earnedAmount = isHourlyBooking ? rate * booking.hours : rate;
+  // `rate` is bookings.artistRate, which is ALREADY the total for the booking
+  // (Bubble stored $50/hr × 5 hrs as 250, and native confirms now do the same).
+  // Multiplying by hours here double-counted every hourly booking, and because
+  // "hourly" was inferred from `hours` being set at all, it also multiplied 365
+  // FLAT-rate bookings that happen to record hours. Never multiply.
+  const earnedAmount = rate;
   const processingFee = Math.round((earnedAmount + totalReimb) * 0.04);
   const invoiceTotal = earnedAmount + totalReimb + processingFee;
 
@@ -1558,9 +1564,9 @@ function ConfirmationCard({ booking }: { booking: any }) {
                   {/* Invoice summary */}
                   <div className="bg-pink-50 rounded-xl p-3 space-y-1.5 text-xs">
                     <p className="font-semibold text-[#111] mb-2">Invoice Summary</p>
-                    {isHourlyBooking && (
+                    {booking.hours > 0 && (
                       <div className="flex justify-between text-gray-600">
-                        <span>Rate</span><span>${rate}/hr × {booking.hours} hrs</span>
+                        <span>Hours</span><span>{booking.hours} hrs</span>
                       </div>
                     )}
                     <div className="flex justify-between text-gray-600">

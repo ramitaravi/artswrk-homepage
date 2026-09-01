@@ -22,8 +22,13 @@
  *  went out carrying localhost:3000 and manus.space links — the recipient is
  *  not the person whose browser made the request, so their origin is
  *  meaningless and often wrong. */
+/** Fallback is the LIVE site. It used to be app.artswrk.com — the pre-cutover
+ *  host — so with neither env var set (which is the case today) every email CTA
+ *  pointed at the old site: "View my submissions" and friends landed people on
+ *  the old login page. Every other module in the app already defaults to
+ *  artswrk.com; this was the one that didn't. */
 export const APP_URL =
-  process.env.APP_URL || process.env.VITE_APP_URL || "https://app.artswrk.com";
+  process.env.APP_URL || process.env.VITE_APP_URL || "https://artswrk.com";
 
 export const FROM_EMAIL = "contact@artswrk.com";
 export const FROM_NAME = "Artswrk";
