@@ -159,7 +159,7 @@ function SignupCard() {
       </div>
       <p className="mt-2 text-sm leading-relaxed" style={{ color: BODY }}>
         {isArtist
-          ? "One profile. Paid work near you, on the days you choose."
+          ? "Create your artist profile and apply to work you love."
           : "Whether a last minute job or long term hire, share your role and dates — we'll share it with our artist network."}
       </p>
 
@@ -194,9 +194,6 @@ function SignupCard() {
         {submitError ? <p className="m-0 text-xs font-medium text-red-600" role="alert">{submitError}</p> : null}
       </form>
 
-      <div className="mt-3 text-xs" style={{ color: MUTED }}>
-        {isArtist ? "Free to join. You keep your rate." : "Takes about 60 seconds."}
-      </div>
     </div>
   );
 }
@@ -384,8 +381,12 @@ function ForHirers() {
           </div>
 
           <div className="mt-7 flex flex-wrap items-center gap-3">
+            {/* Goes to the selected vertical's own landing page, which is where
+                the pitch and the inquiry form for that audience live. This used
+                to send all three straight to /join, skipping the page that does
+                the actual convincing. */}
             <Link
-              href="/join?role=client"
+              href={shown.href ?? "/join?role=client"}
               className="rounded-xl px-7 py-4 text-[15px] font-bold text-white transition-colors hover:bg-[#3D3D4A]"
               style={{ background: INK }}
             >
@@ -785,14 +786,14 @@ function CTABanner() {
         <div className="mx-auto mt-8 flex w-full max-w-[320px] flex-col justify-center gap-3 sm:max-w-none sm:flex-row sm:flex-wrap">
           <Link
             href="/join?role=client"
-            className="inline-flex w-full items-center justify-center rounded-full bg-white px-[34px] py-4 text-base font-bold sm:w-[140px]"
+            className="inline-flex w-full items-center justify-center whitespace-nowrap rounded-full bg-white px-[34px] py-4 text-base font-bold sm:w-auto sm:min-w-[140px]"
             style={{ color: INK }}
           >
             Post Job
           </Link>
           <Link
             href="/join?role=artist"
-            className="inline-flex w-full items-center justify-center rounded-full px-[34px] py-4 text-base font-bold text-white transition-colors hover:bg-white/15 sm:w-[140px]"
+            className="inline-flex w-full items-center justify-center whitespace-nowrap rounded-full px-[34px] py-4 text-base font-bold text-white transition-colors hover:bg-white/15 sm:w-auto sm:min-w-[140px]"
             style={{ border: "1px solid rgba(255,255,255,0.6)" }}
           >
             Get Hired

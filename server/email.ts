@@ -1,7 +1,7 @@
 import sgMail from "@sendgrid/mail";
 import {
   renderEmailShell, detailsCard, sanitizeUserText, p as para, b, quote,
-  APP_URL, SUPPORT_EMAIL,
+  APP_URL, SUPPORT_EMAIL, CONTACT_EMAIL,
 } from "./emailTemplates";
 
 // Initialize SendGrid with API key
@@ -311,18 +311,35 @@ export async function sendSimpleEmail({
   subject,
   html,
   cc,
+  replyTo,
+  fromName,
 }: {
   to: string;
   subject: string;
   html: string;
   cc?: string | string[];
+  /** Where a reply should land. Used to open a real back-and-forth thread —
+   *  the team's copy replies to the enquirer, and the enquirer's copy replies
+   *  to support — instead of both bouncing to the no-reply from address. */
+  replyTo?: string;
+  /** Overrides the "Artswrk" display name for mail that should read as coming
+   *  from a person. The ADDRESS never changes — it stays the SendGrid-verified
+   *  sender, so only the friendly name differs. */
+  fromName?: string;
 }): Promise<boolean> {
   if (!process.env.SENDGRID_API_KEY) {
     console.warn("[email] SENDGRID_API_KEY not set — skipping email send");
     return false;
   }
   try {
-    await sgMail.send({ to, from: { email: FROM_EMAIL, name: FROM_NAME }, subject, html, ...(cc ? { cc } : {}) });
+    await sgMail.send({
+      to,
+      from: { email: FROM_EMAIL, name: fromName ?? FROM_NAME },
+      subject,
+      html,
+      ...(cc ? { cc } : {}),
+      ...(replyTo ? { replyTo } : {}),
+    });
     return true;
   } catch (err: unknown) {
     console.error("[email] Failed to send simple email:", err instanceof Error ? err.message : err);
@@ -459,62 +476,64 @@ export async function sendFirstLoginAlertEmail({
 }
 
 /**
- * Enterprise / competition inquiry from a public landing page (e.g.
- * /dance-competitions). Two emails go out: this internal one so the team can
- * pick it up, and a confirmation to the person who submitted so they know it
- * landed. The submitter usually has no account yet, so these are the whole
- * handshake — nothing in-app would reach them.
+ * Inquiry from a public landing page (/dance-competitions, The Judge
+ * Experience) — ONE email that introduces the two parties, not a receipt plus
+ * a separate internal alert.
+ *
+ * It goes TO the person who enquired with contact@ cc'd, so both sides are on
+ * the same thread from the first message and either can just hit reply. That
+ * beats the old pattern — a branded "We've got your inquiry ✅" confirmation
+ * that started no conversation, plus a second internal copy that lived in its
+ * own thread — because the point of the form is to start talking, and most
+ * people who fill it in have no account for anything in-app to reach.
+ *
+ * Written like a person sent it: no CTA button, no marketing block. Their own
+ * message is quoted back so the team has the context to reply directly.
  */
-export async function sendEnterpriseInquiryAlertEmail({
+export async function sendInquiryIntroEmail({
   name, email, company, source, message, phone,
 }: {
   name?: string | null; email: string; company?: string | null;
   source: string; message?: string | null; phone?: string | null;
 }): Promise<boolean> {
-  const who = company || name || email;
-  const html = renderEmailShell({
-    accent: "internal",
-    headline: "New enterprise inquiry 📨",
-    preheader: who + " submitted an inquiry from " + source + ".",
-    bodyHtml:
-      para(b(who) + " just submitted an inquiry from the " + b(source) + " page.") +
-      detailsCard([
-        { label: "Company", value: company },
-        { label: "Name", value: name },
-        { label: "Email", value: email },
-        { label: "Phone", value: phone },
-        { label: "Page", value: source },
-      ]) +
-      (message ? para(b("What they said")) + quote(sanitizeUserText(message, 1000)) : ""),
-    ctaText: "View in Admin",
-    ctaUrl: APP_URL + "/admin-dashboard",
-    footerNote: "Reply straight to " + email + " to follow up.",
-  });
-  return sendSimpleEmail({
-    to: SUPPORT_EMAIL,
-    subject: "New inquiry — " + who,
-    html,
-  });
-}
-
-/** Confirmation to whoever submitted the inquiry above. */
-export async function sendEnterpriseInquiryConfirmationEmail({
-  to, name, company,
-}: { to: string; name?: string | null; company?: string | null }): Promise<boolean> {
+  const isJudgeTraining = source === "judge-experience";
+  // "Artswrk / <the thing they asked about>" — the competition's own name where
+  // we have it, so the thread is findable later by either side.
+  const topic = isJudgeTraining
+    ? "The Judge Experience"
+    : (company || name || "Hiring on Artswrk");
   const greeting = name ? "Hi " + b(name) + "," : "Hi there,";
+  const note = message ? sanitizeUserText(message, 1000) : "";
+
   const html = renderEmailShell({
     accent: "client",
-    headline: "We've got your inquiry ✅",
-    preheader: "Our team has received your inquiry — we'll be in touch shortly.",
+    headline: "Let's connect \u{1F44B}",
+    preheader: "Connecting you with the Artswrk team" + (isJudgeTraining ? " about The Judge Experience." : "."),
     bodyHtml:
       para(greeting) +
-      para("Our team has received your inquiry" + (company ? " for " + b(company) : "") + " and we'll be in touch shortly.") +
-      para("In the meantime, you can browse the artists already on Artswrk — judges, emcees, backstage staff, photographers and more."),
-    ctaText: "Browse Artists",
-    ctaUrl: APP_URL + "/browse",
-    footerNote: 'Questions in the meantime? Just reply to this email or reach us at <a href="mailto:contact@artswrk.com" style="color:#F25722;font-weight:600;">contact@artswrk.com</a>.<br><br>Best,<br>The Artswrk Team',
+      para(
+        isJudgeTraining
+          ? "Thanks for your interest in " + b("The Judge Experience") + " — our dance adjudicator certification. I've put our team on this thread so we can find a time to talk through training your panel this season."
+          : "Thanks for reaching out about hiring on Artswrk. I've put our team on this thread so we can pick up from here."
+      ) +
+      (note ? para(b("What you sent:")) + quote(note) : "") +
+      para("Do you have times available to chat? Feel free to share availability or I will reach out to share mine."),
+    footerNote: "Best,<br>Nick Silverio<br>Co-Founder, Artswrk",
+    showUnsubscribe: false,
   });
-  return sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject: "We've received your inquiry — Artswrk", html });
+
+  return sendSimpleEmail({
+    to: email,
+    // cc, not bcc: the enquirer can see who they're talking to, and reply-all
+    // from either side keeps everyone on the one thread.
+    cc: CONTACT_EMAIL,
+    subject: "Let's Connect: Artswrk / " + topic,
+    html,
+    replyTo: CONTACT_EMAIL,
+    // Reads as a note from a co-founder rather than a form autoresponder —
+    // which is what it is, and what makes a reply likely.
+    fromName: "Nick Silverio",
+  });
 }
 
 export async function sendStripeConnectAlertEmail({

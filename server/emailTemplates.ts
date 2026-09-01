@@ -33,6 +33,10 @@ export const APP_URL =
 export const FROM_EMAIL = "contact@artswrk.com";
 export const FROM_NAME = "Artswrk";
 export const SUPPORT_EMAIL = "support@artswrk.com";
+/** Where inbound enquiries land. Separate from SUPPORT_EMAIL on purpose:
+ *  support@ is the ops/alerts firehose, contact@ is the address a human
+ *  actually watches and replies from. */
+export const CONTACT_EMAIL = "contact@artswrk.com";
 
 /**
  * Logos, one per audience. PNG rather than SVG on purpose: Gmail strips SVG,

@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { INQUIRY_DRAFT_KEY } from "@/lib/inquiryDraft";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -704,6 +705,27 @@ function PostJobModal({
     applyLink: "",
   });
 
+  // Carry over whatever they typed on a landing page before logging in, so the
+  // job they already described isn't lost to the login round-trip. Read once
+  // and cleared, so a later manual "Post Job" opens a blank form.
+  useEffect(() => {
+    let draft: { company?: string; description?: string } | null = null;
+    try {
+      const raw = sessionStorage.getItem(INQUIRY_DRAFT_KEY);
+      if (raw) draft = JSON.parse(raw);
+      sessionStorage.removeItem(INQUIRY_DRAFT_KEY);
+    } catch {
+      // Private browsing / bad JSON — just open an empty form.
+    }
+    if (!draft) return;
+    setForm((f) => ({
+      ...f,
+      description: draft.description || f.description,
+      // Only prefill the company name when they don't already have one saved.
+      company: f.company || draft.company || "",
+    }));
+  }, []);
+
   // Service types grouped under their parent artist type, same source and
   // grouping the regular job form uses.
   const { data: serviceTypeOptions = [] } = trpc.artists.getMasterServiceTypes.useQuery();
@@ -1118,7 +1140,20 @@ function MasterView({
 }) {
   const [, navigate] = useLocation();
   const [tab, setTab] = useState<MasterTab>("jobs");
-  const [showPostJob, setShowPostJob] = useState(false);
+  // ?postJob=1 comes from a landing-page inquiry by an existing customer: they
+  // logged in and should land straight on the post-job form, not have to find
+  // it again.
+  const [showPostJob, setShowPostJob] = useState(
+    () => new URLSearchParams(window.location.search).get("postJob") === "1"
+  );
+  useEffect(() => {
+    if (!showPostJob) return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("postJob")) return;
+    params.delete("postJob");
+    const qs = params.toString();
+    window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
+  }, [showPostJob]);
   const userId = user?.id;
 
   const utils = trpc.useUtils();

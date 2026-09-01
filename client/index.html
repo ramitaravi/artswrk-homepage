@@ -3,15 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <!-- Defaults for every route. server/seoMeta.ts swaps these per landing page
+         before the HTML is served, because social crawlers do not run the SPA's JS. -->
     <title>Hire Artists &amp; Find Performing Arts Jobs | Artswrk</title>
     <meta name="description" content="Hire dance teachers, competition staff, judges, photographers, videographers and music teachers, or find dance, judging and performing arts jobs on Artswrk." />
     <link rel="canonical" href="https://artswrk.com/" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Artswrk" />
+    <meta property="og:url" content="https://artswrk.com/" />
     <meta property="og:title" content="Hire Artists &amp; Find Performing Arts Jobs | Artswrk" />
     <meta property="og:description" content="Hire dance teachers, competition staff, judges, photographers, videographers and music teachers, or find dance, judging and performing arts jobs on Artswrk." />
-    <meta property="og:url" content="https://artswrk.com/" />
     <meta property="og:image" content="https://artswrk.com/manus-storage/artswrk-og-home_85a4ee93.png" />
     <meta property="og:image:secure_url" content="https://artswrk.com/manus-storage/artswrk-og-home_85a4ee93.png" />
     <meta property="og:image:type" content="image/png" />
@@ -24,6 +26,7 @@
     <meta name="twitter:description" content="Hire dance teachers, competition staff, judges, photographers, videographers and music teachers, or find dance, judging and performing arts jobs on Artswrk." />
     <meta name="twitter:image" content="https://artswrk.com/manus-storage/artswrk-og-home_85a4ee93.png" />
     <meta name="twitter:image:alt" content="Artswrk — Hire Artists. Find WRK." />
+
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -61,6 +64,22 @@
         ]
       }
     </script>
+
+    <!-- Brevo Conversations -->
+    <script>
+      (function(d, w, c) {
+        w.BrevoConversationsID = "65ef06fa68c404139515292a";
+        w[c] = w[c] || function() {
+          (w[c].q = w[c].q || []).push(arguments);
+        };
+        var s = d.createElement("script");
+        s.async = true;
+        s.src = "https://conversations-widget.brevo.com/brevo-conversations.js";
+        if (d.head) d.head.appendChild(s);
+      })(document, window, "BrevoConversations");
+    </script>
+    <!-- /Brevo Conversations -->
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
