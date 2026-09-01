@@ -74,3 +74,59 @@ describe("homepage responsive hero and CTA", () => {
     expect(source).toContain('"Join Now →"');
   });
 });
+
+describe("homepage search metadata", () => {
+  const homeSource = readFileSync(
+    new URL("../client/src/pages/Home.tsx", import.meta.url),
+    "utf8",
+  );
+  const htmlSource = readFileSync(
+    new URL("../client/index.html", import.meta.url),
+    "utf8",
+  );
+
+  it("uses the requested hiring and job-search headings", () => {
+    expect(homeSource).toContain("on Artswrk");
+    expect(homeSource).toContain(
+      "Hire Dance Teachers, Dance Competition Staff, Photographers, Videographers and more on Artswrk.",
+    );
+    expect(homeSource).toContain("ballet teachers and choreographers");
+    expect(homeSource).toContain("dance teacher jobs, competition jobs, judging jobs");
+  });
+
+  it("keeps the title and description concise while covering both search intents", () => {
+    const title = htmlSource.match(/<title>([^<]+)<\/title>/)?.[1] ?? "";
+    const description = htmlSource.match(
+      /<meta name="description" content="([^"]+)"/,
+    )?.[1] ?? "";
+
+    expect(title).toBe("Hire Artists &amp; Find Performing Arts Jobs | Artswrk");
+    expect(title.length).toBeLessThanOrEqual(60);
+    expect(description.length).toBeGreaterThanOrEqual(120);
+    expect(description.length).toBeLessThanOrEqual(160);
+    expect(description).toContain("Hire dance teachers");
+    expect(description).toContain("performing arts jobs");
+  });
+
+  it("uses the supplied homepage tile for Open Graph and Twitter previews", () => {
+    const imageUrl = "https://artswrk.com/manus-storage/artswrk-og-home_85a4ee93.png";
+    expect(htmlSource).toContain(`<meta property="og:image" content="${imageUrl}"`);
+    expect(htmlSource).toContain(`<meta name="twitter:image" content="${imageUrl}"`);
+    expect(htmlSource).toContain('<meta property="og:image:width" content="1200"');
+    expect(htmlSource).toContain('<meta property="og:image:height" content="630"');
+  });
+
+  it("publishes valid Organization, WebSite, and Service structured data", () => {
+    const jsonLd = htmlSource.match(
+      /<script type="application\/ld\+json">\s*([\s\S]*?)\s*<\/script>/,
+    )?.[1];
+    expect(jsonLd).toBeTruthy();
+
+    const graph = JSON.parse(jsonLd!) as { "@graph": Array<{ "@type": string }> };
+    expect(graph["@graph"].map(item => item["@type"])).toEqual([
+      "Organization",
+      "WebSite",
+      "Service",
+    ]);
+  });
+});

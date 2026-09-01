@@ -844,8 +844,24 @@
 - [x] Save or confirm a validated checkpoint and provide the exact user-approved Publish step for live domains
 
 ## Dance Competitions GitHub Freshness Investigation
-- [ ] Compare local HEAD, checkpoint state, and `user_github/main` against the newest remote commit
-- [ ] Inspect recent Git history and branch changes affecting `DanceCompetitions.tsx`
-- [ ] Compare the current source and rendered Dance Competitions page for stale content
-- [ ] Resync, restart, or merge the correct source without overwriting reviewed work
-- [ ] Validate the corrected page and save a restorable checkpoint
+- [x] Compare local HEAD, checkpoint state, and `user_github/main` against the newest remote commit
+- [x] Inspect recent Git history and branch changes affecting `DanceCompetitions.tsx`
+- [x] Compare the current source and rendered Dance Competitions page for stale content
+- [x] Resync, restart, or merge the correct source without overwriting reviewed work
+- [x] Validate the corrected page and save a restorable checkpoint
+
+## Default Homepage SEO Image
+- [x] Inspect `ArtswrkSEOTiles.zip` and identify the orange-gradient "Find WRK / Hire Artists" tile
+- [x] Upload the selected SEO tile to managed project storage
+- [x] Set the selected tile as the homepage and global fallback Open Graph and Twitter image
+- [x] Verify rendered metadata, tests, TypeScript, and production build
+- [x] Save a validated checkpoint for the default SEO image
+
+## Homepage Search Optimization
+- [x] Audit the homepage H1/H2 structure, title, description, canonical URL, robots, sitemap, and structured data
+- [x] Set the visible H1 to "Hire Artists, Find WRK on Artswrk"
+- [x] Set an optimized visible H2 covering dance teachers, competition staff, photographers, videographers, music teachers, and related hiring intent
+- [x] Optimize title and meta/social descriptions for both hiring and performing-arts job-search intent without keyword stuffing
+- [x] Add natural supporting copy or structured data for ballet teachers, dance teacher jobs, competition jobs, judging jobs, and nearby artist searches where appropriate
+- [x] Add SEO regression coverage and validate rendered HTML, tests, TypeScript, and production build
+- [x] Save a validated homepage SEO checkpoint
