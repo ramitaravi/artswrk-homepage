@@ -77,6 +77,12 @@ describe("homepage responsive hero and CTA", () => {
     expect(source).toContain('"Get Hired on Artswrk!"');
     expect(source).toContain('"Join Now →"');
   });
+
+  it("temporarily sends studio and music-school hirers to client Join while preserving competitions", () => {
+    expect(source).toMatch(/title: "Dance Studios",[\s\S]*?cta: "Post a Studio Job",[\s\S]*?href: "\/join\?role=client"/);
+    expect(source).toMatch(/title: "Dance Competitions",[\s\S]*?cta: "Post a Competition Job",[\s\S]*?href: "\/dance-competitions"/);
+    expect(source).toMatch(/title: "Music Schools",[\s\S]*?cta: "Post a School Job",[\s\S]*?href: "\/join\?role=client"/);
+  });
 });
 
 describe("homepage search metadata", () => {

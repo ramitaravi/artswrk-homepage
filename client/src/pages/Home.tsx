@@ -211,7 +211,7 @@ const BIZ_TYPES = [
     blurb: "Weekly classes, last-minute subs, guest artists and choreo",
     icon: Building2,
     cta: "Post a Studio Job",
-    href: "/dance-studios",
+    href: "/join?role=client",
     tag: "RELIABLE TEACHERS",
     quote: "“We just wanted to follow up to tell you that we LOVE working with your teachers — they’re always reliable and committed.”",
     who: "Alexa S., Owner, Lambarri Dance Arts",
@@ -233,7 +233,7 @@ const BIZ_TYPES = [
     blurb: "Voice, piano, acting, and instrument teachers",
     icon: Music4,
     cta: "Post a School Job",
-    href: "/music-schools",
+    href: "/join?role=client",
     tag: "FILLED A 4-MONTH SEARCH",
     quote: "“After a difficult 4ish month search, we are sending an offer letter for our teaching position! We couldn’t have found this candidate without Artswrk.”",
     who: "Allison L., Recruiting @ Ensemble Performing Arts",
@@ -381,10 +381,9 @@ function ForHirers() {
           </div>
 
           <div className="mt-7 flex flex-wrap items-center gap-3">
-            {/* Goes to the selected vertical's own landing page, which is where
-                the pitch and the inquiry form for that audience live. This used
-                to send all three straight to /join, skipping the page that does
-                the actual convincing. */}
+            {/* Studio and music-school CTAs temporarily join directly while those
+                niche pages are being updated. Competitions retains its dedicated
+                inquiry page. */}
             <Link
               href={shown.href ?? "/join?role=client"}
               className="rounded-xl px-7 py-4 text-[15px] font-bold text-white transition-colors hover:bg-[#3D3D4A]"

@@ -879,3 +879,10 @@
 - [x] Add regression coverage for the widget ID, loader source, and route-specific SEO metadata
 - [x] Run deterministic tests, TypeScript, production build, metadata checks, asset checks, and desktop/mobile smoke tests
 - [x] Save a validated merged SEO and chatbot checkpoint
+
+## Temporary Homepage Hirer CTA Routing
+- [x] Route the Dance Studios homepage CTA directly to `/join?role=client`
+- [x] Route the Music Schools homepage CTA directly to `/join?role=client`
+- [x] Leave the Dance Competitions homepage route unchanged
+- [x] Add regression coverage for the temporary CTA destinations
+- [x] Verify desktop/mobile links and save a checkpoint
