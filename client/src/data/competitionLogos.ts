@@ -7,12 +7,6 @@ export type CompetitionLogo = {
 
 export const COMPETITION_LOGOS: CompetitionLogo[] = [
   {
-    name: "REVEL Dance Convention",
-    src: "/manus-storage/revel_aaaad0b2.png",
-    surface: "light",
-    sizing: "compact",
-  },
-  {
     name: "Accelerate Dance Experience",
     src: "/manus-storage/accelerate-dance-experience_bf858aab.png",
     surface: "light",
@@ -35,6 +29,12 @@ export const COMPETITION_LOGOS: CompetitionLogo[] = [
     src: "/manus-storage/danceone_e7264985.png",
     surface: "light",
     sizing: "wide",
+  },
+  {
+    name: "REVEL Dance Convention",
+    src: "/manus-storage/revel_aaaad0b2.png",
+    surface: "light",
+    sizing: "compact",
   },
   {
     name: "Imagine National Dance Challenge",

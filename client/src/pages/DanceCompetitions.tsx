@@ -79,32 +79,30 @@ function FaqItem({ q, a }: { q: string; a: string }) {
   );
 }
 
+/**
+ * Bare logo on white — no card, no border, no shadow. That's the design: the
+ * marks sit directly on the page at a fixed 180x90 box, `contain` so nothing
+ * crops.
+ *
+ * The two dark-surface marks (Thunderstruck, Storm) are light artwork built for
+ * a dark backdrop and would vanish on white, so those alone keep a dark chip.
+ * Everything else is bare.
+ */
 function CompetitionLogoCard({ logo, duplicate = false }: { logo: CompetitionLogo; duplicate?: boolean }) {
-  const widthClass = logo.sizing === "wide"
-    ? "w-[220px] md:w-[268px]"
-    : logo.sizing === "compact"
-      ? "w-[160px] md:w-[188px]"
-      : "w-[190px] md:w-[224px]";
-
+  const needsDarkChip = logo.surface === "dark";
   return (
     <div
-      className={`${widthClass} flex h-[92px] shrink-0 items-center justify-center rounded-2xl border px-4 py-3 shadow-[0_10px_35px_rgba(15,23,42,0.06)] md:h-[108px] md:px-5 md:py-4 ${
-        logo.surface === "dark"
-          ? "border-white/10 bg-[#08090c]"
-          : "border-gray-200/80 bg-white"
+      className={`relative h-[90px] w-[180px] flex-none ${
+        needsDarkChip ? "rounded-xl bg-[#08090c] p-2.5" : ""
       }`}
       aria-hidden={duplicate || undefined}
     >
-      {/* rounded-xl on the image itself, not just the card: several of these
-          logos are full-bleed exports with their own baked-in background, so
-          without it they render as a hard-edged rectangle inside a rounded
-          card. object-contain means it's a no-op for transparent marks. */}
       <img
         src={logo.src}
         alt={duplicate ? "" : logo.name}
         loading="lazy"
         decoding="async"
-        className="h-full w-full rounded-xl object-contain"
+        className="h-full w-full object-contain"
       />
     </div>
   );
@@ -112,14 +110,12 @@ function CompetitionLogoCard({ logo, duplicate = false }: { logo: CompetitionLog
 
 function CompetitionLogoMarquee() {
   return (
-    <div className="relative overflow-hidden" aria-label="Dance competitions hiring on Artswrk">
-      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-[#f8fafc] to-transparent sm:w-24" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-[#f8fafc] to-transparent sm:w-24" />
-      <div className="competition-logo-marquee flex w-max">
+    <div className="mt-8 overflow-hidden">
+      <div className="competition-logo-marquee flex w-max items-center gap-16 px-6">
         {[false, true].map((duplicate) => (
           <div
             key={duplicate ? "duplicate" : "primary"}
-            className="flex shrink-0 items-center gap-4 pr-4 md:gap-6 md:pr-6"
+            className="flex flex-none items-center gap-16"
             aria-hidden={duplicate || undefined}
           >
             {COMPETITION_LOGOS.map((logo) => (
@@ -271,8 +267,8 @@ export default function DanceCompetitions() {
       </section>
 
       {/* ── Logo Ticker ─────────────────────────────────────────────────── */}
-      <section className="overflow-hidden border-y border-gray-100 bg-[#f8fafc] py-8 md:py-10">
-        <p className="mb-6 text-center text-xs font-semibold uppercase tracking-[0.2em] text-gray-400 md:mb-8">
+      <section className="pt-14 md:pt-24">
+        <p className="m-0 text-center text-[17px] font-medium text-gray-500">
           Join Competitions Nationwide Hiring on Artswrk
         </p>
         <CompetitionLogoMarquee />

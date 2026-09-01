@@ -64,9 +64,13 @@ describe("homepage responsive hero and CTA", () => {
     expect(source).toContain("gap-5 px-5 pt-32 sm:gap-9");
   });
 
-  it("keeps both final CTA buttons full-width on mobile", () => {
-    expect(source.match(/w-full items-center justify-center rounded-full/g)).toHaveLength(2);
-    expect(source.match(/sm:w-\[140px\]/g)).toHaveLength(2);
+  it("keeps both final CTA buttons full-width on mobile and unwrapped on desktop", () => {
+    expect(source.match(/w-full items-center justify-center whitespace-nowrap rounded-full/g)).toHaveLength(2);
+    // A fixed sm:w-[140px] was too narrow for "Get Hired" at this padding and
+    // broke the label onto two lines. Desktop sizes to content with 140px as a
+    // floor, so the pair still reads as matched buttons.
+    expect(source.match(/sm:w-auto sm:min-w-\[140px\]/g)).toHaveLength(2);
+    expect(source).not.toContain("sm:w-[140px]");
   });
 
   it("uses the requested artist signup headline and button copy", () => {
