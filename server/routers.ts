@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { APP_URL } from "./emailTemplates";
 import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ONE_YEAR_MS } from "@shared/const";
 import { isJobPubliclyLive } from "@shared/jobStatus";
+import { resolveBookingBaseAmount, isHourlyBooking } from "@shared/bookingRates";
 import { getPasswordError, PASSWORD_MAX_LENGTH } from "@shared/password";
 
 /**
@@ -4953,22 +4954,22 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
             throw new Error("The artist's payout account isn't connected yet — contact Artswrk support.");
           }
 
-          // Read the REAL hourly/flat flag from the applicant record — never
-          // infer it from `hours` being set, which is also true for 365 flat
-          // bookings and made this over-charge them. This is the amount the
-          // studio's card is actually charged, so it must not guess.
-          const isHourly = !!booking.isHourlyRate;
+          // resolveBookingBaseAmount owns both rules this used to get wrong:
+          // the stored rate is a TOTAL (never multiply it), and hourly-vs-flat
+          // comes from the applicant record's real flag (never inferred from
+          // `hours` being set). This is the amount actually charged to the
+          // studio's card, so it must not guess. Covered by
+          // shared/bookingRates.test.ts.
           const finalHours = input.hours ?? booking.hours ?? 0;
-          const storedTotal = booking.artistRate ?? 0;
-          // bookings.artistRate is the booking TOTAL, not a unit rate, so the
-          // stored total is used as-is. It's only recomputed when the studio
-          // actually changed the hours on an hourly booking, and then only from
-          // the real per-hour rate — never by multiplying the total again.
-          const unitRate = booking.artistHourlyRate ?? null;
-          const hoursChanged = input.hours != null && booking.hours != null && input.hours !== booking.hours;
-          const baseAmount = isHourly && hoursChanged && unitRate != null
-            ? Math.round(unitRate * finalHours)
-            : storedTotal;
+          const baseAmount = resolveBookingBaseAmount(
+            {
+              isHourlyRate: booking.isHourlyRate,
+              storedTotal: booking.artistRate,
+              unitHourlyRate: booking.artistHourlyRate,
+              storedHours: booking.hours,
+            },
+            input.hours
+          );
           const totalReimb = booking.reimbursementsTotal ?? 0;
           const processingFee = Math.round((baseAmount + totalReimb) * 0.04);
           const totalDollars = baseAmount + totalReimb + processingFee;
@@ -5012,7 +5013,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           if (!session.url) throw new Error("Could not create payment link");
 
           await approveArtswrkInvoice(booking.id, {
-            hours: isHourly ? finalHours : undefined,
+            hours: isHourlyBooking({ isHourlyRate: booking.isHourlyRate }) ? finalHours : undefined,
             invoiceStripeCheckoutUrl: session.url,
             invoiceTotalCents: totalCents,
           });

@@ -20,6 +20,9 @@ export default defineConfig({
       "server/**/*.test.ts",
       "server/**/*.spec.ts",
       "client/src/lib/**/*.test.ts",
+      // shared/ holds pure rules both sides depend on (booking money, job
+      // status, password policy) — exactly the logic worth locking down.
+      "shared/**/*.test.ts",
     ],
   },
 });
