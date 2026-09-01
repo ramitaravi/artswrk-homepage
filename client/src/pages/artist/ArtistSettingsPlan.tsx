@@ -140,6 +140,19 @@ export default function ArtistSettingsPlan() {
             </li>
           ))}
         </ul>
+        {/* Basic listed its price and features but had no way to buy it — the
+            only button on this page upgraded to PRO, so a free artist could
+            not get Basic at all. createBasicCheckout already existed. */}
+        {currentPlan === "free" && (
+          <button
+            onClick={() => openTab(() => createBasicCheckout.mutate({ origin: window.location.origin }))}
+            disabled={isBusy}
+            className="w-full py-3 rounded-xl text-sm font-bold text-white bg-[#111] hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2 mt-4"
+          >
+            {createBasicCheckout.isPending && <Loader2 size={15} className="animate-spin" />}
+            Unlock Basic
+          </button>
+        )}
       </div>
 
       {/* PRO */}
