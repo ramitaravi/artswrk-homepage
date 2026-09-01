@@ -5,27 +5,24 @@ import { COMPETITION_LOGOS, type CompetitionLogo } from "@/data/competitionLogos
 import { trpc } from "@/lib/trpc";
 import { saveInquiryDraft } from "@/lib/inquiryDraft";
 
-// How it works screenshots (from the existing artist strip CDN images)
-const HOW_IT_WORKS = [
-  {
-    step: "01",
-    title: "Post Jobs & Browse Artists",
-    desc: "Post a job or browse thousands of vetted professional freelance artists",
-    img: "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/artist-strip-1-aY8po4fr7wkR7kHuYcLRjW.webp",
-  },
-  {
-    step: "02",
-    title: "Book & Schedule Artists",
-    desc: "View and schedule available artists on one simple screen. No more emails or FB groups",
-    img: "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/artist-strip-2-Vo37fp95iDpS9ybaZkYWJB.webp",
-  },
-  {
-    step: "03",
-    title: "Pay Artists Online",
-    desc: "Pay artists digitally with a simple payment link. We take care of the rest!",
-    img: "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/artist-strip-3-hjiUkBU9Pft72RAaeq8oxW.webp",
-  },
+// The mock board in "How it WRKs" — the design's own sample rows, shown as an
+// illustration of the enterprise dashboard rather than live data.
+const BOARD_JOBS = [
+  { title: "Judges", grad: "linear-gradient(150deg,#4A90E2 0%,#0B3C7A 100%)" },
+  { title: "General Staff", grad: "linear-gradient(150deg,#B06CF0 0%,#EF5E95 100%)" },
+  { title: "Judge", grad: "linear-gradient(150deg,#7AA7F0 0%,#C77DF5 100%)" },
+  { title: "Merchandise Sales", grad: "linear-gradient(150deg,#F278A8 0%,#B06CF0 100%)" },
 ];
+
+const BOARD_APPLICANTS = [
+  { initials: "JF", name: "James Felton", grad: "linear-gradient(150deg,#EF1187 0%,#FF7171 100%)" },
+  { initials: "FC", name: "Faith Coleman", grad: "linear-gradient(150deg,#FFBC5D 0%,#F25722 100%)" },
+  { initials: "AC", name: "Alexa Cutrone", grad: "linear-gradient(150deg,#6061F6 0%,#EF5E95 100%)" },
+  { initials: "AE", name: "Annie Ellertsen", grad: "linear-gradient(150deg,#4A49CE 0%,#6061F6 100%)" },
+  { initials: "SA", name: "Sophie Ackerman", grad: "linear-gradient(150deg,#F278A8 0%,#FBAD6D 100%)" },
+];
+
+const BOARD_ORG = "Imagine National Dance Challenge";
 
 const STAFF_TYPES = [
   { emoji: "🏆", label: "Dance Judges", desc: "Certified judges with competition experience across all styles." },
@@ -334,22 +331,99 @@ export default function DanceCompetitions() {
 
       {/* ── How it WRKs ─────────────────────────────────────────────────── */}
       <section id="how" className="mx-auto max-w-[1200px] px-5 pt-20 lg:px-8 lg:pt-28">
-        <p className="text-[15px] font-semibold text-[#F25722]">For Competitions</p>
-        <h2 className="mt-3.5 text-[30px] font-extrabold tracking-[-0.02em] text-[#F25722] md:text-[44px]">
-          How it WRKs
-        </h2>
-        <div className="mt-10 grid gap-8 md:grid-cols-3">
-          {HOW_IT_WORKS.map((step) => (
-            <div key={step.step} className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
-              <div className="aspect-[4/3] overflow-hidden bg-gray-100">
-                <img src={step.img} alt={step.title} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+        <div className="grid items-start gap-9 lg:grid-cols-2 lg:gap-16">
+          <div>
+            <div className="text-base font-medium text-gray-500">For Competitions</div>
+            <h2 className="mt-3.5 text-[30px] font-extrabold tracking-[-0.02em] text-[#F25722] md:text-[44px]">
+              How it WRKs
+            </h2>
+            <img
+              src="/testimonials/competition-imagine.png"
+              alt="“I posted a job at 7am and had a judge on a train to us by 10am — and she was absolutely AMAZING! I’m blown away by Artswrk.” — Shaun M., Imagine Dance Challenge, Dance One"
+              loading="lazy"
+              decoding="async"
+              className="mt-9 block w-full rounded-2xl"
+              style={{ boxShadow: "0 1px 2px rgba(14,14,23,0.04), 0 18px 44px -20px rgba(14,14,23,0.18)" }}
+            />
+          </div>
+
+          {/* Illustration of the enterprise dashboard. Deliberately static and
+              decorative — the names are the design's sample data, not real
+              applicants, so it must never be wired to live records. */}
+          <div
+            className="overflow-hidden rounded-[20px] bg-white"
+            style={{ border: "1px solid rgba(14,14,23,0.10)" }}
+            aria-hidden="true"
+          >
+            <div className="flex items-start justify-between gap-4 px-6 pt-6">
+              <div>
+                <div
+                  className="relative h-[88px] w-[88px] overflow-hidden rounded-full"
+                  style={{ backgroundImage: "linear-gradient(150deg,#7AA7F0 0%,#C77DF5 100%)" }}
+                >
+                  <img
+                    src="/manus-storage/imagine-national-dance-challenge_dbc06acd.png"
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="absolute inset-0 h-full w-full bg-white object-contain p-2"
+                  />
+                </div>
+                <div className="mt-3.5 text-xl font-bold text-[#0E0E17]">{BOARD_ORG}</div>
               </div>
-              <div className="p-6">
-                <h3 className="mb-2 text-base font-black text-[#111]">{step.title}</h3>
-                <p className="text-sm leading-relaxed text-gray-500">{step.desc}</p>
+              <span
+                className="whitespace-nowrap rounded-full px-5 py-[11px] text-[13px] font-semibold text-[#0E0E17]"
+                style={{ border: "1px solid rgba(14,14,23,0.16)" }}
+              >
+                + Post Job
+              </span>
+            </div>
+
+            <div className="flex gap-6 px-6 pt-5" style={{ borderBottom: "1px solid rgba(14,14,23,0.08)" }}>
+              <span className="border-b-2 border-[#0E0E17] pb-2.5 text-sm font-bold text-[#0E0E17]">Jobs</span>
+              <span className="pb-2.5 text-sm text-[#737373]">Companies</span>
+              <span className="pb-2.5 text-sm text-[#737373]">Artists</span>
+            </div>
+
+            <div className="grid gap-4 p-4" style={{ gridTemplateColumns: "1.5fr 1fr" }}>
+              <div className="flex flex-col gap-2.5">
+                {BOARD_JOBS.map((j, i) => (
+                  <div
+                    key={`${j.title}-${i}`}
+                    className="flex items-center gap-3 rounded-xl p-3"
+                    style={{ border: "1px solid rgba(14,14,23,0.10)" }}
+                  >
+                    <div className="h-[38px] w-[38px] flex-none rounded-full" style={{ backgroundImage: j.grad }} />
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-bold text-[#0E0E17]">{j.title}</div>
+                      <div className="truncate text-xs text-[#737373]">{BOARD_ORG}</div>
+                      <div className="mt-0.5 text-[11.5px] text-gray-400">📍 Work from Anywhere</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-xl p-4" style={{ border: "1px solid rgba(14,14,23,0.10)" }}>
+                <div className="text-sm font-bold text-[#0E0E17]">Applications</div>
+                <div className="mt-3.5 flex flex-col gap-3.5">
+                  {BOARD_APPLICANTS.map((a) => (
+                    <div key={a.initials} className="flex items-center gap-2.5">
+                      <div
+                        className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-[11px] font-extrabold tracking-[-0.02em] text-white"
+                        style={{ backgroundImage: a.grad }}
+                      >
+                        {a.initials}
+                      </div>
+                      <div>
+                        <div className="text-[12.5px] font-bold text-[#0E0E17]">{a.name}</div>
+                        <div className="text-[11.5px] text-[#737373]">Judge</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          ))}
+          </div>
         </div>
       </section>
 
