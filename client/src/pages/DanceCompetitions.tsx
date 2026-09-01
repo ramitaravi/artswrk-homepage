@@ -417,6 +417,86 @@ export default function DanceCompetitions() {
         </div>
       </section>
 
+      {/* ── The Judge Experience ────────────────────────────────────────── */}
+      <section id="training" className="mx-auto max-w-[1200px] px-5 pt-20 lg:px-8 lg:pt-28">
+        <div
+          className="relative flex flex-wrap items-center overflow-hidden rounded-[28px] bg-[#08090c]"
+          style={{ minHeight: "clamp(360px,38vw,460px)" }}
+        >
+          {/* Dancer photo, dimmed, with a left-to-right scrim so the copy keeps
+              its contrast over the brightest part of the image. */}
+          <img
+            src="/judge/judge-experience-bg.png"
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover object-center"
+            style={{ opacity: 0.62 }}
+          />
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage:
+                "linear-gradient(90deg, rgba(8,9,12,0.80) 0%, rgba(8,9,12,0.44) 55%, rgba(8,9,12,0.22) 100%)",
+            }}
+          />
+
+          <div
+            className="relative min-w-0 flex-[1_1_340px]"
+            style={{ padding: "clamp(40px,5vw,64px) clamp(28px,4vw,56px)" }}
+          >
+            <span className="inline-block rounded-full border border-white/30 px-[18px] py-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-white">
+              Judge training
+            </span>
+            <h2
+              className="mt-[22px] font-extrabold uppercase leading-[1.02] tracking-[-0.03em] text-[#FDF8F2]"
+              style={{ fontSize: "clamp(34px,5vw,62px)" }}
+            >
+              The Judge<br />Experience
+            </h2>
+            <div
+              className="mt-[22px] h-1 w-[220px] rounded-full"
+              style={{ backgroundImage: "linear-gradient(90deg,#EF1187 0%,#F25722 55%,#FFBC5D 100%)" }}
+            />
+            <p
+              className="mt-[22px] max-w-[34em] leading-relaxed text-white/[0.82]"
+              style={{ fontSize: "clamp(15px,1.6vw,18px)", textWrap: "pretty" as never }}
+            >
+              Dance adjudicator certification, presented by Artswrk. Put your judging panel through a
+              shared standard — scoring, feedback, and critique your studios can trust.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              {/* Straight to the enquiry form — this is the same conversation,
+                  and the design's own link points back up the page. */}
+              <a
+                href="#get-started"
+                className="rounded-xl bg-white px-8 py-4 text-[15px] font-bold text-[#08090c] transition-colors hover:bg-gray-100"
+              >
+                Train My Staff
+              </a>
+            </div>
+          </div>
+
+          <div
+            className="relative flex flex-none items-center self-stretch"
+            style={{
+              width: "clamp(280px,36%,430px)",
+              padding: "clamp(24px,2.6vw,34px) clamp(24px,2.6vw,38px) clamp(24px,2.6vw,34px) 0",
+            }}
+          >
+            <img
+              src="/judge/judge-experience-card.png"
+              alt="The Judge Experience — Dance Adjudicator Certification with Jodie Points and Nick Silverio"
+              loading="lazy"
+              decoding="async"
+              className="block h-auto w-full rounded-2xl"
+              style={{ boxShadow: "0 24px 60px rgba(0,0,0,0.5)" }}
+            />
+          </div>
+        </div>
+      </section>
+
       {/* ── FAQs ────────────────────────────────────────────────────────── */}
       <section id="faq" className="mx-auto max-w-[1200px] px-5 pt-20 lg:px-8 lg:pt-28">
         <div className="grid items-start gap-9 lg:grid-cols-2 lg:gap-16">
