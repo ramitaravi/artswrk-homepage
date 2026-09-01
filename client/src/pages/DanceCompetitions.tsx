@@ -314,13 +314,16 @@ export default function DanceCompetitions() {
             </div>
           </div>
 
+          {/* The gradient is only ever seen while the photo loads, so it's
+              keyed to the photo's own tones — the design's red backdrop was
+              chosen for a different image and flashed hard against this one. */}
           <div
             className="relative w-full overflow-hidden rounded-3xl"
-            style={{ aspectRatio: "1 / 1", backgroundImage: "linear-gradient(150deg, #E01B1B 0%, #8E0B0B 100%)" }}
+            style={{ aspectRatio: "1 / 1", backgroundImage: "linear-gradient(150deg, #E8C4D8 0%, #C9B6E4 100%)" }}
           >
             <img
-              src="/testimonials/competition-imagine.png"
-              alt="A competition hiring judges and staff on Artswrk"
+              src="/testimonials/competition-dancer.png"
+              alt="A dancer mid-leap"
               loading="lazy"
               decoding="async"
               className="absolute inset-0 h-full w-full object-cover"
