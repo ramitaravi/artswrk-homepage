@@ -907,3 +907,10 @@
 - [x] Remove the extra visible paragraph beginning “From ballet teachers…”
 - [x] Preserve broader search terms in metadata and structured data
 - [x] Update regression coverage, verify desktop/mobile rendering, and save a checkpoint
+
+## Latest GitHub Release and Production Publish Preparation
+- [ ] Synchronize the working project with the newest `user_github/main`
+- [ ] Review incoming commits and changed files for database, authentication, payment, email, and deployment risk
+- [ ] Run deterministic tests, TypeScript, production build, and key-page visual checks
+- [ ] Save a validated release checkpoint synchronized with GitHub `main`
+- [ ] Provide the exact user-operated Publish step for the live domains
