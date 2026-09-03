@@ -31,7 +31,7 @@ import BoostJobModal from "@/components/BoostJobModal";
 import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
 import { useLocationField } from "@/hooks/useLocationField";
 import { toSimpleJobStatus, SIMPLE_JOB_STATUSES, type SimpleJobStatus } from "@shared/jobStatus";
-import { processingFeeFor } from "@shared/bookingRates";
+import { processingFeeFor, formatPitchedRate } from "@shared/bookingRates";
 
 // ─── Boost Performance Bar ────────────────────────────────────────────────────
 
@@ -218,11 +218,9 @@ function ApplicantDetailView({
     : null;
   const profileUrl = applicant.artistSlug ? `/book/${applicant.artistSlug}` : null;
   const disciplines = parseList(applicant.artistDisciplines).slice(0, 6);
-  const rate = applicant.artistHourlyRate
-    ? `$${applicant.artistHourlyRate}/hr`
-    : applicant.clientHourlyRate
-    ? `$${applicant.clientHourlyRate}/hr`
-    : null;
+  // formatPitchedRate, not a local hourly-only check: these applicants pitch a
+  // FLAT rate on open-rate jobs, which used to render as nothing at all.
+  const rate = formatPitchedRate(applicant);
   const resumeFileName = applicant.resumeLink
     ? decodeURIComponent(applicant.resumeLink.split("/").pop() || "resume").replace(/%20/g, " ")
     : null;
@@ -717,7 +715,7 @@ function ApplicantsList({ applicants, allIds, onSelectApplicant }: {
         <div className="divide-y divide-gray-100">
           {sorted.map((a: any) => {
             const name = displayName(a);
-            const rate = a.artistHourlyRate ? `$${a.artistHourlyRate}/hr` : a.clientHourlyRate ? `$${a.clientHourlyRate}/hr` : null;
+            const rate = formatPitchedRate(a);
             const msgPreview = a.message
               ? a.message.length > 160 ? a.message.slice(0, 160).trimEnd() + " …" : a.message
               : null;
@@ -1026,9 +1024,35 @@ function ConfirmModal({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-[#111]">Artswrk will invoice {company}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    5% processing fee{clientTotal > 0 ? <> · Total billed: <strong className="text-gray-600">${clientTotal.toLocaleString()}</strong></> : null}
-                  </p>
+                  {/* Spelled out line by line rather than "5% fee · Total $X":
+                      the studio needs to see that the whole rate reaches the
+                      artist and the fee is added on top, not skimmed off. */}
+                  {rateDollars > 0 ? (
+                    <div className="mt-1.5 space-y-0.5 text-xs">
+                      <div className="flex justify-between gap-4 text-gray-500">
+                        <span>{name} receives</span>
+                        <span className="font-semibold text-[#111]">${rateDollars.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between gap-4 text-gray-500">
+                        <span>Processing fee (5%)</span>
+                        <span className="font-semibold text-[#111]">
+                          ${processingFeeFor(rateDollars).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-4 border-t border-gray-200 pt-1 mt-1">
+                        <span className="font-bold text-[#111]">You pay</span>
+                        <span className="font-bold text-[#111]">${clientTotal.toLocaleString()}</span>
+                      </div>
+                      <p className="pt-1 text-[11px] leading-relaxed text-[#F25722]">
+                        Artswrk is commission-free — {name} gets their full rate. The fee only covers
+                        card and payment processing. 🧡
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      5% processing fee added on top — the artist keeps their full rate.
+                    </p>
+                  )}
                   <button type="button" onClick={() => setPaymentMethod("direct")} className="text-xs font-semibold text-[#F25722] hover:underline mt-1.5">
                     Pay directly instead
                   </button>

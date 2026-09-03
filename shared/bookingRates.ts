@@ -89,3 +89,25 @@ export function resolveInvoiceTotals(
     total: baseAmount + reimbursements + processingFee,
   };
 }
+
+/**
+ * The rate an applicant pitched, formatted for display.
+ *
+ * Handles FLAT as well as hourly: the applicant list used to check only
+ * artistHourlyRate/clientHourlyRate, so a flat-rate pitch rendered as nothing
+ * at all and the studio couldn't see what they'd be paying. Open-rate jobs
+ * invite exactly those flat pitches, so this was the common case, not an edge.
+ */
+export function formatPitchedRate(a: {
+  artistHourlyRate?: number | null;
+  artistFlatRate?: number | null;
+  clientHourlyRate?: number | null;
+  clientFlatRate?: number | null;
+}): string | null {
+  const money = (n: number) => `$${Number(n).toLocaleString()}`;
+  if (a.artistHourlyRate) return `${money(a.artistHourlyRate)}/hr`;
+  if (a.artistFlatRate) return `${money(a.artistFlatRate)} flat`;
+  if (a.clientHourlyRate) return `${money(a.clientHourlyRate)}/hr`;
+  if (a.clientFlatRate) return `${money(a.clientFlatRate)} flat`;
+  return null;
+}

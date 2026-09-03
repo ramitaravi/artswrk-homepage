@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Loader2, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
-import { processingFeeFor } from "@shared/bookingRates";
+import { processingFeeFor, PROCESSING_FEE_RATE } from "@shared/bookingRates";
 
 export default function InvoicePayment() {
   const { token } = useParams<{ token: string }>();
@@ -93,13 +93,24 @@ export default function InvoicePayment() {
   // Live recompute as the studio edits hours — mirrors the server's math
   // exactly (invoice.approve), so what they see here is what they'll pay.
   let liveTotalDollars: number;
+  // Split out so the breakdown below can show what the artist gets vs the fee.
+  // On an already-approved invoice only the stored total is authoritative, so
+  // the base is derived back from it rather than recomputed.
+  let liveBase: number;
+  let liveFee: number;
   if (isApproved || isPaid) {
     liveTotalDollars = (booking.invoiceTotalCents ?? 0) / 100;
+    liveFee = processingFeeFor(liveTotalDollars / (1 + PROCESSING_FEE_RATE));
+    liveBase = liveTotalDollars - liveFee - reimbTotal;
   } else if (isPeriodInvoice) {
-    liveTotalDollars = clientRate * hoursNum + reimbTotal;
+    liveBase = clientRate * hoursNum;
+    liveFee = 0;
+    liveTotalDollars = liveBase + reimbTotal;
   } else {
     const base = isHourly ? artistRate * hoursNum : artistRate;
     const fee = processingFeeFor(base + reimbTotal);
+    liveBase = base;
+    liveFee = fee;
     liveTotalDollars = base + reimbTotal + fee;
   }
 
@@ -182,10 +193,33 @@ export default function InvoicePayment() {
                 {reimbTotal > 0 && (
                   <p className="text-sm text-gray-700"><strong>Reimbursements:</strong> ${reimbTotal.toFixed(2)}</p>
                 )}
-                <p className="text-sm text-gray-700 pt-1">
-                  <strong>Total Payment Amount:</strong>{" "}
-                  <span className="text-[#F25722] font-bold">${liveTotalDollars.toFixed(2)}</span>
-                </p>
+                {/* Broken out rather than a single total: the studio needs to
+                    see the artist's full rate reaching the artist, with the fee
+                    added on top instead of skimmed off it. */}
+                <div className="pt-2 mt-1 border-t border-gray-100 space-y-1">
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>{artistName} receives</span>
+                    <span className="font-semibold">${liveBase.toFixed(2)}</span>
+                  </div>
+                  {reimbTotal > 0 && (
+                    <div className="flex justify-between text-sm text-gray-700">
+                      <span>Reimbursements</span>
+                      <span className="font-semibold">${reimbTotal.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>Processing fee (5%)</span>
+                    <span className="font-semibold">${liveFee.toFixed(2)}</span>
+                  </div>
+                  <p className="flex justify-between text-sm pt-1 border-t border-gray-100">
+                    <strong>Total Payment Amount:</strong>{" "}
+                    <span className="text-[#F25722] font-bold">${liveTotalDollars.toFixed(2)}</span>
+                  </p>
+                  <p className="text-xs leading-relaxed text-[#F25722] pt-1">
+                    Artswrk is commission-free — {artistName} keeps their full rate. The fee only
+                    covers card and payment processing. 🧡
+                  </p>
+                </div>
                 {!isApproved && isHourly && (
                   <p className="text-xs text-gray-400">Adjust hours above if they don't match — the total updates automatically.</p>
                 )}
