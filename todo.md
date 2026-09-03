@@ -909,8 +909,10 @@
 - [x] Update regression coverage, verify desktop/mobile rendering, and save a checkpoint
 
 ## Latest GitHub Release and Production Publish Preparation
-- [ ] Synchronize the working project with the newest `user_github/main`
-- [ ] Review incoming commits and changed files for database, authentication, payment, email, and deployment risk
-- [ ] Run deterministic tests, TypeScript, production build, and key-page visual checks
-- [ ] Save a validated release checkpoint synchronized with GitHub `main`
-- [ ] Provide the exact user-operated Publish step for the live domains
+- [x] Synchronize the working project with the newest `user_github/main`
+- [x] Review incoming commits and changed files for database, authentication, payment, email, and deployment risk
+- [x] Run deterministic tests, TypeScript, production build, and key-page visual checks
+- [x] Save a validated release checkpoint synchronized with GitHub `main`
+- [x] Provide the exact user-operated Publish step for the live domains
+- [x] Replace dashboard logo URLs that still point to the removed `app.artswrk.com` domain
+- [x] Add regression coverage and visually verify the dashboard logos on the active domain
