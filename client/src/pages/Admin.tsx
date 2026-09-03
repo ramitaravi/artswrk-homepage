@@ -5780,6 +5780,174 @@ const CATEGORY_LABELS: Record<EmailCategory, { label: string; color: string }> =
  * emails reach real artists. Deliberately loud and deliberately awkward to turn
  * on — a mis-click here mails thousands of people.
  */
+/**
+ * The queue itself, plus a real render of the email — both behind a toggle so
+ * the switch panel stays uncluttered.
+ *
+ * The switch already showed a queue COUNT, which can't answer "did MY job go
+ * out?" — the question anyone actually asks when a post seems to have gone
+ * quiet. This lists the jobs and their send state, and previews the exact HTML
+ * an artist would receive without sending anything.
+ */
+function JobAlertQueuePanel() {
+  const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState<{ mode: "last-minute" | "digest"; jobId?: number } | null>(null);
+
+  const { data: queue, isLoading } = trpc.admin.listJobAlertQueue.useQuery(
+    { limit: 50 },
+    { enabled: open },
+  );
+
+  const STATUS_STYLE: Record<string, string> = {
+    pending: "text-amber-700 bg-amber-50 border-amber-200",
+    sent_digest: "text-green-700 bg-green-50 border-green-200",
+    sent_lastminute: "text-green-700 bg-green-50 border-green-200",
+    expired: "text-gray-500 bg-gray-100 border-gray-200",
+  };
+  const STATUS_LABEL: Record<string, string> = {
+    pending: "In queue",
+    sent_digest: "Sent (digest)",
+    sent_lastminute: "Sent (last minute)",
+    expired: "Expired",
+  };
+
+  const fmt = (d: string | Date | null) =>
+    d ? new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
+
+  const pending = (queue ?? []).filter((j) => j.networkStatus === "pending");
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between gap-3 px-6 py-4 text-left hover:bg-gray-50 transition-colors"
+      >
+        <div>
+          <p className="text-sm font-black text-[#111]">Queue &amp; email preview</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            See which jobs are waiting, and exactly what the email looks like — nothing is sent.
+          </p>
+        </div>
+        <ChevronDown size={16} className={`flex-shrink-0 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="border-t border-gray-100 p-5 space-y-5">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setPreview({ mode: "digest" })}
+              className="text-xs font-bold px-3 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+            >
+              Preview digest ({pending.length} job{pending.length === 1 ? "" : "s"})
+            </button>
+          </div>
+
+          {isLoading ? (
+            <p className="text-sm text-gray-400">Loading queue…</p>
+          ) : !queue?.length ? (
+            <p className="text-sm text-gray-400">No active jobs in the alert queue.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 text-left">
+                    <th className="py-2 pr-3">Job</th>
+                    <th className="py-2 pr-3">Status</th>
+                    <th className="py-2 pr-3 whitespace-nowrap">Posted</th>
+                    <th className="py-2 pr-3 whitespace-nowrap">Sent</th>
+                    <th className="py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {queue.map((j) => (
+                    <tr key={j.id}>
+                      <td className="py-2.5 pr-3">
+                        <p className="font-semibold text-[#111]">{j.title || `Job #${j.id}`}</p>
+                        <p className="text-xs text-gray-400">
+                          {[j.client, j.locationAddress].filter(Boolean).join(" · ") || "—"}
+                        </p>
+                      </td>
+                      <td className="py-2.5 pr-3">
+                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${STATUS_STYLE[j.networkStatus] ?? STATUS_STYLE.expired}`}>
+                          {STATUS_LABEL[j.networkStatus] ?? j.networkStatus}
+                        </span>
+                      </td>
+                      <td className="py-2.5 pr-3 text-xs text-gray-500 whitespace-nowrap">{fmt(j.createdAt)}</td>
+                      <td className="py-2.5 pr-3 text-xs text-gray-500 whitespace-nowrap">{fmt(j.networkSentAt)}</td>
+                      <td className="py-2.5 text-right">
+                        <button
+                          onClick={() => setPreview({ mode: "last-minute", jobId: j.id })}
+                          className="text-xs font-bold text-[#F25722] hover:underline whitespace-nowrap"
+                        >
+                          Preview email
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {preview && <JobAlertPreviewModal {...preview} onClose={() => setPreview(null)} />}
+    </div>
+  );
+}
+
+/** Renders the real email HTML in a sandboxed iframe. */
+function JobAlertPreviewModal({
+  mode, jobId, onClose,
+}: { mode: "last-minute" | "digest"; jobId?: number; onClose: () => void }) {
+  const { data, isLoading, error } = trpc.admin.previewJobAlert.useQuery({ mode, jobId, isProMember: false });
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div role="dialog" aria-modal="true" aria-label="Job alert email preview"
+           className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white">
+        <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-[#F25722]">
+              {mode === "digest" ? "Daily digest" : "Last-minute blast"} · preview only, nothing sent
+            </p>
+            <p className="truncate text-sm font-black text-[#111]">{data?.subject ?? "Loading…"}</p>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-hidden bg-gray-100">
+          {isLoading ? (
+            <p className="p-6 text-sm text-gray-400">Rendering…</p>
+          ) : error ? (
+            <p className="p-6 text-sm text-red-500">{error.message}</p>
+          ) : (
+            // sandbox with no allow-scripts: it's email HTML, and it should not
+            // be able to run anything inside the admin page.
+            <iframe
+              title="Email preview"
+              sandbox=""
+              srcDoc={data?.html ?? ""}
+              className="h-[70vh] w-full border-0 bg-white"
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function JobAlertsSwitch() {
   const utils = trpc.useUtils();
   const { data, isLoading } = trpc.admin.getJobAlertStatus.useQuery(undefined, {
@@ -5904,6 +6072,7 @@ function EmailsSection() {
       </div>
 
       <JobAlertsSwitch />
+      <JobAlertQueuePanel />
 
       {/* Filter pills */}
       <div className="flex gap-2">

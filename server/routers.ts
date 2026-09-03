@@ -1001,6 +1001,145 @@ export const appRouter = router({
       };
     }),
 
+    /**
+     * The jobs actually sitting in the alert queue, not just how many.
+     * A count alone can't answer "did MY job go out?" — which is the question
+     * anyone asks when a post seems to have gone quiet.
+     */
+    listJobAlertQueue: protectedProcedure
+      .input(z.object({ limit: z.number().min(1).max(200).default(50) }).optional())
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getDb } = await import("./db");
+        const db = await getDb();
+        if (!db) throw new Error("Database unavailable");
+        const limit = input?.limit ?? 50;
+
+        const rows: any = await db.execute(`
+          SELECT j.id, j.title, j.slug, j.networkStatus, j.networkSentAt,
+                 j.createdAt, j.startDate, j.locationAddress, j.requestStatus,
+                 COALESCE(cc.name, u.clientCompanyName,
+                   NULLIF(TRIM(CONCAT(COALESCE(u.firstName,''),' ',COALESCE(u.lastName,''))),'')) AS client
+          FROM jobs j
+          LEFT JOIN users u ON j.clientUserId = u.id
+          LEFT JOIN client_companies cc ON j.clientCompanyId = cc.id
+          WHERE j.requestStatus = 'Active'
+            AND (j.networkStatus IN ('pending','sent_digest','sent_lastminute','expired')
+                 OR j.networkStatus IS NULL)
+          ORDER BY
+            -- Anything still waiting sits at the top; then most recent first.
+            CASE WHEN j.networkStatus = 'pending' OR j.networkStatus IS NULL THEN 0 ELSE 1 END,
+            j.createdAt DESC
+          LIMIT ${limit}`);
+        const list: any[] = Array.isArray(rows) ? (Array.isArray(rows[0]) ? rows[0] : rows) : [];
+        return list.map((r) => ({
+          id: Number(r.id),
+          title: r.title ?? null,
+          slug: r.slug ?? null,
+          client: r.client ?? null,
+          // Null is treated as suppressed everywhere else, but a job that
+          // reaches this list with no status genuinely hasn't been queued yet.
+          networkStatus: (r.networkStatus ?? "pending") as string,
+          networkSentAt: r.networkSentAt ?? null,
+          createdAt: r.createdAt ?? null,
+          startDate: r.startDate ?? null,
+          locationAddress: r.locationAddress ?? null,
+        }));
+      }),
+
+    /**
+     * Renders a job-alert email from REAL rows and returns the HTML, sending
+     * nothing. Lets an admin see exactly what would land in an artist's inbox
+     * before turning the switch on — the alternative was running a CLI script.
+     */
+    previewJobAlert: protectedProcedure
+      .input(z.object({
+        /** "last-minute" needs a jobId; "digest" previews the whole queue. */
+        mode: z.enum(["last-minute", "digest"]),
+        jobId: z.number().optional(),
+        /** The digest looks different to a PRO member (extra PRO section). */
+        isProMember: z.boolean().default(false),
+      }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { getDb } = await import("./db");
+        const db = await getDb();
+        if (!db) throw new Error("Database unavailable");
+
+        const { renderDigest, renderLastMinute, excerpt } = await import("./jobAlerts/templates");
+        const { toJobCard, toProCard, formatWhen, formatRate, formatLocation, jobTitle } =
+          await import("./jobAlerts/format");
+        const APP = APP_URL;
+
+        const rowsOf = (r: any): any[] =>
+          Array.isArray(r) ? (Array.isArray(r[0]) ? r[0] : r) : [];
+
+        const JOB_COLS = `
+          j.id, j.title, j.description, j.startDate, j.endDate, j.dateType,
+          j.locationAddress, j.locationCity, j.locationState,
+          j.isHourly, j.openRate, j.clientHourlyRate, j.clientFlatRate, j.hours,
+          j.transportation, j.transportationDetails, m.name AS svc,
+          COALESCE(cc.name, u.clientCompanyName,
+            NULLIF(TRIM(CONCAT(COALESCE(u.firstName,''),' ',COALESCE(u.lastName,''))),'')) AS client`;
+        const JOB_JOINS = `
+          FROM jobs j
+          LEFT JOIN users u ON j.clientUserId = u.id
+          LEFT JOIN client_companies cc ON j.clientCompanyId = cc.id
+          LEFT JOIN master_service_types m ON m.bubbleId = j.masterServiceTypeId`;
+
+        const preferencesUrl = `${APP}/app/settings`;
+        const unsubscribeUrl = `${APP}/unsubscribe?token=PREVIEW`;
+        const firstName = "there";
+
+        if (input.mode === "last-minute") {
+          if (!input.jobId) throw new Error("jobId is required for a last-minute preview");
+          const j = rowsOf(await db.execute(
+            `SELECT ${JOB_COLS} ${JOB_JOINS} WHERE j.id = ${input.jobId} LIMIT 1`))[0];
+          if (!j) throw new Error("Job not found");
+          const r = renderLastMinute({
+            firstName,
+            serviceName: j.svc || jobTitle(j),
+            title: jobTitle(j),
+            client: j.client || null,
+            whenLabel: formatWhen(
+              j.startDate ? new Date(j.startDate) : null,
+              j.endDate ? new Date(j.endDate) : null,
+              j.dateType,
+            ) || "Starting soon",
+            location: formatLocation(j.locationAddress, j.locationCity, j.locationState),
+            transportationNote: j.transportation ? (j.transportationDetails || "Travel reimbursed") : null,
+            rateLabel: formatRate(j),
+            excerpt: excerpt(j.description),
+            applyUrl: `${APP}/app/jobs/${j.id}`,
+            preferencesUrl,
+            unsubscribeUrl,
+          });
+          return { subject: r.subject, html: r.html, jobCount: 1 };
+        }
+
+        // Digest: exactly the jobs a run would pick up right now.
+        const queued = rowsOf(await db.execute(`
+          SELECT ${JOB_COLS} ${JOB_JOINS}
+          WHERE j.networkStatus = 'pending' AND j.requestStatus = 'Active'
+          ORDER BY j.createdAt DESC LIMIT 10`));
+        const proRows = rowsOf(await db.execute(`
+          SELECT id, serviceType, company, location, budget, workFromAnywhere, description
+          FROM premium_jobs WHERE status='Active' AND serviceType IS NOT NULL
+          ORDER BY id DESC LIMIT 5`));
+
+        const r = renderDigest({
+          firstName,
+          jobs: queued.map((row) => toJobCard(row, APP)),
+          totalMatchCount: queued.length,
+          proJobs: input.isProMember ? proRows.map((row) => toProCard(row, APP)) : [],
+          jobsUrl: `${APP}/jobs`,
+          preferencesUrl,
+          unsubscribeUrl,
+          isProMember: input.isProMember,
+        });
+        return { subject: r.subject, html: r.html, jobCount: queued.length };
+      }),
+
     setJobAlertEnabled: protectedProcedure
       .input(z.object({ enabled: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
