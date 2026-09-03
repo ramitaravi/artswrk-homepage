@@ -126,7 +126,12 @@ export async function maybeSendLastMinute(jobId: number): Promise<LastMinuteResu
     if (ok) result.sent++; else result.skipped++;
   }
 
-  if (policy.enabled) {
+  // Only burn the job's one shot when something actually went out. This used to
+  // fire on `policy.enabled` alone, so an allowlisted TEST run — which sends to
+  // nobody because every real artist is dropped — still marked the job as sent
+  // and silently guaranteed it would never be alerted. A run that reaches zero
+  // recipients must leave the job queued.
+  if (policy.enabled && result.sent > 0) {
     await db.execute(
       `UPDATE jobs SET networkStatus='sent_lastminute', networkSentAt=NOW() WHERE id=${job.id}`
     );
