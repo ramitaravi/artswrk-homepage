@@ -44,6 +44,7 @@ import { trpc } from "@/lib/trpc";
 import { useUpgrade } from "@/lib/useUpgrade";
 import { formatLocation, getJobTitle } from "@/lib/utils";
 import { toProJobUrl } from "./ProJobDetail";
+import { processingFeeFor } from "@shared/bookingRates";
 
 // ─── Placeholder data (to be replaced with real API data) ─────────────────────
 
@@ -873,7 +874,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
   // "hourly" was inferred from `hours` being set at all, it also multiplied 365
   // FLAT-rate bookings that happen to record hours. Never multiply.
   const earnedAmount = rate;
-  const processingFee = Math.round((earnedAmount + totalReimb) * 0.04);
+  const processingFee = processingFeeFor(earnedAmount + totalReimb);
   const invoiceTotal = earnedAmount + totalReimb + processingFee;
 
   async function handleAddReimbursement() {
@@ -1400,7 +1401,7 @@ function ConfirmationCard({ booking }: { booking: any }) {
   // "hourly" was inferred from `hours` being set at all, it also multiplied 365
   // FLAT-rate bookings that happen to record hours. Never multiply.
   const earnedAmount = rate;
-  const processingFee = Math.round((earnedAmount + totalReimb) * 0.04);
+  const processingFee = processingFeeFor(earnedAmount + totalReimb);
   const invoiceTotal = earnedAmount + totalReimb + processingFee;
 
   return (

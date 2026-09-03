@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { APP_URL } from "./emailTemplates";
 import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ONE_YEAR_MS } from "@shared/const";
 import { isJobPubliclyLive } from "@shared/jobStatus";
-import { resolveBookingBaseAmount, isHourlyBooking } from "@shared/bookingRates";
+import { resolveBookingBaseAmount, isHourlyBooking, processingFeeFor } from "@shared/bookingRates";
 import { getPasswordError, PASSWORD_MAX_LENGTH } from "@shared/password";
 
 /**
@@ -3839,7 +3839,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           ? Math.round(unitRate * input.hours)
           : unitRate;
         const clientRateDollars = artistRateDollars !== null && input.paymentMethod === "artswrk"
-          ? Math.round(artistRateDollars * 1.05)
+          ? artistRateDollars + processingFeeFor(artistRateDollars)
           : artistRateDollars;
 
         // Create the booking (reuse existing helper, passing premium IDs in the jobId / interestedArtistId slots)
@@ -4197,7 +4197,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const reimbList = await getReimbursementsByBookingId(input.bookingId);
         const totalReimb = reimbList.reduce((s: number, r: any) => s + (r.value ?? 0), 0);
         const artistRate = input.artistRate ?? 0;
-        const processingFee = Math.round((artistRate + totalReimb) * 0.04);
+        const processingFee = processingFeeFor(artistRate + totalReimb);
         const totalDollars = artistRate + totalReimb + processingFee;
         const totalCents = Math.round(totalDollars * 100);
 
@@ -4915,7 +4915,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           ? Math.round((unitRate as number) * bookingHours)
           : unitRate;
         const clientRateDollars = artistRateDollars !== null && input.paymentMethod === "artswrk"
-          ? Math.round((artistRateDollars as number) * 1.05)
+          ? (artistRateDollars as number) + processingFeeFor(artistRateDollars as number)
           : artistRateDollars;
         const bookingId = await createBookingFromApplicant({
           jobId: applicant.jobId,
@@ -5126,7 +5126,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
             input.hours
           );
           const totalReimb = booking.reimbursementsTotal ?? 0;
-          const processingFee = Math.round((baseAmount + totalReimb) * 0.04);
+          const processingFee = processingFeeFor(baseAmount + totalReimb);
           const totalDollars = baseAmount + totalReimb + processingFee;
           const totalCents = Math.round(totalDollars * 100);
           const applicationFeeCents = Math.round(processingFee * 100);

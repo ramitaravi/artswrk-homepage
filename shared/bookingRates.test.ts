@@ -3,7 +3,7 @@
  * Every case here is a real shape from production data.
  */
 import { describe, it, expect } from "vitest";
-import { isHourlyBooking, resolveBookingBaseAmount, resolveInvoiceTotals } from "./bookingRates";
+import { isHourlyBooking, resolveBookingBaseAmount, resolveInvoiceTotals, processingFeeFor, PROCESSING_FEE_RATE } from "./bookingRates";
 
 describe("hourly vs flat is read, never inferred", () => {
   it("a flat booking that also records hours is NOT hourly", () => {
@@ -87,5 +87,36 @@ describe("invoice totals", () => {
     );
     expect(t.processingFee).toBe(0);
     expect(t.total).toBe(115);
+  });
+});
+
+describe("processing fee", () => {
+  it("is 5%, the rate quoted to studios", () => {
+    expect(PROCESSING_FEE_RATE).toBe(0.05);
+  });
+
+  it("matches what a studio is told they'll pay", () => {
+    // Rosemary's two real applicants on job 2880001.
+    expect(processingFeeFor(300)).toBe(15);   // pays $315
+    expect(processingFeeFor(800)).toBe(40);   // pays $840
+  });
+
+  it("adds the fee on top rather than deducting it from the artist", () => {
+    const t = resolveInvoiceTotals(
+      { isHourlyRate: 0, storedTotal: 300 },
+      { reimbursements: 0 },
+    );
+    expect(t.baseAmount).toBe(300);      // artist receives 100%
+    expect(t.processingFee).toBe(15);
+    expect(t.total).toBe(315);           // client pays base + fee
+  });
+
+  it("charges the fee on reimbursements too", () => {
+    const t = resolveInvoiceTotals(
+      { isHourlyRate: 0, storedTotal: 300 },
+      { reimbursements: 100 },
+    );
+    expect(t.processingFee).toBe(20);    // 5% of 400
+    expect(t.total).toBe(420);
   });
 });

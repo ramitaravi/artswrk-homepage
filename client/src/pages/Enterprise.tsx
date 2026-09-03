@@ -56,6 +56,7 @@ import Artists from "@/pages/dashboard/Artists";
 import Bookings from "@/pages/dashboard/Bookings";
 import CompanyPage from "@/pages/dashboard/CompanyPage";
 import SubLists from "@/pages/dashboard/SubLists";
+import { processingFeeFor } from "@shared/bookingRates";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1502,7 +1503,7 @@ function EnterpriseConfirmDialog({
   const picUrl = fixUrl(applicant.profilePicture);
 
   const rateDollars = parseFloat(rateInput) || 0;
-  const clientTotal = rateDollars && paymentMethod === "artswrk" ? Math.round(rateDollars * 1.05) : rateDollars;
+  const clientTotal = rateDollars && paymentMethod === "artswrk" ? rateDollars + processingFeeFor(rateDollars) : rateDollars;
 
   const fieldCls = "w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#F25722]/30 focus:border-[#F25722] transition";
   const labelCls = "text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5";

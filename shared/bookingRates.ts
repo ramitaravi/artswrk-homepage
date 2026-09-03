@@ -16,6 +16,24 @@
  * dependency-free so it can be unit tested and shared by client and server.
  */
 
+/**
+ * The processing fee added on top of the artist's rate, as a fraction.
+ *
+ * One constant because this was 0.04 in the three places that compute a charge
+ * and 1.05 in the three that compute a booking total — so the studio was quoted
+ * 5% and billed 4%. It also has to cover Stripe's own ~2.9% + 30c: at 4% a $300
+ * booking netted $2.65, and anything under ~$150 ran at a loss.
+ *
+ * Artists always receive 100% of their rate — this is added to what the client
+ * pays, never deducted from the artist (a Stripe destination charge).
+ */
+export const PROCESSING_FEE_RATE = 0.05;
+
+/** What the client pays on top of `amount`, rounded to whole dollars. */
+export function processingFeeFor(amount: number): number {
+  return Math.round(amount * PROCESSING_FEE_RATE);
+}
+
 export type BookingRateBasis = {
   /** interested_artists.isHourlyRate — the REAL flag. Never infer this. */
   isHourlyRate?: boolean | number | null;
@@ -62,7 +80,7 @@ export function resolveInvoiceTotals(
 ): { baseAmount: number; reimbursements: number; processingFee: number; total: number } {
   const baseAmount = resolveBookingBaseAmount(basis, opts.adjustedHours);
   const reimbursements = Number(opts.reimbursements ?? 0);
-  const feeRate = opts.feeRate ?? 0;
+  const feeRate = opts.feeRate ?? PROCESSING_FEE_RATE;
   const processingFee = Math.round((baseAmount + reimbursements) * feeRate);
   return {
     baseAmount,

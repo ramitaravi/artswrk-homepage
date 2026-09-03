@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Loader2, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
+import { processingFeeFor } from "@shared/bookingRates";
 
 export default function InvoicePayment() {
   const { token } = useParams<{ token: string }>();
@@ -98,7 +99,7 @@ export default function InvoicePayment() {
     liveTotalDollars = clientRate * hoursNum + reimbTotal;
   } else {
     const base = isHourly ? artistRate * hoursNum : artistRate;
-    const fee = Math.round((base + reimbTotal) * 0.04);
+    const fee = processingFeeFor(base + reimbTotal);
     liveTotalDollars = base + reimbTotal + fee;
   }
 

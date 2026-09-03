@@ -31,6 +31,7 @@ import BoostJobModal from "@/components/BoostJobModal";
 import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
 import { useLocationField } from "@/hooks/useLocationField";
 import { toSimpleJobStatus, SIMPLE_JOB_STATUSES, type SimpleJobStatus } from "@shared/jobStatus";
+import { processingFeeFor } from "@shared/bookingRates";
 
 // ─── Boost Performance Bar ────────────────────────────────────────────────────
 
@@ -847,7 +848,7 @@ function ConfirmModal({
     : null;
 
   const rateDollars = parseFloat(rateInput) || 0;
-  const clientTotal = rateDollars && paymentMethod === "artswrk" ? Math.round(rateDollars * 1.05) : rateDollars;
+  const clientTotal = rateDollars && paymentMethod === "artswrk" ? rateDollars + processingFeeFor(rateDollars) : rateDollars;
 
   const fieldCls = "w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#F25722]/30 focus:border-[#F25722] transition";
   const labelCls = "text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5";
