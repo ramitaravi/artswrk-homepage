@@ -280,7 +280,9 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
       <div className="px-5 pt-6 pb-5">
         <Link href="/app">
           <img
-            src={`https://app.artswrk.com/logos/artswrk-${isArtist ? "pink" : "orange"}.png`}
+            src={isArtist
+              ? "/manus-storage/artswrk-pink_904a2428.png"
+              : "/manus-storage/artswrk-orange_928de736.png"}
             alt="Artswrk"
             className="h-8 w-auto"
           />
