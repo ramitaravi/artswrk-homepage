@@ -1150,6 +1150,22 @@ export async function getBookingByInterestedArtistId(interestedArtistId: number)
 /**
  * Get all payments for a client, joined with booking info.
  */
+/**
+ * Bubble wrote a NEW payments row every time the same Stripe checkout session
+ * reported in, so one real charge is stored as many rows — 18,168 rows for
+ * 5,092 actual Stripe transactions. Left unfiltered this showed a studio seven
+ * $500 charges for a single $500 payment, and overstated total revenue by
+ * ~$865k.
+ *
+ * Every read of `payments` narrows to one row per Stripe transaction (the
+ * earliest), rather than deleting anything: the duplicates are the migrated
+ * record of what Bubble did, and a read-time filter is reversible.
+ *
+ * Rows with no stripeId fall back to their own id, so each stands alone.
+ */
+const DEDUPED_PAYMENT_IDS = sql`
+  (SELECT MIN(p2.id) FROM payments p2 GROUP BY COALESCE(p2.stripeId, CAST(p2.id AS CHAR)))`;
+
 export async function getPaymentsByClientId(
   clientUserId: number,
   limit = 100,
@@ -1202,6 +1218,8 @@ export async function getPaymentsByClientId(
       // padded with rows that never charged anyone anything.
       inArray(payments.stripeStatus, ["paid", "succeeded"]),
       isNotNull(payments.stripeAmount),
+      // One row per real Stripe transaction — see DEDUPED_PAYMENT_IDS.
+      sql`${payments.id} IN ${DEDUPED_PAYMENT_IDS}`,
     ))
     .orderBy(desc(payments.paymentDate))
     .limit(limit)
@@ -1223,7 +1241,10 @@ export async function getPaymentStatsByClientId(clientUserId: number) {
       sumFees: sql<number>`SUM(COALESCE(stripeApplicationFeeAmount, 0))`,
     })
     .from(payments)
-    .where(eq(payments.clientUserId, clientUserId))
+    .where(and(
+      eq(payments.clientUserId, clientUserId),
+      sql`${payments.id} IN ${DEDUPED_PAYMENT_IDS}`,
+    ))
     .groupBy(payments.stripeStatus);
 
   const stats = { total: 0, succeeded: 0, totalAmount: 0, totalFees: 0 };
@@ -3311,7 +3332,10 @@ export async function getAdminPayments({
   const db = await getDb();
   if (!db) return { payments: [], total: 0 };
 
-  const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(payments);
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(payments)
+    .where(sql`${payments.id} IN ${DEDUPED_PAYMENT_IDS}`);
 
   const rows = await db
     .select({
@@ -3333,6 +3357,7 @@ export async function getAdminPayments({
     })
     .from(payments)
     .leftJoin(users, eq(payments.clientUserId, users.id))
+    .where(sql`${payments.id} IN ${DEDUPED_PAYMENT_IDS}`)
     .orderBy(desc(payments.createdAt))
     .limit(limit)
     .offset(offset);
