@@ -1874,7 +1874,7 @@ export async function createNewUser(input: {
     lastSignedIn: new Date(),
     ...(input.clientCompanyName ? { clientCompanyName: input.clientCompanyName } : {}),
   });
-  const newId = (result as any).insertId as number;
+  const newId = result[0].insertId as number;
   return { id: newId, openId };
 }
 
@@ -4219,7 +4219,7 @@ export async function createBenefit(input: AdminBenefitInput): Promise<number> {
     artistTypes: toJsonArrayOrNull(input.artistTypes),
     categories: toJsonArrayOrNull(input.categories),
   });
-  return (result as any).insertId as number;
+  return result[0].insertId as number;
 }
 
 export async function updateBenefit(id: number, input: AdminBenefitInput): Promise<void> {
@@ -4267,7 +4267,7 @@ export async function getOrCreateConversation(clientUserId: number, artistUserId
     lastMessageDate: new Date(),
     unreadCount: 0,
   });
-  const newId = (result as any).insertId as number;
+  const newId = result[0].insertId as number;
   if (newId) {
     const created = await db.select().from(conversations).where(eq(conversations.id, newId)).limit(1);
     if (created[0]) return created[0];
@@ -4302,7 +4302,7 @@ export async function sendMessageToConversation({
     content,
     isSystem: false,
   });
-  const newId = (result as any).insertId as number;
+  const newId = result[0].insertId as number;
   // Update conversation timestamp + unreadCount
   await db
     .update(conversations)

@@ -4861,12 +4861,14 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         if (!unlocked) throw new Error("Job must be unlocked to message applicants");
         const conversation = await getOrCreateConversation(user.id, applicant.artistId);
         const msg = await sendMessageToConversation({ conversationId: conversation.id, senderUserId: user.id, content: input.message });
-        if ((user as any).enterprise && applicant.artistEmail) {
+        if (applicant.artistEmail) {
           try {
-            await sendSimpleEmail({
+            await sendNewMessageEmail({
               to: applicant.artistEmail,
-              subject: `New message from ${(user as any).clientCompanyName ?? user.name ?? "Artswrk Client"}`,
-              html: `<p>Hi ${applicant.artistFirstName ?? "there"},</p><p>${(user as any).clientCompanyName ?? user.name ?? "A client"} has sent you a message on Artswrk:</p><blockquote style="border-left:3px solid #F25722;padding-left:12px;color:#555">${input.message}</blockquote><p><a href="https://artswrk.com/app/messages">Log in to reply</a></p><p>Best,<br/>The Artswrk Team</p>`,
+              recipientFirstName: applicant.artistFirstName ?? "there",
+              senderName: (user as any).clientCompanyName ?? user.name ?? "Artswrk Client",
+              messagePreview: input.message,
+              dashboardUrl: `${process.env.VITE_APP_URL ?? "https://artswrk.com"}/app/messages`,
             });
           } catch (e) {
             console.error("[messageApplicant] Email send failed (non-fatal):", e);
