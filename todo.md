@@ -916,3 +916,10 @@
 - [x] Provide the exact user-operated Publish step for the live domains
 - [x] Replace dashboard logo URLs that still point to the removed `app.artswrk.com` domain
 - [x] Add regression coverage and visually verify the dashboard logos on the active domain
+
+## Newest GitHub Sync and Publish Preparation
+- [ ] Synchronize the working project with the newest `user_github/main`
+- [ ] Review incoming commits and changed files for release-sensitive changes
+- [ ] Run deterministic tests, TypeScript, production build, GitHub parity, and key-page checks
+- [ ] Save a validated publish-ready checkpoint synchronized with GitHub `main`
+- [ ] Provide the user-operated Publish step for the live domains
