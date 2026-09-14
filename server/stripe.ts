@@ -324,7 +324,7 @@ export async function createArtistBasicCheckoutSession(
 }
 
 /**
- * Create a Stripe Checkout Session for an enterprise on-demand job unlock ($100).
+ * Create a Stripe Checkout Session for an enterprise on-demand job unlock ($150).
  */
 export async function createEnterpriseJobUnlockCheckoutSession(
   opts: CreateCheckoutOptions & { jobId: number; jobTitle?: string }

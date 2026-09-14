@@ -620,7 +620,7 @@ export default function Join() {
                     <p className="text-xs text-gray-500 mt-0.5">Post free, pay to unlock applicants</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-black text-2xl text-[#111]">${isEnterprise(bizType) ? "100" : "40"}</p>
+                    <p className="font-black text-2xl text-[#111]">${isEnterprise(bizType) ? "150" : "40"}</p>
                     <p className="text-xs text-gray-400">per job unlock</p>
                   </div>
                 </div>

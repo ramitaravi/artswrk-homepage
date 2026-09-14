@@ -3705,7 +3705,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
       return { unlockedJobIds };
     }),
 
-    /** Start a Stripe checkout to unlock a single job ($100, on-demand plan) */
+    /** Start a Stripe checkout to unlock a single job ($150, on-demand plan) */
     checkoutJobUnlock: protectedProcedure
       .input(z.object({ jobId: z.number(), jobTitle: z.string().optional(), origin: z.string() }))
       .mutation(async ({ input, ctx }) => {
@@ -3714,7 +3714,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         // planTier is the real source of truth — self-signup (auto-detected
         // via businessType) and several admin-creation paths set planTier
         // but never touch the legacy enterprisePlan column, so checking that
-        // column here left those accounts unable to ever pay the $100 unlock.
+        // column here left those accounts unable to ever pay the job unlock.
         if (user.planTier !== "enterprise_on_demand") throw new Error("Job unlock is only for on-demand plan");
         // Never take money to unlock a job that isn't live. NOTE: this id is a
         // premium_jobs id, not a jobs id — looking it up in `jobs` matched
@@ -3775,7 +3775,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           jobId: input.jobId,
           stripeSessionId: input.sessionId,
           stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : null,
-          amountCents: session.amount_total ?? 10000,
+          amountCents: session.amount_total ?? 15000,
         });
         // Save Stripe customer ID for future use
         if (session.customer && typeof session.customer === "string") {
@@ -4815,7 +4815,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         );
         return { url };
       }),
-    /** Competition Job Unlock checkout — $100 one-time per job (for Dance Competition / Event Company clients). */
+    /** Competition Job Unlock checkout — $150 one-time per job (for Dance Competition / Event Company clients). */
     createCompetitionJobUnlockCheckout: protectedProcedure
       .input(z.object({ jobId: z.number(), jobTitle: z.string().optional(), origin: z.string() }))
       .mutation(async ({ input, ctx }) => {

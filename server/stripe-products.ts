@@ -199,17 +199,18 @@ export const STRIPE_PRODUCTS = {
     },
   },
   /**
-   * Enterprise On-Demand — $100 per job to unlock candidate list.
+   * Enterprise On-Demand — $150 per job to unlock candidate list (raised from $100 on 2026-09-14).
    * Product: prod_TxJ7FkYDtKrFS1
-   * Price ID: price_1SzOVLA91H1fWNkK5rX69GBU (set via ENTERPRISE_JOB_UNLOCK_PRICE_ID env var)
+   * Price ID: price_1TLjk9A91H1fWNkKHG3jsruZ (hardcoded like every other live price; the old
+   * ENTERPRISE_JOB_UNLOCK_PRICE_ID env var pointed at the $100 price and is no longer read)
    */
   ENTERPRISE_ON_DEMAND: {
     productId: envOrLive("STRIPE_TEST_ENTERPRISE_ON_DEMAND_PRODUCT_ID", STRIPE_TEST_FALLBACKS.ENTERPRISE_ON_DEMAND_PRODUCT, "prod_TxJ7FkYDtKrFS1"),
     paymentLinkId: "plink_1SzOVjA91H1fWNkKiqwN8q1j",
-    priceId: envOrLive("STRIPE_TEST_ENTERPRISE_ON_DEMAND_PRICE_ID", STRIPE_TEST_FALLBACKS.ENTERPRISE_ON_DEMAND, process.env.ENTERPRISE_JOB_UNLOCK_PRICE_ID ?? ""),
+    priceId: envOrLive("STRIPE_TEST_ENTERPRISE_ON_DEMAND_PRICE_ID", STRIPE_TEST_FALLBACKS.ENTERPRISE_ON_DEMAND, "price_1TLjk9A91H1fWNkKHG3jsruZ"),
     name: "Artswrk Enterprise — View Candidates",
     description: "Unlock candidate list for one PRO job posting.",
-    amount: 10000, // $100 in cents (fallback if priceId not set)
+    amount: 15000, // $150 in cents (fallback if priceId not set)
     currency: "usd",
     mode: "payment" as const,
   },

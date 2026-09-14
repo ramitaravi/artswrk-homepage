@@ -1160,13 +1160,13 @@ const TIERS = [
   },
 ];
 
-// Competition-specific tiers ($100 unlock + $500/mo or $5,000/yr subscription)
+// Competition-specific tiers ($150 unlock + $500/mo or $5,000/yr subscription)
 const COMPETITION_TIERS = [
   {
     id: "connect",
     label: "Job Unlock",
-    price: 100,
-    priceLabel: "$100",
+    price: 150,
+    priceLabel: "$150",
     description: "Unlock all applicants for this job",
     features: ["View all applicants", "Message artists directly", "One-time fee"],
     icon: <Unlock size={20} className="text-white" />,

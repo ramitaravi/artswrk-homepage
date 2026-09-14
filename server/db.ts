@@ -4202,7 +4202,7 @@ export async function recordEnterpriseJobUnlock(unlock: InsertEnterpriseJobUnloc
   // Both the webhook and the client-side verify fallback call this for the
   // same checkout session — without this guard, a normal double-fire (both
   // paths succeeding, which is the common case, not an error case) inserts
-  // two unlock rows for one real $100 charge, double-counting revenue.
+  // two unlock rows for one real unlock charge, double-counting revenue.
   // Mirrors the same guard already in createClientJobUnlock.
   const existing = await db
     .select({ id: enterpriseJobUnlocks.id })

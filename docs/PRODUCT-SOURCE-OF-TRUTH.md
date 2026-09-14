@@ -42,7 +42,7 @@ Three orthogonal flags on users: role (user/admin), userRole ("Client"/"Artist")
 | artist_pro | Artist PRO | Apply to all jobs incl. PRO/enterprise | $110/yr, annual-only, 7-day trial (legacy monthly subscribers grandfathered) |
 | client_on_demand | Client, per-job | Post jobs (free); $40/job unlock to view+message applicants | $40/job unlock |
 | client_premium | Client Premium | Subscription-wide applicant access, no per-job unlocks | $65/mo or $650/yr |
-| enterprise_on_demand | Enterprise client | Post PRO jobs; $100/job "view candidates" unlock | $100/job |
+| enterprise_on_demand | Enterprise client | Post PRO jobs; $150/job "view candidates" unlock | $150/job |
 | enterprise_subscription | Enterprise subscriber | Full PRO job management + applicants | $500/mo or $5,000/yr live list price (existing customers grandfathered; discount via promo codes) |
 
 **Legacy flags still on the row** (used in places, but gating now centralizes on planTier + the unlock helpers): artswrkBasic, artswrkPro, clientPremium, enterprisePlan. Per-job unlocks live in client_job_unlocks and enterprise_job_unlocks. Access rule of thumb: client_premium and enterprise_subscription get subscription-wide access; everyone else needs a per-job unlock (isClientJobUnlocked, canClientMessageArtist).  
@@ -155,7 +155,7 @@ All wrapped in DashboardLayout; sidebar and content adapt to userRole. URL desig
 
 > 1. Enterprise account (enterprise=true) → /enterprise dashboard or unified /app.  
 > 2. Posts PRO jobs (premium_jobs) via enterprise.postJob.  
-> 3. Applicant access: enterprise_subscription, or $100/job "view candidates" unlock (enterprise_job_unlocks).
+> 3. Applicant access: enterprise_subscription, or $150/job "view candidates" unlock (enterprise_job_unlocks).
 
 ### **5.4 Booking → invoice → payment**
 
@@ -301,7 +301,7 @@ Scheduling: cron calls POST /api/scheduled/job-alerts **hourly**; the handler se
 
 ### **9.1 Stripe**
 
-> * Checkout sessions: job post ($0), job boost (default $10/day × 7 days), artist Basic/PRO (annual), client job unlock ($40), client Premium ($65/mo, $650/yr), enterprise unlock ($100) and subscription ($500/mo, $5k/yr). Products/prices centralized in server/stripe-products.ts with env-overridable price IDs; TEST fallbacks hardcoded.  
+> * Checkout sessions: job post ($0), job boost (default $10/day × 7 days), artist Basic/PRO (annual), client job unlock ($40), client Premium ($65/mo, $650/yr), enterprise unlock ($150) and subscription ($500/mo, $5k/yr). Products/prices centralized in server/stripe-products.ts with env-overridable price IDs; TEST fallbacks hardcoded.  
 > * Webhook: POST /api/stripe/webhook (raw body, signature-verified, registered BEFORE express.json). See §5.7 for event handling. Test events (evt_test_\*) short-circuit 200.  
 > * Connect: artist payouts via Express accounts; OAuth callback /stripe-connect/callback; marketplace application fees recorded on payments.  
 > * Access note: Instinct holds a restricted API key (no Accounts-write); dashboard login is behind Nick's 2FA.

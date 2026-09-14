@@ -4817,7 +4817,7 @@ function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; 
                 disabled={setPlan.isPending}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${localPlan === "on_demand" ? "bg-amber-100 border-amber-300 text-amber-700" : "bg-white border-gray-200 text-gray-400 hover:bg-amber-50"}`}
               >
-                On-Demand ($100/job)
+                On-Demand ($150/job)
               </button>
               <button
                 onClick={() => handlePlanChange("subscriber")}
@@ -4832,7 +4832,7 @@ function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; 
           </div>
           {localPlan === "on_demand" && (
             <p className="mt-2 text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
-              This client pays <strong>$100 per job</strong> to unlock the candidate list. Each payment is tracked individually.
+              This client pays <strong>$150 per job</strong> to unlock the candidate list. Each payment is tracked individually.
             </p>
           )}
           {localPlan === "subscriber" && (

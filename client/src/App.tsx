@@ -110,8 +110,12 @@ function AppRoute({ clientComponent: ClientComponent = Overview }: { clientCompo
   // chrome, same as it always has at the standalone /enterprise route (which
   // still exists too, untouched — Enterprise's own internal navigation to
   // /enterprise/:jobId for job deep-links still resolves correctly there).
+  // The one other page Enterprise shows is the shared inbox: without this,
+  // /app/messages (the "open your thread" redirect after messaging an
+  // applicant, and the link in every new-message email) landed enterprise
+  // clients back on their dashboard with no way to reach the conversation.
   if (isEnterprise) {
-    return <Enterprise />;
+    return <Enterprise initialSection={ClientComponent === Messages ? "messages" : "dashboard"} />;
   }
 
   return (
