@@ -3705,7 +3705,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
       return { unlockedJobIds };
     }),
 
-    /** Start a Stripe checkout to unlock a single job ($100, on-demand plan) */
+    /** Start a Stripe checkout to unlock a single job ($150, on-demand plan) */
     checkoutJobUnlock: protectedProcedure
       .input(z.object({ jobId: z.number(), jobTitle: z.string().optional(), origin: z.string() }))
       .mutation(async ({ input, ctx }) => {
@@ -3714,7 +3714,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         // planTier is the real source of truth — self-signup (auto-detected
         // via businessType) and several admin-creation paths set planTier
         // but never touch the legacy enterprisePlan column, so checking that
-        // column here left those accounts unable to ever pay the $100 unlock.
+        // column here left those accounts unable to ever pay the job unlock.
         if (user.planTier !== "enterprise_on_demand") throw new Error("Job unlock is only for on-demand plan");
         // Never take money to unlock a job that isn't live. NOTE: this id is a
         // premium_jobs id, not a jobs id — looking it up in `jobs` matched
@@ -3775,7 +3775,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           jobId: input.jobId,
           stripeSessionId: input.sessionId,
           stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : null,
-          amountCents: session.amount_total ?? 10000,
+          amountCents: session.amount_total ?? 15000,
         });
         // Save Stripe customer ID for future use
         if (session.customer && typeof session.customer === "string") {
@@ -4206,6 +4206,14 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const booking = await getBookingById(input.bookingId);
         if (!booking) throw new Error("Booking not found");
         if (booking.artistUserId !== user.id) throw new Error("Not authorized");
+        // Nothing to invoice on a settled booking. invoice.approve already refuses
+        // these, but without this the studio still got an invoice email — and the
+        // 2026-09-14 reminder misfire pointed artists at years-old Completed/Paid
+        // bookings from Bubble.
+        if (String((booking as any).paymentStatus ?? "").toLowerCase() === "paid" || (booking as any).bookingStatus === "Completed") {
+          throw new Error("This booking is already completed and paid, so there's nothing to invoice.");
+        }
+        if ((booking as any).bookingStatus === "Cancelled") throw new Error("This booking was cancelled, so there's nothing to invoice.");
 
         // Every payout must land in the artist's own connected Stripe account —
         // never let an invoice go out (and get paid) with nowhere for the money to go.
@@ -4815,7 +4823,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         );
         return { url };
       }),
-    /** Competition Job Unlock checkout — $100 one-time per job (for Dance Competition / Event Company clients). */
+    /** Competition Job Unlock checkout — $150 one-time per job (for Dance Competition / Event Company clients). */
     createCompetitionJobUnlockCheckout: protectedProcedure
       .input(z.object({ jobId: z.number(), jobTitle: z.string().optional(), origin: z.string() }))
       .mutation(async ({ input, ctx }) => {

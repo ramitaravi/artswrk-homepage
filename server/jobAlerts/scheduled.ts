@@ -33,7 +33,7 @@ export async function handleScheduledJobAlerts(req: Request, res: Response): Pro
   try {
     const r = await runDigest();
     console.log(
-      `[job-alerts] ${r.pendingJobs} jobs / ${r.pendingProJobs} PRO → ` +
+      `[job-alerts] ${r.digestMode} digest: ${r.pendingJobs} jobs / ${r.pendingProJobs} PRO → ` +
       `${r.recipients} recipients, ${r.sent} sent, ${r.skipped} held back. ${r.mode}`
     );
   } catch (err) {

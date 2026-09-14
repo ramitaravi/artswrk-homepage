@@ -53,10 +53,10 @@ const INK = "#111111";
 const MUTED = "#6b7280";
 const HAIR = "#e9e9ee";
 
-/** Hosted on the same CloudFront distribution the site nav uses, so it is
- *  already public and cached. 971x211 native; shown at 150px wide. */
-const LOGO_URL =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/artswrk-logo-gradient_8e560567.png";
+/** Served from the site itself as image/png. The old CloudFront copy came back
+ *  as application/octet-stream, which some mail clients refuse to show as an
+ *  image, so the digest could open with no logo. Shown at 150px wide. */
+const LOGO_URL = "https://artswrk.com/logos/artswrk-pink.png";
 
 /**
  * Gradient button. Outlook (Word rendering engine) ignores background-image
@@ -198,6 +198,33 @@ export function renderDigest(d: DigestData): { subject: string; html: string } {
       ${d.jobs.map(jobCard).join("")}
       ${overflow}
       ${d.isProMember ? "" : proSectionTeaser(d)}
+      ${forwardBlock}
+    </div>`;
+
+  return { subject, html: shell(inner, footerBlock(d)) };
+}
+
+/**
+ * PRO jobs as their own email, sent alongside the regular digest instead of
+ * inside it. On a heavy day the combined email ran long and PRO jobs were cut
+ * at five, so some listings never reached anyone. Same audience as the digest
+ * (the caller gates on a targeted match); this only splits the content.
+ */
+export function renderProDigest(d: DigestData): { subject: string; html: string } {
+  const n = d.proJobs.length;
+  const jobs = n === 1 ? "PRO job" : "PRO jobs";
+  const subject = d.isProMember ? `Artswrk PRO: ${n} new ${jobs} for you` : `Artswrk: ${n} new ${jobs} this week`;
+
+  const inner = `
+    <div style="background:#ffffff;border-radius:14px;padding:26px 22px;">
+      <h1 style="font-size:23px;font-weight:800;color:${INK};margin:0 0 4px;line-height:1.2;">New PRO Jobs, ${esc(d.firstName)}</h1>
+      <div style="font-size:11px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:${PINK};margin:0 0 14px;">Competitions, events &amp; premium listings</div>
+      <p style="font-size:14px;color:${MUTED};margin:0 0 18px;line-height:1.55;">
+        ${d.isProMember
+          ? "Your membership shows every detail below: the client, rate, location and how to apply."
+          : "Hirers posted these PRO listings on Artswrk. Your regular job matches come in a separate email."}
+      </p>
+      ${d.isProMember ? proSectionPro(d) : proSectionTeaser(d)}
       ${forwardBlock}
     </div>`;
 

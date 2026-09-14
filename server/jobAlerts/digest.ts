@@ -12,16 +12,26 @@
 import { getDb } from "../db";
 import { sendHtmlEmail, ASM_GROUP_JOB_ALERTS } from "../email";
 import { findMatchingArtists, type JobForMatching, type MatchedArtist } from "./matching";
-import { renderDigest, type DigestData } from "./templates";
+import { renderDigest, renderProDigest, type DigestData } from "./templates";
 import { toJobCard, toProCard } from "./format";
 import { decideSend, describeMode, loadSendPolicy } from "./safety";
 import { unsubscribeUrl } from "./unsubscribe";
+import { digestModeFor, DIGEST_SCHEDULE_KEY, type DigestMode } from "./digestSchedule";
+import { easternDateString } from "../reminderWindow";
 
 const MAX_JOB_CARDS = 10;
 const MAX_PRO_ITEMS = 5;
+/** A PRO-only email has the room to show every PRO job. */
+const MAX_PRO_ITEMS_PRO_ONLY = 10;
 
 export interface DigestResult {
   mode: string;
+  /** combined, pro or jobs — from app_settings.job_alerts_schedule for today's Eastern date. */
+  digestMode: DigestMode;
+  /** True when nothing was sent, logged or marked. */
+  dryRun: boolean;
+  /** Dry runs only: one rendered email per kind of recipient, for review. */
+  samples?: Array<{ isPro: boolean; subject: string; html: string }>;
   pendingJobs: number;
   pendingProJobs: number;
   recipients: number;
@@ -76,20 +86,32 @@ export interface RunOptions {
    */
   simulateJobIds?: number[];
   simulateProJobIds?: number[];
+  /** Override the scheduled mode (for dry runs). */
+  mode?: DigestMode;
+  /** Build every email but send, log and mark nothing. */
+  dryRun?: boolean;
 }
 
 export async function runDigest(opts: RunOptions = {}): Promise<DigestResult> {
   const simulating = !!(opts.simulateJobIds?.length || opts.simulateProJobIds?.length);
+  const dryRun = opts.dryRun === true;
   const policy = await loadSendPolicy();
   const db = await getDb();
   const empty: DigestResult = {
-    mode: describeMode(policy), pendingJobs: 0, pendingProJobs: 0,
-    recipients: 0, sent: 0, skipped: 0, plan: [],
+    mode: describeMode(policy), digestMode: opts.mode ?? "combined", dryRun,
+    pendingJobs: 0, pendingProJobs: 0, recipients: 0, sent: 0, skipped: 0, plan: [],
   };
   if (!db) return empty;
 
+  // One-off schedule: a PRO-only day leaves regular jobs queued, and vice versa.
+  const scheduleRows: any = await db.execute(
+    `SELECT settingValue FROM app_settings WHERE settingKey = '${DIGEST_SCHEDULE_KEY}' LIMIT 1`);
+  const digestMode: DigestMode = opts.mode
+    ?? digestModeFor(unwrap(scheduleRows)[0]?.settingValue, easternDateString(new Date()));
+  const proCap = digestMode === "pro" ? MAX_PRO_ITEMS_PRO_ONLY : MAX_PRO_ITEMS;
+
   // Pending regular jobs whose start date hasn't already passed.
-  const jobRows: any = await db.execute(`
+  const jobRows: any = digestMode === "pro" ? [] : await db.execute(`
     SELECT j.id, j.title, j.slug, j.description, j.startDate, j.endDate, j.dateType,
            j.locationAddress, j.locationCity, j.locationState, j.locationLat, j.locationLng,
            j.isHourly, j.openRate, j.clientHourlyRate, j.clientFlatRate, j.hours,
@@ -106,7 +128,7 @@ export async function runDigest(opts: RunOptions = {}): Promise<DigestResult> {
                 AND (j.startDate IS NULL OR j.startDate > NOW())`}`);
   const jobs: any[] = unwrap(jobRows);
 
-  const proRows: any = await db.execute(`
+  const proRows: any = digestMode === "jobs" ? [] : await db.execute(`
     SELECT p.id, p.serviceType, p.slug, p.company, p.description, p.location,
            p.locationLat, p.locationLng, p.budget, p.workFromAnywhere,
            p.masterServiceTypeId, p.createdByUserId
@@ -134,6 +156,9 @@ export async function runDigest(opts: RunOptions = {}): Promise<DigestResult> {
 
   const result: DigestResult = {
     mode: describeMode(policy),
+    digestMode,
+    dryRun,
+    ...(dryRun ? { samples: [] } : {}),
     pendingJobs: jobs.length,
     pendingProJobs: proJobs.length,
     recipients: 0, sent: 0, skipped: 0, plan: [],
@@ -150,7 +175,7 @@ export async function runDigest(opts: RunOptions = {}): Promise<DigestResult> {
     const ordered = [...b.targetedJobs].sort(compareJobs);
     const cards = ordered.slice(0, MAX_JOB_CARDS).map((r) => toJobCard(r, appUrl()));
     // Targeted PRO first — they actually matched this artist's services.
-    const pro = [...b.targetedPro, ...b.ridealongPro].slice(0, MAX_PRO_ITEMS)
+    const pro = [...b.targetedPro, ...b.ridealongPro].slice(0, proCap)
       .map((r) => toProCard(r, appUrl()));
 
     const data: DigestData = {
@@ -163,7 +188,7 @@ export async function runDigest(opts: RunOptions = {}): Promise<DigestResult> {
       preferencesUrl: `${appUrl()}/app/settings?section=notifications`,
       unsubscribeUrl: unsubscribeUrl(appUrl(), b.artist.userId),
     };
-    const { subject, html } = renderDigest(data);
+    const { subject, html } = digestMode === "pro" ? renderProDigest(data) : renderDigest(data);
 
     const decision = decideSend(policy, b.artist.email);
     result.plan.push({
@@ -173,6 +198,12 @@ export async function runDigest(opts: RunOptions = {}): Promise<DigestResult> {
       ...(decision.send ? {} : { reason: decision.reason }),
     });
 
+    if (dryRun) {
+      if (result.samples!.length < 2 && !result.samples!.some((s) => s.isPro === b.artist.isPro)) {
+        result.samples!.push({ isPro: b.artist.isPro, subject, html });
+      }
+      continue;
+    }
     if (!decision.send) { result.skipped++; continue; }
 
     const { ok, messageId } = await sendHtmlEmail({
@@ -188,7 +219,7 @@ export async function runDigest(opts: RunOptions = {}): Promise<DigestResult> {
     for (const j of ordered.slice(0, MAX_JOB_CARDS)) {
       await logSend(db, { jobId: j.id, userId: b.artist.userId, ok, messageId });
     }
-    for (const p of [...b.targetedPro, ...b.ridealongPro].slice(0, MAX_PRO_ITEMS)) {
+    for (const p of [...b.targetedPro, ...b.ridealongPro].slice(0, proCap)) {
       await logSend(db, { premiumJobId: p.id, userId: b.artist.userId, ok, messageId });
     }
     if (ok) result.sent++; else result.skipped++;
@@ -198,7 +229,9 @@ export async function runDigest(opts: RunOptions = {}): Promise<DigestResult> {
   // nobody must not sit pending and be retried forever — §2 of the spec.
   // Never advance status while simulating: a test must leave the queue exactly
   // as it found it.
-  if (!simulating && policy.enabled) {
+  // Only the kind of job that went out is marked: on a PRO-only day the regular
+  // jobs were never loaded, so they stay pending for the next run.
+  if (!simulating && !dryRun && policy.enabled) {
     if (jobs.length) {
       await db.execute(`UPDATE jobs SET networkStatus='sent_digest', networkSentAt=NOW()
                         WHERE id IN (${jobs.map((j) => j.id).join(",")})`);

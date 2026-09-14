@@ -12,9 +12,13 @@
  * already used elsewhere in this codebase, e.g. JobDetail.tsx's date
  * formatting). Branches on paymentMethod: artswrk-pay bookings get pointed
  * at invoicing, direct-pay bookings get pointed at confirming receipt.
+ *
+ * ONLY ON THE DAY OF THE BOOKING (Eastern). A booking whose day has passed is
+ * never reminded — see reminderWindow.ts for why.
  */
 import type { Request, Response } from "express";
 import { getDb, getDuePeriodReminders, markPeriodNotified } from "./db";
+import { reminderWindow, completionReminderDueSql } from "./reminderWindow";
 import { sendCompleteBookingReminderEmail, sendConfirmDirectPaymentReminderEmail } from "./email";
 import { requireCronRequest } from "./_core/cronAuth";
 
@@ -27,14 +31,18 @@ interface DueBooking {
   artistFirstName: string | null;
 }
 
-async function getDueCompletionReminders(): Promise<DueBooking[]> {
+/** Bookings to remind now. `now` is a parameter so the rule can be dry-run at any time. */
+export async function getDueCompletionReminders(now: Date = new Date()): Promise<DueBooking[]> {
   const db = await getDb();
   if (!db) return [];
+  const w = reminderWindow(now);
   const rows = await db.execute(`
     SELECT b.id, b.paymentMethod, a.email AS artistEmail, a.firstName AS artistFirstName
     FROM bookings b
     JOIN users a ON b.artistUserId = a.id
-    WHERE b.bookingStatus <> 'Cancelled'
+    WHERE COALESCE(b.bookingStatus, '') NOT IN ('Cancelled', 'Completed')
+      -- A booking that's already settled has nothing left to complete.
+      AND COALESCE(b.paymentStatus, '') NOT IN ('Paid', 'Refunded')
       AND b.deleted = false
       -- Recurring admin bookings are reminded per week (sendDuePeriodReminders),
       -- not once for the whole booking.
@@ -45,10 +53,7 @@ async function getDueCompletionReminders(): Promise<DueBooking[]> {
         (COALESCE(b.paymentMethod, 'artswrk') = 'artswrk' AND b.artswrkInvoiceSubmittedAt IS NULL)
         OR (b.paymentMethod = 'direct' AND b.directPayConfirmedAt IS NULL)
       )
-      AND (
-        (TIME(b.startDate) <> '00:00:00' AND b.startDate <= (NOW() + INTERVAL 10 MINUTE))
-        OR (TIME(b.startDate) = '00:00:00' AND DATE(b.startDate) <= CURDATE())
-      )
+      AND ${completionReminderDueSql(w)}
     LIMIT 200
   `);
   return rows[0] as unknown as DueBooking[];
@@ -64,10 +69,11 @@ async function markReminderSent(bookingId: number): Promise<void> {
  * Recurring admin bookings (weekly classes): each week is its own booking to
  * complete, so the same "Complete Your Booking" email goes out on each class
  * day at the week's reminder time, and the week opens for hours. Weeks skipped
- * for holidays never match. Reminders more than a day late are opened silently.
+ * for holidays never match. A week whose class day has already passed (Eastern)
+ * is opened for hours without an email — never reminded late.
  */
-export async function sendDuePeriodReminders(): Promise<{ sent: number; opened: number; total: number }> {
-  const due = await getDuePeriodReminders();
+export async function sendDuePeriodReminders(now: Date = new Date()): Promise<{ sent: number; opened: number; total: number }> {
+  const due = await getDuePeriodReminders(now);
   let sent = 0;
   let opened = 0;
   for (const period of due) {

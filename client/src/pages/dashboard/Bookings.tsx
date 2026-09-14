@@ -339,7 +339,15 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 uppercase tracking-wider">Admin Booking</span>
+                  {/* Same status badge as every other booking — never labeled "admin". */}
+                  {(() => {
+                    const cfg = BOOKING_STATUS_CONFIG[booking.bookingStatus as BookingStatus] ?? BOOKING_STATUS_CONFIG.Confirmed;
+                    return (
+                      <span className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.className}`}>
+                        {cfg.icon} {cfg.label}
+                      </span>
+                    );
+                  })()}
                   {booking.isRecurring && <span className="text-[10px] font-semibold text-gray-500 capitalize">{booking.recurringCadence}</span>}
                 </div>
                 <p className="text-sm font-bold text-[#111]">
@@ -543,10 +551,10 @@ export default function Bookings() {
         ))}
       </div>
 
-      {/* Admin Bookings */}
+      {/* Weekly and manually entered bookings. Artists and studios see these as
+          ordinary bookings — never labeled "admin". */}
       {!adminLoading && (adminBookings as any[])?.length > 0 && (
-        <div className="mb-7">
-          <h2 className="text-base font-black text-[#111] mb-3">Admin Bookings</h2>
+        <div className="mb-3">
           <div className="space-y-3">
             {(adminBookings as any[]).map((b: any) => (
               <AdminBookingCard key={b.id} booking={b} isArtist={isArtist} onPeriodsUpdated={() => refetchAdmin()} />

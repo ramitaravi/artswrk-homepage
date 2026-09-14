@@ -7,9 +7,11 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { INQUIRY_DRAFT_KEY } from "@/lib/inquiryDraft";
+import Messages from "@/pages/dashboard/Messages";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
+  MessageSquare,
   Users,
   MapPin,
   CreditCard,
@@ -238,17 +240,23 @@ function Sidebar({
   const [, navigate] = useLocation();
   const { logout } = useAuth();
 
-  // Trimmed to Dashboard + Log out for launch. Messages, My Artists, Browse
-  // Artists, Bookings, Company Page, Sub Lists and Settings are hidden until
-  // they're wired up for enterprise — Browse Artists in particular navigated to
-  // /app/artists, dropping enterprise users into the client app shell. Restore
-  // entries here as each one is finished.
+  // Trimmed for launch. My Artists, Browse Artists, Bookings, Company Page, Sub
+  // Lists and Settings are hidden until they're wired up for enterprise — Browse
+  // Artists in particular navigated to /app/artists, dropping enterprise users
+  // into the client app shell. Restore entries here as each one is finished.
+  // Messages is back: /app/messages renders the shared inbox inside this page.
   const items: SidebarItem[] = [
     {
       icon: <LayoutDashboard size={18} />,
       label: "Dashboard",
       onClick: () => onNavigate("dashboard"),
       active: activeSection === "dashboard",
+    },
+    {
+      icon: <MessageSquare size={18} />,
+      label: "Messages",
+      onClick: () => navigate("/app/messages"),
+      active: activeSection === "messages",
     },
   ];
 
@@ -2211,7 +2219,7 @@ function JobDetailView({
                     </div>
                     <span className="text-sm font-bold text-[#111]">Unlock This Job</span>
                   </div>
-                  <p className="text-3xl font-black text-[#111] mb-1">$100</p>
+                  <p className="text-3xl font-black text-[#111] mb-1">$150</p>
                   <p className="text-xs text-gray-400 mb-4">One-time · this job only</p>
                   <ul className="space-y-1.5 mb-5 flex-1">
                     {[
@@ -2234,7 +2242,7 @@ function JobDetailView({
                     {checkingOut ? (
                       <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Redirecting…</>
                     ) : (
-                      <><Unlock size={15} /> Unlock — $100</>
+                      <><Unlock size={15} /> Unlock — $150</>
                     )}
                   </button>
                   <p className="text-[11px] text-gray-400 text-center mt-2">Secure checkout via Stripe</p>
@@ -2694,7 +2702,7 @@ function EnterpriseBillingSettings({ onBack }: { onBack: () => void }) {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <p className="text-xl font-black text-[#111] mb-1">On-Demand</p>
-                    <p className="text-sm text-gray-500">$100 per job to unlock candidate lists</p>
+                    <p className="text-sm text-gray-500">$150 per job to unlock candidate lists</p>
                   </div>
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center flex-shrink-0">
                     <Unlock size={20} className="text-white" />
@@ -2820,11 +2828,11 @@ function EnterpriseBillingSettings({ onBack }: { onBack: () => void }) {
 
 // ── Main Enterprise Page ──────────────────────────────────────────────────────
 
-export default function Enterprise({ initialJobId }: { initialJobId?: number } = {}) {
+export default function Enterprise({ initialJobId, initialSection = "dashboard" }: { initialJobId?: number; initialSection?: string } = {}) {
   const { user, loading } = useAuth();
   const [, navigate] = useLocation();
   const [selectedJob, setSelectedJob] = useState<any>(null);
-  const [activeSection, setActiveSection] = useState("dashboard");
+  const [activeSection, setActiveSection] = useState(initialSection);
   const utils = trpc.useUtils();
 
   function selectJob(job: any) {
@@ -2907,7 +2915,9 @@ export default function Enterprise({ initialJobId }: { initialJobId?: number } =
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">
-        {activeSection === "settings" ? (
+        {activeSection === "messages" ? (
+          <Messages />
+        ) : activeSection === "settings" ? (
           <EnterpriseBillingSettings onBack={() => setActiveSection("dashboard")} />
         ) : activeSection === "artists" ? (
           <Artists />

@@ -163,7 +163,7 @@ export async function applyCheckoutSessionCompleted(session: any): Promise<void>
           jobId: unlockJobId,
           stripeSessionId: session.id,
           stripePaymentIntentId: session.payment_intent ?? null,
-          amountCents: session.amount_total ?? 10000,
+          amountCents: session.amount_total ?? 15000,
         });
         await saveEnterpriseStripeCustomerId(userId, session.customer);
         console.log(`[Checkout] Unlocked enterprise job ${unlockJobId} for user ${userId}`);

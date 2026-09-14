@@ -128,7 +128,7 @@ export const users = mysqlTable("users", {
   enterpriseDescription: text("enterpriseDescription"),
   /**
    * Enterprise billing plan:
-   *   on_demand  — pay $100 per job to unlock candidate list
+   *   on_demand  — pay $150 per job to unlock candidate list
    *   subscriber — monthly ($250/mo) or annual ($2500/yr) subscription
    * Null = not yet assigned (admin sets this)
    */
@@ -924,7 +924,7 @@ export const clientCompanyMemberships = mysqlTable("client_company_memberships",
 
 /**
  * Enterprise Job Unlocks — tracks which on-demand enterprise jobs have been
- * paid for (at $100 each) so the client can view the candidate list.
+ * paid for ($150 each since 2026-09-14; $100 before) so the client can view the candidate list.
  */
 export const enterpriseJobUnlocks = mysqlTable("enterprise_job_unlocks", {
   id: int("id").autoincrement().primaryKey(),
@@ -936,7 +936,7 @@ export const enterpriseJobUnlocks = mysqlTable("enterprise_job_unlocks", {
   stripeSessionId: varchar("stripeSessionId", { length: 128 }),
   /** Stripe Payment Intent ID */
   stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 128 }),
-  /** Amount paid in cents (should be 10000 = $100) */
+  /** Amount paid in cents (15000 = $150 since 2026-09-14; older rows 10000 = $100) */
   amountCents: int("amountCents").default(10000),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
