@@ -5,6 +5,7 @@ import { BookingPeriod, ClientCompany, EnterpriseJobUnlock, InsertClientCompany,
 import { ENV } from './_core/env';
 import { extractCity, DEFAULT_RADIUS_MILES } from "../shared/location";
 import { easternDateTimeToUtc, utcDateString } from "../shared/adminBookingSchedule";
+import { reminderWindow, periodReminderDueSql, periodReminderIsTodaySql } from "./reminderWindow";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -5626,24 +5627,26 @@ export async function markPeriodNotified(periodId: number) {
 }
 
 /**
- * Weeks whose reminder is due, for the automated sweep. `recent` is 0 for
- * reminders more than a day late — those get opened for submission without an
- * email, so a backlog (old test bookings, scheduler downtime) never turns into
- * a burst of stale "Complete Your Booking" emails. Skipped weeks never match.
+ * Weeks whose reminder is due, for the automated sweep. `recent` is 1 only when
+ * the reminder falls on today's Eastern date; a week from an earlier day is
+ * opened for submission without an email, so a backlog (old test bookings,
+ * scheduler downtime) never turns into a burst of stale "Complete Your Booking"
+ * emails. Skipped weeks never match. `now` is a parameter so it can be dry-run.
  */
-export async function getDuePeriodReminders() {
+export async function getDuePeriodReminders(now: Date = new Date()) {
   const db = await getDb();
   if (!db) return [];
+  const w = reminderWindow(now);
   const rows = await db.execute(`
     SELECT bp.id, bp.bookingId, bp.periodStart, bp.notifyArtistAt,
-      (bp.notifyArtistAt > NOW() - INTERVAL 1 DAY) AS recent,
+      ${periodReminderIsTodaySql(w)} AS recent,
       a.email AS artistEmail, a.firstName AS artistFirstName
     FROM booking_periods bp
     JOIN bookings b ON bp.bookingId = b.id
     LEFT JOIN users a ON b.artistUserId = a.id
     WHERE bp.status = 'upcoming'
       AND bp.artistNotifiedAt IS NULL
-      AND bp.notifyArtistAt <= NOW()
+      AND ${periodReminderDueSql(w)}
       AND (b.deleted IS NULL OR b.deleted = 0)
       AND COALESCE(b.bookingStatus, '') <> 'Cancelled'
     ORDER BY bp.notifyArtistAt ASC

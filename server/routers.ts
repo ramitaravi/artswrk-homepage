@@ -4206,6 +4206,14 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const booking = await getBookingById(input.bookingId);
         if (!booking) throw new Error("Booking not found");
         if (booking.artistUserId !== user.id) throw new Error("Not authorized");
+        // Nothing to invoice on a settled booking. invoice.approve already refuses
+        // these, but without this the studio still got an invoice email — and the
+        // 2026-09-14 reminder misfire pointed artists at years-old Completed/Paid
+        // bookings from Bubble.
+        if (String((booking as any).paymentStatus ?? "").toLowerCase() === "paid" || (booking as any).bookingStatus === "Completed") {
+          throw new Error("This booking is already completed and paid, so there's nothing to invoice.");
+        }
+        if ((booking as any).bookingStatus === "Cancelled") throw new Error("This booking was cancelled, so there's nothing to invoice.");
 
         // Every payout must land in the artist's own connected Stripe account —
         // never let an invoice go out (and get paid) with nowhere for the money to go.
