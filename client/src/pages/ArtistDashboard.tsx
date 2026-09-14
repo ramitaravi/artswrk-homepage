@@ -829,7 +829,8 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const studio = booking.clientCompanyName ?? booking.clientFirstName ?? `Studio #${booking.clientUserId}`;
-  const jobTitle = (booking.jobDescription ?? "").split("\n")[0].slice(0, 80) || null;
+  // A booking with no job behind it carries its own description — use it.
+  const jobTitle = (booking.jobDescription ?? booking.description ?? "").split("\n")[0].slice(0, 80) || null;
   // null paymentMethod = historical → treat as "artswrk"
   const effectiveMethod: "artswrk" | "direct" = (booking.paymentMethod === "direct") ? "direct" : "artswrk";
   const isAlreadyPaid = booking.paymentStatus?.toLowerCase() === "paid";
@@ -955,10 +956,10 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                   <p className="text-sm text-[#111]">{booking.jobLocation}</p>
                 </div>
               )}
-              {booking.jobDescription && (
+              {(booking.jobDescription ?? booking.description) && (
                 <div>
                   <p className="text-xs font-bold text-gray-500 mb-0.5">Details</p>
-                  <p className="text-sm text-[#111] whitespace-pre-wrap">{booking.jobDescription}</p>
+                  <p className="text-sm text-[#111] whitespace-pre-wrap">{booking.jobDescription ?? booking.description}</p>
                 </div>
               )}
             </div>
@@ -1363,7 +1364,8 @@ function ConfirmationCard({ booking }: { booking: any }) {
   );
 
   const studioName = booking.clientCompanyName ?? booking.clientFirstName ?? `Studio #${booking.clientUserId}`;
-  const jobTitle = (booking.jobDescription ?? "").split("\n")[0].slice(0, 60) || `Job #${booking.jobId}`;
+  const jobTitle = (booking.jobDescription ?? booking.description ?? "").split("\n")[0].slice(0, 60)
+    || (booking.jobId ? `Job #${booking.jobId}` : "Booking");
   const isArtswrk = booking.paymentMethod === "artswrk";
   const isDirect = booking.paymentMethod === "direct";
   const isInvoiceSubmitted = !!booking.artswrkInvoiceSubmittedAt;

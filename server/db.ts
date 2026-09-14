@@ -3694,6 +3694,7 @@ export async function getArtistBookings(artistUserId: number): Promise<{
   if (!db) return [];
   const rows = await db.execute(
     `SELECT b.id, b.bookingStatus, b.paymentStatus, b.clientRate, b.artistRate, b.startDate, b.endDate, b.locationAddress,
+     b.description,
      u.clientCompanyName,
      COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.firstName,''), ' ', COALESCE(u.lastName,''))), ''), u.name) as clientName
      FROM bookings b
@@ -4706,6 +4707,9 @@ export async function getArtistConfirmedBookings(artistUserId: number) {
       directPayConfirmedAt: bookings.directPayConfirmedAt,
       artswrkInvoiceSubmittedAt: bookings.artswrkInvoiceSubmittedAt,
       createdAt: bookings.createdAt,
+      // The booking's own description — the only details a booking created
+      // without a job (e.g. itemized hourly work) has.
+      description: bookings.description,
       jobDescription: jobs.description,
       jobLocation: jobs.locationAddress,
       jobServiceType: jobs.masterServiceTypeId,
@@ -4876,6 +4880,9 @@ export async function getBookingByInvoiceToken(token: string) {
       bookingStatus: bookings.bookingStatus,
       paymentStatus: bookings.paymentStatus,
       startDate: bookings.startDate,
+      // Shown on the invoice so the studio sees what they're paying for even
+      // when there's no job behind the booking.
+      description: bookings.description,
       jobDescription: jobs.description,
       jobLocation: jobs.locationAddress,
       artistName: users.name,

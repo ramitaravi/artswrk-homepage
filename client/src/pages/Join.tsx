@@ -5,6 +5,7 @@
  * Artist path  → account → artist types → plan
  * Client path  → account → business type → details → pricing → done
  */
+import { safeNextPath } from "@shared/nav";
 import { useState, useRef, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
 import {
@@ -121,7 +122,7 @@ export default function Join() {
   const [, navigate]  = useLocation();
   const searchStr     = useSearch();
   const params        = new URLSearchParams(searchStr);
-  const next          = params.get("next") ?? "";
+  const next          = safeNextPath(params.get("next")) ?? "";
   const prefillEmail  = params.get("email") ?? "";
   const prefillCompany = params.get("company") ?? "";
   const prefillRole: Role =

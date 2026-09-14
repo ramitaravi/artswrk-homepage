@@ -190,11 +190,14 @@ export default function ClientBookingDetail() {
 
   // "Pay Now" is the status that means the client owes money right now.
   const needsPayment = bookingStatus === "Pay Now" && paymentStatus !== "Paid" && !b.invoicePaidAt;
-  // ONLY invoiceStripeCheckoutUrl — the link this app generates for THIS
-  // booking. Never fall back to bookings.stripeCheckoutUrl: 2,622 rows carry a
-  // legacy Bubble Payment Link that charges for a different artist's booking
-  // entirely (a client clicking it is shown someone else's name and amount).
-  const payUrl: string | null = b.invoiceStripeCheckoutUrl || null;
+  // Only links this app generated for THIS booking: the Stripe session once the
+  // studio has approved, otherwise this booking's own invoice review page —
+  // approving there is what creates the session. Never fall back to
+  // bookings.stripeCheckoutUrl: 2,622 rows carry a legacy Bubble Payment Link
+  // that charges for a different artist's booking entirely (a client clicking
+  // it is shown someone else's name and amount).
+  const payUrl: string | null =
+    b.invoiceStripeCheckoutUrl || (b.invoicePaymentToken ? `/invoice/${b.invoicePaymentToken}` : null);
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto">
@@ -252,8 +255,14 @@ export default function ClientBookingDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* Pay Now removed — see dashboard/Payments.tsx. It linked to a
-                Bubble Payment Link that charges for a different booking. */}
+            {needsPayment && payUrl && (
+              <a
+                href={payUrl}
+                className="flex items-center gap-1.5 text-sm font-semibold text-white bg-[#F25722] px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
+              >
+                <CreditCard size={14} /> Review & Pay{total > 0 ? ` ${formatCurrency(total)}` : ""}
+              </a>
+            )}
             <button
               onClick={() => setMsgOpen(true)}
               className="flex items-center gap-1.5 text-sm font-semibold text-[#111] border border-gray-200 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors"

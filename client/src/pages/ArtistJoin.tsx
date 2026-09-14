@@ -9,6 +9,7 @@
  * Font: Poppins
  * Artist gradient: pink → purple (artist-grad-bg / artist-grad-text)
  */
+import { safeNextPath } from "@shared/nav";
 import { useState, useRef } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { Eye, EyeOff, ArrowRight, ArrowLeft, CheckCircle2, Zap, Star, Lock, Upload } from "lucide-react";
@@ -42,7 +43,7 @@ function StepDots({ current, total }: { current: number; total: number }) {
 export default function ArtistJoin() {
   const [, navigate] = useLocation();
   const searchStr = useSearch();
-  const next = new URLSearchParams(searchStr).get("next") ?? "/jobs";
+  const next = safeNextPath(new URLSearchParams(searchStr).get("next")) ?? "/jobs";
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);

@@ -714,6 +714,8 @@ export async function sendClientPayArtistEmail(data: {
   to: string; clientName?: string; artistName: string; clientRate: string;
   date: string; reimbursements?: string; startDate?: string;
   totalClientRate: string; payUrl: string;
+  /** False for flat-total bookings, where the review page has no hours to adjust. */
+  hoursAdjustable?: boolean;
 }): Promise<boolean> {
   const total = "$" + String(data.totalClientRate).replace(/^\$/, "");
   const html = renderEmailShell({
@@ -728,7 +730,7 @@ export async function sendClientPayArtistEmail(data: {
         { label: "Reimbursements", value: data.reimbursements },
         { label: "Total due", value: total },
       ]) +
-      para("If the hours need adjusting, you can update them before paying. Once you approve, pay in a minute by card or Apple Pay \u2014 you\u2019ll get a receipt as soon as it processes."),
+      para((data.hoursAdjustable === false ? "" : "If the hours need adjusting, you can update them before paying. ") + "Once you approve, pay in a minute by card or Apple Pay \u2014 you\u2019ll get a receipt as soon as it processes."),
     ctaText: "Review & Pay",
     ctaUrl: data.payUrl,
   });

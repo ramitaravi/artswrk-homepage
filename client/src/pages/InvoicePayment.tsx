@@ -80,7 +80,14 @@ export default function InvoicePayment() {
   const checkoutUrl = booking.invoiceStripeCheckoutUrl;
   const isApproved = !!checkoutUrl;
   const artistName = booking.artistName ?? booking.artistFirstName ?? "Your artist";
-  const jobTitle = ((booking as any).jobDescription ?? "").split("\n")[0].slice(0, 80) || "Booking";
+  // A booking created without a job (e.g. itemized hourly work) has only its
+  // own description: its first line titles the invoice, the rest is the detail.
+  const jobDescriptionText: string = (booking as any).jobDescription ?? "";
+  const bookingDescriptionText: string = (booking as any).description ?? "";
+  const jobTitle = (jobDescriptionText || bookingDescriptionText).split("\n")[0].slice(0, 80) || "Booking";
+  const bookingDetailsText = (jobDescriptionText
+    ? bookingDescriptionText
+    : bookingDescriptionText.split("\n").slice(1).join("\n")).trim();
   const bookingDate = booking.startDate
     ? new Date(booking.startDate).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" })
     : new Date((booking as any).artswrkInvoiceSubmittedAt ?? Date.now()).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" });
@@ -165,10 +172,16 @@ export default function InvoicePayment() {
             <div className="px-10 py-6 border-b border-gray-100">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Your Booking:</p>
               <div className="border-l-4 border-[#ec008c] pl-5 space-y-3">
-                <p className="text-sm text-gray-700"><strong>Job:</strong> {jobTitle}</p>
+                <p className="text-sm text-gray-700"><strong>{jobDescriptionText ? "Job" : "Booking"}:</strong> {jobTitle}</p>
                 <p className="text-sm text-gray-700"><strong>Date:</strong> {bookingDate}</p>
                 {(booking as any).jobLocation && (
                   <p className="text-sm text-gray-700"><strong>Location:</strong> {(booking as any).jobLocation}</p>
+                )}
+                {bookingDetailsText && (
+                  <div className="text-sm text-gray-700">
+                    <strong>Details:</strong>
+                    <p className="mt-1 whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-gray-600">{bookingDetailsText}</p>
+                  </div>
                 )}
                 {isHourly && (
                   <div className="text-sm text-gray-700 flex items-center gap-2">

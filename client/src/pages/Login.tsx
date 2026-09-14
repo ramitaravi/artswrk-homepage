@@ -1,3 +1,4 @@
+import { safeNextPath } from "@shared/nav";
 import { useLocation, useSearch } from "wouter";
 import Navbar from "@/components/Navbar";
 import InlineAuth, { type AuthResult } from "@/components/InlineAuth";
@@ -6,7 +7,7 @@ export default function Login() {
   const [, navigate] = useLocation();
   const searchStr = useSearch();
   const params = new URLSearchParams(searchStr);
-  const next = params.get("next");
+  const next = safeNextPath(params.get("next"));
   const prefillEmail = params.get("email") ?? "";
   const prefillRole = params.get("role");
 

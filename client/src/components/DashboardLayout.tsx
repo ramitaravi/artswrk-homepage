@@ -230,7 +230,10 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!loading && !user) {
-      navigate("/login");
+      // Keep where they were headed — e.g. a booking linked from a "Payment due"
+      // email — so signing in lands them back on it, not the dashboard home.
+      const here = window.location.pathname + window.location.search;
+      navigate(here && here !== "/app" ? `/login?next=${encodeURIComponent(here)}` : "/login");
     }
   }, [loading, user, navigate]);
 
