@@ -438,7 +438,12 @@ function HelpSection() {
 export default function ArtistSettings() {
   // Default to Subscription — every existing "subscribe"/"upgrade" CTA in the
   // app links straight to /app/settings expecting to land on the plan picker.
-  const [section, setSection] = useState<Section>("subscription");
+  // ?section= overrides it: job alert emails and the unsubscribe page link to
+  // /app/settings?section=notifications and must open Notification Preferences.
+  const [section, setSection] = useState<Section>(() => {
+    const requested = new URLSearchParams(window.location.search).get("section");
+    return NAV.some((item) => item.id === requested) ? (requested as Section) : "subscription";
+  });
 
   return (
     <div className="max-w-5xl">

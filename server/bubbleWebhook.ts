@@ -59,10 +59,16 @@ async function upsertArtistFromBubble(artist: BubbleArtist): Promise<void> {
 
   // Check if user exists by bubbleId
   const [existing] = await db
-    .select({ id: users.id })
+    .select({ id: users.id, deactivatedAt: users.deactivatedAt })
     .from(users)
     .where(eq(users.bubbleId, artist._id))
     .limit(1);
+
+  // Scrubbed on a deletion request — don't write Bubble's copy of their details back.
+  if (existing?.deactivatedAt) {
+    console.log(`[BubbleWebhook] Skipped deactivated artist ${artist._id}`);
+    return;
+  }
 
   if (existing) {
     await db.update(users).set(profileData).where(eq(users.bubbleId, artist._id));

@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { APP_URL } from "./emailTemplates";
 import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ONE_YEAR_MS } from "@shared/const";
+import { processingFeeFor as adminPeriodFee } from "@shared/bookingRates";
 import { isJobPubliclyLive } from "@shared/jobStatus";
 import { resolveBookingBaseAmount, isHourlyBooking, processingFeeFor } from "@shared/bookingRates";
 import { getPasswordError, PASSWORD_MAX_LENGTH } from "@shared/password";
@@ -1691,6 +1692,26 @@ export const appRouter = router({
             planTier: isEnterprise ? "enterprise_on_demand" : input.plan === "premium" ? "client_premium" : "client_on_demand",
           });
         }
+        return { success: true };
+      }),
+
+    /**
+     * Deactivate an account on a deletion request: scrubs their details, blocks
+     * sign-in and all email, keeps bookings, payments and messages. Irreversible,
+     * so the client must send the typed confirmation along with the id.
+     */
+    deactivateUser: protectedProcedure
+      .input(z.object({ userId: z.number(), confirm: z.literal("DEACTIVATE") }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") {
+          throw new Error("Forbidden: admin only");
+        }
+        if (input.userId === ctx.user.id) throw new Error("You can't deactivate your own account.");
+        const { deactivateUser } = await import("./db");
+        const who = String(ctx.user.email ?? ctx.user.openId ?? "admin").slice(0, 128);
+        const result = await deactivateUser(input.userId, who);
+        if (!result.ok) throw new Error(result.reason);
+        console.warn(`[admin] user ${input.userId} deactivated by ${who}`);
         return { success: true };
       }),
 
@@ -3934,9 +3955,11 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         offset: z.number().min(0).default(0),
         lat: z.number().optional(),
         lng: z.number().optional(),
+        /** Limit to the artist's saved profile location when no lat/lng is sent (dashboard "Jobs for You"). */
+        local: z.boolean().optional(),
       }))
       .query(async ({ input, ctx }) => {
-        return getArtistJobsFeed(input.limit, input.offset, input.lat, input.lng, ctx.user?.id);
+        return getArtistJobsFeed(input.limit, input.offset, input.lat, input.lng, ctx.user?.id, input.local === true);
       }),
     /** Get the logged-in artist's affiliations */
     getMyAffiliations: protectedProcedure.query(async ({ ctx }) => {
@@ -5199,7 +5222,9 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const finalHours = input.hours ?? (period as any).actualHours ?? 0;
         const totalReimb = (period as any).reimbursementsTotal ?? 0;
         const artistTotal = ((period as any).artistRate ?? 0) * finalHours + totalReimb;
-        const clientTotal = ((period as any).clientRate ?? 0) * finalHours + totalReimb;
+        // Client rate plus the standard 5% processing fee (see bookingPeriods.submit).
+        const clientSubtotal = ((period as any).clientRate ?? 0) * finalHours + totalReimb;
+        const clientTotal = clientSubtotal + adminPeriodFee(clientSubtotal);
         const totalCents = Math.round(clientTotal * 100);
         const applicationFeeCents = Math.max(0, totalCents - Math.round(artistTotal * 100));
         if (totalCents < 50) throw new Error("Total is below Stripe's minimum charge amount");
@@ -5267,6 +5292,10 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         /** Structured Google Places data for the address above. */
         locationData: locationInputSchema,
         description: z.string().optional(),
+        /** "HH:mm" Eastern — weekly classes remind the artist on each class day at this time. */
+        reminderTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Reminder time must be HH:mm").optional(),
+        /** Scheduled hours per period — shown as the placeholder estimate until the artist submits. */
+        hours: z.number().min(0).max(24).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden");
@@ -5314,26 +5343,20 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
     triggerNotifications: protectedProcedure
       .mutation(async ({ ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden");
-        const due = await getDuePeriods();
-        const { sendSimpleEmail: _sendPeriodNotif } = await import("./email");
-        let sent = 0;
-        for (const period of due) {
-          try {
-            const periodLabel = new Date(period.periodStart).toLocaleDateString("en-US", { month: "long", year: "numeric" });
-            if (period.artistEmail) {
-              await _sendPeriodNotif({
-                to: period.artistEmail,
-                subject: `Time to submit your hours — ${periodLabel}`,
-                html: `<p>Hi ${period.artistFirstName ?? "there"},</p><p>It's time to log your hours and submit reimbursements for <strong>${periodLabel}</strong>.</p><p>Rate: $${period.artistRate}/hr${period.clientCompanyName ? ` · Client: ${period.clientCompanyName}` : ""}</p><p><a href="https://artswrk.com/app/bookings" style="background:#F25722;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Submit Hours →</a></p><p>Best,<br/>The Artswrk Team</p>`,
-              });
-            }
-            await markPeriodNotified(period.id);
-            sent++;
-          } catch (e) {
-            console.error(`[triggerNotifications] Period ${period.id} failed:`, e);
-          }
-        }
-        return { sent, total: due.length };
+        // Same safe sweep the scheduled job runs every 15 minutes: emails only
+        // reminders due in the last day, opens older weeks without emailing.
+        const { sendDuePeriodReminders } = await import("./bookingReminders");
+        const r = await sendDuePeriodReminders();
+        return { sent: r.sent, total: r.total };
+      }),
+
+    /** Skip a class week for a holiday, or restore it. */
+    setPeriodSkipped: protectedProcedure
+      .input(z.object({ periodId: z.number().int(), skipped: z.boolean() }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden");
+        const { setPeriodSkipped } = await import("./db");
+        return { status: await setPeriodSkipped(input.periodId, input.skipped) };
       }),
   }),
 
@@ -5368,10 +5391,16 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const artistRatePerHour = booking.artistRate ?? 0;
         const clientRatePerHour = booking.clientRate ?? 0;
 
-        // No processing fee for admin bookings — client pays clientRate spread only.
-        // The platform's cut is the rate spread itself (clientTotal - artistTotal).
+        if ((period as any).status === "skipped") {
+          throw new Error("This week was skipped (no class), so there are no hours to submit.");
+        }
+
+        // The studio pays the client rate plus the standard 5% processing fee,
+        // like every other booking; the artist receives their full rate.
+        // Artswrk's cut is the rate spread plus the fee.
         const artistTotal = artistRatePerHour * input.actualHours + totalReimb;
-        const clientTotal = clientRatePerHour * input.actualHours + totalReimb;
+        const clientSubtotal = clientRatePerHour * input.actualHours + totalReimb;
+        const clientTotal = clientSubtotal + adminPeriodFee(clientSubtotal);
         const totalCents = Math.round(clientTotal * 100);
         const applicationFeeCents = Math.max(0, totalCents - Math.round(artistTotal * 100));
 

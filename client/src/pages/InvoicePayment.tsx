@@ -113,9 +113,10 @@ export default function InvoicePayment() {
     liveFee = processingFeeFor(liveTotalDollars / (1 + PROCESSING_FEE_RATE));
     liveBase = liveTotalDollars - liveFee - reimbTotal;
   } else if (isPeriodInvoice) {
+    // Recurring weeks carry the standard processing fee, same as the server charge.
     liveBase = clientRate * hoursNum;
-    liveFee = 0;
-    liveTotalDollars = liveBase + reimbTotal;
+    liveFee = processingFeeFor(liveBase + reimbTotal);
+    liveTotalDollars = liveBase + reimbTotal + liveFee;
   } else {
     const base = isHourly ? artistRate * hoursNum : artistRate;
     const fee = processingFeeFor(base + reimbTotal);

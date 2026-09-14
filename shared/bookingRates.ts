@@ -34,6 +34,19 @@ export function processingFeeFor(amount: number): number {
   return Math.round(amount * PROCESSING_FEE_RATE);
 }
 
+/**
+ * One week of a recurring booking: hourly rate × hours plus reimbursements,
+ * with the processing fee on that whole amount. Before the artist submits it's
+ * the placeholder (scheduled hours, no reimbursements); once they submit, the
+ * same math runs on what they actually entered, so the fee moves with it.
+ */
+export function periodInvoiceTotals(ratePerHour: number, hours: number, reimbursements = 0) {
+  const base = Number(ratePerHour || 0) * Number(hours || 0);
+  const reimb = Number(reimbursements || 0);
+  const fee = processingFeeFor(base + reimb);
+  return { base, reimbursements: reimb, fee, total: base + reimb + fee };
+}
+
 export type BookingRateBasis = {
   /** interested_artists.isHourlyRate — the REAL flag. Never infer this. */
   isHourlyRate?: boolean | number | null;

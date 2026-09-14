@@ -214,6 +214,13 @@ export const users = mysqlTable("users", {
   /** When the artist's Stripe Connect account was created */
   artistStripeDateCreated: timestamp("artistStripeDateCreated"),
 
+  // ── Deactivation ───────────────────────────────────────────────────────────
+  /** Set when an admin deactivates the account on a deletion request. Sign-in is
+   *  blocked and personal details are scrubbed; bookings and payments are kept.
+   *  Added by drizzle/0056_user_deactivation.sql — apply it before deploying. */
+  deactivatedAt: timestamp("deactivatedAt"),
+  deactivatedBy: varchar("deactivatedBy", { length: 128 }),
+
   // ── Metadata ───────────────────────────────────────────────────────────────
   bubbleCreatedAt: timestamp("bubbleCreatedAt"),
   bubbleModifiedAt: timestamp("bubbleModifiedAt"),

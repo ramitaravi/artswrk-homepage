@@ -11,6 +11,7 @@ type ExistingUser = {
   passwordHash: string | null;
   loginMethod: string | null;
   role: "user" | "admin";
+  deactivatedAt: Date | null;
 };
 
 export function findDemotedAdminIds(
@@ -155,7 +156,7 @@ async function main() {
   const styleTypes = await loadLookup(conn, "master_style_types");
 
   const [existingRows] = await conn.execute<(ExistingUser & RowDataPacket)[]>(`
-    SELECT id, openId, bubbleId, email, passwordHash, loginMethod, role
+    SELECT id, openId, bubbleId, email, passwordHash, loginMethod, role, deactivatedAt
     FROM users
     ORDER BY id
   `);
@@ -185,6 +186,7 @@ async function main() {
     attachByEmail: 0,
     insert: 0,
     suppressedDuplicateRows: 0,
+    skippedDeactivated: 0,
   };
 
   const plan = sourceUsers.map((source) => {
@@ -213,6 +215,11 @@ async function main() {
     else planned.insert += 1;
 
     return { source, canonical, method };
+  }).filter(({ canonical }) => {
+    // Scrubbed on a deletion request — don't write Bubble's copy of their details back.
+    if (!canonical?.deactivatedAt) return true;
+    planned.skippedDeactivated += 1;
+    return false;
   });
 
   console.log(JSON.stringify({ mode: apply ? "apply" : "dry-run", planned }, null, 2));

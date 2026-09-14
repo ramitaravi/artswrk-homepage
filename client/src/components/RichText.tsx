@@ -37,7 +37,12 @@ function bbcodeToHtml(input: string): string {
 }
 
 export default function RichText({ html, className = "" }: RichTextProps) {
-  const clean = DOMPurify.sanitize(bbcodeToHtml(html), {
+  const converted = bbcodeToHtml(html);
+  // Plain-text descriptions (older jobs, booking notes) carry their line breaks
+  // as newlines, which HTML collapses — turn them into <br> so they still read
+  // as paragraphs. Real HTML is left alone.
+  const markup = /<[a-z!/]/i.test(converted) ? converted : converted.replace(/\r?\n/g, "<br>");
+  const clean = DOMPurify.sanitize(markup, {
     ALLOWED_TAGS: [
       "p", "br", "div", "span", "b", "strong", "i", "em", "u", "s", "strike",
       "ul", "ol", "li", "a", "h1", "h2", "h3", "h4", "blockquote",

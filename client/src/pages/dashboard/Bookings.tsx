@@ -11,6 +11,7 @@ import {
   TrendingUp, Loader2, RefreshCw, Send, ArrowRight, Building2
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { periodInvoiceTotals } from "@shared/bookingRates";
 import { useAuth } from "@/_core/hooks/useAuth";
 // Flexible type for both raw Booking schema rows and enriched query results
 type AnyBooking = {
@@ -218,7 +219,8 @@ function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [hours, setHours] = useState(period.actualHours?.toString() ?? "");
+  // Pre-fill with the scheduled hours so the artist only changes it when a week ran long or short.
+  const [hours, setHours] = useState((period.actualHours ?? period.scheduledHours)?.toString() ?? "");
   const [notes, setNotes] = useState(period.artistNotes ?? "");
 
   const submit = trpc.bookingPeriods.submit.useMutation({
@@ -307,6 +309,7 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
     open: "text-amber-600 bg-amber-50",
     artist_submitted: "text-blue-600 bg-blue-50",
     client_paid: "text-green-600 bg-green-50",
+    skipped: "text-gray-400 bg-gray-50 line-through",
   }[s] ?? "text-gray-400 bg-gray-50");
 
   const statusLabel = (s: string) => ({
@@ -314,6 +317,7 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
     open: "Awaiting submission",
     artist_submitted: "Invoice sent",
     client_paid: "Paid",
+    skipped: "No class",
   }[s] ?? s);
 
   return (
@@ -357,7 +361,7 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
               <p className="text-[10px] text-gray-400">{paidPeriods.length}/{periods.length} paid</p>
               {isArtist && openPeriods.length > 0 && (
                 <button
-                  onClick={() => setSubmitPeriod(openPeriods[0])}
+                  onClick={() => setSubmitPeriod({ ...openPeriods[0], scheduledHours: booking.hours })}
                   className="flex items-center gap-1 text-xs font-bold text-white hirer-grad-bg px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
                 >
                   <Send size={11} /> Submit Hours
@@ -391,10 +395,26 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
                   {p.actualHours != null && <p className="text-[10px] text-gray-500">{p.actualHours}h logged</p>}
                 </div>
                 <div className="flex items-center gap-2">
-                  {p.invoiceTotalCents != null && <span className="text-xs font-semibold text-gray-700">${(p.invoiceTotalCents / 100).toFixed(2)}</span>}
+                  {p.invoiceTotalCents != null ? (
+                    <span className="text-xs font-semibold text-gray-700">${(p.invoiceTotalCents / 100).toFixed(2)}</span>
+                  ) : booking.hours != null && p.status !== "skipped" ? (
+                    // Placeholder until hours are submitted: the artist sees their pay,
+                    // the studio sees what they'll be invoiced (with the processing fee).
+                    <span
+                      className="text-[10px] text-gray-500"
+                      title={isArtist
+                        ? `${booking.hours} scheduled hrs × $${booking.artistRate}/hr`
+                        : `${booking.hours} scheduled hrs × $${booking.clientRate}/hr + 5% processing fee`}
+                    >
+                      Est. ${(isArtist
+                        ? Number(booking.artistRate ?? 0) * Number(booking.hours)
+                        : periodInvoiceTotals(Number(booking.clientRate ?? 0), Number(booking.hours)).total
+                      ).toFixed(2)}
+                    </span>
+                  ) : null}
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusColor(p.status)}`}>{statusLabel(p.status)}</span>
                   {isArtist && p.status === "open" && (
-                    <button onClick={() => setSubmitPeriod(p)} className="text-[10px] font-bold text-[#F25722] hover:underline">Submit →</button>
+                    <button onClick={() => setSubmitPeriod({ ...p, scheduledHours: booking.hours })} className="text-[10px] font-bold text-[#F25722] hover:underline">Submit →</button>
                   )}
                   {!isArtist && p.status === "artist_submitted" && p.invoiceStripeCheckoutUrl && (
                     <a href={p.invoiceStripeCheckoutUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-[#F25722] hover:underline">Pay →</a>

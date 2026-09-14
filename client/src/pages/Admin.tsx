@@ -22,6 +22,8 @@ import {
 import { ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE } from "@shared/const";
 import { Link } from "wouter";
 import RichTextEditor from "@/components/RichTextEditor";
+import RichText from "@/components/RichText";
+import { periodInvoiceTotals } from "@shared/bookingRates";
 import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
 import { useLocationField } from "@/hooks/useLocationField";
 import { toast } from "sonner";
@@ -312,6 +314,83 @@ function RunAsButton({ userId, userName, userRole, enterprise }: {
       )}
       Run As
     </button>
+  );
+}
+
+// ─── Deactivate Account ───────────────────────────────────────────────────────
+// For account deletion requests. Irreversible, so it takes a typed confirmation
+// and spells out exactly what happens before anything is sent.
+function DeactivateAccountButton({ userId, userName, onDone }: {
+  userId: number;
+  userName: string;
+  onDone: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const deactivate = trpc.admin.deactivateUser.useMutation({
+    onSuccess: () => { setOpen(false); setTyped(""); onDone(); },
+  });
+
+  const close = () => { if (!deactivate.isPending) { setOpen(false); setTyped(""); deactivate.reset(); } };
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+      >
+        Deactivate
+      </button>
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) close(); }}
+        >
+          <div role="dialog" aria-modal="true" aria-labelledby={`deactivate-title-${userId}`} className="w-full max-w-md rounded-2xl bg-white p-6">
+            <h3 id={`deactivate-title-${userId}`} className="text-lg font-black text-[#111]">Deactivate {userName}?</h3>
+            <p className="mt-1 text-sm text-gray-500">Use this for account deletion requests. It can't be undone.</p>
+            <ul className="mt-4 space-y-1.5 text-sm text-gray-600 list-disc pl-5">
+              <li>Their name becomes “Deleted user”. Email, password, photo, bio, links, location and profile URL are removed.</li>
+              <li>They can't sign in, and any session they have open ends.</li>
+              <li>No email of any kind goes to their old address.</li>
+              <li>Bookings, payments and message history stay, so other people's records are intact.</li>
+            </ul>
+            <label htmlFor={`deactivate-confirm-${userId}`} className="mt-5 block text-xs font-semibold text-gray-500">
+              Type DEACTIVATE to confirm
+            </label>
+            <input
+              id={`deactivate-confirm-${userId}`}
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              autoComplete="off"
+              className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-red-400 focus:outline-none"
+            />
+            {deactivate.error && <p className="mt-3 text-sm text-red-600">{deactivate.error.message}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={close} disabled={deactivate.isPending} className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-500 hover:text-gray-700">
+                Cancel
+              </button>
+              <button
+                onClick={() => deactivate.mutate({ userId, confirm: "DEACTIVATE" })}
+                disabled={typed !== "DEACTIVATE" || deactivate.isPending}
+                className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40"
+              >
+                {deactivate.isPending ? "Deactivating…" : "Deactivate account"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function DeactivatedNote({ at, by }: { at: string | Date; by?: string | null }) {
+  return (
+    <p className="text-xs font-semibold text-red-600 whitespace-nowrap">
+      Deactivated {new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+      {by ? ` by ${by}` : ""}
+    </p>
   );
 }
 
@@ -898,6 +977,7 @@ function ArtistBookingsTab({ artistId }: { artistId: number }) {
 // ─── Admin Artist Detail ──────────────────────────────────────────────────────
 function AdminArtistDetail({ artistId, onBack, onEdit }: { artistId: number; onBack: () => void; onEdit: () => void }) {
   const { data: artist, isLoading } = trpc.admin.getArtist.useQuery({ id: artistId });
+  const utils = trpc.useUtils();
   const [tab, setTab] = useState<"overview" | "applications" | "bookings">("overview");
   const sendWelcome = trpc.admin.sendWelcomeEmail.useMutation({
     onSuccess: () => alert("Welcome email sent!"),
@@ -952,6 +1032,7 @@ function AdminArtistDetail({ artistId, onBack, onEdit }: { artistId: number; onB
                 {artist.artswrkPro && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">PRO</span>}
                 {artist.artswrkBasic && !artist.artswrkPro && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Basic</span>}
                 {artist.priorityList && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">Featured</span>}
+                {artist.deactivatedAt && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">Deactivated</span>}
                 {artist.artistStripeAccountId ? (
                   <span title={artist.artistStripeAccountId} className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-[#635bff]/10 text-[#635bff]">
                     💳 Stripe Connected
@@ -971,15 +1052,22 @@ function AdminArtistDetail({ artistId, onBack, onEdit }: { artistId: number; onB
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={() => sendWelcome.mutate({ artistId })}
-              disabled={sendWelcome.isPending}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
-            >
-              <Send size={13} />
-              {sendWelcome.isPending ? "Sending…" : "Send Welcome"}
-            </button>
-            <RunAsButton userId={artist.id} userName={name} userRole="Artist" />
+            {artist.deactivatedAt ? (
+              <DeactivatedNote at={artist.deactivatedAt} by={artist.deactivatedBy} />
+            ) : (
+              <>
+                <button
+                  onClick={() => sendWelcome.mutate({ artistId })}
+                  disabled={sendWelcome.isPending}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  <Send size={13} />
+                  {sendWelcome.isPending ? "Sending…" : "Send Welcome"}
+                </button>
+                <RunAsButton userId={artist.id} userName={name} userRole="Artist" />
+                <DeactivateAccountButton userId={artist.id} userName={name} onDone={() => utils.admin.getArtist.invalidate({ id: artistId })} />
+              </>
+            )}
             <button
               onClick={onEdit}
               className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-[#F25722] text-white hover:opacity-90 transition-opacity"
@@ -2368,6 +2456,7 @@ function ClientBookingsTab({ clientId }: { clientId: number }) {
 // ─── Admin Client Detail ──────────────────────────────────────────────────────
 function AdminClientDetail({ clientId, onBack, onEdit }: { clientId: number; onBack: () => void; onEdit: () => void }) {
   const { data: client, isLoading } = trpc.admin.getClient.useQuery({ id: clientId });
+  const utils = trpc.useUtils();
   const [tab, setTab] = useState<"overview" | "jobs" | "bookings">("overview");
 
   if (isLoading) return <div className="flex justify-center py-24"><div className="w-6 h-6 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" /></div>;
@@ -2407,6 +2496,7 @@ function AdminClientDetail({ clientId, onBack, onEdit }: { clientId: number; onB
                 <h2 className="text-2xl font-black text-[#111]">{name}</h2>
                 {client.enterprise && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">Enterprise</span>}
                 {client.clientPremium && !client.enterprise && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">Premium</span>}
+                {client.deactivatedAt && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">Deactivated</span>}
               </div>
               {client.clientCompanyName && <p className="text-sm text-gray-500 mb-1 font-medium">{client.clientCompanyName}</p>}
               <div className="flex items-center gap-4 flex-wrap text-xs text-gray-400">
@@ -2417,7 +2507,14 @@ function AdminClientDetail({ clientId, onBack, onEdit }: { clientId: number; onB
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <RunAsButton userId={client.id} userName={name} userRole="Client" enterprise={client.enterprise} />
+            {client.deactivatedAt ? (
+              <DeactivatedNote at={client.deactivatedAt} by={client.deactivatedBy} />
+            ) : (
+              <>
+                <RunAsButton userId={client.id} userName={name} userRole="Client" enterprise={client.enterprise} />
+                <DeactivateAccountButton userId={client.id} userName={name} onDone={() => utils.admin.getClient.invalidate({ id: clientId })} />
+              </>
+            )}
             <button onClick={onEdit} className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-[#F25722] text-white hover:opacity-90 transition-opacity">
               <Edit2 size={13} /> Edit
             </button>
@@ -2910,7 +3007,7 @@ function AdminJobDetail({ jobId, onBack, onEdit }: { jobId: number; onBack: () =
             {job.description && (
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Description</p>
-                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{job.description}</p>
+                <RichText html={job.description ?? ""} className="text-sm text-gray-700 leading-relaxed" />
               </div>
             )}
           </div>
@@ -3954,7 +4051,7 @@ function AdminProJobDetail({ jobId, onBack, onEdit }: { jobId: number; onBack: (
           {cleanDesc ? (
             <>
               <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Description</h3>
-              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{cleanDesc}</p>
+              <RichText html={job.description ?? ""} className="text-sm text-gray-700 leading-relaxed" />
             </>
           ) : (
             <p className="text-sm text-gray-400 text-center py-8">No description provided.</p>
@@ -6275,7 +6372,8 @@ function AdminBookingCreateForm({ onBack, onCreated }: { onBack: () => void; onC
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [isRecurring, setIsRecurring] = useState(false);
-  const [cadence, setCadence] = useState<"weekly" | "biweekly" | "monthly" | "quarterly">("monthly");
+  const [cadence, setCadence] = useState<"weekly" | "biweekly" | "monthly" | "quarterly">("weekly");
+  const [reminderTime, setReminderTime] = useState("");
   const bookingLocation = useLocationField();
   const [description, setDescription] = useState("");
 
@@ -6308,6 +6406,7 @@ function AdminBookingCreateForm({ onBack, onCreated }: { onBack: () => void; onC
       endDate,
       isRecurring,
       recurringCadence: isRecurring ? cadence : undefined,
+      reminderTime: reminderTime || undefined,
       locationAddress: bookingLocation.value || undefined,
       locationData: bookingLocation.locationData,
       description: description || undefined,
@@ -6434,6 +6533,13 @@ function AdminBookingCreateForm({ onBack, onCreated }: { onBack: () => void; onC
                   <option value="monthly">Monthly</option>
                   <option value="quarterly">Quarterly</option>
                 </select>
+                {cadence === "weekly" && (
+                  <div className="mt-3">
+                    <label className={labelCls}>Class-day reminder time (Eastern)</label>
+                    <input type="time" value={reminderTime} onChange={e => setReminderTime(e.target.value)} className={inputCls} />
+                    <p className="text-[10px] text-gray-500 mt-1">Every week, on the start date's weekday, the artist gets “Complete Your Booking” at this time. Set it just after the last class.</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -6444,11 +6550,16 @@ function AdminBookingCreateForm({ onBack, onCreated }: { onBack: () => void; onC
           <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
             <p className="text-xs font-semibold text-blue-700 mb-1">Billing Period Preview</p>
             <p className="text-xs text-blue-600">
-              {cadence === "weekly" && `≈${Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (7 * 86400000))} weekly periods`}
+              {cadence === "weekly" && (() => {
+                const start = new Date(`${startDate}T00:00:00Z`);
+                const weeks = Math.ceil((new Date(`${endDate}T00:00:00Z`).getTime() - start.getTime()) / (7 * 86400000));
+                const weekday = start.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
+                return `${weeks} weekly class${weeks === 1 ? "" : "es"}, every ${weekday}${reminderTime ? ` — reminder at ${reminderTime} ET` : ""}`;
+              })()}
               {cadence === "biweekly" && `≈${Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (14 * 86400000))} bi-weekly periods`}
               {cadence === "monthly" && `≈${Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (30 * 86400000))} monthly periods`}
               {cadence === "quarterly" && `≈${Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (90 * 86400000))} quarterly periods`}
-              {" "}— artist will be notified at the end of each period to submit hours.
+              {cadence === "weekly" && reminderTime ? "" : " — artist will be notified at the end of each period to submit hours."}
             </p>
           </div>
         )}
@@ -6477,6 +6588,11 @@ function AdminBookingCreateForm({ onBack, onCreated }: { onBack: () => void; onC
 function AdminRecurringBookingDetail({ bookingId, onBack }: { bookingId: number; onBack: () => void }) {
   const { data, isLoading } = trpc.adminBookings.detail.useQuery({ bookingId });
   const booking = data as any;
+  const utils = trpc.useUtils();
+  const skipMutation = trpc.adminBookings.setPeriodSkipped.useMutation({
+    onSuccess: () => utils.adminBookings.detail.invalidate({ bookingId }),
+    onError: (e) => alert(e.message),
+  });
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-6 h-6 border-2 border-[#F25722] border-t-transparent rounded-full animate-spin" /></div>;
   if (!booking) return <div className="py-20 text-center text-gray-400 text-sm">Booking not found.</div>;
@@ -6487,6 +6603,7 @@ function AdminRecurringBookingDetail({ bookingId, onBack }: { bookingId: number;
     open: "bg-amber-50 text-amber-600",
     artist_submitted: "bg-blue-50 text-blue-600",
     client_paid: "bg-green-50 text-green-600",
+    skipped: "bg-gray-50 text-gray-400 line-through",
   }[s] ?? "bg-gray-100 text-gray-500");
 
   const statusLabel = (s: string) => ({
@@ -6494,6 +6611,7 @@ function AdminRecurringBookingDetail({ bookingId, onBack }: { bookingId: number;
     open: "Open — Awaiting Artist",
     artist_submitted: "Submitted — Awaiting Payment",
     client_paid: "Paid",
+    skipped: "Skipped — no class",
   }[s] ?? s);
 
   return (
@@ -6515,12 +6633,13 @@ function AdminRecurringBookingDetail({ bookingId, onBack }: { bookingId: number;
               <div className="flex justify-between"><span className="text-gray-500">Status</span><span className="font-semibold capitalize">{booking.bookingStatus}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Client Rate</span><span className="font-semibold">${booking.clientRate}/hr</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Artist Rate</span><span className="font-semibold">${booking.artistRate}/hr</span></div>
+              {booking.hours != null && <div className="flex justify-between"><span className="text-gray-500">Scheduled hours</span><span className="font-semibold">{booking.hours} hrs / period</span></div>}
               <div className="flex justify-between"><span className="text-gray-500">Margin</span><span className="font-semibold text-green-600">${(booking.clientRate - booking.artistRate).toFixed(2)}/hr</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Start</span><span>{fmtDate(booking.startDate)}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">End</span><span>{fmtDate(booking.endDate)}</span></div>
               {booking.isRecurring && <div className="flex justify-between"><span className="text-gray-500">Cadence</span><span className="capitalize font-semibold text-purple-600">{booking.recurringCadence}</span></div>}
               {booking.locationAddress && <div className="flex justify-between"><span className="text-gray-500">Location</span><span className="text-right max-w-[60%]">{booking.locationAddress}</span></div>}
-              {booking.description && <div><span className="text-gray-500 block mb-1">Notes</span><span className="text-gray-700">{booking.description}</span></div>}
+              {booking.description && <div><span className="text-gray-500 block mb-1">Notes</span><span className="text-gray-700 whitespace-pre-line">{booking.description}</span></div>}
             </div>
           </div>
 
@@ -6552,10 +6671,37 @@ function AdminRecurringBookingDetail({ bookingId, onBack }: { bookingId: number;
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusColor(p.status)}`}>{statusLabel(p.status)}</span>
                   </div>
                   <p className="text-sm font-semibold text-[#111]">{fmtDate(p.periodStart)} → {fmtDate(p.periodEnd)}</p>
-                  <p className="text-xs text-gray-500">Artist notified: {p.notifyArtistAt ? fmtDate(p.notifyArtistAt) : "—"}</p>
+                  <p className="text-xs text-gray-500">
+                    {p.status === "skipped"
+                      ? "No class — no reminder or invoice this week"
+                      : p.artistNotifiedAt
+                        ? `Reminder sent ${fmtDate(p.artistNotifiedAt)}`
+                        : p.notifyArtistAt
+                          ? `Reminder ${new Date(p.notifyArtistAt).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" })} ET`
+                          : "—"}
+                  </p>
                 </div>
                 <div className="text-right text-xs">
+                  {["upcoming", "open", "skipped"].includes(p.status) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const skip = p.status !== "skipped";
+                        if (skip && !confirm(`Skip the week of ${fmtDate(p.periodStart)}? No reminder or invoice will go out for it.`)) return;
+                        skipMutation.mutate({ periodId: p.id, skipped: skip });
+                      }}
+                      disabled={skipMutation.isPending}
+                      className="mb-1 font-semibold text-gray-500 hover:text-[#F25722] disabled:opacity-50"
+                    >
+                      {p.status === "skipped" ? "Restore week" : "Skip (holiday)"}
+                    </button>
+                  )}
                   {p.actualHours != null && <p className="font-semibold text-[#111]">{p.actualHours}h logged</p>}
+                  {p.invoiceTotalCents == null && booking.hours != null && p.status !== "skipped" && (
+                    <p className="text-gray-500" title={`${booking.hours} scheduled hrs × $${booking.clientRate}/hr + 5% processing fee`}>
+                      Est. {fmt$(Math.round(periodInvoiceTotals(Number(booking.clientRate ?? 0), Number(booking.hours)).total * 100))}
+                    </p>
+                  )}
                   {p.invoiceTotalCents != null && <p className="text-gray-600">{fmt$(p.invoiceTotalCents)}</p>}
                   {p.invoicePaidAt && <p className="text-green-600 font-semibold">Paid {fmtDate(p.invoicePaidAt)}</p>}
                   {p.invoiceStripeCheckoutUrl && p.status === "artist_submitted" && (

@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
+import RichText from "@/components/RichText";
 import { useLocation, useSearch } from "wouter";
 import ArtistProfilePage from "./artist/ArtistProfilePage";
 import ArtistSettings from "./artist/ArtistSettings";
@@ -170,16 +171,6 @@ function DashboardTab({ user }: { user: any }) {
   const firstName = user?.firstName || user?.name?.split(" ")[0] || "there";
   const isPro = !!(user?.artswrkPro);
   const [tasksOpen, setTasksOpen] = useState(true);
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => {} // silently fail — feed will load without radius filter
-      );
-    }
-  }, []);
 
   const { data: msgStats } = trpc.messages.myStats.useQuery();
   const unreadMessages = msgStats?.unreadMessages ?? 0;
@@ -202,7 +193,9 @@ function DashboardTab({ user }: { user: any }) {
   });
 
   const { data: jobsFeed, isLoading: feedLoading } = trpc.artistDashboard.getJobsFeed.useQuery(
-    { limit: 20, offset: 0, lat: coords?.lat, lng: coords?.lng },
+    // Local to the artist's saved profile location — not the browser's, which
+    // is wrong for Run As and for anyone away from home.
+    { limit: 20, offset: 0, local: true },
     { enabled: true }
   );
   const { data: proJobs, isLoading: proLoading } = trpc.artistDashboard.getProJobsFeed.useQuery({ limit: 10, offset: 0 });
@@ -212,8 +205,6 @@ function DashboardTab({ user }: { user: any }) {
   const appliedProJobIds = new Set((proApplications as any[] ?? []).map((a: any) => a.premiumJobId).filter(Boolean));
 
   const nearbyJobs = jobsFeed ?? [];
-  // If fewer than 5 nearby (location × artist type) jobs, show PRO jobs in the main jobs section instead
-  const showProJobsAsPrimary = !feedLoading && nearbyJobs.length < 5;
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 items-start">
@@ -393,9 +384,67 @@ function DashboardTab({ user }: { user: any }) {
       {/* ── Right column: jobs (primary CTA) ──────────────────────────── */}
       <div className="flex-1 min-w-0 w-full overflow-x-hidden space-y-6">
 
-        {/* PRO Jobs — horizontal scroll cards (hidden when the section below is
-            already showing PRO jobs as the primary feed, to avoid duplicates) */}
-        {!showProJobsAsPrimary && (
+        {/* Jobs for You — local to the artist's saved location, always shown */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-[#111]">Jobs for You</h2>
+            <a href="/app/jobs" className="text-sm font-semibold text-gray-600 hover:text-[#111]">View All</a>
+          </div>
+
+          <div className="space-y-2">
+            {feedLoading ? (
+              <div className="p-8 text-center bg-white rounded-2xl border border-gray-100">
+                <div className="w-6 h-6 border-2 border-gray-200 border-t-[#ec008c] rounded-full animate-spin mx-auto" />
+              </div>
+            ) : !nearbyJobs.length ? (
+              <div className="p-6 text-center bg-white rounded-2xl border border-dashed border-gray-200">
+                <p className="text-sm text-gray-500">No jobs near you match your services right now.</p>
+                <a href="/app/jobs" className="mt-1 inline-block text-sm font-semibold text-[#ec008c] hover:underline">Browse all jobs</a>
+              </div>
+            ) : nearbyJobs.map((job: any) => {
+              const studio = job.clientCompanyName || job.clientName || "Studio";
+              const location = formatLocation(job.locationAddress) ?? "";
+              const ago = postedAgo(job.createdAt);
+              const rate = formatRate(job);
+              const dateLabel = job.dateType === "Ongoing" ? "Ongoing" : formatJobDate(job);
+              const jobDetailUrl = job.slug ? `/jobs/${job.slug}` : `/jobs/arts-job-${job.id}`;
+              const isApplied = appliedJobIds.has(job.id);
+              return (
+                <div key={job.id} className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm transition-all duration-150">
+                  <SquareAvatar name={studio} logo={job.clientLogo} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{getJobTitle(job.title, job.description, studio)}</h3>
+                        <p className="text-xs text-gray-500 truncate">{studio}</p>
+                      </div>
+                      <a
+                        href={jobDetailUrl}
+                        className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                          isApplied
+                            ? "text-green-700 bg-green-50 border border-green-200 hover:bg-green-100"
+                            : "text-white bg-[#111] hover:opacity-80"
+                        }`}
+                      >
+                        {isApplied ? "View Application →" : "Apply →"}
+                      </a>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
+                      {location && <><MapPin size={10} /><span>{location}</span></>}
+                      {ago && <><span>·</span><span>Posted {ago}</span></>}
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs">
+                      {dateLabel && <span className="flex items-center gap-1 text-[#ec008c] font-medium"><Clock size={10} />{dateLabel}</span>}
+                      <span className="font-medium border rounded-full px-2 py-0.5 text-gray-600 border-gray-200 self-start">{rate || "Open rate"}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* PRO Jobs — horizontal scroll cards, below the local jobs */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-semibold text-[#111] flex items-center gap-2">
@@ -453,107 +502,6 @@ function DashboardTab({ user }: { user: any }) {
               })}
             </div>
           )}
-        </div>
-        )}
-
-        {/* Jobs for You (or PRO fallback if < 2 nearby) */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-semibold text-[#111]">
-              {showProJobsAsPrimary ? "Jobs PRO ⭐" : "Jobs for You"}
-            </h2>
-            <a href="/app/jobs" className="text-sm font-semibold text-gray-600 hover:text-[#111]">View All</a>
-          </div>
-
-          <div className="space-y-2">
-            {feedLoading || (showProJobsAsPrimary && proLoading) ? (
-              <div className="p-8 text-center bg-white rounded-2xl border border-gray-100">
-                <div className="w-6 h-6 border-2 border-gray-200 border-t-[#ec008c] rounded-full animate-spin mx-auto" />
-              </div>
-            ) : showProJobsAsPrimary ? (
-              // PRO jobs as list fallback
-              (proJobs?.length ? proJobs : []).map((job: any) => {
-                const isApplied = appliedProJobIds.has(job.id);
-                const title = job.serviceType || job.title || "Job";
-                const company = job.companyName || job.company || "";
-                const location = job.workFromAnywhere ? "Work From Anywhere" : (formatLocation(job.location) ?? "");
-                const ago = postedAgo(job.createdAt);
-                const rate = formatRate(job);
-                const dateLabel = formatJobDate(job);
-                return (
-                  <div key={job.id} className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm transition-all duration-150">
-                    <SquareAvatar name={company || title} logo={job.logo} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <div className="min-w-0">
-                          <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{title}</h3>
-                          <p className="text-xs text-gray-500 truncate">{company}</p>
-                        </div>
-                        <a
-                          href={toProJobUrl({ id: job.id, company: job.companyName || job.company || null, serviceType: job.serviceType || null })}
-                          className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                            isApplied
-                              ? "text-green-700 bg-green-50 border border-green-200 hover:bg-green-100"
-                              : "text-white bg-[#111] hover:opacity-80"
-                          }`}
-                        >
-                          {isApplied ? "View Application →" : "Apply →"}
-                        </a>
-                      </div>
-                      {location && (
-                        <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
-                          <MapPin size={10} /><span>{location}</span>{ago && <><span>·</span><span>Posted {ago}</span></>}
-                        </div>
-                      )}
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs">
-                        {dateLabel && <span className="flex items-center gap-1 text-[#ec008c] font-medium"><Clock size={10} />{dateLabel}</span>}
-                        <span className="font-medium border rounded-full px-2 py-0.5 text-gray-600 border-gray-200 self-start">{rate || "Open rate"}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            ) : nearbyJobs.map((job: any) => {
-              const studio = job.clientCompanyName || job.clientName || "Studio";
-              const location = formatLocation(job.locationAddress) ?? "";
-              const ago = postedAgo(job.createdAt);
-              const rate = formatRate(job);
-              const dateLabel = job.dateType === "Ongoing" ? "Ongoing" : formatJobDate(job);
-              const jobDetailUrl = job.slug ? `/jobs/${job.slug}` : `/jobs/arts-job-${job.id}`;
-              const isApplied = appliedJobIds.has(job.id);
-              return (
-                <div key={job.id} className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm transition-all duration-150">
-                  <SquareAvatar name={studio} logo={job.clientLogo} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <div className="min-w-0">
-                        <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{getJobTitle(job.title, job.description, studio)}</h3>
-                        <p className="text-xs text-gray-500 truncate">{studio}</p>
-                      </div>
-                      <a
-                        href={jobDetailUrl}
-                        className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                          isApplied
-                            ? "text-green-700 bg-green-50 border border-green-200 hover:bg-green-100"
-                            : "text-white bg-[#111] hover:opacity-80"
-                        }`}
-                      >
-                        {isApplied ? "View Application →" : "Apply →"}
-                      </a>
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
-                      {location && <><MapPin size={10} /><span>{location}</span></>}
-                      {ago && <><span>·</span><span>Posted {ago}</span></>}
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs">
-                      {dateLabel && <span className="flex items-center gap-1 text-[#ec008c] font-medium"><Clock size={10} />{dateLabel}</span>}
-                      <span className="font-medium border rounded-full px-2 py-0.5 text-gray-600 border-gray-200 self-start">{rate || "Open rate"}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </div>
       </div>
     </div>
@@ -974,7 +922,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
               {(booking.jobDescription ?? booking.description) && (
                 <div>
                   <p className="text-xs font-bold text-gray-500 mb-0.5">Details</p>
-                  <p className="text-sm text-[#111] whitespace-pre-wrap">{booking.jobDescription ?? booking.description}</p>
+                  <RichText html={booking.jobDescription ?? booking.description} className="text-sm text-[#111]" />
                 </div>
               )}
             </div>

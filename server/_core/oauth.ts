@@ -28,6 +28,14 @@ export function registerOAuthRoutes(app: Express) {
         return;
       }
 
+      // Checked before the upsert, which would otherwise write the provider's
+      // name and email back onto an account scrubbed on a deletion request.
+      const existing = await db.getUserByOpenId(userInfo.openId);
+      if (existing?.deactivatedAt) {
+        res.status(403).send("This account has been deactivated. If that's a mistake, email contact@artswrk.com.");
+        return;
+      }
+
       await db.upsertUser({
         openId: userInfo.openId,
         name: userInfo.name || null,

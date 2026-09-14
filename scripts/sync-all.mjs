@@ -596,7 +596,15 @@ async function syncUsers(conn, modifiedSince = null) {
   const records = await fetchAllPages("user", constraints);
   let upserted = 0, errors = 0;
 
+  // Deactivated accounts were scrubbed on a deletion request; re-importing them
+  // from Bubble would restore the name and email they asked us to remove.
+  const [deactivatedRows] = await conn.execute(
+    "SELECT bubbleId FROM users WHERE deactivatedAt IS NOT NULL AND bubbleId IS NOT NULL"
+  );
+  const deactivated = new Set(deactivatedRows.map((row) => row.bubbleId));
+
   for (const r of records) {
+    if (deactivated.has(r._id)) continue;
     const firstName = r["First Name"] ?? r.firstName ?? null;
     const lastName = r["Last Name"] ?? r.lastName ?? null;
     const name = firstName && lastName

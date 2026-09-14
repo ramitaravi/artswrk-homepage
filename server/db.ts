@@ -4,6 +4,7 @@ import mysql from "mysql2/promise";
 import { BookingPeriod, ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, affiliations, artistResumes, benefits, bookingPeriods, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, masterArtistTypes, masterServiceTypes, masterStyleTypes, messages, payments, premiumJobInterestedArtists, premiumJobs, reimbursements, savedArtists, userAffiliations, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { extractCity, DEFAULT_RADIUS_MILES } from "../shared/location";
+import { easternDateTimeToUtc, utcDateString } from "../shared/adminBookingSchedule";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -178,6 +179,95 @@ export async function getUserByOpenId(openId: string) {
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
 
   return result.length > 0 ? result[0] : undefined;
+}
+
+const PAID_PLAN_TIERS = ["artist_basic", "artist_pro", "client_premium", "enterprise_subscription"];
+
+/**
+ * Why an account can't be deactivated yet, or null if it can. Admins must lose
+ * admin access first, and anyone on a paid plan must be moved to free first —
+ * deactivating doesn't touch Stripe, so they would keep being charged.
+ */
+export function deactivationBlocker(user: {
+  role: string | null; openId: string; deactivatedAt: Date | null; planTier: string | null;
+  artswrkPro: boolean | null; artswrkBasic: boolean | null; clientPremium: boolean | null; enterprisePlan: string | null;
+}): string | null {
+  if (user.deactivatedAt) return "This account is already deactivated.";
+  if (user.role === "admin" || (ENV.ownerOpenId && user.openId === ENV.ownerOpenId)) {
+    return "This account has admin access. Remove admin access first.";
+  }
+  const paid = (user.planTier != null && PAID_PLAN_TIERS.includes(user.planTier))
+    || !!user.artswrkPro || !!user.artswrkBasic || !!user.clientPremium || user.enterprisePlan === "subscriber";
+  if (paid) {
+    return "This account is on a paid plan. Cancel the subscription in Stripe and set their plan to Free first, so they stop being charged.";
+  }
+  return null;
+}
+
+/**
+ * Admin action for account deletion requests. Scrubs personal details, blocks
+ * sign-in (see sdk.authenticateRequest and the OAuth callback) and blocks all
+ * email to the old address, while keeping bookings, payments and messages —
+ * those are business records and other people's history too. Irreversible.
+ */
+export async function deactivateUser(userId: number, deactivatedBy: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) return { ok: false, reason: "User not found." };
+  const blocker = deactivationBlocker(user);
+  if (blocker) return { ok: false, reason: blocker };
+
+  // Block the address before it's removed from the row, so nothing that still
+  // holds it (a queued send, a Brevo list) can mail them after this.
+  const email = (user.email ?? "").trim().toLowerCase();
+  if (email) {
+    await db.execute(sql`
+      INSERT INTO email_suppressions (email, source, scope, reason)
+      VALUES (${email}, 'inapp', 'global', 'account deactivated')
+      ON DUPLICATE KEY UPDATE reason = 'account deactivated', updatedAt = NOW()`);
+  }
+
+  await db.update(users).set({
+    deactivatedAt: new Date(),
+    deactivatedBy: deactivatedBy.slice(0, 128),
+    email: null,
+    passwordHash: null,
+    firstName: "Deleted",
+    lastName: "user",
+    name: "Deleted user",
+    slug: null,
+    profilePicture: null,
+    phoneNumber: null,
+    bio: null,
+    pronouns: null,
+    tagline: null,
+    credits: null,
+    location: null,
+    locationLat: null,
+    locationLng: null,
+    locationCity: null,
+    locationState: null,
+    locationCountry: null,
+    locationPlaceId: null,
+    portfolio: null,
+    website: null,
+    instagram: null,
+    tiktok: null,
+    youtube: null,
+    resumes: null,
+    videos: null,
+    mediaPhotos: null,
+    resumeFiles: null,
+    artistBusinessName: null,
+    clientCompanyName: null,
+    enterpriseLogoUrl: null,
+    enterpriseDescription: null,
+    priorityList: false,
+  }).where(eq(users.id, userId));
+
+  return { ok: true };
 }
 
 // ── Artswrk-specific queries ──────────────────────────────────────────────────
@@ -1624,7 +1714,8 @@ export async function getArtistById(artistId: number) {
       credits: users.credits,
     })
     .from(users)
-    .where(eq(users.id, artistId))
+    // A deactivated profile is gone for everyone viewing it through the site.
+    .where(and(eq(users.id, artistId), isNull(users.deactivatedAt)))
     .limit(1);
 
   return artist ?? null;
@@ -2174,6 +2265,8 @@ export async function getArtistsList({
 
   const conditions = [
     inArray(users.planTier, ARTIST_PLAN_TIERS),
+    // Deactivated accounts are scrubbed to "Deleted user" — never list them.
+    isNull(users.deactivatedAt),
     // Only show artists with at least a name or firstName populated
     or(
       and(isNotNull(users.firstName), sql`${users.firstName} != ''`),
@@ -2457,6 +2550,7 @@ export async function getFeaturedArtists(limit = 24) {
     .where(
       and(
         inArray(users.planTier, ARTIST_PLAN_TIERS),
+        isNull(users.deactivatedAt),
         isNotNull(users.profilePicture),
         sql`${users.profilePicture} != ''`,
         isNotNull(users.firstName),
@@ -3532,12 +3626,38 @@ export async function createPremiumJob(data: {
 // ── Artist Dashboard ──────────────────────────────────────────────────────────
 
 /** Get jobs feed for artist dashboard (active/open jobs with client info) */
+/**
+ * Split stored type values into ids and names. Types are meant to be stored as
+ * Bubble ids (or a numeric id for types created on the new site), but some
+ * migrated rows and older onboarding saves hold display names instead.
+ */
+export function splitTypeValues(values: string[]): { ids: string[]; names: string[] } {
+  const ids: string[] = [];
+  const names: string[] = [];
+  for (const value of values) {
+    const v = value.trim();
+    if (!v) continue;
+    if (/^\d{10,}x\d+$/.test(v) || /^\d+$/.test(v)) ids.push(v);
+    else names.push(v);
+  }
+  return { ids, names };
+}
+
+/** Ids as-is, names resolved to ids; names with no matching type are dropped. */
+async function normalizeTypeIds(values: string[], resolveNames: (names: string[]) => Promise<string[]>): Promise<string[]> {
+  const { ids, names } = splitTypeValues(values);
+  if (!names.length) return ids;
+  return [...new Set([...ids, ...(await resolveNames(names))])];
+}
+
 export async function getArtistJobsFeed(
   limit = 20,
   offset = 0,
   lat?: number,
   lng?: number,
   artistUserId?: number,
+  /** Fall back to the artist's saved profile location when no lat/lng is sent. */
+  useSavedLocation = false,
 ): Promise<{
   id: number;
   title: string | null;
@@ -3561,12 +3681,11 @@ export async function getArtistJobsFeed(
   const db = await getDb();
   if (!db) return [];
 
-  const radiusClause = (lat != null && lng != null)
-    ? `AND (j.locationLat IS NULL OR j.locationLng IS NULL OR
-        (6371 * acos(LEAST(1.0, cos(radians(${lat})) * cos(radians(CAST(j.locationLat AS DECIMAL(10,6))))
-          * cos(radians(CAST(j.locationLng AS DECIMAL(10,6))) - radians(${lng}))
-          + sin(radians(${lat})) * sin(radians(CAST(j.locationLat AS DECIMAL(10,6))))))) <= 80.467)`
-    : "";
+  // Radius center: the caller's lat/lng when sent; otherwise, when asked, the
+  // artist's saved profile location — so a New York artist sees New York jobs
+  // without sharing device location, and Run As shows what the artist sees.
+  let centerLat = lat;
+  let centerLng = lng;
 
   // Personalization — mirrors the "Jobs for You" list filter in Bubble:
   // Current User's Master Artist Types contains This Request's artist type,
@@ -3577,7 +3696,12 @@ export async function getArtistJobsFeed(
   let personalizationClause = "";
   if (artistUserId != null) {
     const [artist] = await db
-      .select({ masterArtistTypes: users.masterArtistTypes, masterServiceType: users.masterServiceType })
+      .select({
+        masterArtistTypes: users.masterArtistTypes,
+        masterServiceType: users.masterServiceType,
+        locationLat: users.locationLat,
+        locationLng: users.locationLng,
+      })
       .from(users)
       .where(eq(users.id, artistUserId))
       .limit(1);
@@ -3590,8 +3714,17 @@ export async function getArtistJobsFeed(
         return [];
       }
     };
-    const artistTypeIds = parseIds(artist?.masterArtistTypes);
-    const serviceIds = parseIds(artist?.masterServiceType);
+    // A name never matches a job's type id, so resolve names before filtering.
+    const artistTypeIds = await normalizeTypeIds(parseIds(artist?.masterArtistTypes), resolveMasterArtistTypeIds);
+    const serviceIds = await normalizeTypeIds(parseIds(artist?.masterServiceType), resolveMasterServiceTypeIds);
+    if (useSavedLocation && (centerLat == null || centerLng == null)) {
+      const savedLat = Number.parseFloat(artist?.locationLat ?? "");
+      const savedLng = Number.parseFloat(artist?.locationLng ?? "");
+      if (Number.isFinite(savedLat) && Number.isFinite(savedLng)) {
+        centerLat = savedLat;
+        centerLng = savedLng;
+      }
+    }
     const escapeSql = (s: string) => s.replace(/'/g, "''");
     if (artistTypeIds.length > 0) {
       const list = artistTypeIds.map((id) => `'${escapeSql(id)}'`).join(",");
@@ -3602,6 +3735,13 @@ export async function getArtistJobsFeed(
       personalizationClause += ` AND (j.masterServiceTypeId IS NULL OR j.masterServiceTypeId IN (${list}))`;
     }
   }
+
+  const radiusClause = (centerLat != null && centerLng != null)
+    ? `AND (j.locationLat IS NULL OR j.locationLng IS NULL OR
+        (6371 * acos(LEAST(1.0, cos(radians(${centerLat})) * cos(radians(CAST(j.locationLat AS DECIMAL(10,6))))
+          * cos(radians(CAST(j.locationLng AS DECIMAL(10,6))) - radians(${centerLng}))
+          + sin(radians(${centerLat})) * sin(radians(CAST(j.locationLat AS DECIMAL(10,6))))))) <= 80.467)`
+    : "";
 
   const rows = await db.execute(
      `SELECT j.id, j.slug, j.title, j.description, j.dateType, ${utcIsoSql('j.startDate')} AS startDate, ${utcIsoSql('j.endDate')} AS endDate,
@@ -4552,6 +4692,16 @@ export async function getUsersByEmails(emails: string[]): Promise<Map<string, {
 }
 
 /** Create a new client company for a user */
+/** Company names that differ only in case, spacing or apostrophe style are the same company. */
+export function normalizeCompanyName(name: string): string {
+  return name
+    .normalize("NFKC")
+    .replace(/[‘’‛′`´]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
 export async function createClientCompany(data: {
   ownerUserId: number;
   name: string;
@@ -4568,6 +4718,32 @@ export async function createClientCompany(data: {
 }): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+
+  // Reuse the owner's existing company when the name matches ignoring case,
+  // spacing and curly vs straight apostrophes. Posting a job calls this every
+  // time, and the unique index only blocks exact-byte matches, so each post
+  // was adding another "That's Entertainment". Only fills in details the
+  // existing company is missing — never overwrites what's already there.
+  const wanted = normalizeCompanyName(data.name);
+  const owned = await db
+    .select()
+    .from(clientCompanies)
+    .where(eq(clientCompanies.ownerUserId, data.ownerUserId));
+  const match = owned.find((c) => normalizeCompanyName(c.name ?? "") === wanted);
+  if (match) {
+    const fill: Record<string, unknown> = {};
+    const fillable = ["logo", "locationAddress", "locationLat", "locationLng", "locationCity",
+      "locationState", "locationPlaceId", "website", "description"] as const;
+    for (const key of fillable) {
+      const incoming = data[key];
+      if (incoming != null && incoming !== "" && (match[key] == null || match[key] === "")) fill[key] = incoming;
+    }
+    if (Object.keys(fill).length) {
+      await db.update(clientCompanies).set(fill as any).where(eq(clientCompanies.id, match.id));
+    }
+    return match.id;
+  }
+
   // Use raw SQL for upsert to prevent duplicates (unique index on ownerUserId+name)
   // Use Drizzle's insert with onDuplicateKeyUpdate
   const result = await db.insert(clientCompanies).values({
@@ -5079,16 +5255,20 @@ export async function getBookingByApplicantId(interestedArtistId: number) {
 // ─── Admin Bookings ───────────────────────────────────────────────────────────
 
 /** Generate billing period date ranges from a booking's start/end and cadence. */
-function computeAdminPeriods(
+export function computeAdminPeriods(
   startDate: Date,
   endDate: Date,
   isRecurring: boolean,
   cadence?: string | null,
+  /** "HH:mm" Eastern. Weekly classes: remind on each class day at this time. */
+  reminderTime?: string | null,
 ): Array<{ start: Date; end: Date; notifyAt: Date }> {
   if (!isRecurring) {
-    // One-time booking → single period, notify 1 day after start
-    const notifyAt = new Date(startDate);
-    notifyAt.setDate(notifyAt.getDate() + 1);
+    // One-time booking → single period: on the day at the reminder time if one
+    // was given, otherwise 1 day after start.
+    const notifyAt = reminderTime
+      ? easternDateTimeToUtc(utcDateString(startDate), reminderTime)
+      : new Date(new Date(startDate).setDate(new Date(startDate).getDate() + 1));
     return [{ start: startDate, end: endDate, notifyAt }];
   }
 
@@ -5110,9 +5290,16 @@ function computeAdminPeriods(
   while (cursor < end) {
     const periodEnd = advanceByPeriod(cursor);
     const actualEnd = periodEnd > end ? end : periodEnd;
-    // Notify artist on the last day of the period
-    const notifyAt = new Date(actualEnd);
-    notifyAt.setDate(notifyAt.getDate() - 1);
+    // Weekly classes with a reminder time: remind on the class day itself (the
+    // week's start date) at that Eastern time — each week is its own booking to
+    // complete. Otherwise, the original behavior: the last day of the period.
+    let notifyAt: Date;
+    if (reminderTime && cadence === "weekly") {
+      notifyAt = easternDateTimeToUtc(utcDateString(cursor), reminderTime);
+    } else {
+      notifyAt = new Date(actualEnd);
+      notifyAt.setDate(notifyAt.getDate() - 1);
+    }
     periods.push({ start: new Date(cursor), end: actualEnd, notifyAt });
     cursor = periodEnd;
     if (periods.length > 120) break; // safety cap
@@ -5138,6 +5325,10 @@ export async function createAdminBooking(input: {
   locationState?: string | null;
   locationPlaceId?: string | null;
   description?: string;
+  /** "HH:mm" Eastern — weekly classes remind the artist on each class day at this time. */
+  reminderTime?: string | null;
+  /** Scheduled hours per period — the placeholder estimate until the artist submits. */
+  hours?: number | null;
 }): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -5156,6 +5347,7 @@ export async function createAdminBooking(input: {
     locationState: input.locationState ?? null,
     locationPlaceId: input.locationPlaceId ?? null,
     description: input.description ?? null,
+    hours: input.hours ?? null,
     bookingStatus: "Confirmed",
     paymentStatus: "Unpaid",
     paymentMethod: "artswrk",
@@ -5166,7 +5358,7 @@ export async function createAdminBooking(input: {
 
   const bookingId = (result as any).insertId as number;
 
-  const periods = computeAdminPeriods(input.startDate, input.endDate, input.isRecurring, input.recurringCadence);
+  const periods = computeAdminPeriods(input.startDate, input.endDate, input.isRecurring, input.recurringCadence, input.reminderTime);
   if (periods.length > 0) {
     await db.insert(bookingPeriods).values(
       periods.map((p, i) => ({
@@ -5214,7 +5406,7 @@ export async function listAdminBookings({
     SELECT
       b.id, b.bookingStatus, b.paymentStatus, b.artistRate, b.clientRate,
       b.startDate, b.endDate, b.isRecurring, b.recurringCadence,
-      b.locationAddress, b.description, b.createdAt,
+      b.locationAddress, b.description, b.hours, b.createdAt,
       a.id AS artistId, a.firstName AS artistFirstName, a.lastName AS artistLastName,
       a.name AS artistName, a.profilePicture AS artistProfilePicture, a.email AS artistEmail,
       c.id AS clientId, c.firstName AS clientFirstName, c.lastName AS clientLastName,
@@ -5249,7 +5441,7 @@ export async function getAdminBookingDetail(bookingId: number) {
     SELECT
       b.id, b.bookingStatus, b.paymentStatus, b.artistRate, b.clientRate,
       b.startDate, b.endDate, b.isRecurring, b.recurringCadence,
-      b.locationAddress, b.description, b.createdAt,
+      b.locationAddress, b.description, b.hours, b.createdAt,
       a.id AS artistId, a.firstName AS artistFirstName, a.lastName AS artistLastName,
       a.name AS artistName, a.profilePicture AS artistProfilePicture, a.email AS artistEmail,
       c.id AS clientId, c.firstName AS clientFirstName, c.lastName AS clientLastName,
@@ -5369,7 +5561,7 @@ export async function getArtistAdminBookings(artistUserId: number) {
   const rows = await db.execute(`
     SELECT
       b.id, b.bookingStatus, b.artistRate, b.clientRate, b.startDate, b.endDate,
-      b.isRecurring, b.recurringCadence, b.locationAddress, b.description,
+      b.isRecurring, b.recurringCadence, b.locationAddress, b.description, b.hours,
       c.clientCompanyName, c.firstName AS clientFirstName, c.lastName AS clientLastName, c.name AS clientName
     FROM bookings b
     LEFT JOIN users c ON b.clientUserId = c.id
@@ -5399,7 +5591,7 @@ export async function getClientAdminBookings(clientUserId: number) {
   const rows = await db.execute(`
     SELECT
       b.id, b.bookingStatus, b.artistRate, b.clientRate, b.startDate, b.endDate,
-      b.isRecurring, b.recurringCadence, b.locationAddress, b.description,
+      b.isRecurring, b.recurringCadence, b.locationAddress, b.description, b.hours,
       a.firstName AS artistFirstName, a.lastName AS artistLastName, a.name AS artistName,
       a.profilePicture AS artistProfilePicture, a.slug AS artistSlug
     FROM bookings b
@@ -5431,6 +5623,65 @@ export async function markPeriodNotified(periodId: number) {
     artistNotifiedAt: new Date(),
     status: "open",
   } as any).where(eq(bookingPeriods.id, periodId));
+}
+
+/**
+ * Weeks whose reminder is due, for the automated sweep. `recent` is 0 for
+ * reminders more than a day late — those get opened for submission without an
+ * email, so a backlog (old test bookings, scheduler downtime) never turns into
+ * a burst of stale "Complete Your Booking" emails. Skipped weeks never match.
+ */
+export async function getDuePeriodReminders() {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(`
+    SELECT bp.id, bp.bookingId, bp.periodStart, bp.notifyArtistAt,
+      (bp.notifyArtistAt > NOW() - INTERVAL 1 DAY) AS recent,
+      a.email AS artistEmail, a.firstName AS artistFirstName
+    FROM booking_periods bp
+    JOIN bookings b ON bp.bookingId = b.id
+    LEFT JOIN users a ON b.artistUserId = a.id
+    WHERE bp.status = 'upcoming'
+      AND bp.artistNotifiedAt IS NULL
+      AND bp.notifyArtistAt <= NOW()
+      AND (b.deleted IS NULL OR b.deleted = 0)
+      AND COALESCE(b.bookingStatus, '') <> 'Cancelled'
+    ORDER BY bp.notifyArtistAt ASC
+    LIMIT 200
+  `);
+  return rows[0] as unknown as Array<{
+    id: number; bookingId: number; periodStart: Date; notifyArtistAt: Date; recent: number;
+    artistEmail: string | null; artistFirstName: string | null;
+  }>;
+}
+
+/**
+ * Skip a class week (holiday) or restore it. Only weeks without submitted
+ * hours can be skipped. Restoring a week whose reminder time has already passed
+ * re-opens it for submission without re-sending the reminder.
+ */
+export async function setPeriodSkipped(periodId: number, skipped: boolean): Promise<string> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [period] = await db.select().from(bookingPeriods).where(eq(bookingPeriods.id, periodId)).limit(1);
+  if (!period) throw new Error("Week not found.");
+
+  if (skipped) {
+    if (!["upcoming", "open"].includes(period.status ?? "")) {
+      throw new Error("Hours have already been submitted for this week, so it can't be skipped.");
+    }
+    await db.update(bookingPeriods).set({ status: "skipped" } as any).where(eq(bookingPeriods.id, periodId));
+    return "skipped";
+  }
+
+  if (period.status !== "skipped") return period.status ?? "upcoming";
+  const due = period.notifyArtistAt != null && new Date(period.notifyArtistAt) <= new Date();
+  const status = due || period.artistNotifiedAt ? "open" : "upcoming";
+  await db.update(bookingPeriods).set({
+    status,
+    ...(due && !period.artistNotifiedAt ? { artistNotifiedAt: new Date() } : {}),
+  } as any).where(eq(bookingPeriods.id, periodId));
+  return status;
 }
 
 /** Return all periods due for notification (notifyArtistAt <= now, not yet notified). */

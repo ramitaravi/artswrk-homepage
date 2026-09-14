@@ -912,6 +912,68 @@ export async function sendCompleteBookingReminderEmail({
   return sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject: "Artswrk: Complete Your Booking", html });
 }
 
+/** One studio + weekday of recurring classes, for the "classes set up" email. */
+export interface RecurringClassSchedule {
+  studio: string;
+  location?: string | null;
+  day: string;
+  /** "YYYY-MM-DD" */
+  firstDate: string;
+  lastDate: string;
+  ratePerHour: number;
+  hours: number;
+  /** 24h "HH:mm" Eastern. */
+  classes: Array<{ start: string; end: string; name: string }>;
+}
+
+/**
+ * Recurring classes set up — sent once per artist when an admin adds their
+ * weekly class bookings. Lists each studio/day with its classes and rate,
+ * explains the weekly "Complete Your Booking" flow, and flags that holiday
+ * dates are still to be removed.
+ */
+export async function sendRecurringClassesAddedEmail({
+  to, firstName, schedules,
+}: {
+  to: string; firstName: string; schedules: RecurringClassSchedule[];
+}): Promise<boolean> {
+  const time = (hm: string) => {
+    let [h, m] = hm.split(":").map(Number);
+    const ap = h >= 12 ? "pm" : "am";
+    h = h % 12 || 12;
+    return `${h}:${String(m).padStart(2, "0")}${ap}`;
+  };
+  const date = (ymd: string) =>
+    new Date(`${ymd}T00:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
+
+  const scheduleHtml = schedules.map((s) =>
+    para(b(`${s.studio} · ${s.day}s`)) +
+    detailsCard([
+      { label: "Dates", value: `${date(s.firstDate)} – ${date(s.lastDate)}` },
+      { label: "Location", value: s.location ?? null },
+      ...s.classes.map((c) => ({ label: `${time(c.start)}–${time(c.end)}`, value: c.name })),
+      { label: "Rate", value: `$${s.ratePerHour}/hr · ${s.hours} hrs each week` },
+    ])
+  ).join("");
+
+  const studios = [...new Set(schedules.map((s) => s.studio))].join(", ");
+  const html = renderEmailShell({
+    accent: "artist",
+    headline: "Your weekly classes are set up",
+    preheader: `Your weekly classes at ${studios} are on Artswrk. Here's how it works each week.`,
+    bodyHtml:
+      para("Hi " + b(firstName) + ",") +
+      para("We've added your weekly classes to Artswrk. Here's your schedule:") +
+      scheduleHtml +
+      para(b("How it works:") + " after your last class each week, you'll get a “Complete Your Booking” email. Confirm your hours and add any reimbursements, and the studio is invoiced for that week. Your pay goes straight to your connected Stripe account.") +
+      para(b("Heads up:") + " holiday dates haven't been taken out yet. We'll remove them from your schedule soon, so you won't get reminders for weeks without class."),
+    ctaText: "View Your Bookings",
+    ctaUrl: `${APP_URL}/app/bookings`,
+    footerNote: "Questions? Just reply to this email.<br>Best,<br>The Artswrk Team",
+  });
+  return sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject: "Your weekly classes are set up on Artswrk", html });
+}
+
 /**
  * "Did you get paid?" reminder — direct-pay path. Same trigger and timing
  * as the Artswrk-pay reminder above, different content since there's no

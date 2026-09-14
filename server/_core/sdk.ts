@@ -292,6 +292,11 @@ class SDKServer {
       throw ForbiddenError("User not found");
     }
 
+    // Deactivated on a deletion request — end any session that outlived it.
+    if (user.deactivatedAt) {
+      throw ForbiddenError("Account deactivated");
+    }
+
     await db.upsertUser({
       openId: user.openId,
       lastSignedIn: signedInAt,
