@@ -1,12 +1,12 @@
 /**
  * BOOKING COMPLETION REMINDERS
  * ─────────────────────────────────────────────────────────────────────────────
- * "Complete your booking" — promised in the Terms of Service ("Ten (10)
+ * "Complete your booking" — the Terms of Service describe this email ("Ten (10)
  * minutes after the Job time begins, the Artist will receive an email to
- * complete the booking and upload any reimbursements") but never actually
- * built. This is that.
+ * complete the booking and upload any reimbursements"). Moved to 10 minutes
+ * BEFORE the start at Ramita's request (2026-09-14).
  *
- * Fires once per booking, 10 minutes after startDate if it has a real
+ * Fires once per booking, 10 minutes before startDate if it has a real
  * time-of-day, or on the calendar day of startDate if it's a bare date
  * (midnight timestamp — the same "no specific time was set" convention
  * already used elsewhere in this codebase, e.g. JobDetail.tsx's date
@@ -45,7 +45,7 @@ async function getDueCompletionReminders(): Promise<DueBooking[]> {
         OR (b.paymentMethod = 'direct' AND b.directPayConfirmedAt IS NULL)
       )
       AND (
-        (TIME(b.startDate) <> '00:00:00' AND b.startDate <= (NOW() - INTERVAL 10 MINUTE))
+        (TIME(b.startDate) <> '00:00:00' AND b.startDate <= (NOW() + INTERVAL 10 MINUTE))
         OR (TIME(b.startDate) = '00:00:00' AND DATE(b.startDate) <= CURDATE())
       )
     LIMIT 200

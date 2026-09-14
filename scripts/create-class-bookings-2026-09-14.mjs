@@ -1,7 +1,7 @@
 /**
  * Creates the 2026–27 recurring class bookings in class-bookings-2026-09-14.data.mjs.
  * One weekly admin booking per artist per class day. Each week's "Complete Your
- * Booking" reminder is set for the end of that day's last class, Eastern. Artist
+ * Booking" reminder is set for 10 minutes before that day's first class, Eastern. Artist
  * and studio see the same hourly rate; each booking stores its scheduled hours
  * so every week shows a placeholder estimate (rate × hours + the studio's 5%
  * processing fee) until the artist submits real hours and reimbursements.

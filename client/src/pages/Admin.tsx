@@ -24,6 +24,7 @@ import { Link } from "wouter";
 import RichTextEditor from "@/components/RichTextEditor";
 import RichText from "@/components/RichText";
 import { periodInvoiceTotals } from "@shared/bookingRates";
+import { hmMinusMinutes } from "@shared/adminBookingSchedule";
 import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
 import { useLocationField } from "@/hooks/useLocationField";
 import { toast } from "sonner";
@@ -6406,7 +6407,8 @@ function AdminBookingCreateForm({ onBack, onCreated }: { onBack: () => void; onC
       endDate,
       isRecurring,
       recurringCadence: isRecurring ? cadence : undefined,
-      reminderTime: reminderTime || undefined,
+      // The admin enters when class starts; the reminder goes out 10 minutes before.
+      reminderTime: reminderTime ? hmMinusMinutes(reminderTime, 10) : undefined,
       locationAddress: bookingLocation.value || undefined,
       locationData: bookingLocation.locationData,
       description: description || undefined,
@@ -6535,9 +6537,9 @@ function AdminBookingCreateForm({ onBack, onCreated }: { onBack: () => void; onC
                 </select>
                 {cadence === "weekly" && (
                   <div className="mt-3">
-                    <label className={labelCls}>Class-day reminder time (Eastern)</label>
+                    <label className={labelCls}>First class starts (Eastern)</label>
                     <input type="time" value={reminderTime} onChange={e => setReminderTime(e.target.value)} className={inputCls} />
-                    <p className="text-[10px] text-gray-500 mt-1">Every week, on the start date's weekday, the artist gets “Complete Your Booking” at this time. Set it just after the last class.</p>
+                    <p className="text-[10px] text-gray-500 mt-1">Every week, on the start date's weekday, the artist gets “Complete Your Booking” 10 minutes before this time.</p>
                   </div>
                 )}
               </div>
@@ -6554,7 +6556,7 @@ function AdminBookingCreateForm({ onBack, onCreated }: { onBack: () => void; onC
                 const start = new Date(`${startDate}T00:00:00Z`);
                 const weeks = Math.ceil((new Date(`${endDate}T00:00:00Z`).getTime() - start.getTime()) / (7 * 86400000));
                 const weekday = start.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
-                return `${weeks} weekly class${weeks === 1 ? "" : "es"}, every ${weekday}${reminderTime ? ` — reminder at ${reminderTime} ET` : ""}`;
+                return `${weeks} weekly class${weeks === 1 ? "" : "es"}, every ${weekday}${reminderTime ? ` — reminder at ${hmMinusMinutes(reminderTime, 10)} ET` : ""}`;
               })()}
               {cadence === "biweekly" && `≈${Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (14 * 86400000))} bi-weekly periods`}
               {cadence === "monthly" && `≈${Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (30 * 86400000))} monthly periods`}

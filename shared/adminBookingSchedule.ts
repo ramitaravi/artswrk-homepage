@@ -24,6 +24,13 @@ function tzOffsetMinutes(at: Date, tz: string): number {
   return Math.round((asUtc - at.getTime()) / 60000);
 }
 
+/** "HH:mm" moved `minutes` earlier, stopping at midnight. The weekly reminder goes out 10 minutes before the first class. */
+export function hmMinusMinutes(timeHm: string, minutes: number): string {
+  const [h, m] = timeHm.split(":").map(Number);
+  const total = Math.max(0, h * 60 + m - minutes);
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
 /** The UTC instant for a wall-clock date ("YYYY-MM-DD") and time ("HH:mm") in Eastern, DST-aware. */
 export function easternDateTimeToUtc(dateYmd: string, timeHm: string, tz = TZ): Date {
   const [y, m, d] = dateYmd.split("-").map(Number);

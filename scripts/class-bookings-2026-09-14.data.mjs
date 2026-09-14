@@ -71,8 +71,11 @@ export const CLASS_BOOKINGS = [
 
 const toMin = (hm) => { const [h, m] = hm.split(":").map(Number); return h * 60 + m; };
 
-/** The day's last class end time — when the weekly reminder goes out. */
-export const reminderTimeFor = (row) => row.classes.reduce((best, c) => (toMin(c[1]) > toMin(best) ? c[1] : best), "00:00");
+/** 10 minutes before the day's first class — when the weekly reminder goes out. */
+export const reminderTimeFor = (row) => {
+  const first = Math.max(0, Math.min(...row.classes.map((c) => toMin(c[0]))) - 10);
+  return `${String(Math.floor(first / 60)).padStart(2, "0")}:${String(first % 60).padStart(2, "0")}`;
+};
 
 /** Paid hours per class day: the sum of class lengths (gaps between classes aren't counted). */
 export const hoursFor = (row) => row.classes.reduce((s, c) => s + toMin(c[1]) - toMin(c[0]), 0) / 60;

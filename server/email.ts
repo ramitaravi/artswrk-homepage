@@ -965,7 +965,7 @@ export async function sendRecurringClassesAddedEmail({
       para("Hi " + b(firstName) + ",") +
       para("We've added your weekly classes to Artswrk. Here's your schedule:") +
       scheduleHtml +
-      para(b("How it works:") + " after your last class each week, you'll get a “Complete Your Booking” email. Confirm your hours and add any reimbursements, and the studio is invoiced for that week. Your pay goes straight to your connected Stripe account.") +
+      para(b("How it works:") + " 10 minutes before your first class each week, you'll get a “Complete Your Booking” email. After class, confirm your hours and add any reimbursements, and the studio is invoiced for that week. Your pay goes straight to your connected Stripe account.") +
       para(b("Heads up:") + " holiday dates haven't been taken out yet. We'll remove them from your schedule soon, so you won't get reminders for weeks without class."),
     ctaText: "View Your Bookings",
     ctaUrl: `${APP_URL}/app/bookings`,

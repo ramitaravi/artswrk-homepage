@@ -3,8 +3,23 @@
  * Booking" reminder on each class day at an Eastern wall-clock time.
  */
 import { describe, it, expect } from "vitest";
-import { easternDateTimeToUtc, utcDateString } from "../shared/adminBookingSchedule";
+import { easternDateTimeToUtc, hmMinusMinutes, utcDateString } from "../shared/adminBookingSchedule";
 import { computeAdminPeriods } from "./db";
+// @ts-expect-error — plain .mjs data file shared with the booking scripts
+import { CLASS_BOOKINGS, reminderTimeFor } from "../scripts/class-bookings-2026-09-14.data.mjs";
+
+describe("reminder 10 minutes before class", () => {
+  it("moves a time 10 minutes earlier, across the hour", () => {
+    expect(hmMinusMinutes("17:15", 10)).toBe("17:05");
+    expect(hmMinusMinutes("16:05", 10)).toBe("15:55");
+    expect(hmMinusMinutes("00:05", 10)).toBe("00:00");
+  });
+
+  it("sets each class day's reminder 10 minutes before its first class", () => {
+    const byRow = Object.fromEntries(CLASS_BOOKINGS.map((b: { n: number }) => [b.n, reminderTimeFor(b)]));
+    expect(byRow).toEqual({ 1: "12:35", 2: "17:05", 3: "15:35", 4: "17:05", 5: "17:20", 6: "16:20", 7: "16:20", 8: "15:20" });
+  });
+});
 
 describe("easternDateTimeToUtc", () => {
   it("converts daylight time (EDT, UTC−4)", () => {
