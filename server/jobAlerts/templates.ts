@@ -53,10 +53,10 @@ const INK = "#111111";
 const MUTED = "#6b7280";
 const HAIR = "#e9e9ee";
 
-/** Hosted on the same CloudFront distribution the site nav uses, so it is
- *  already public and cached. 971x211 native; shown at 150px wide. */
-const LOGO_URL =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663410355144/AyEgFhxRkEopXHz25XyihS/artswrk-logo-gradient_8e560567.png";
+/** Served from the site itself as image/png. The old CloudFront copy came back
+ *  as application/octet-stream, which some mail clients refuse to show as an
+ *  image, so the digest could open with no logo. Shown at 150px wide. */
+const LOGO_URL = "https://artswrk.com/logos/artswrk-pink.png";
 
 /**
  * Gradient button. Outlook (Word rendering engine) ignores background-image

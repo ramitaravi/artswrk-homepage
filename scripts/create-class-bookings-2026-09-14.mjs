@@ -106,7 +106,7 @@ async function emailArtists(rows) {
   for (const [artistId, list] of byArtist) {
     const artist = people.get(artistId);
     if (!artist?.email) { console.log(`  ✗ ${list[0].b.artistName}: no email on file, not sent`); continue; }
-    await sendRecurringClassesAddedEmail({
+    const ok = await sendRecurringClassesAddedEmail({
       to: artist.email,
       firstName: artist.firstName ?? list[0].b.artistName.split(" ")[0],
       schedules: list.map((p) => ({
@@ -120,7 +120,9 @@ async function emailArtists(rows) {
         classes: p.b.classes.map(([start, end, name]) => ({ start, end, name })),
       })),
     });
-    console.log(`  ✉ ${list[0].b.artistName}: sent (${list.length} schedule${list.length === 1 ? "" : "s"})`);
+    console.log(ok
+      ? `  ✉ ${list[0].b.artistName}: sent to ${artist.email}, cc support (${list.length} schedule${list.length === 1 ? "" : "s"})`
+      : `  ✗ ${list[0].b.artistName}: SEND FAILED — see the [email] error above`);
   }
 }
 
