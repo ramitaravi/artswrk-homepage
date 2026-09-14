@@ -881,7 +881,9 @@ export async function getBookingsByClientId(
   const db = await getDb();
   if (!db) return [];
 
-  const conditions = [eq(bookings.clientUserId, clientUserId)];
+  // Bookings deleted in Bubble stay in the table (1,647 of them) but must never
+  // reach a client or artist — they surfaced as phantom "Pay Now" duplicates.
+  const conditions = [eq(bookings.clientUserId, clientUserId), eq(bookings.deleted, false)];
   if (statusFilter && statusFilter.length > 0) {
     const statusConds = statusFilter.map(s => eq(bookings.bookingStatus, s));
     conditions.push(or(...statusConds)!);
@@ -959,7 +961,7 @@ export async function getBookingStatsByClientId(clientUserId: number) {
       sumClientRate: sql<number>`SUM(COALESCE(totalClientRate, clientRate, 0))`,
     })
     .from(bookings)
-    .where(eq(bookings.clientUserId, clientUserId))
+    .where(and(eq(bookings.clientUserId, clientUserId), eq(bookings.deleted, false)))
     .groupBy(bookings.bookingStatus, bookings.paymentStatus);
 
   const stats = { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, awaitingPayment: 0, totalRevenue: 0 };
@@ -1057,7 +1059,7 @@ export async function getClientBookingDetail(bookingId: number, clientUserId: nu
      LEFT JOIN users a ON b.artistUserId = a.id
      LEFT JOIN jobs j ON b.jobId = j.id
      LEFT JOIN interested_artists ia ON ia.id = b.interestedArtistId
-     WHERE b.id = ${bookingId} AND b.clientUserId = ${clientUserId}
+     WHERE b.id = ${bookingId} AND b.clientUserId = ${clientUserId} AND b.deleted = false
      LIMIT 1`
   );
   const arr = rows[0] as unknown as any[];
@@ -1497,6 +1499,7 @@ export async function getWalletStatsByClientId(clientUserId: number) {
     .from(bookings)
     .where(and(
       eq(bookings.clientUserId, clientUserId),
+      eq(bookings.deleted, false),
       inArray(bookings.bookingStatus, ['Completed', 'Confirmed', 'Pay Now'])
     ));
 
@@ -1505,6 +1508,7 @@ export async function getWalletStatsByClientId(clientUserId: number) {
     .from(bookings)
     .where(and(
       eq(bookings.clientUserId, clientUserId),
+      eq(bookings.deleted, false),
       eq(bookings.bookingStatus, 'Confirmed')
     ));
 
@@ -1513,6 +1517,7 @@ export async function getWalletStatsByClientId(clientUserId: number) {
     .from(bookings)
     .where(and(
       eq(bookings.clientUserId, clientUserId),
+      eq(bookings.deleted, false),
       eq(bookings.bookingStatus, 'Pay Now')
     ));
 
@@ -1532,6 +1537,7 @@ export async function getWalletStatsByClientId(clientUserId: number) {
     .from(bookings)
     .where(and(
       eq(bookings.clientUserId, clientUserId),
+      eq(bookings.deleted, false),
       eq(bookings.bookingStatus, 'Confirmed')
     ));
 
@@ -1572,6 +1578,7 @@ export async function getPendingPaymentsByClientId(clientUserId: number) {
     .leftJoin(artistUser, eq(bookings.artistUserId, artistUser.id))
     .where(and(
       eq(bookings.clientUserId, clientUserId),
+      eq(bookings.deleted, false),
       eq(bookings.bookingStatus, 'Pay Now')
     ))
     .orderBy(bookings.startDate);
@@ -1690,6 +1697,7 @@ export async function getArtistHistoryForClient(artistUserId: number, clientUser
     .where(and(
       eq(bookings.artistUserId, artistUserId),
       eq(bookings.clientUserId, clientUserId),
+      eq(bookings.deleted, false),
     ))
     .orderBy(desc(bookings.bubbleCreatedAt));
 
@@ -3699,7 +3707,7 @@ export async function getArtistBookings(artistUserId: number): Promise<{
      COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.firstName,''), ' ', COALESCE(u.lastName,''))), ''), u.name) as clientName
      FROM bookings b
      LEFT JOIN users u ON b.clientUserId = u.id
-     WHERE b.artistUserId = ${artistUserId}
+     WHERE b.artistUserId = ${artistUserId} AND b.deleted = false
      ORDER BY b.startDate DESC
      LIMIT 50`
   );
@@ -4900,7 +4908,7 @@ export async function getBookingByInvoiceToken(token: string) {
     .leftJoin(jobs, eq(bookings.jobId, jobs.id))
     .leftJoin(users, eq(bookings.artistUserId, users.id))
     .leftJoin(interestedArtists, eq(bookings.interestedArtistId, interestedArtists.id))
-    .where(eq(bookings.invoicePaymentToken, token))
+    .where(and(eq(bookings.invoicePaymentToken, token), eq(bookings.deleted, false)))
     .limit(1);
   if (result.length === 0) return undefined;
   const booking = result[0];
