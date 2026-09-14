@@ -76,7 +76,10 @@ export default function InvoicePayment() {
     );
   }
 
-  const isPaid = alreadyPaid || !!booking.invoicePaidAt;
+  // paymentStatus catches bookings settled outside this invoice (e.g. a legacy
+  // Bubble payment link) — the server refuses to charge those again.
+  const isPaid = alreadyPaid || !!booking.invoicePaidAt
+    || String((booking as any).paymentStatus ?? "").toLowerCase() === "paid";
   const checkoutUrl = booking.invoiceStripeCheckoutUrl;
   const isApproved = !!checkoutUrl;
   const artistName = booking.artistName ?? booking.artistFirstName ?? "Your artist";

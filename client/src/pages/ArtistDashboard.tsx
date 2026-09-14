@@ -771,6 +771,21 @@ function formatBookingDate(b: any): string {
   return d.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 }
 
+/**
+ * The date a booking is filed under in the list. One waiting on payment files
+ * under the day it was invoiced — when the artist became owed — rather than
+ * the day the work started. The work date still decides upcoming vs. completed.
+ */
+function listDate(b: any): Date | null {
+  if (b.bookingStatus === "Pay Now" && b.artswrkInvoiceSubmittedAt) return new Date(b.artswrkInvoiceSubmittedAt);
+  return bookingDate(b);
+}
+
+/** "Pay Now" is the client's call to action — the artist is waiting to be paid. */
+function artistStatusLabel(status: string): string {
+  return status === "Pay Now" ? "Payment Pending" : status;
+}
+
 function isUpcoming(b: any): boolean {
   const s = b.bookingStatus?.toLowerCase() ?? "";
   if (s === "completed" || s === "cancelled") return false;
@@ -808,7 +823,7 @@ function BookingRow({ booking, onClick }: { booking: any; onClick: () => void })
         {rate != null && (
           <p className="text-sm text-gray-700 font-semibold mt-0.5">+${typeof rate === "number" ? rate.toFixed(2) : rate}</p>
         )}
-        <span className={`inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor}`}>{status}</span>
+        <span className={`inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor}`}>{artistStatusLabel(status)}</span>
       </div>
       <ChevronRight size={18} className="text-gray-300 flex-shrink-0" />
     </button>
@@ -1260,12 +1275,19 @@ function BookingsTab() {
       const db = bookingDate(b)?.getTime() ?? 0;
       return da - db;
     });
+  } else {
+    // Newest first by filing date, so an invoiced booking sits with its
+    // invoice date instead of wherever its start date would put it.
+    filtered.sort((a: any, b: any) => (listDate(b)?.getTime() ?? 0) - (listDate(a)?.getTime() ?? 0));
   }
 
   // Group by date string
   const groups: { label: string; items: any[] }[] = [];
   for (const b of filtered) {
-    const label = formatBookingDate(b) || "Unknown date";
+    const filed = listDate(b);
+    const label = filed
+      ? filed.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+      : "Unknown date";
     const last = groups[groups.length - 1];
     if (last && last.label === label) last.items.push(b);
     else groups.push({ label, items: [b] });

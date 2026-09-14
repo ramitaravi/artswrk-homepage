@@ -5103,6 +5103,12 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const booking = await getBookingByInvoiceToken(input.token);
         if (booking) {
           if (booking.invoicePaidAt) throw new Error("This invoice has already been paid");
+          // A booking can be settled outside this invoice — paid through a legacy
+          // Bubble payment link, or cancelled — while its token still exists.
+          // invoicePaidAt only records payments made HERE, so check the booking
+          // itself too, or the studio gets a second checkout for work already paid.
+          if (String(booking.paymentStatus ?? "").toLowerCase() === "paid") throw new Error("This booking has already been paid");
+          if (booking.bookingStatus === "Cancelled") throw new Error("This booking was cancelled");
           if (booking.invoiceStripeCheckoutUrl) return { checkoutUrl: booking.invoiceStripeCheckoutUrl };
           if (!booking.artistUserId) throw new Error("Booking not found");
 
