@@ -16,6 +16,7 @@
 import type { Request, Response } from "express";
 import { getDb, getDuePeriodReminders, markPeriodNotified } from "./db";
 import { sendCompleteBookingReminderEmail, sendConfirmDirectPaymentReminderEmail } from "./email";
+import { requireCronRequest } from "./_core/cronAuth";
 
 const APP_URL = process.env.VITE_APP_URL || "https://artswrk.com";
 
@@ -90,9 +91,9 @@ export async function sendDuePeriodReminders(): Promise<{ sent: number; opened: 
 }
 
 export async function handleScheduledBookingCompletionReminders(req: Request, res: Response): Promise<void> {
-  const taskUid = req.headers["x-manus-cron-task-uid"] as string | undefined;
-  const forced = req.body?.force === true;
-  if (!taskUid && !forced) {
+  try {
+    await requireCronRequest(req);
+  } catch {
     res.status(403).json({ error: "cron-only endpoint" });
     return;
   }

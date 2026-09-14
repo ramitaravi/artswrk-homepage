@@ -11,11 +11,13 @@ import type { Request, Response } from "express";
 import { runDigest, isDigestHour } from "./digest";
 import { describeMode, loadSendPolicy } from "./safety";
 import { syncBrevoSuppressions } from "./brevoSync";
+import { requireCronRequest } from "../_core/cronAuth";
 
 export async function handleScheduledJobAlerts(req: Request, res: Response): Promise<void> {
-  const taskUid = req.headers["x-manus-cron-task-uid"] as string | undefined;
   const forced = req.body?.force === true;
-  if (!taskUid && !forced) {
+  try {
+    await requireCronRequest(req);
+  } catch {
     res.status(403).json({ error: "cron-only endpoint" });
     return;
   }
@@ -45,8 +47,9 @@ export async function handleScheduledJobAlerts(req: Request, res: Response): Pro
  * digest is switched off.
  */
 export async function handleScheduledBrevoSync(req: Request, res: Response): Promise<void> {
-  const taskUid = req.headers["x-manus-cron-task-uid"] as string | undefined;
-  if (!taskUid && req.body?.force !== true) {
+  try {
+    await requireCronRequest(req);
+  } catch {
     res.status(403).json({ error: "cron-only endpoint" });
     return;
   }
