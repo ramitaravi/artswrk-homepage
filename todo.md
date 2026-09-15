@@ -932,3 +932,10 @@
 - [x] Provide the user-operated Publish step for the live domains
 - [x] Correct the 403 authentication failures affecting the active job-alert and booking-reminder callbacks; exclude the retired Bubble sync from this release task
 - [x] Add regression coverage for authenticated Heartbeat callbacks before publishing
+
+## Newest GitHub Synchronization
+- [ ] Synchronize the working project with the newest `user_github/main`
+- [ ] Review incoming commits and changed files for schema, dependency, secret, payment, authentication, scheduler, and deployment risk
+- [ ] Run deterministic tests, TypeScript, production build, GitHub parity, route smoke checks, and visual validation
+- [ ] Save a clean synchronized checkpoint matching GitHub `main`
+- [ ] Deliver the checkpoint and summarize any required release steps
