@@ -46,6 +46,7 @@ const checks: PriceCheck[] = [
     label: "Enterprise job unlock",
     priceId: STRIPE_PRODUCTS.ENTERPRISE_ON_DEMAND.priceId,
     expectedAmount: 15000,
+    allowDynamicFallback: true,
   },
   {
     label: "Enterprise subscription monthly",

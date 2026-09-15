@@ -45,13 +45,13 @@ describe("Stripe environment mode selection", () => {
     })).toBe("");
   });
 
-  it("includes verified test fallbacks for every static checkout price", () => {
+  it("includes verified test fallbacks for static prices whose test amounts match production", () => {
     expect(STRIPE_TEST_FALLBACKS.ARTIST_BASIC_ANNUAL).toMatch(/^price_/);
     expect(STRIPE_TEST_FALLBACKS.ARTIST_PRO_ANNUAL).toMatch(/^price_/);
     expect(STRIPE_TEST_FALLBACKS.CLIENT_JOB_UNLOCK).toMatch(/^price_/);
     expect(STRIPE_TEST_FALLBACKS.CLIENT_PREMIUM_MONTHLY).toMatch(/^price_/);
     expect(STRIPE_TEST_FALLBACKS.CLIENT_PREMIUM_ANNUAL).toMatch(/^price_/);
-    expect(STRIPE_TEST_FALLBACKS.ENTERPRISE_ON_DEMAND).toMatch(/^price_/);
+    expect(STRIPE_TEST_FALLBACKS.ENTERPRISE_ON_DEMAND).toBe("");
   });
 
   it("wires the configured test environment to test-mode prices, never live fallbacks", () => {
@@ -61,7 +61,8 @@ describe("Stripe environment mode selection", () => {
     expect(STRIPE_PRODUCTS.CLIENT_JOB_UNLOCK.priceId).toBe(STRIPE_TEST_FALLBACKS.CLIENT_JOB_UNLOCK);
     expect(STRIPE_PRODUCTS.CLIENT_PREMIUM.monthly.priceId).toBe(STRIPE_TEST_FALLBACKS.CLIENT_PREMIUM_MONTHLY);
     expect(STRIPE_PRODUCTS.CLIENT_PREMIUM.annual.priceId).toBe(STRIPE_TEST_FALLBACKS.CLIENT_PREMIUM_ANNUAL);
-    expect(STRIPE_PRODUCTS.ENTERPRISE_ON_DEMAND.priceId).toBe(STRIPE_TEST_FALLBACKS.ENTERPRISE_ON_DEMAND);
+    expect(STRIPE_PRODUCTS.ENTERPRISE_ON_DEMAND.priceId).toBe("");
+    expect(STRIPE_PRODUCTS.ENTERPRISE_ON_DEMAND.amount).toBe(15000);
     expect(STRIPE_PRODUCTS.ENTERPRISE_SUBSCRIPTION.monthly.priceId).toBe("");
     expect(STRIPE_PRODUCTS.ENTERPRISE_SUBSCRIPTION.annual.priceId).toBe("");
   });

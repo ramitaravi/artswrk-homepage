@@ -934,8 +934,10 @@
 - [x] Add regression coverage for authenticated Heartbeat callbacks before publishing
 
 ## Newest GitHub Synchronization
-- [ ] Synchronize the working project with the newest `user_github/main`
-- [ ] Review incoming commits and changed files for schema, dependency, secret, payment, authentication, scheduler, and deployment risk
-- [ ] Run deterministic tests, TypeScript, production build, GitHub parity, route smoke checks, and visual validation
-- [ ] Save a clean synchronized checkpoint matching GitHub `main`
-- [ ] Deliver the checkpoint and summarize any required release steps
+- [x] Synchronize the working project with the newest `user_github/main`
+- [x] Review incoming commits and changed files for schema, dependency, secret, payment, authentication, scheduler, and deployment risk
+- [x] Run deterministic tests, TypeScript, production build, GitHub parity, route smoke checks, and visual validation
+- [x] Save a clean synchronized checkpoint matching GitHub `main`
+- [x] Deliver the checkpoint and summarize any required release steps
+- [x] Prevent test-mode enterprise job unlock checkout from using the obsolete $100 Stripe price after the production amount increased to $150
+- [x] Add regression coverage requiring the $150 test checkout to use a mode-safe dynamic price fallback until a matching test Price exists

@@ -54,7 +54,9 @@ export const STRIPE_TEST_FALLBACKS = {
   CLIENT_PREMIUM_MONTHLY: "price_1UAHuvA91H1fWNkK2eY7GKWg",
   CLIENT_PREMIUM_ANNUAL: "price_1UAHuwA91H1fWNkKNLPxiSGR",
   ENTERPRISE_ON_DEMAND_PRODUCT: "prod_V9VrQo8i6FY7Is",
-  ENTERPRISE_ON_DEMAND: "price_1U9CpkA91H1fWNkKCv4dbBzQ",
+  // The existing test Price is the retired $100 amount. Keep this empty so
+  // test-mode checkout uses price_data at the current $150 amount instead.
+  ENTERPRISE_ON_DEMAND: "",
   ENTERPRISE_SUBSCRIPTION_PRODUCT: "prod_V9Vrjw5wgJAjiP",
   // No matching $500/$5,000 test prices exist yet. Empty forces the checkout
   // helper's verified price_data fallback at the correct configured amount.
@@ -210,7 +212,7 @@ export const STRIPE_PRODUCTS = {
     priceId: envOrLive("STRIPE_TEST_ENTERPRISE_ON_DEMAND_PRICE_ID", STRIPE_TEST_FALLBACKS.ENTERPRISE_ON_DEMAND, "price_1TLjk9A91H1fWNkKHG3jsruZ"),
     name: "Artswrk Enterprise — View Candidates",
     description: "Unlock candidate list for one PRO job posting.",
-    amount: 15000, // $150 in cents (fallback if priceId not set)
+    amount: 15000, // $150 in cents (test-mode price_data fallback until a matching test Price exists)
     currency: "usd",
     mode: "payment" as const,
   },
