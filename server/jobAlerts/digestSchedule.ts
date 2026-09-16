@@ -13,6 +13,14 @@ export type DigestMode = "combined" | "pro" | "jobs";
 
 export const DIGEST_SCHEDULE_KEY = "job_alerts_schedule";
 
+/**
+ * A combined digest with no regular-job cards must use the PRO template so its
+ * subject never reads "0 new jobs" when the artist only matched PRO work.
+ */
+export function shouldRenderProDigest(mode: DigestMode, regularCardCount: number): boolean {
+  return mode === "pro" || regularCardCount === 0;
+}
+
 export function digestModeFor(scheduleJson: string | null | undefined, dateEt: string): DigestMode {
   if (!scheduleJson) return "combined";
   try {

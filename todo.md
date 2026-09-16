@@ -943,8 +943,12 @@
 - [x] Add regression coverage requiring the $150 test checkout to use a mode-safe dynamic price fallback until a matching test Price exists
 
 ## Latest GitHub Synchronization
-- [ ] Synchronize the working project with the newest `user_github/main`
-- [ ] Review incoming commits and changed files for schema, dependency, secret, payment, authentication, scheduler, and deployment risk
+- [x] Synchronize the working project with the newest `user_github/main`
+- [x] Review incoming commits and changed files for schema, dependency, secret, payment, authentication, scheduler, and deployment risk
 - [ ] Run deterministic tests, TypeScript, production build, GitHub parity, route smoke checks, and visual validation
 - [ ] Save a clean synchronized checkpoint matching GitHub `main`
 - [ ] Deliver the checkpoint and summarize any required release steps
+- [x] Replace the live-data-dependent PRO-only digest verifier assertion with deterministic subject-selection regression coverage
+- [x] Keep the read-only digest audit useful when current queued jobs contain no PRO-only recipient fixture
+- [ ] Merge and review the newer GitHub `main` commit detected while release validation was running
+- [ ] Re-run validation against the final merged GitHub state rather than the superseded intermediate commit

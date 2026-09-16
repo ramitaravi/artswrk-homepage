@@ -16,7 +16,7 @@ import { renderDigest, renderProDigest, type DigestData } from "./templates";
 import { toJobCard, toProCard } from "./format";
 import { decideSend, describeMode, loadSendPolicy } from "./safety";
 import { unsubscribeUrl } from "./unsubscribe";
-import { digestModeFor, DIGEST_SCHEDULE_KEY, type DigestMode } from "./digestSchedule";
+import { digestModeFor, DIGEST_SCHEDULE_KEY, shouldRenderProDigest, type DigestMode } from "./digestSchedule";
 import { easternDateString } from "../reminderWindow";
 
 const MAX_JOB_CARDS = 10;
@@ -190,7 +190,7 @@ export async function runDigest(opts: RunOptions = {}): Promise<DigestResult> {
     };
     // An artist whose only matches today are PRO jobs gets the PRO email, never a
     // regular digest that reads "0 new jobs near you" (that went out on 2026-09-15).
-    const { subject, html } = digestMode === "pro" || cards.length === 0 ? renderProDigest(data) : renderDigest(data);
+    const { subject, html } = shouldRenderProDigest(digestMode, cards.length) ? renderProDigest(data) : renderDigest(data);
 
     const decision = decideSend(policy, b.artist.email);
     result.plan.push({

@@ -11,6 +11,7 @@ process.env.SENDGRID_API_KEY = "";
 const { writeFileSync } = await import("node:fs");
 const { getDb } = await import("../server/db.ts");
 const { runDigest } = await import("../server/jobAlerts/digest.ts");
+const { shouldRenderProDigest } = await import("../server/jobAlerts/digestSchedule.ts");
 const OUT = process.argv[2];
 const db = await getDb();
 const q = async (s) => (await db.execute(s))[0];
@@ -34,7 +35,10 @@ console.table(Object.entries(subjects).sort((a, b) => b[1] - a[1]).map(([subject
 check(r.sent === 0 && r.dryRun, "nothing sent");
 check(!r.plan.some((p) => /\b0 new jobs?\b/.test(p.subject)), "no email says 0 new jobs");
 const proOnly = r.plan.filter((p) => /PRO job/.test(p.subject));
-check(proOnly.length > 0, `${proOnly.length} PRO-only artists get the PRO email`);
+check(shouldRenderProDigest("combined", 0), "a PRO-only artist deterministically uses the PRO template");
+console.log(proOnly.length > 0
+  ? `  INFO  ${proOnly.length} current recipients also exercise the PRO-only path`
+  : "  INFO  current queued jobs contain no PRO-only recipient fixture; deterministic coverage verifies that path");
 check((await q(`SELECT COUNT(*) n FROM email_send_log`))[0].n === logBefore, "send log unchanged");
 const statusAfter = JSON.stringify(await q(`SELECT id, networkStatus FROM premium_jobs WHERE id IN (${proIds.join(",")}) ORDER BY id`));
 check(statusAfter === statusBefore, "job statuses unchanged");

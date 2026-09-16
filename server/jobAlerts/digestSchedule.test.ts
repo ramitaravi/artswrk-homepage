@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { digestModeFor } from "./digestSchedule";
+import { digestModeFor, shouldRenderProDigest } from "./digestSchedule";
 import { renderProDigest, renderDigest } from "./templates";
 
 const SCHEDULE = JSON.stringify({ "2026-09-15": "pro", "2026-09-16": "jobs" });
@@ -19,6 +19,22 @@ describe("digestModeFor", () => {
     expect(digestModeFor(null, "2026-09-15")).toBe("combined");
     expect(digestModeFor("not json", "2026-09-15")).toBe("combined");
     expect(digestModeFor(JSON.stringify({ "2026-09-15": "everything" }), "2026-09-15")).toBe("combined");
+  });
+});
+
+describe("shouldRenderProDigest", () => {
+  it("uses the PRO template whenever an artist has no regular-job cards", () => {
+    expect(shouldRenderProDigest("combined", 0)).toBe(true);
+    expect(shouldRenderProDigest("jobs", 0)).toBe(true);
+  });
+
+  it("uses the PRO template for a PRO-only scheduled run", () => {
+    expect(shouldRenderProDigest("pro", 3)).toBe(true);
+  });
+
+  it("keeps the regular template when regular cards exist in a combined or jobs run", () => {
+    expect(shouldRenderProDigest("combined", 2)).toBe(false);
+    expect(shouldRenderProDigest("jobs", 1)).toBe(false);
   });
 });
 
