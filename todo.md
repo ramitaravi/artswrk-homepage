@@ -952,3 +952,10 @@
 - [x] Keep the read-only digest audit useful when current queued jobs contain no PRO-only recipient fixture
 - [x] Merge and review the newer GitHub `main` commit detected while release validation was running
 - [x] Re-run validation against the final merged GitHub state rather than the superseded intermediate commit
+
+## Current GitHub Synchronization
+- [ ] Synchronize the working project with the newest `user_github/main`
+- [ ] Review incoming commits and changed files for schema, dependency, secret, payment, authentication, scheduler, and deployment risk
+- [ ] Run deterministic tests, TypeScript, production build, GitHub parity, route smoke checks, and visual validation
+- [ ] Save a clean synchronized checkpoint matching GitHub `main`
+- [ ] Deliver the checkpoint and summarize any required release steps
