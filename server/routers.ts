@@ -4214,6 +4214,13 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           throw new Error("This booking is already completed and paid, so there's nothing to invoice.");
         }
         if ((booking as any).bookingStatus === "Cancelled") throw new Error("This booking was cancelled, so there's nothing to invoice.");
+        // A weekly class booking is invoiced one week at a time, where the rate
+        // is multiplied by the hours taught. This path treats the rate as the
+        // whole total, so it billed $50 + expenses instead of $50 x 4 hours
+        // (Kaylee DaCosta, 2026-09-15).
+        if ((booking as any).isAdminBooking && (booking as any).isRecurring) {
+          throw new Error("This is a weekly booking — submit your hours for the specific week instead, from the Bookings page.");
+        }
 
         // Every payout must land in the artist's own connected Stripe account —
         // never let an invoice go out (and get paid) with nowhere for the money to go.

@@ -798,6 +798,8 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
   const effectiveMethod: "artswrk" | "direct" = (booking.paymentMethod === "direct") ? "direct" : "artswrk";
   const isAlreadyPaid = booking.paymentStatus?.toLowerCase() === "paid";
   const isInvoiceSubmitted = !!booking.artswrkInvoiceSubmittedAt;
+  /** Weekly classes are invoiced per week (rate x hours), never as one flat total. */
+  const isWeeklyClassBooking = !!booking.isAdminBooking && !!booking.isRecurring;
   const isDirectConfirmed = !!booking.directPayConfirmedAt;
   const rate = parseFloat(artistRate) || 0;
 
@@ -1101,8 +1103,24 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                 </div>
               )}
 
+              {/* A weekly class booking is invoiced one week at a time, on the
+                  Bookings page, where the rate is multiplied by the hours taught.
+                  This form treats the rate as the whole total, so it billed
+                  $50 + expenses instead of $50 x 4 hours (2026-09-15). */}
+              {isWeeklyClassBooking && (
+                <div className="border-t border-gray-50 pt-4">
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-1.5">
+                    <p className="text-sm font-bold text-[#111]">Invoice this booking week by week</p>
+                    <p className="text-xs text-gray-500">
+                      Go to <a href="/app/bookings" className="font-semibold text-[#ec008c] hover:underline">Bookings</a> and hit
+                      Submit Hours on the week you taught. You'll be paid ${booking.artistRate}/hr for the hours you enter, plus any expenses.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Artswrk invoice */}
-              {effectiveMethod === "artswrk" && !isInvoiceSubmitted && connectStatus && !connectStatus.connected && (
+              {!isWeeklyClassBooking && effectiveMethod === "artswrk" && !isInvoiceSubmitted && connectStatus && !connectStatus.connected && (
                 <div className="border-t border-gray-50 pt-4">
                   <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-2.5">
                     <p className="text-sm font-bold text-[#111]">Connect your payout account first</p>
@@ -1118,7 +1136,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                   </div>
                 </div>
               )}
-              {effectiveMethod === "artswrk" && !isInvoiceSubmitted && connectStatus?.connected && (
+              {!isWeeklyClassBooking && effectiveMethod === "artswrk" && !isInvoiceSubmitted && connectStatus?.connected && (
                 <div className="space-y-3 border-t border-gray-50 pt-4">
                   <p className="text-xs font-bold text-gray-500">Submit Invoice to Artswrk</p>
                   <input
@@ -1434,8 +1452,18 @@ function ConfirmationCard({ booking }: { booking: any }) {
         </div>
       )}
 
+      {/* Weekly classes are invoiced per week on the Bookings page — this flat
+          form ignores hours, so it must never be offered for them. */}
+      {isArtswrk && booking.isAdminBooking && booking.isRecurring && (
+        <div className="border-t border-gray-50 px-4 py-3">
+          <p className="text-xs text-gray-500">
+            Invoice this one week by week from <a href="/app/bookings" className="font-semibold text-[#ec008c] hover:underline">Bookings</a> — hit Submit Hours on the week you taught.
+          </p>
+        </div>
+      )}
+
       {/* Artswrk invoice flow */}
-      {isArtswrk && (
+      {isArtswrk && !(booking.isAdminBooking && booking.isRecurring) && (
         <div className="border-t border-gray-50">
           {isInvoiceSubmitted ? (
             <div className="px-4 py-3 flex items-center gap-2 text-sm text-green-600 font-semibold">

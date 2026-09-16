@@ -3843,7 +3843,7 @@ export async function getArtistBookings(artistUserId: number): Promise<{
   if (!db) return [];
   const rows = await db.execute(
     `SELECT b.id, b.bookingStatus, b.paymentStatus, b.clientRate, b.artistRate, b.startDate, b.endDate, b.locationAddress,
-     b.description,
+     b.description, b.isAdminBooking, b.isRecurring, b.hours,
      u.clientCompanyName,
      COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.firstName,''), ' ', COALESCE(u.lastName,''))), ''), u.name) as clientName
      FROM bookings b
@@ -5168,6 +5168,17 @@ export async function recordArtswrkPayment(params: {
     stripeReceiptUrl: params.receiptUrl,
     paymentDate: new Date(),
   });
+
+  // Rate write-back is for one-time bookings, whose rate field IS the booking
+  // total. On a weekly class booking the rate is per hour, so writing the gross
+  // charge here destroys it: Kaylee's $50/hr became "$131/hr" after one week was
+  // paid (2026-09-15), which also corrupted every future week's estimate.
+  const [parent] = await db
+    .select({ isAdminBooking: bookings.isAdminBooking, isRecurring: bookings.isRecurring })
+    .from(bookings)
+    .where(eq(bookings.id, params.bookingId))
+    .limit(1);
+  if (parent?.isAdminBooking && parent?.isRecurring) return;
 
   await db
     .update(bookings)
