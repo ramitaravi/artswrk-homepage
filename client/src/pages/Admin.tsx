@@ -3149,6 +3149,8 @@ function JobsSection() {
   const [companySearch, setCompanySearch] = useState("");
   const [locationSearch, setLocationSearch] = useState("");
   const [status, setStatus] = useState("");
+  /** Empty = every job; "none" = nobody has applied yet; "some" = at least one applicant. */
+  const [applicants, setApplicants] = useState<"" | "none" | "some">("");
   const [page, setPage] = useState(1);
   const LIMIT = 50;
 
@@ -3167,6 +3169,7 @@ function JobsSection() {
     companySearch: debouncedCompany || undefined,
     locationSearch: debouncedLocation || undefined,
     status: status || undefined,
+    applicants: applicants || undefined,
     limit: LIMIT,
     offset: (page - 1) * LIMIT,
   }, { enabled: view.mode === "list" });
@@ -3197,6 +3200,12 @@ function JobsSection() {
           <option value="">Status</option>
           {JOB_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
+        {/* Outreach works from this: which jobs still have nobody applied. */}
+        <select value={applicants} onChange={e => { setApplicants(e.target.value as "" | "none" | "some"); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
+          <option value="">Applicants</option>
+          <option value="none">No applicants yet</option>
+          <option value="some">Has applicants</option>
+        </select>
         <div className="flex items-center gap-2 flex-1 min-w-[150px] bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
           <Search size={13} className="text-gray-400 flex-shrink-0" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search clients…" className="bg-transparent text-xs text-[#111] placeholder-gray-400 focus:outline-none w-full" />
@@ -3218,6 +3227,7 @@ function JobsSection() {
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Client / Company</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Title / Description</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Rate</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Applicants</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Status</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Job alerts</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Posted</th>
@@ -3225,9 +3235,9 @@ function JobsSection() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-xs">Loading…</td></tr>
+                <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400 text-xs">Loading…</td></tr>
               ) : data?.jobs.length === 0 ? (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-xs">No jobs found</td></tr>
+                <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400 text-xs">No jobs found</td></tr>
               ) : data?.jobs.map(j => (
                 <tr key={j.id} className="border-b border-gray-50 hover:bg-orange-50/40 transition-colors cursor-pointer" onClick={() => setView({ mode: "detail", id: j.id })}>
                   <td className="px-5 py-3">
@@ -3244,6 +3254,13 @@ function JobsSection() {
                     {j.locationAddress && <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5"><MapPin size={9} />{j.locationAddress}</p>}
                   </td>
                   <td className="px-4 py-3 text-xs font-semibold text-[#111]">{j.openRate ? "Open Rate" : j.clientHourlyRate ? `$${j.clientHourlyRate}/hr` : "—"}</td>
+                  <td className="px-4 py-3">
+                    {Number((j as any).applicantCount) === 0 ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 whitespace-nowrap">None yet</span>
+                    ) : (
+                      <span className="text-xs font-semibold text-[#111] flex items-center gap-1"><Users size={11} className="text-gray-400" />{Number((j as any).applicantCount)}</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${jobStatusColor(j.requestStatus)}`}>{j.requestStatus || "—"}</span></td>
                   <td className="px-4 py-3"><NetworkStatusBadge status={(j as any).networkStatus} sentAt={(j as any).networkSentAt} /></td>
                   <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(j.bubbleCreatedAt || j.createdAt)}</td>

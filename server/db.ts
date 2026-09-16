@@ -3002,6 +3002,7 @@ export async function getAdminJobs({
   service,
   status,
   state,
+  applicants,
   limit = 50,
   offset = 0,
 }: {
@@ -3013,6 +3014,8 @@ export async function getAdminJobs({
   service?: string;
   status?: string;
   state?: string;
+  /** "none" = nobody has applied yet (what outreach works from); "some" = at least one. */
+  applicants?: "none" | "some";
   limit?: number;
   offset?: number;
 }) {
@@ -3029,6 +3032,10 @@ export async function getAdminJobs({
   if (networkStatus === "(none)") conditions.push(sql`${jobs.networkStatus} IS NULL` as any);
   else if (networkStatus) conditions.push(eq(jobs.networkStatus, networkStatus as any) as any);
   if (state) conditions.push(like(jobs.locationAddress, `%${state}%`) as any);
+  // Filtering on the applicant count has to happen in SQL, not after paging, or
+  // "no applicants yet" would only search within the current page.
+  if (applicants === "none") conditions.push(sql`NOT EXISTS (SELECT 1 FROM interested_artists ia WHERE ia.jobId = ${jobs.id})` as any);
+  else if (applicants === "some") conditions.push(sql`EXISTS (SELECT 1 FROM interested_artists ia WHERE ia.jobId = ${jobs.id})` as any);
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -3048,6 +3055,8 @@ export async function getAdminJobs({
       // waiting to be emailed, which have gone out, and which are held back.
       networkStatus: jobs.networkStatus,
       networkSentAt: jobs.networkSentAt,
+      // So admin can see at a glance which jobs still need artists sent to them.
+      applicantCount: sql<number>`(SELECT COUNT(*) FROM interested_artists ia WHERE ia.jobId = ${jobs.id})`,
       title: jobs.title,
       bubbleId: jobs.bubbleId,
       clientHourlyRate: jobs.clientHourlyRate,
