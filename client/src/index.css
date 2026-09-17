@@ -9,6 +9,11 @@
 
 @import "tailwindcss";
 @import "tw-animate-css";
+/* Job/profile descriptions render through <RichText>, which styles them with
+   `prose`. Tailwind v4 only loads plugins named here — without this the class
+   did nothing, so pasted bullet lists lost their bullets (preflight clears
+   list-style) and paragraphs ran together. */
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
