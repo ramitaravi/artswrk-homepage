@@ -747,6 +747,13 @@ function isUpcoming(b: any): boolean {
 function BookingRow({ booking, onClick }: { booking: any; onClick: () => void }) {
   const studio = booking.clientCompanyName ?? booking.clientFirstName ?? `Studio #${booking.clientUserId}`;
   const rate = booking.artistRate ?? booking.clientRate;
+  // A weekly class booking stores an HOURLY rate; everything else stores a total.
+  const perHourWeekly = !!booking.isAdminBooking && !!booking.isRecurring && booking.hours > 0;
+  const rateLabel = typeof rate !== "number"
+    ? String(rate)
+    : perHourWeekly
+      ? `$${(rate * booking.hours).toFixed(2)} / class day ($${rate.toFixed(2)}/hr × ${booking.hours} hrs)`
+      : `+$${rate.toFixed(2)}`;
   const status = booking.bookingStatus ?? "Confirmed";
   const statusColor =
     status === "Completed" ? "text-green-600 bg-green-50"
@@ -769,7 +776,7 @@ function BookingRow({ booking, onClick }: { booking: any; onClick: () => void })
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-[#111] truncate">{studio}</p>
         {rate != null && (
-          <p className="text-sm text-gray-700 font-semibold mt-0.5">+${typeof rate === "number" ? rate.toFixed(2) : rate}</p>
+          <p className="text-sm text-gray-700 font-semibold mt-0.5">{rateLabel}</p>
         )}
         <span className={`inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor}`}>{artistStatusLabel(status)}</span>
       </div>
@@ -1063,21 +1070,31 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
 
             {/* Rate summary — always visible when there's a non-zero rate or reimbursements */}
             {(booking.artistRate > 0 || totalReimb > 0) && (() => {
-              // artistRate is already the booking TOTAL, so hours is context,
-              // not a multiplier. Multiplying here double-counted hourly
-              // bookings and inflated flat ones that merely record hours.
+              // On a one-time booking artistRate is already the booking TOTAL, so
+              // hours is context, not a multiplier (multiplying here double-counted
+              // hourly bookings and inflated flat ones that merely record hours).
+              // On a weekly class booking it is an HOURLY rate, so a week is
+              // rate x hours — showing the bare rate read "$55.00" for a
+              // 4.75-hour class day worth $261.25 (McKell, 2026-09-17).
               const hasHours = booking.hours != null && booking.hours > 0;
-              const baseAmount = booking.artistRate;
+              const perHour = isWeeklyClassBooking && hasHours;
+              const baseAmount = perHour ? booking.artistRate * booking.hours : booking.artistRate;
               return (
                 <div className="border-t border-gray-50 pt-4 space-y-1.5 text-sm">
                   {hasHours && (
                     <div className="flex justify-between text-gray-500 text-xs">
                       <span>Hours</span>
-                      <span>{booking.hours} hrs</span>
+                      <span>{booking.hours} hrs{perHour ? ` × $${Number(booking.artistRate).toFixed(2)}/hr` : ""}</span>
+                    </div>
+                  )}
+                  {perHour && totalReimb > 0 && (
+                    <div className="flex justify-between text-gray-500 text-xs">
+                      <span>Reimbursements</span>
+                      <span>${totalReimb.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-bold text-[#111] text-base pt-1">
-                    <span>Total Rate</span>
+                    <span>{perHour ? "Per class day" : "Total Rate"}</span>
                     <span>${(baseAmount + totalReimb).toFixed(2)}</span>
                   </div>
                 </div>
