@@ -47,6 +47,92 @@ export function periodInvoiceTotals(ratePerHour: number, hours: number, reimburs
   return { base, reimbursements: reimb, fee, total: base + reimb + fee };
 }
 
+/**
+ * THE BOOKING'S OWN RATE BASIS — the model to use for anything new.
+ *
+ * Every booking says outright whether it is hourly or flat (bookings.rateType,
+ * copied from the application when an applicant is confirmed), and carries the
+ * per-hour or flat rate for both sides. Nothing is inferred, and no caller has
+ * to know that the legacy artistRate column means a total on one booking and a
+ * per-hour rate on another.
+ */
+export type RateType = "hourly" | "flat";
+
+export type BookingRates = {
+  rateType?: RateType | null;
+  /** The rate, per hour, when rateType is "hourly". ONE rate — the artist and
+   *  the studio see the same number; the studio's total just adds the fee. */
+  hourlyRate?: number | null;
+  /** The whole-booking rate when rateType is "flat". */
+  flatRate?: number | null;
+  hours?: number | null;
+  /** Legacy fallback for pre-0057 rows (every Bubble booking): bookings
+   *  .artistRate / .clientRate, which hold booking TOTALS and can differ from
+   *  each other because of the old rate-conversion era. */
+  legacyArtistTotal?: number | null;
+  legacyClientTotal?: number | null;
+};
+
+/** One line of money for a booking, or for one week of a recurring one. */
+export interface BookingMoney {
+  rateType: RateType;
+  /** Hours charged (hourly only; 0 for flat). */
+  hours: number;
+  /** The rate used: per hour when hourly, the flat rate when flat. */
+  rate: number;
+  /** The work itself, before reimbursements and the fee. */
+  base: number;
+  reimbursements: number;
+  /** 5% of (base + reimbursements), whole dollars. Studio side only. */
+  processingFee: number;
+  /** Artist receives this — their full rate plus anything they laid out. */
+  artistTotal: number;
+  /** Studio pays this. */
+  clientTotal: number;
+}
+
+/**
+ * The one place booking money is worked out.
+ *
+ * hourly → rate x hours. flat → the flat rate. There is no artist-vs-client
+ * rate conversion: both sides are quoted the same rate, the artist receives it
+ * in full along with any reimbursements, and the studio pays that plus the 5%
+ * processing fee.
+ *
+ * `hoursOverride` is what the artist entered for the week, or what the studio
+ * adjusted to on the approval screen.
+ *
+ * Legacy Bubble bookings have no rateType: they fall back to their stored
+ * totals, which really are totals and must never be multiplied by hours.
+ */
+export function bookingMoney(
+  rates: BookingRates,
+  opts: { hoursOverride?: number | null; reimbursements?: number } = {}
+): BookingMoney {
+  const reimbursements = Number(opts.reimbursements ?? 0);
+  const type: RateType = rates.rateType ?? (rates.hourlyRate != null ? "hourly" : "flat");
+
+  if (type === "hourly") {
+    const rate = Number(rates.hourlyRate ?? 0);
+    const hours = Number(opts.hoursOverride ?? rates.hours ?? 0);
+    const base = rate * hours;
+    const processingFee = processingFeeFor(base + reimbursements);
+    return {
+      rateType: "hourly", hours, rate, base, reimbursements, processingFee,
+      artistTotal: base + reimbursements, clientTotal: base + reimbursements + processingFee,
+    };
+  }
+
+  const base = Number(rates.flatRate ?? rates.legacyArtistTotal ?? 0);
+  // A legacy row can carry a different studio total (old rate conversion); keep it.
+  const clientBase = Number(rates.flatRate ?? rates.legacyClientTotal ?? base);
+  const processingFee = processingFeeFor(clientBase + reimbursements);
+  return {
+    rateType: "flat", hours: 0, rate: base, base, reimbursements, processingFee,
+    artistTotal: base + reimbursements, clientTotal: clientBase + reimbursements + processingFee,
+  };
+}
+
 export type BookingRateBasis = {
   /** interested_artists.isHourlyRate — the REAL flag. Never infer this. */
   isHourlyRate?: boolean | number | null;
