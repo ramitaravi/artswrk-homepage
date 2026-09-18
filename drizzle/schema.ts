@@ -509,6 +509,19 @@ export const bookings = mysqlTable("bookings", {
   /** What the artist receives */
   artistRate: double("artistRate"),
   /** Total client rate including reimbursements */
+  /**
+   * How this booking is priced — set explicitly at confirmation, never inferred.
+   * Added in 0057 because artistRate below means a TOTAL on one-time bookings
+   * and a PER-HOUR rate on weekly classes, and the real hourly/flat flag used to
+   * live on interested_artists (so a booking with no application had none).
+   * One rate for both sides: the studio pays it plus reimbursements plus 5%.
+   * Null on pre-0057 rows, which keep using the stored totals below.
+   */
+  rateType: mysqlEnum("rateType", ["hourly", "flat"]),
+  /** The per-hour rate when rateType is "hourly". */
+  hourlyRate: double("hourlyRate"),
+  /** The whole-booking rate when rateType is "flat". */
+  flatRate: double("flatRate"),
   totalClientRate: double("totalClientRate"),
   /** Total artist rate including reimbursements */
   totalArtistRate: double("totalArtistRate"),

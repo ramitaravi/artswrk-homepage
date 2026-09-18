@@ -5,7 +5,7 @@ import { BookingPeriod, ClientCompany, EnterpriseJobUnlock, InsertClientCompany,
 import { ENV } from './_core/env';
 import { extractCity, DEFAULT_RADIUS_MILES } from "../shared/location";
 import { easternDateTimeToUtc, utcDateString } from "../shared/adminBookingSchedule";
-import { reminderWindow, periodReminderDueSql, periodReminderIsTodaySql } from "./reminderWindow";
+import { reminderWindow, periodReminderDueSql, periodReminderIsTodaySql, easternDateString } from "./reminderWindow";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -5244,6 +5244,13 @@ export async function createReimbursement(data: {
   note?: string | null;
   fileUrl?: string | null;
   expenseDate?: Date | null;
+  /**
+   * The week this expense belongs to, for a recurring booking. REQUIRED for
+   * weekly classes: the weekly invoice reads expenses by bookingPeriodId, so an
+   * expense saved without one is invisible to it and silently unpaid (Kaylee
+   * DaCosta's $75 landed on the whole-booking invoice instead, 2026-09-15).
+   */
+  bookingPeriodId?: number | null;
 }): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -5254,7 +5261,8 @@ export async function createReimbursement(data: {
     note: data.note ?? null,
     fileUrl: data.fileUrl ?? null,
     expenseDate: data.expenseDate ?? new Date(),
-  });
+    ...(data.bookingPeriodId != null ? { bookingPeriodId: data.bookingPeriodId } : {}),
+  } as any);
   // @ts-ignore
   return result[0].insertId as number;
 }
@@ -5573,6 +5581,59 @@ export async function approveBookingPeriodInvoice(
       invoiceTotalCents: opts.invoiceTotalCents,
     } as any)
     .where(eq(bookingPeriods.id, periodId));
+}
+
+/**
+ * What this artist still has to invoice, for the "Submit invoice for N bookings"
+ * prompt. Only counts work whose date has passed.
+ *
+ * A weekly class booking is counted by its open weeks ONLY. Counting the parent
+ * booking row too (it has a start date and never carries a whole-booking invoice)
+ * double-counted it — Marlon showed 3 when he had 1.
+ */
+export async function getArtistInvoicesAwaiting(artistUserId: number): Promise<{
+  total: number;
+  weeks: Array<{ periodId: number; bookingId: number; classDay: Date; hours: number | null; rate: number | null; studio: string | null }>;
+  bookings: Array<{ bookingId: number; startDate: Date; rate: number | null; studio: string | null }>;
+}> {
+  const db = await getDb();
+  if (!db) return { total: 0, weeks: [], bookings: [] };
+  const today = easternDateString(new Date());
+
+  const weekRows = await db.execute(`
+    SELECT p.id AS periodId, p.bookingId, p.periodStart AS classDay, b.hours, b.artistRate AS rate,
+           SUBSTRING_INDEX(b.description, '\n', 1) AS studio
+    FROM booking_periods p
+    JOIN bookings b ON b.id = p.bookingId
+    WHERE b.artistUserId = ${Number(artistUserId)}
+      AND p.status = 'open'
+      AND DATE(p.periodStart) < '${today}'
+      AND COALESCE(b.deleted, 0) = 0
+      AND COALESCE(b.bookingStatus, '') <> 'Cancelled'
+    ORDER BY p.periodStart ASC
+    LIMIT 100`);
+
+  const bookingRows = await db.execute(`
+    SELECT b.id AS bookingId, b.startDate, b.artistRate AS rate,
+           COALESCE(c.clientCompanyName, c.name, SUBSTRING_INDEX(b.description, '\n', 1)) AS studio
+    FROM bookings b
+    LEFT JOIN users c ON c.id = b.clientUserId
+    WHERE b.artistUserId = ${Number(artistUserId)}
+      AND COALESCE(b.deleted, 0) = 0
+      -- Weekly classes are invoiced per week; the parent row never is.
+      AND NOT (COALESCE(b.isAdminBooking, 0) = 1 AND COALESCE(b.isRecurring, 0) = 1)
+      AND COALESCE(b.bookingStatus, '') NOT IN ('Cancelled', 'Completed')
+      AND COALESCE(b.paymentStatus, '') NOT IN ('Paid', 'Refunded')
+      AND COALESCE(b.paymentMethod, 'artswrk') = 'artswrk'
+      AND b.artswrkInvoiceSubmittedAt IS NULL
+      AND b.startDate IS NOT NULL
+      AND b.startDate < NOW()
+    ORDER BY b.startDate ASC
+    LIMIT 100`);
+
+  const weeks = (weekRows[0] as unknown as any[]) ?? [];
+  const bookings = (bookingRows[0] as unknown as any[]) ?? [];
+  return { total: weeks.length + bookings.length, weeks, bookings };
 }
 
 /** Get all admin bookings for an artist (for artist's Bookings page). */

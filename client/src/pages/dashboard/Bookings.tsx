@@ -11,7 +11,7 @@ import {
   TrendingUp, Loader2, RefreshCw, Send, ArrowRight, Building2
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { periodInvoiceTotals } from "@shared/bookingRates";
+import { periodInvoiceTotals, bookingMoney } from "@shared/bookingRates";
 import { useAuth } from "@/_core/hooks/useAuth";
 // Flexible type for both raw Booking schema rows and enriched query results
 type AnyBooking = {
@@ -222,6 +222,25 @@ function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
   // Pre-fill with the scheduled hours so the artist only changes it when a week ran long or short.
   const [hours, setHours] = useState((period.actualHours ?? period.scheduledHours)?.toString() ?? "");
   const [notes, setNotes] = useState(period.artistNotes ?? "");
+  const [expNote, setExpNote] = useState("");
+  const [expValue, setExpValue] = useState("");
+  const [expFile, setExpFile] = useState<File | null>(null);
+  /** Nothing is invoiced until the artist has seen the full breakdown. */
+  const [confirming, setConfirming] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const utils = trpc.useUtils();
+
+  // Expenses belong to the WEEK, not the booking: the weekly invoice reads them
+  // by bookingPeriodId, so one saved against the booking is never paid.
+  const { data: expenses } = trpc.artistDashboard.getPeriodReimbursements.useQuery({ periodId: period.id });
+  const uploadReceipt = trpc.artistDashboard.uploadReimbursementReceipt.useMutation();
+  const addExpense = trpc.artistDashboard.addReimbursement.useMutation({
+    onSuccess: () => {
+      utils.artistDashboard.getPeriodReimbursements.invalidate({ periodId: period.id });
+      setExpNote(""); setExpValue(""); setExpFile(null);
+    },
+    onError: (e: any) => alert("Couldn't add that expense: " + e.message),
+  });
 
   const submit = trpc.bookingPeriods.submit.useMutation({
     onSuccess: () => { onSuccess(); onClose(); },
@@ -230,9 +249,34 @@ function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
 
   const periodLabel = new Date(period.periodStart).toLocaleDateString("en-US", { month: "long", year: "numeric" });
   const artistRate = booking.artistRate ?? 0;
-  const clientRate = booking.clientRate ?? 0;
-  const estimatedArtist = hours ? (Number(hours) * artistRate).toFixed(2) : null;
-  const estimatedClient = hours ? (Number(hours) * clientRate).toFixed(2) : null;
+  const expenseTotal = (expenses ?? []).reduce((s: number, r: any) => s + Number(r.value ?? 0), 0);
+  const money = bookingMoney(
+    { rateType: "hourly", hourlyRate: Number(artistRate), hours: Number(hours || 0) },
+    { reimbursements: expenseTotal },
+  );
+  const estimatedArtist = hours ? money.artistTotal.toFixed(2) : null;
+  const estimatedClient = hours ? money.clientTotal.toFixed(2) : null;
+
+  async function saveExpense() {
+    const value = parseFloat(expValue);
+    if (!value || isNaN(value)) return;
+    let fileUrl: string | undefined;
+    if (expFile) {
+      const base64 = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(String(r.result).split(",")[1] ?? "");
+        r.onerror = rej;
+        r.readAsDataURL(expFile);
+      });
+      const up = await uploadReceipt.mutateAsync({ fileName: expFile.name, fileBase64: base64, mimeType: expFile.type });
+      fileUrl = (up as any)?.fileUrl ?? undefined;
+    }
+    addExpense.mutate({ bookingId: booking.id, bookingPeriodId: period.id, value, note: expNote || undefined, fileUrl });
+  }
+
+  function doSubmit() {
+    submit.mutate({ periodId: period.id, actualHours: Number(hours), artistNotes: notes || undefined, origin: window.location.origin });
+  }
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -254,9 +298,12 @@ function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
 
         {estimatedArtist && (
           <div className="bg-gray-50 rounded-xl p-3 text-xs space-y-1">
-            <div className="flex justify-between"><span className="text-gray-500">Your earnings</span><span className="font-semibold text-[#111]">${estimatedArtist}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Client invoice</span><span className="font-semibold text-[#111]">${estimatedClient}</span></div>
-            <p className="text-[10px] text-gray-400 pt-1">Based on ${artistRate}/hr artist · ${clientRate}/hr client rate. Reimbursements add to the invoice.</p>
+            <div className="flex justify-between"><span className="text-gray-500">${Number(artistRate).toFixed(2)}/hr × {hours} hrs</span><span className="font-semibold text-[#111]">${money.base.toFixed(2)}</span></div>
+            {expenseTotal > 0 && (
+              <div className="flex justify-between"><span className="text-gray-500">Reimbursements</span><span className="font-semibold text-[#111]">${expenseTotal.toFixed(2)}</span></div>
+            )}
+            <div className="flex justify-between border-t border-gray-200 pt-1 mt-1"><span className="font-bold text-[#111]">You'll receive</span><span className="font-bold text-[#111]">${estimatedArtist}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Studio pays (incl. 5% fee)</span><span className="font-semibold text-[#111]">${estimatedClient}</span></div>
           </div>
         )}
 
@@ -269,21 +316,100 @@ function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
           />
         </div>
 
+        {/* Expenses for THIS week — gas, parking, supplies. */}
+        <div className="border-t border-gray-100 pt-3 space-y-2">
+          <label className="block text-xs font-semibold text-gray-600">Reimbursements for this week</label>
+          {(expenses ?? []).length > 0 ? (
+            <div className="space-y-1">
+              {(expenses ?? []).map((r: any) => (
+                <div key={r.id} className="flex items-center justify-between text-xs bg-gray-50 rounded-lg px-3 py-2">
+                  <span className="text-gray-600 truncate">{r.note || "Expense"}{r.fileUrl ? " · receipt attached" : ""}</span>
+                  <span className="font-semibold text-[#111]">${Number(r.value).toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[11px] text-gray-400">None added yet — leave empty if you had no expenses.</p>
+          )}
+          <div className="flex gap-2">
+            <input
+              value={expNote} onChange={e => setExpNote(e.target.value)}
+              placeholder="Description (e.g. Gas, Parking)"
+              className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-[#F25722]"
+            />
+            <input
+              type="number" min="0" step="0.01" value={expValue} onChange={e => setExpValue(e.target.value)}
+              placeholder="$" className="w-20 px-2 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-[#F25722]"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <button type="button" onClick={() => fileRef.current?.click()} className="text-[11px] font-semibold text-gray-500 hover:text-gray-700">
+              {expFile ? `📎 ${expFile.name.slice(0, 22)}` : "Attach receipt"}
+            </button>
+            <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={e => setExpFile(e.target.files?.[0] ?? null)} />
+            <button
+              type="button" onClick={saveExpense}
+              disabled={!expValue || addExpense.isPending || uploadReceipt.isPending}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors disabled:opacity-50"
+            >
+              {addExpense.isPending || uploadReceipt.isPending ? "Adding…" : "+ Add"}
+            </button>
+          </div>
+        </div>
+
         <div className="p-3 bg-blue-50 rounded-xl text-xs text-blue-700">
-          Submitting will generate a payment invoice and email the client a payment link.
+          Submitting will generate a payment invoice and email the studio a payment link.
         </div>
 
         <div className="flex gap-3">
           <button onClick={onClose} className="px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
           <button
-            onClick={() => submit.mutate({ periodId: period.id, actualHours: Number(hours), artistNotes: notes || undefined, origin: window.location.origin })}
+            onClick={() => setConfirming(true)}
             disabled={!hours || submit.isPending}
             className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
           >
-            {submit.isPending ? <><Loader2 size={14} className="animate-spin" /> Submitting…</> : <><Send size={14} /> Submit & Invoice Client</>}
+            <Send size={14} /> Review &amp; Submit
           </button>
         </div>
       </div>
+
+      {/* Last look before anything is invoiced. An artist who forgot their
+          expenses can't get them back on this week once it's submitted. */}
+      {confirming && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && setConfirming(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <div>
+              <h3 className="text-base font-black text-[#111]">Send this invoice?</h3>
+              <p className="text-xs text-gray-500">{periodLabel} · {formatDate(period.periodStart)}</p>
+            </div>
+
+            {expenseTotal === 0 && (
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-2">
+                <p className="text-xs font-bold text-amber-800">You haven't added any reimbursements.</p>
+                <p className="text-[11px] text-amber-700">If you paid for gas, parking or supplies this week, add it now — it can't be added to this week once the invoice is sent.</p>
+                <button onClick={() => setConfirming(false)} className="text-[11px] font-bold text-amber-800 underline">Go back and add expenses</button>
+              </div>
+            )}
+
+            <div className="bg-gray-50 rounded-xl p-3 text-xs space-y-1.5">
+              <div className="flex justify-between"><span className="text-gray-500">${Number(artistRate).toFixed(2)}/hr × {hours} hrs</span><span className="font-semibold text-[#111]">${money.base.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Reimbursements</span><span className="font-semibold text-[#111]">${expenseTotal.toFixed(2)}</span></div>
+              <div className="flex justify-between border-t border-gray-200 pt-1.5"><span className="font-bold text-[#111]">You'll receive</span><span className="font-black text-[#ec008c]">${money.artistTotal.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Studio pays (incl. 5% fee)</span><span className="font-semibold text-[#111]">${money.clientTotal.toFixed(2)}</span></div>
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={() => setConfirming(false)} className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Back</button>
+              <button
+                onClick={doSubmit} disabled={submit.isPending}
+                className="flex-1 px-3 py-2.5 rounded-xl text-xs font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {submit.isPending ? <><Loader2 size={14} className="animate-spin" /> Sending…</> : <>Yes, send it</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
