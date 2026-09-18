@@ -248,7 +248,7 @@ function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
   });
 
   const periodLabel = new Date(period.periodStart).toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  const artistRate = booking.artistRate ?? 0;
+  const artistRate = booking.hourlyRate ?? booking.artistRate ?? 0;
   const expenseTotal = (expenses ?? []).reduce((s: number, r: any) => s + Number(r.value ?? 0), 0);
   const money = bookingMoney(
     { rateType: "hourly", hourlyRate: Number(artistRate), hours: Number(hours || 0) },
@@ -269,7 +269,7 @@ function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
         r.readAsDataURL(expFile);
       });
       const up = await uploadReceipt.mutateAsync({ fileName: expFile.name, fileBase64: base64, mimeType: expFile.type });
-      fileUrl = (up as any)?.fileUrl ?? undefined;
+      fileUrl = up.url;
     }
     addExpense.mutate({ bookingId: booking.id, bookingPeriodId: period.id, value, note: expNote || undefined, fileUrl });
   }
@@ -365,7 +365,7 @@ function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
           <button onClick={onClose} className="px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
           <button
             onClick={() => setConfirming(true)}
-            disabled={!hours || submit.isPending}
+            disabled={!hours || submit.isPending || addExpense.isPending || uploadReceipt.isPending}
             className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
           >
             <Send size={14} /> Review &amp; Submit
@@ -566,6 +566,29 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
 // Need CalendarDays icon
 function CalendarDays({ size, className }: { size: number; className?: string }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="8" y2="18"/><line x1="12" y1="18" x2="12" y2="18"/></svg>;
+}
+
+/** Recurring bookings panel used by the active artist dashboard route. */
+export function ArtistRecurringBookings() {
+  const { data: adminBookings, isLoading, refetch } = trpc.bookingPeriods.myAdminBookings.useQuery();
+
+  if (isLoading) {
+    return <div className="flex justify-center py-5"><Loader2 size={18} className="animate-spin text-gray-300" /></div>;
+  }
+  if (!(adminBookings as any[])?.length) return null;
+
+  return (
+    <div className="space-y-3">
+      {(adminBookings as any[]).map((booking: any) => (
+        <AdminBookingCard
+          key={booking.id}
+          booking={booking}
+          isArtist
+          onPeriodsUpdated={() => refetch()}
+        />
+      ))}
+    </div>
+  );
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────

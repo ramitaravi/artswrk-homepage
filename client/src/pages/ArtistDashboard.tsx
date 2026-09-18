@@ -11,6 +11,7 @@ import { useLocation, useSearch } from "wouter";
 import ArtistProfilePage from "./artist/ArtistProfilePage";
 import ArtistSettings from "./artist/ArtistSettings";
 import Benefits from "./dashboard/Benefits";
+import { ArtistRecurringBookings } from "./dashboard/Bookings";
 import MessagesPage from "./dashboard/Messages";
 import {
   Briefcase,
@@ -1220,7 +1221,12 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
 
 function BookingsTab() {
   const { data, isLoading } = trpc.artistDashboard.myConfirmations.useQuery();
-  const confirmations = data ?? [];
+  // Recurring admin bookings have their own per-week invoice controls below.
+  // Exclude their parent rows from this legacy whole-booking list so artists do
+  // not see the same engagement twice or accidentally use the flat invoice UI.
+  const confirmations = (data ?? []).filter(
+    (booking: any) => !(booking.isAdminBooking && booking.isRecurring),
+  );
   const [filter, setFilter] = useState<BookingFilter>("all");
   const [selected, setSelected] = useState<any | null>(null);
   const search = useSearch();
@@ -1285,6 +1291,8 @@ function BookingsTab() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-[#111]">Bookings</h1>
+
+      <ArtistRecurringBookings />
 
       {/* Filter tabs */}
       <div className="flex gap-2">

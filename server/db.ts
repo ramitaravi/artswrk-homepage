@@ -4804,6 +4804,9 @@ export async function createBookingFromApplicant(data: {
   clientUserId: number;
   artistUserId: number;
   paymentMethod: "artswrk" | "direct";
+  rateType?: "hourly" | "flat" | null;
+  hourlyRate?: number | null;
+  flatRate?: number | null;
   artistRate?: number | null;
   clientRate?: number | null;
   startDate?: Date | null;
@@ -4827,6 +4830,9 @@ export async function createBookingFromApplicant(data: {
     bookingStatus: "Confirmed",
     paymentStatus: "Unpaid",
     paymentMethod: data.paymentMethod,
+    rateType: data.rateType ?? null,
+    hourlyRate: data.hourlyRate ?? null,
+    flatRate: data.flatRate ?? null,
     artistRate: data.artistRate ?? null,
     clientRate: data.clientRate ?? null,
     startDate: data.startDate ?? null,
@@ -5365,6 +5371,9 @@ export async function createAdminBooking(input: {
   const [result] = await db.insert(bookings).values({
     clientUserId: input.clientUserId,
     artistUserId: input.artistUserId,
+    rateType: input.isRecurring ? "hourly" : null,
+    hourlyRate: input.isRecurring ? input.artistRateDollars : null,
+    flatRate: null,
     artistRate: input.artistRateDollars,
     clientRate: input.clientRateDollars,
     startDate: input.startDate,
@@ -5642,7 +5651,8 @@ export async function getArtistAdminBookings(artistUserId: number) {
   if (!db) return [];
   const rows = await db.execute(`
     SELECT
-      b.id, b.bookingStatus, b.artistRate, b.clientRate, b.startDate, b.endDate,
+      b.id, b.bookingStatus, b.rateType, b.hourlyRate, b.flatRate,
+      b.artistRate, b.clientRate, b.startDate, b.endDate,
       b.isRecurring, b.recurringCadence, b.locationAddress, b.description, b.hours,
       c.clientCompanyName, c.firstName AS clientFirstName, c.lastName AS clientLastName, c.name AS clientName
     FROM bookings b
@@ -5672,7 +5682,8 @@ export async function getClientAdminBookings(clientUserId: number) {
   if (!db) return [];
   const rows = await db.execute(`
     SELECT
-      b.id, b.bookingStatus, b.artistRate, b.clientRate, b.startDate, b.endDate,
+      b.id, b.bookingStatus, b.rateType, b.hourlyRate, b.flatRate,
+      b.artistRate, b.clientRate, b.startDate, b.endDate,
       b.isRecurring, b.recurringCadence, b.locationAddress, b.description, b.hours,
       a.firstName AS artistFirstName, a.lastName AS artistLastName, a.name AS artistName,
       a.profilePicture AS artistProfilePicture, a.slug AS artistSlug

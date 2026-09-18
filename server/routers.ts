@@ -1,10 +1,10 @@
 import bcrypt from "bcryptjs";
 import { APP_URL } from "./emailTemplates";
 import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ONE_YEAR_MS } from "@shared/const";
-import { processingFeeFor as adminPeriodFee } from "@shared/bookingRates";
 import { isJobPubliclyLive } from "@shared/jobStatus";
-import { resolveBookingBaseAmount, isHourlyBooking, processingFeeFor } from "@shared/bookingRates";
+import { bookingMoney, resolveBookingBaseAmount, isHourlyBooking, processingFeeFor } from "@shared/bookingRates";
 import { getPasswordError, PASSWORD_MAX_LENGTH } from "@shared/password";
+import { assertReimbursementWriteAccess } from "./reimbursementAccess";
 
 /**
  * Shared by every flow where a user SETS a password (signup, reset, first
@@ -3871,6 +3871,9 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           clientUserId: ctx.user.id,
           artistUserId: applicantRow.artistUserId!,
           paymentMethod: input.paymentMethod,
+          rateType: input.rateType,
+          hourlyRate: input.rateType === "hourly" ? unitRate : null,
+          flatRate: input.rateType === "flat" ? unitRate : null,
           artistRate: artistRateDollars,
           clientRate: clientRateDollars,
           startDate: input.startDate ? new Date(input.startDate) : null,
@@ -4154,6 +4157,8 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
       .query(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
+        const booking = await getBookingById(input.bookingId);
+        if (!booking || booking.artistUserId !== user.id) throw new Error("Not authorized");
         return getReimbursementsByBookingId(input.bookingId);
       }),
 
@@ -4171,6 +4176,16 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
+        const booking = await getBookingById(input.bookingId);
+        const period = input.bookingPeriodId != null
+          ? await getBookingPeriodById(input.bookingPeriodId)
+          : null;
+        assertReimbursementWriteAccess({
+          userId: user.id,
+          booking,
+          bookingPeriodId: input.bookingPeriodId,
+          period,
+        });
         const id = await createReimbursement({
           bookingId: input.bookingId,
           artistUserId: user.id,
@@ -4988,6 +5003,9 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           clientUserId: user.id,
           artistUserId: applicant.artistId,
           paymentMethod: input.paymentMethod,
+          rateType: isHourly ? "hourly" : "flat",
+          hourlyRate: isHourly ? unitRate : null,
+          flatRate: isHourly ? null : unitRate,
           artistRate: artistRateDollars,
           clientRate: clientRateDollars,
           startDate: input.startDate ? new Date(input.startDate) : (applicant.startDate ?? null),
@@ -5261,12 +5279,16 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
 
         const finalHours = input.hours ?? (period as any).actualHours ?? 0;
         const totalReimb = (period as any).reimbursementsTotal ?? 0;
-        const artistTotal = ((period as any).artistRate ?? 0) * finalHours + totalReimb;
-        // Client rate plus the standard 5% processing fee (see bookingPeriods.submit).
-        const clientSubtotal = ((period as any).clientRate ?? 0) * finalHours + totalReimb;
-        const clientTotal = clientSubtotal + adminPeriodFee(clientSubtotal);
-        const totalCents = Math.round(clientTotal * 100);
-        const applicationFeeCents = Math.max(0, totalCents - Math.round(artistTotal * 100));
+        const money = bookingMoney({
+          rateType: (parentBooking as any).rateType ?? "hourly",
+          hourlyRate: (parentBooking as any).hourlyRate ?? (period as any).artistRate ?? 0,
+          flatRate: (parentBooking as any).flatRate,
+          hours: (parentBooking as any).hours,
+          legacyArtistTotal: (period as any).artistRate,
+          legacyClientTotal: (period as any).clientRate,
+        }, { hoursOverride: finalHours, reimbursements: totalReimb });
+        const totalCents = Math.round(money.clientTotal * 100);
+        const applicationFeeCents = Math.max(0, totalCents - Math.round(money.artistTotal * 100));
         if (totalCents < 50) throw new Error("Total is below Stripe's minimum charge amount");
 
         const clientUser = parentBooking.clientUserId ? await getUserById(parentBooking.clientUserId) : null;
@@ -5428,21 +5450,19 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
 
         const reimbList = await getReimbursementsByPeriodId(input.periodId);
         const totalReimb = reimbList.reduce((s: number, r: any) => s + (r.value ?? 0), 0);
-        const artistRatePerHour = booking.artistRate ?? 0;
-        const clientRatePerHour = booking.clientRate ?? 0;
-
         if ((period as any).status === "skipped") {
           throw new Error("This week was skipped (no class), so there are no hours to submit.");
         }
 
-        // The studio pays the client rate plus the standard 5% processing fee,
-        // like every other booking; the artist receives their full rate.
-        // Artswrk's cut is the rate spread plus the fee.
-        const artistTotal = artistRatePerHour * input.actualHours + totalReimb;
-        const clientSubtotal = clientRatePerHour * input.actualHours + totalReimb;
-        const clientTotal = clientSubtotal + adminPeriodFee(clientSubtotal);
-        const totalCents = Math.round(clientTotal * 100);
-        const applicationFeeCents = Math.max(0, totalCents - Math.round(artistTotal * 100));
+        const money = bookingMoney({
+          rateType: (booking as any).rateType ?? "hourly",
+          hourlyRate: (booking as any).hourlyRate ?? booking.artistRate ?? 0,
+          flatRate: (booking as any).flatRate,
+          hours: booking.hours,
+          legacyArtistTotal: booking.artistRate,
+          legacyClientTotal: booking.clientRate,
+        }, { hoursOverride: input.actualHours, reimbursements: totalReimb });
+        const totalCents = Math.round(money.clientTotal * 100);
 
         const { randomBytes } = await import("crypto");
         const invoicePaymentToken = randomBytes(24).toString("hex");
