@@ -806,9 +806,10 @@ function PostJobModal({
       budget: form.askArtistRate ? undefined : (form.budget || undefined),
       workFromAnywhere: form.workFromAnywhere,
       description: form.description || undefined,
-      applyEmail: form.applyEmail || undefined,
-      applyDirect: form.applyDirect,
-      applyLink: form.applyDirect ? (form.applyLink || undefined) : undefined,
+      // Enterprise applications always come through Artswrk; the company's own
+      // form is an optional step afterwards.
+      applyDirect: false,
+      applyLink: form.applyLink || undefined,
       bubbleClientCompanyId: form.bubbleClientCompanyId || undefined,
       appUrl: window.location.origin,
     });
@@ -1044,59 +1045,22 @@ function PostJobModal({
               </div>
             </div>
 
-            {/* Apply directly through Artswrk vs. off-site */}
+            {/* Applications always come through Artswrk for enterprise accounts. A
+                link to the company's own form is optional, and shown to artists
+                only AFTER they've applied on Artswrk. */}
             <div className="flex items-start gap-4 py-4 border-b border-gray-100">
-              <label className="w-36 text-sm font-bold text-[#111] pt-2 flex-shrink-0">
-                How to Apply
-              </label>
-              <div className="flex-1 space-y-3">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setForm((f) => ({ ...f, applyDirect: false }))}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-colors ${!form.applyDirect ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}
-                  >
-                    Through Artswrk
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setForm((f) => ({ ...f, applyDirect: true }))}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-colors ${form.applyDirect ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}
-                  >
-                    Send Off-Site
-                  </button>
-                </div>
-                {form.applyDirect ? (
-                  <div>
-                    <input
-                      type="url"
-                      placeholder="https://yourcompany.com/apply"
-                      value={form.applyLink}
-                      onChange={(e) => setForm((f) => ({ ...f, applyLink: e.target.value }))}
-                      className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
-                    />
-                    <p className="text-xs text-gray-400 mt-1.5">
-                      Artists see an "Apply Now" button that sends them to this link{form.applyEmail && !form.applyLink ? ` — or to ${form.applyEmail} if no link is set` : ""}. Applications won't come through your Artswrk dashboard.
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-400">Applicants apply here on Artswrk and show up in your dashboard.</p>
-                )}
+              <label className="w-36 text-sm font-bold text-[#111] pt-2 flex-shrink-0">How to Apply</label>
+              <div className="flex-1 space-y-2">
+                <p className="text-xs text-gray-500 pt-2">Artists apply here on Artswrk and show up in your dashboard.</p>
+                <input
+                  type="url"
+                  placeholder="Your own application form (optional) — https://…"
+                  value={form.applyLink}
+                  onChange={(e) => setForm((f) => ({ ...f, applyLink: e.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
+                />
+                <p className="text-xs text-gray-400">Need artists to fill out your own form too? Add the link — they'll see it right after applying on Artswrk.</p>
               </div>
-            </div>
-
-            {/* Apply Email */}
-            <div className="flex items-start gap-4 py-4 border-b border-gray-100">
-              <label className="w-36 text-sm font-bold text-[#111] pt-2 flex-shrink-0">
-                Apply Email
-              </label>
-              <input
-                type="email"
-                placeholder="email@company.com"
-                value={form.applyEmail}
-                onChange={(e) => setForm((f) => ({ ...f, applyEmail: e.target.value }))}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-[#F25722] transition-all"
-              />
             </div>
 
             {/* Description */}
@@ -1939,8 +1903,8 @@ function JobDetailView({
         rate: editForm.askArtistRate ? null : (editForm.budget || job.rate),
         description: editForm.description ?? job.description,
         applyEmail: editForm.applyEmail || job.applyEmail,
-        applyDirect: editForm.applyDirect,
-        applyLink: editForm.applyDirect ? editForm.applyLink : null,
+        applyDirect: false,
+        applyLink: editForm.applyLink || null,
       });
       utils.enterprise.getJobs.invalidate();
     },
@@ -1967,9 +1931,8 @@ function JobDetailView({
       workFromAnywhere: editForm.workFromAnywhere,
       budget: editForm.askArtistRate ? "" : editForm.budget,
       description: editForm.description || undefined,
-      applyEmail: editForm.applyEmail || undefined,
-      applyDirect: editForm.applyDirect,
-      applyLink: editForm.applyDirect ? (editForm.applyLink || undefined) : "",
+      applyDirect: false,
+      applyLink: editForm.applyLink || "",
     });
   }
 
@@ -2517,28 +2480,13 @@ function JobDetailView({
               )}
             </div>
 
-            {/* How to Apply */}
+            {/* Applications always come through Artswrk for enterprise accounts; the
+                company's own form link is an optional step after applying. */}
             <div>
               <label className={labelCls}>How to Apply</label>
-              <div className="flex items-center gap-2 mb-2">
-                <button type="button" onClick={() => setEditForm(f => ({ ...f, applyDirect: false }))}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-colors ${!editForm.applyDirect ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}>
-                  Through Artswrk
-                </button>
-                <button type="button" onClick={() => setEditForm(f => ({ ...f, applyDirect: true }))}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-colors ${editForm.applyDirect ? "bg-[#111] text-white border-[#111]" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}>
-                  Send Off-Site
-                </button>
-              </div>
-              {editForm.applyDirect && (
-                <input type="url" value={editForm.applyLink} onChange={e => setEditForm(f => ({ ...f, applyLink: e.target.value }))} className={fieldCls} placeholder="https://yourcompany.com/apply" />
-              )}
-            </div>
-
-            {/* Apply Email */}
-            <div>
-              <label className={labelCls}>Apply Email</label>
-              <input type="email" value={editForm.applyEmail} onChange={e => setEditForm(f => ({ ...f, applyEmail: e.target.value }))} className={fieldCls} placeholder="applications@yourcompany.com" />
+              <p className="text-xs text-gray-500 mb-2">Artists apply here on Artswrk and show up in your dashboard.</p>
+              <input type="url" value={editForm.applyLink} onChange={e => setEditForm(f => ({ ...f, applyLink: e.target.value }))} className={fieldCls} placeholder="Your own application form (optional) — https://…" />
+              <p className="text-xs text-gray-400 mt-1">Artists see this right after applying on Artswrk.</p>
             </div>
 
             {/* Description */}

@@ -6,11 +6,13 @@
  * - Apply form inline at bottom of content (scrolled to on click)
  * - Sticky bottom bar always visible
  */
+import { externalApplyTarget, followUpApplyLink } from "@/lib/proJobApply";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import {
   MapPin, Clock, ArrowLeft, Star, Loader2, AlertCircle, CheckCircle2,
   FileText, Upload, DollarSign, Share2, ExternalLink, Lock,
+  ArrowRight,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useUpgrade } from "@/lib/useUpgrade";
@@ -421,22 +423,11 @@ export default function ProJobDetail() {
   }
 
   const j = job as any;
-  // Some PRO jobs are configured to receive applications outside Artswrk
-  // entirely (a link or an email address) instead of through the in-platform
-  // apply form. The applyDirect flag itself is unreliable on Bubble-migrated
-  // records (many real link-out jobs have applyDirect=0 with applyLink still
-  // populated) — the presence of a real link/email is the actual signal.
-  // Audited every distinct applyEmail value in premium_jobs (2026-08-28) and
-  // found this is a real, recurring migration-quality issue, not a one-off:
-  // internal @artswrk.com aliases (contact@, support@, ramita+*@) and outright
-  // garbage non-email strings (e.g. "Several emails - Nick") are stored in the
-  // same field as real employer addresses. None of those are a real external
-  // apply target — jobs with only one of those (no real link) are genuinely
-  // in-platform, and treating them as external hides the in-platform apply
-  // state entirely, including any application the artist already submitted.
-  const isRealEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) && !v.trim().toLowerCase().endsWith("@artswrk.com");
-  const hasRealApplyEmail = !!j.applyEmail && isRealEmail(j.applyEmail);
-  const externalApplyHref: string | null = j.applyLink || (hasRealApplyEmail ? `mailto:${j.applyEmail}` : null);
+  // Off-site target (link or mailto), or null to apply on Artswrk. Enterprise
+  // accounts are always null — see lib/proJobApply.ts.
+  const externalApplyHref: string | null = externalApplyTarget(j);
+  // An enterprise's own form: a second step after applying on Artswrk, never instead of it.
+  const followUpHref: string | null = followUpApplyLink(j);
   // The external link is a real off-platform apply target — it must never be
   // reachable before the artist has actually unlocked PRO, or they get the
   // full benefit of a PRO job (the employer's real contact) for free.
@@ -605,6 +596,21 @@ export default function ProJobDetail() {
                   <CheckCircle2 size={18} className="text-green-600 flex-shrink-0" />
                   <p className="text-sm font-bold text-green-700">Application submitted!</p>
                 </div>
+                {followUpHref && (
+                  <div className="border-t border-green-100 pt-3 space-y-2">
+                    <p className="text-sm text-green-700">
+                      <span className="font-bold">Amazing, thank you!</span> {company} would also love for you to fill out their application form too.
+                    </p>
+                    <a
+                      href={followUpHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white artist-grad-bg hover:opacity-90 transition-opacity"
+                    >
+                      Fill out {company}'s form <ArrowRight size={14} />
+                    </a>
+                  </div>
+                )}
                 {(appliedSummary?.resumeLink || appliedSummary?.resumeTitle || appliedSummary?.message || appliedSummary?.rate) && (
                   <div className="border-t border-green-100 pt-3 space-y-2.5">
                     {/* Resume */}

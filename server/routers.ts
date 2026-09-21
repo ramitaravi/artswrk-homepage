@@ -1,3 +1,4 @@
+import { isEnterpriseAccount } from "../shared/enterprise";
 import bcrypt from "bcryptjs";
 import { APP_URL } from "./emailTemplates";
 import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ONE_YEAR_MS } from "@shared/const";
@@ -3425,7 +3426,11 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
       .input(z.object({ jobId: z.number() }))
       .query(async ({ input }) => {
         const job = await getPremiumJobById(input.jobId);
-        return { job };
+        if (!job) return { job };
+        // Enterprise accounts take applications on Artswrk, never off-site —
+        // the page uses this instead of the job's own apply link/email.
+        const owner = (job as any).createdByUserId ? await getUserById((job as any).createdByUserId) : null;
+        return { job: { ...job, ownerIsEnterprise: isEnterpriseAccount(owner as any) } };
       }),
     /** Get applicants (interested artists) for a specific premium job */
     getJobApplicants: protectedProcedure
@@ -3543,8 +3548,12 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           workFromAnywhere: input.workFromAnywhere === true,
           description: input.description || null,
           applyEmail: input.applyEmail || null,
+          // An enterprise account's applicants always apply on Artswrk and land
+          // in its dashboard. Its own form link is kept as an optional step
+          // artists complete AFTER applying; only admins posting for
+          // non-customers can send artists off-site instead.
           applyLink: input.applyLink || null,
-          applyDirect: input.applyDirect,
+          applyDirect: isEnterpriseAccount(poster0 as any) ? false : input.applyDirect,
           createdByUserId: ctx.user.id,
           bubbleClientCompanyId: input.bubbleClientCompanyId || null,
         });
@@ -3625,6 +3634,11 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         if (fields.applyLink !== undefined) patch.applyLink = fields.applyLink || null;
         if (fields.applyDirect !== undefined) patch.applyDirect = fields.applyDirect;
         if (fields.status !== undefined) patch.status = fields.status;
+        // An enterprise account's applicants always apply on Artswrk; its own
+        // form link is only ever a follow-up step, never a way off-site.
+        if (isEnterpriseAccount(await getUserById(ctx.user.id) as any)) {
+          patch.applyDirect = false;
+        }
 
         if (Object.keys(patch).length > 0) {
           await db.update(premiumJobsTable).set(patch).where(eq(premiumJobsTable.id, id));
