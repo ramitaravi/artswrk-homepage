@@ -21,12 +21,12 @@ describe("externalApplyTarget", () => {
 });
 
 describe("followUpApplyLink", () => {
-  it("offers an enterprise's own form as a step after applying on Artswrk", () => {
+  it("uses the secure form returned after applying on Artswrk", () => {
     const link = "https://recruiting.paylocity.com/Recruiting/Jobs/Details/4350679";
-    expect(followUpApplyLink({ ownerIsEnterprise: true, applyLink: link })).toBe(link);
+    expect(followUpApplyLink({ followUpApplyLink: link })).toBe(link);
   });
-  it("is null without a link, or for non-enterprise jobs (they link out instead)", () => {
-    expect(followUpApplyLink({ ownerIsEnterprise: true })).toBeNull();
-    expect(followUpApplyLink({ ownerIsEnterprise: false, applyLink: "https://x.com/apply" })).toBeNull();
+  it("is null until an authenticated application response supplies a link", () => {
+    expect(followUpApplyLink({})).toBeNull();
+    expect(followUpApplyLink(null)).toBeNull();
   });
 });

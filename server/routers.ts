@@ -1,4 +1,9 @@
-import { isEnterpriseAccount } from "../shared/enterprise";
+import {
+  canAccessEnterpriseJobApplicants,
+  enterpriseFollowUpApplyLink,
+  isEnterpriseAccount,
+  visibleProJobApplyFields,
+} from "../shared/enterprise";
 import bcrypt from "bcryptjs";
 import { APP_URL } from "./emailTemplates";
 import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ONE_YEAR_MS } from "@shared/const";
@@ -3424,20 +3429,35 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
     /** Get a single premium job by ID */
     getJobDetail: publicProcedure
       .input(z.object({ jobId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const job = await getPremiumJobById(input.jobId);
         if (!job) return { job };
         // Enterprise accounts take applications on Artswrk, never off-site —
         // the page uses this instead of the job's own apply link/email.
         const owner = (job as any).createdByUserId ? await getUserById((job as any).createdByUserId) : null;
-        return { job: { ...job, ownerIsEnterprise: isEnterpriseAccount(owner as any) } };
+        const ownerIsEnterprise = isEnterpriseAccount(owner as any);
+        const viewer = ctx.user ? await getUserById(ctx.user.id) : null;
+        const applyFields = visibleProJobApplyFields(job as any, {
+          viewerIsPro: (viewer as any)?.planTier === "artist_pro",
+          ownerIsEnterprise,
+        });
+        return { job: { ...job, ...applyFields, ownerIsEnterprise } };
       }),
     /** Get applicants (interested artists) for a specific premium job */
     getJobApplicants: protectedProcedure
       .input(z.object({ jobId: z.number() }))
       .query(async ({ input, ctx }) => {
-        const user = await getUserById(ctx.user.id);
         const isAdmin = ctx.user.openId === ENV.ownerOpenId || ctx.user.role === "admin";
+        const job = await getPremiumJobById(input.jobId);
+        if (!job) throw new Error("Job not found");
+        if (!canAccessEnterpriseJobApplicants({
+          viewerUserId: ctx.user.id,
+          ownerUserId: (job as any).createdByUserId,
+          isAdmin,
+        })) {
+          throw new Error("Forbidden: not your job");
+        }
+        const user = await getUserById(ctx.user.id);
         const isOnDemand = (user as any)?.planTier === "enterprise_on_demand";
         const isActiveSubscriber = (user as any)?.planTier === "enterprise_subscription";
 
@@ -4025,6 +4045,10 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         if ((applicant as any)?.planTier !== "artist_pro") {
           throw new Error("Upgrade to Artswrk PRO to apply to PRO jobs.");
         }
+        const job = await getPremiumJobById(input.premiumJobId);
+        if (!job) throw new Error("PRO job not found");
+        const jobOwner = (job as any).createdByUserId ? await getUserById((job as any).createdByUserId) : null;
+        const followUpApplyLink = enterpriseFollowUpApplyLink(job as any, jobOwner as any);
         const { getDb } = await import('./db');
         const dbConn = await getDb();
         if (!dbConn) throw new Error('DB unavailable');
@@ -4046,7 +4070,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
               rate: input.rate || null,
             })
             .where(eq(premiumJobInterestedArtists.id, existing[0].id));
-          return { success: true, alreadyApplied: true };
+          return { success: true, alreadyApplied: true, followUpApplyLink };
         }
         await dbConn.insert(premiumJobInterestedArtists).values({
           artistUserId: ctx.user.id,
@@ -4062,9 +4086,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         (async () => {
           try {
             const appUrl = process.env.VITE_APP_URL || "https://artswrk.com";
-            const job = await getPremiumJobById(input.premiumJobId);
-            if (!job) return;
-            const clientUser = job.createdByUserId ? await getUserById(job.createdByUserId) : null;
+            const clientUser = jobOwner;
             const artist = ctx.user as any;
             const artistFirstName: string = artist.firstName || "Artist";
             const artistLastInitial: string = (artist.lastName || "").charAt(0).toUpperCase();
@@ -4108,7 +4130,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           }
         })();
 
-        return { success: true, alreadyApplied: false };
+        return { success: true, alreadyApplied: false, followUpApplyLink };
       }),
 
     /** Check if the logged-in artist has already applied to a specific PRO job */
@@ -4117,7 +4139,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
       .query(async ({ input, ctx }) => {
         const { getDb } = await import('./db');
         const dbConn = await getDb();
-        if (!dbConn) return { applied: false, message: null, resumeLink: null, rate: null };
+        if (!dbConn) return { applied: false, message: null, resumeLink: null, rate: null, followUpApplyLink: null };
         const { premiumJobInterestedArtists } = await import('../drizzle/schema');
         const { eq, and } = await import('drizzle-orm');
         const existing = await dbConn.select({
@@ -4132,9 +4154,17 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
             eq(premiumJobInterestedArtists.premiumJobId, input.premiumJobId)
           ))
           .limit(1);
-        if (existing.length === 0) return { applied: false, message: null, resumeLink: null, rate: null };
+        if (existing.length === 0) return { applied: false, message: null, resumeLink: null, rate: null, followUpApplyLink: null };
         const rec = existing[0];
-        return { applied: true, message: rec.message ?? null, resumeLink: rec.resumeLink ?? null, rate: rec.rate ?? null };
+        const job = await getPremiumJobById(input.premiumJobId);
+        const owner = (job as any)?.createdByUserId ? await getUserById((job as any).createdByUserId) : null;
+        return {
+          applied: true,
+          message: rec.message ?? null,
+          resumeLink: rec.resumeLink ?? null,
+          rate: rec.rate ?? null,
+          followUpApplyLink: job ? enterpriseFollowUpApplyLink(job as any, owner as any) : null,
+        };
       }),
 
     /** Get all confirmed bookings for the logged-in artist. */

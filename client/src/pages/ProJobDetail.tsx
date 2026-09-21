@@ -83,7 +83,13 @@ function ResumeCard({ resume, selected, onSelect }: { resume: ResumeItem; select
 
 // ─── Inline apply form ────────────────────────────────────────────────────────
 
-type ApplicationSummary = { resumeTitle?: string; resumeLink?: string; message?: string; rate?: string };
+type ApplicationSummary = {
+  resumeTitle?: string;
+  resumeLink?: string;
+  message?: string;
+  rate?: string;
+  followUpApplyLink?: string;
+};
 
 function ProApplyForm({
   jobId,
@@ -106,7 +112,7 @@ function ProApplyForm({
   );
   const uploadResumeMutation = trpc.artists.uploadResume.useMutation();
   const applyMutation = trpc.artistDashboard.applyToProJob.useMutation({
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       // Invalidate so Applications tab + dashboard both reflect the new record
       utils.artistDashboard.getProApplications.invalidate();
       utils.artistDashboard.checkProJobApplication.invalidate({ premiumJobId: jobId });
@@ -116,6 +122,7 @@ function ProApplyForm({
         resumeLink: selectedResume?.fileUrl,
         message: variables.message,
         rate: variables.rate,
+        followUpApplyLink: data.followUpApplyLink ?? undefined,
       });
     },
     onError: () => toast.error("Something went wrong. Please try again."),
@@ -345,6 +352,7 @@ export default function ProJobDetail() {
           : undefined,
         message: (applicationCheck as any).message as string ?? undefined,
         rate: (applicationCheck as any).rate as string ?? undefined,
+        followUpApplyLink: (applicationCheck as any).followUpApplyLink as string ?? undefined,
       };
     });
   }, [applicationCheck]);
@@ -426,8 +434,9 @@ export default function ProJobDetail() {
   // Off-site target (link or mailto), or null to apply on Artswrk. Enterprise
   // accounts are always null — see lib/proJobApply.ts.
   const externalApplyHref: string | null = externalApplyTarget(j);
-  // An enterprise's own form: a second step after applying on Artswrk, never instead of it.
-  const followUpHref: string | null = followUpApplyLink(j);
+  // An enterprise's own form is returned only after the viewer's Artswrk
+  // application exists; it is never part of the public job-detail payload.
+  const followUpHref: string | null = followUpApplyLink(appliedSummary);
   // The external link is a real off-platform apply target — it must never be
   // reachable before the artist has actually unlocked PRO, or they get the
   // full benefit of a PRO job (the employer's real contact) for free.

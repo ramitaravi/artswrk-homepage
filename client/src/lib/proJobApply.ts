@@ -26,11 +26,10 @@ export function externalApplyTarget(job: {
 }
 
 /**
- * An enterprise job's own application form, shown as a second step AFTER the
- * artist applies on Artswrk — so the application is always in our system,
- * and the employer still gets its own form filled in (e.g. Journey's
- * Paylocity postings). Null for everyone else.
+ * An enterprise job's own application form, supplied only by an authenticated
+ * post-application response. The raw job detail never contains this secret,
+ * so it cannot be opened before the Artswrk application is recorded.
  */
-export function followUpApplyLink(job: { applyLink?: string | null; ownerIsEnterprise?: boolean | null }): string | null {
-  return job.ownerIsEnterprise && job.applyLink ? job.applyLink : null;
+export function followUpApplyLink(application: { followUpApplyLink?: string | null } | null | undefined): string | null {
+  return application?.followUpApplyLink ?? null;
 }
