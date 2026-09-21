@@ -5,13 +5,15 @@
  * Main: Greeting, Affiliations, Tasks, Profile Boost, PRO Jobs, Jobs for You
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import RichText from "@/components/RichText";
 import { useLocation, useSearch } from "wouter";
 import ArtistProfilePage from "./artist/ArtistProfilePage";
 import ArtistSettings from "./artist/ArtistSettings";
 import Benefits from "./dashboard/Benefits";
-import { ArtistRecurringBookings } from "./dashboard/Bookings";
+import { PeriodSubmitModal } from "./dashboard/Bookings";
+import { artistBookingTasks, toPeriodRows } from "@/lib/weeklyBookings";
+import { formatJobCardDate } from "@/lib/jobDates";
 import MessagesPage from "./dashboard/Messages";
 import {
   Briefcase,
@@ -39,6 +41,8 @@ import {
   Trash2,
   FileText,
   DollarSign,
+  Paperclip,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -135,29 +139,6 @@ function postedAgo(date: Date | string | null): string {
 }
 
 
-function formatJobDate(job: any): string {
-  if (job.dateType === "Ongoing") return "Ongoing";
-  if (job.dateType === "Recurring") return "Recurring";
-  if (job.dateType === "Dates Flexible") return "Flexible";
-  if (!job.startDate) return job.dateType ?? "";
-  const s = new Date(job.startDate);
-  if (isNaN(s.getTime())) return "";
-  const datePart = s.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" });
-  const startTime = s.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  if (job.endDate) {
-    const e = new Date(job.endDate);
-    if (!isNaN(e.getTime())) {
-      const endTime = e.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-      // Same day: "4/23/26, 9:15 PM – 12:00 AM"
-      const sameDay = s.toDateString() === e.toDateString();
-      if (sameDay) return `${datePart}, ${startTime} – ${endTime}`;
-      const endDate = e.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" });
-      return `${datePart}, ${startTime} – ${endDate}, ${endTime}`;
-    }
-  }
-  return `${datePart}, ${startTime}`;
-}
-
 function formatRate(job: any): string {
   if (job.openRate) return "Open rate";
   // Rates are unified: the client rate is what the artist earns (no commission).
@@ -179,10 +160,16 @@ function DashboardTab({ user }: { user: any }) {
   const { data: benefitsData } = trpc.benefits.list.useQuery({ audienceType: "Artist" });
   const benefitsCount = benefitsData?.benefits?.length ?? 0;
 
-  const { data: myBookings } = trpc.artistDashboard.getBookings.useQuery();
-  const nextBooking = (myBookings as any[] ?? [])
-    .filter((b) => b.bookingStatus === "Confirmed" && b.startDate && new Date(b.startDate) > new Date())
-    .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())[0] ?? null;
+  // Tasks come from the same rows as the Bookings tab, so weekly classes show
+  // up too. (This used to pick one booking whose start was in the future — a
+  // weekly booking's start is its first class, so none of its weeks appeared.)
+  const { rows: bookingRows } = useArtistBookingRows();
+  const { hoursDue } = artistBookingTasks(bookingRows);
+  const taskCount = unreadMessages + hoursDue.length;
+  // One week due → open it; several → the Bookings page, where they sit at the top.
+  const hoursHref = hoursDue.length === 1
+    ? `/app/bookings?open=${hoursDue[0].id}&week=${hoursDue[0].period.id}`
+    : "/app/bookings";
 
   const { data: connectStatus, isLoading: connectStatusLoading } = trpc.artistDashboard.stripeConnectStatus.useQuery();
   const connectStripe = trpc.artistDashboard.createStripeConnectUrl.useMutation({
@@ -253,9 +240,9 @@ function DashboardTab({ user }: { user: any }) {
           >
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-[#111]">Your Tasks</span>
-              {(unreadMessages > 0 || nextBooking) && (
-                <span className="w-5 h-5 rounded-full bg-[#ec008c] text-white text-[10px] font-semibold flex items-center justify-center">
-                  {unreadMessages + (nextBooking ? 1 : 0)}
+              {taskCount > 0 && (
+                <span className="min-w-5 h-5 px-1 rounded-full bg-[#ec008c] text-white text-[10px] font-semibold flex items-center justify-center">
+                  {taskCount}
                 </span>
               )}
             </div>
@@ -263,19 +250,17 @@ function DashboardTab({ user }: { user: any }) {
           </button>
           {tasksOpen && (
             <div className="px-5 pb-4 space-y-2">
-              {nextBooking && (
+              {hoursDue.length > 0 && (
                 <div
-                  className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => window.location.href = `/app/bookings?open=${nextBooking.id}`}
+                  className="flex items-start gap-3 p-3 rounded-xl bg-amber-50 cursor-pointer hover:bg-amber-100 transition-colors"
+                  onClick={() => window.location.href = hoursHref}
                 >
-                  <Calendar size={16} className="text-[#ec008c] flex-shrink-0 mt-0.5" />
+                  <Clock size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-[#111]">
-                      Upcoming booking{nextBooking.clientCompanyName ? ` — ${nextBooking.clientCompanyName}` : ""}
+                      Submit hours for {hoursDue.length} {hoursDue.length === 1 ? "booking" : "bookings"}
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {new Date(nextBooking.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">Tap to complete {hoursDue.length === 1 ? "it" : "them"}</p>
                   </div>
                   <ChevronRight size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
                 </div>
@@ -295,7 +280,7 @@ function DashboardTab({ user }: { user: any }) {
                   <ChevronRight size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
                 </div>
               )}
-              {!nextBooking && unreadMessages === 0 && (
+              {taskCount === 0 && (
                 <p className="text-xs text-gray-400 py-1">No pending tasks — you're all caught up!</p>
               )}
               {!isPro && (
@@ -385,67 +370,7 @@ function DashboardTab({ user }: { user: any }) {
       {/* ── Right column: jobs (primary CTA) ──────────────────────────── */}
       <div className="flex-1 min-w-0 w-full overflow-x-hidden space-y-6">
 
-        {/* Jobs for You — local to the artist's saved location, always shown */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-semibold text-[#111]">Jobs for You</h2>
-            <a href="/app/jobs" className="text-sm font-semibold text-gray-600 hover:text-[#111]">View All</a>
-          </div>
-
-          <div className="space-y-2">
-            {feedLoading ? (
-              <div className="p-8 text-center bg-white rounded-2xl border border-gray-100">
-                <div className="w-6 h-6 border-2 border-gray-200 border-t-[#ec008c] rounded-full animate-spin mx-auto" />
-              </div>
-            ) : !nearbyJobs.length ? (
-              <div className="p-6 text-center bg-white rounded-2xl border border-dashed border-gray-200">
-                <p className="text-sm text-gray-500">No jobs near you match your services right now.</p>
-                <a href="/app/jobs" className="mt-1 inline-block text-sm font-semibold text-[#ec008c] hover:underline">Browse all jobs</a>
-              </div>
-            ) : nearbyJobs.map((job: any) => {
-              const studio = job.clientCompanyName || job.clientName || "Studio";
-              const location = formatLocation(job.locationAddress) ?? "";
-              const ago = postedAgo(job.createdAt);
-              const rate = formatRate(job);
-              const dateLabel = job.dateType === "Ongoing" ? "Ongoing" : formatJobDate(job);
-              const jobDetailUrl = job.slug ? `/jobs/${job.slug}` : `/jobs/arts-job-${job.id}`;
-              const isApplied = appliedJobIds.has(job.id);
-              return (
-                <div key={job.id} className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm transition-all duration-150">
-                  <SquareAvatar name={studio} logo={job.clientLogo} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <div className="min-w-0">
-                        <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{getJobTitle(job.title, job.description, studio)}</h3>
-                        <p className="text-xs text-gray-500 truncate">{studio}</p>
-                      </div>
-                      <a
-                        href={jobDetailUrl}
-                        className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                          isApplied
-                            ? "text-green-700 bg-green-50 border border-green-200 hover:bg-green-100"
-                            : "text-white bg-[#111] hover:opacity-80"
-                        }`}
-                      >
-                        {isApplied ? "View Application →" : "Apply →"}
-                      </a>
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
-                      {location && <><MapPin size={10} /><span>{location}</span></>}
-                      {ago && <><span>·</span><span>Posted {ago}</span></>}
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs">
-                      {dateLabel && <span className="flex items-center gap-1 text-[#ec008c] font-medium"><Clock size={10} />{dateLabel}</span>}
-                      <span className="font-medium border rounded-full px-2 py-0.5 text-gray-600 border-gray-200 self-start">{rate || "Open rate"}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* PRO Jobs — horizontal scroll cards, below the local jobs */}
+        {/* PRO Jobs — horizontal scroll cards, first: they're the higher-value work */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-semibold text-[#111] flex items-center gap-2">
@@ -503,6 +428,66 @@ function DashboardTab({ user }: { user: any }) {
               })}
             </div>
           )}
+        </div>
+
+        {/* Jobs for You — local to the artist's saved location, always shown */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-[#111]">Jobs for You</h2>
+            <a href="/app/jobs" className="text-sm font-semibold text-gray-600 hover:text-[#111]">View All</a>
+          </div>
+
+          <div className="space-y-2">
+            {feedLoading ? (
+              <div className="p-8 text-center bg-white rounded-2xl border border-gray-100">
+                <div className="w-6 h-6 border-2 border-gray-200 border-t-[#ec008c] rounded-full animate-spin mx-auto" />
+              </div>
+            ) : !nearbyJobs.length ? (
+              <div className="p-6 text-center bg-white rounded-2xl border border-dashed border-gray-200">
+                <p className="text-sm text-gray-500">No jobs near you match your services right now.</p>
+                <a href="/app/jobs" className="mt-1 inline-block text-sm font-semibold text-[#ec008c] hover:underline">Browse all jobs</a>
+              </div>
+            ) : nearbyJobs.map((job: any) => {
+              const studio = job.clientCompanyName || job.clientName || "Studio";
+              const location = formatLocation(job.locationAddress) ?? "";
+              const ago = postedAgo(job.createdAt);
+              const rate = formatRate(job);
+              const dateLabel = formatJobCardDate(job);
+              const jobDetailUrl = job.slug ? `/jobs/${job.slug}` : `/jobs/arts-job-${job.id}`;
+              const isApplied = appliedJobIds.has(job.id);
+              return (
+                <div key={job.id} className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm transition-all duration-150">
+                  <SquareAvatar name={studio} logo={job.clientLogo} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-[#111] text-sm leading-tight truncate">{getJobTitle(job.title, job.description, studio)}</h3>
+                        <p className="text-xs text-gray-500 truncate">{studio}</p>
+                      </div>
+                      <a
+                        href={jobDetailUrl}
+                        className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                          isApplied
+                            ? "text-green-700 bg-green-50 border border-green-200 hover:bg-green-100"
+                            : "text-white bg-[#111] hover:opacity-80"
+                        }`}
+                      >
+                        {isApplied ? "View Application →" : "Apply →"}
+                      </a>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
+                      {location && <><MapPin size={10} /><span>{location}</span></>}
+                      {ago && <><span>·</span><span>Posted {ago}</span></>}
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs">
+                      {dateLabel && <span className="flex items-center gap-1 text-[#ec008c] font-medium"><Clock size={10} />{dateLabel}</span>}
+                      <span className="font-medium border rounded-full px-2 py-0.5 text-gray-600 border-gray-200 self-start">{rate || "Open rate"}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -726,7 +711,8 @@ function formatBookingDate(b: any): string {
  * the day the work started. The work date still decides upcoming vs. completed.
  */
 function listDate(b: any): Date | null {
-  if (b.bookingStatus === "Pay Now" && b.artswrkInvoiceSubmittedAt) return new Date(b.artswrkInvoiceSubmittedAt);
+  const invoicedAt = b.artswrkInvoiceSubmittedAt ?? b.periodSubmittedAt;
+  if (b.bookingStatus === "Pay Now" && invoicedAt) return new Date(invoicedAt);
   return bookingDate(b);
 }
 
@@ -736,6 +722,8 @@ function artistStatusLabel(status: string): string {
 }
 
 function isUpcoming(b: any): boolean {
+  // A week waiting on hours is still to-do, not completed, whatever its date.
+  if (b.periodDue) return true;
   const s = b.bookingStatus?.toLowerCase() ?? "";
   if (s === "completed" || s === "cancelled") return false;
   const d = bookingDate(b);
@@ -744,6 +732,24 @@ function isUpcoming(b: any): boolean {
 }
 
 // ── Booking row (list item) ───────────────────────────────────────────────────
+
+/**
+ * Every booking row the artist sees — weekly class bookings expanded to one row
+ * per week. Memoized: week rows are new objects each time they're built, and the
+ * Bookings tab's deep-link effect would otherwise re-open one on every render.
+ */
+function useArtistBookingRows() {
+  const { data, isLoading: confirmationsLoading } = trpc.artistDashboard.myConfirmations.useQuery();
+  const { data: adminBookings, isLoading: adminLoading } = trpc.bookingPeriods.myAdminBookings.useQuery();
+  const rows = useMemo(() => {
+    const adminById = new Map(((adminBookings as any[]) ?? []).map((a: any) => [a.id, a]));
+    return (data ?? []).flatMap((booking: any) => {
+      const admin = adminById.get(booking.id);
+      return admin ? toPeriodRows(booking, admin) : [booking];
+    });
+  }, [data, adminBookings]);
+  return { rows, isLoading: confirmationsLoading || adminLoading };
+}
 
 function BookingRow({ booking, onClick }: { booking: any; onClick: () => void }) {
   const studio = booking.clientCompanyName ?? booking.clientFirstName ?? `Studio #${booking.clientUserId}`;
@@ -757,9 +763,11 @@ function BookingRow({ booking, onClick }: { booking: any; onClick: () => void })
       : `+$${rate.toFixed(2)}`;
   const status = booking.bookingStatus ?? "Confirmed";
   const statusColor =
-    status === "Completed" ? "text-green-600 bg-green-50"
+    status === "Completed" || status === "Paid" ? "text-green-600 bg-green-50"
     : status === "Cancelled" ? "text-red-500 bg-red-50"
     : status === "Pay Now" ? "text-[#ec008c] bg-pink-50"
+    : status === "Submit Hours" ? "text-amber-700 bg-amber-50"
+    : status === "No class" ? "text-gray-400 bg-gray-100"
     : "text-blue-600 bg-blue-50";
 
   return (
@@ -806,8 +814,11 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
   const effectiveMethod: "artswrk" | "direct" = (booking.paymentMethod === "direct") ? "direct" : "artswrk";
   const isAlreadyPaid = booking.paymentStatus?.toLowerCase() === "paid";
   const isInvoiceSubmitted = !!booking.artswrkInvoiceSubmittedAt;
+  /** Set when this row is one week of a weekly class booking (see lib/weeklyBookings). */
+  const period = booking.period ?? null;
+  const [submitOpen, setSubmitOpen] = useState(false);
   /** Weekly classes are invoiced per week (rate x hours), never as one flat total. */
-  const isWeeklyClassBooking = !!booking.isAdminBooking && !!booking.isRecurring;
+  const isWeeklyClassBooking = !!period || (!!booking.isAdminBooking && !!booking.isRecurring);
   const isDirectConfirmed = !!booking.directPayConfirmedAt;
   const rate = parseFloat(artistRate) || 0;
 
@@ -825,7 +836,15 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
       utils.artistDashboard.myConfirmations.invalidate();
       utils.artistDashboard.getReimbursements.invalidate({ bookingId: booking.id });
       setReimbNote(""); setReimbValue(""); setReimbFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     },
+  });
+  const removeReimbursement = trpc.artistDashboard.removeReimbursement.useMutation({
+    onSuccess: () => {
+      utils.artistDashboard.myConfirmations.invalidate();
+      utils.artistDashboard.getReimbursements.invalidate({ bookingId: booking.id });
+    },
+    onError: (e: any) => toast.error(e.message || "Couldn't remove that expense"),
   });
   const uploadReceipt = trpc.artistDashboard.uploadReimbursementReceipt.useMutation();
   const submitInvoice = trpc.artistDashboard.submitArtswrkInvoice.useMutation({
@@ -841,7 +860,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
     onError: (e: any) => toast.error(e.message || "Couldn't start Stripe connect"),
   });
 
-  const totalReimb = (reimbursements ?? []).reduce((s: number, r: any) => s + (r.value ?? 0), 0);
+  const totalReimb = period ? 0 : (reimbursements ?? []).reduce((s: number, r: any) => s + (r.value ?? 0), 0);
   // `rate` is bookings.artistRate, which is ALREADY the total for the booking
   // (Bubble stored $50/hr × 5 hrs as 250, and native confirms now do the same).
   // Multiplying by hours here double-counted every hourly booking, and because
@@ -852,7 +871,8 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
   const invoiceTotal = earnedAmount + totalReimb + processingFee;
 
   async function handleAddReimbursement() {
-    if (!reimbValue || isNaN(parseFloat(reimbValue))) return;
+    // A receipt is required for every expense.
+    if (!reimbValue || isNaN(parseFloat(reimbValue)) || !reimbFile) return;
     let fileUrl: string | undefined;
     if (reimbFile) {
       const reader = new FileReader();
@@ -863,11 +883,12 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
       const res = await uploadReceipt.mutateAsync({ fileName: reimbFile.name, fileBase64: base64, mimeType: reimbFile.type });
       fileUrl = res.url;
     }
+    if (!fileUrl) return; // a receipt is required — the server rejects expenses without one
     addReimbursement.mutate({ bookingId: booking.id, value: parseFloat(reimbValue), note: reimbNote || undefined, fileUrl });
   }
 
   const dateStr = formatBookingDate(booking);
-  const startTime = booking.startDate ? new Date(booking.startDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : null;
+  const startTime = !period && booking.startDate ? new Date(booking.startDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : null;
 
   return (
     <div className="space-y-4">
@@ -1010,8 +1031,8 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
               </div>
             )}
 
-            {/* Reimbursements — always visible */}
-            {(reimbursements ?? []).length > 0 && (
+            {/* Reimbursements — a week's expenses are added in Submit Hours instead */}
+            {!period && (reimbursements ?? []).length > 0 && (
               <div>
                 <p className="text-xs font-bold text-gray-500 mb-2">Reimbursements</p>
                 <div className="space-y-1.5">
@@ -1020,9 +1041,21 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                       <span className="text-gray-500">${r.value?.toFixed(2)}</span>
                       <span className="text-gray-700 flex-1 px-3">{r.note || "Expense"}</span>
                       {r.fileUrl && (
-                        <a href={r.fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-600 mr-2">
+                        <a href={r.fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-600 mr-2" title="View receipt">
                           <FileText size={12} />
                         </a>
+                      )}
+                      {!isAlreadyPaid && !isInvoiceSubmitted && (
+                        <button
+                          type="button"
+                          onClick={() => removeReimbursement.mutate({ id: r.id })}
+                          disabled={removeReimbursement.isPending}
+                          aria-label={`Remove ${r.note || "expense"}`}
+                          title="Remove"
+                          className="p-1 -mr-1 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                        >
+                          <X size={13} />
+                        </button>
                       )}
                     </div>
                   ))}
@@ -1034,8 +1067,9 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
               </div>
             )}
 
-            {/* Add reimbursement — hidden when already paid */}
-            {!isAlreadyPaid && (
+            {/* Add reimbursement — hidden when already paid, and on a week: an expense
+                saved against the booking is never paid on a weekly invoice. */}
+            {!isAlreadyPaid && !period && (
               <div>
                 <p className="text-xs font-bold text-gray-500 mb-2">Add Reimbursement</p>
                 <div className="bg-gray-50 rounded-xl p-3 space-y-2">
@@ -1052,14 +1086,34 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#ec008c] transition-colors">
-                      <Upload size={11} /> {reimbFile ? reimbFile.name.slice(0, 18) : "Attach receipt"}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors min-w-0 ${
+                        reimbFile
+                          ? "border-green-200 bg-green-50 text-green-700"
+                          : "border-dashed border-gray-300 bg-white text-gray-600 hover:border-[#ec008c] hover:text-[#ec008c]"
+                      }`}
+                    >
+                      <Paperclip size={12} className="flex-shrink-0" />
+                      <span className="truncate">{reimbFile ? reimbFile.name.slice(0, 18) : "Attach receipt *"}</span>
                     </button>
+                    {reimbFile && (
+                      <button
+                        type="button"
+                        onClick={() => { setReimbFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                        aria-label="Remove attached receipt"
+                        className="p-1 rounded-md text-gray-400 hover:text-red-500"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
                     <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden"
                       onChange={(e) => setReimbFile(e.target.files?.[0] ?? null)} />
                     <button
                       onClick={handleAddReimbursement}
-                      disabled={addReimbursement.isPending || uploadReceipt.isPending || !reimbValue}
+                      title={!reimbFile ? "Attach a receipt first" : undefined}
+                      disabled={addReimbursement.isPending || uploadReceipt.isPending || !reimbValue || !reimbFile}
                       className="ml-auto flex items-center gap-1 text-xs font-bold text-white bg-[#ec008c] px-3 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50"
                     >
                       {(addReimbursement.isPending || uploadReceipt.isPending) ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />} Add
@@ -1125,7 +1179,45 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                   Bookings page, where the rate is multiplied by the hours taught.
                   This form treats the rate as the whole total, so it billed
                   $50 + expenses instead of $50 x 4 hours (2026-09-15). */}
-              {isWeeklyClassBooking && (
+              {period && (
+                <div className="border-t border-gray-50 pt-4">
+                  {period.status === "artist_submitted" ? (
+                    <div className="bg-green-50 border border-green-100 rounded-xl p-4 space-y-1.5">
+                      <div className="flex items-center gap-2 text-sm text-green-700 font-semibold">
+                        <CheckCircle2 size={15} /> Hours submitted{period.artistSubmittedAt ? ` on ${new Date(period.artistSubmittedAt).toLocaleDateString()}` : ""}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-600">
+                        <Clock size={12} /> Payment pending from the studio
+                      </div>
+                    </div>
+                  ) : period.status === "skipped" ? (
+                    <p className="text-xs text-gray-500">No class this week — there's nothing to submit.</p>
+                  ) : !booking.periodDue ? (
+                    <p className="text-xs text-gray-500">After class on {dateStr}, come back here to complete this booking and submit your hours.</p>
+                  ) : connectStatus && !connectStatus.connected ? (
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-2.5">
+                      <p className="text-sm font-bold text-[#111]">Connect your payout account first</p>
+                      <p className="text-xs text-gray-500">You need a connected Stripe account before you can submit hours — that's where the payment lands.</p>
+                      <button
+                        onClick={() => connectStripe.mutate({ origin: window.location.origin })}
+                        disabled={connectStripe.isPending}
+                        className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {connectStripe.isPending ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />}
+                        Connect to Stripe
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setSubmitOpen(true)}
+                      className="w-full py-3 px-4 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#ff7171] to-[#ec008c] hover:opacity-90 flex items-center justify-center gap-2 text-center"
+                    >
+                      Upload Reimbursements &amp; Complete Booking <ArrowRight size={14} className="flex-shrink-0" />
+                    </button>
+                  )}
+                </div>
+              )}
+              {isWeeklyClassBooking && !period && (
                 <div className="border-t border-gray-50 pt-4">
                   <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-1.5">
                     <p className="text-sm font-bold text-[#111]">Invoice this booking week by week</p>
@@ -1215,30 +1307,45 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
           </div>
         )}
       </div>
+      {submitOpen && period && (
+        <PeriodSubmitModal
+          period={{ ...period, scheduledHours: booking.adminBooking?.hours ?? booking.hours }}
+          booking={booking.adminBooking}
+          onClose={() => setSubmitOpen(false)}
+          onSuccess={() => {
+            utils.bookingPeriods.myAdminBookings.invalidate();
+            utils.artistDashboard.myConfirmations.invalidate();
+            toast.success("Hours submitted — the studio has been sent the invoice.");
+            onBack();
+          }}
+        />
+      )}
     </div>
   );
 }
 
 function BookingsTab() {
-  const { data, isLoading } = trpc.artistDashboard.myConfirmations.useQuery();
-  // Recurring admin bookings have their own per-week invoice controls below.
-  // Exclude their parent rows from this legacy whole-booking list so artists do
-  // not see the same engagement twice or accidentally use the flat invoice UI.
-  const confirmations = (data ?? []).filter(
-    (booking: any) => !(booking.isAdminBooking && booking.isRecurring),
-  );
+  // Weekly class bookings list one row per class date — the way artists saw
+  // them in Bubble — instead of one booking with a table of billing periods.
+  const { rows: confirmations, isLoading } = useArtistBookingRows();
   const [filter, setFilter] = useState<BookingFilter>("all");
   const [selected, setSelected] = useState<any | null>(null);
   const search = useSearch();
 
   // Deep-link support: /app/bookings?open=<bookingId> auto-opens that booking's
   // detail view (used by the dashboard's "Upcoming booking" task).
+  // Open each link once — otherwise "Back" from a deep-linked booking reopens it.
+  const openedFor = useRef<string | null>(null);
   useEffect(() => {
-    const openId = new URLSearchParams(search).get("open");
-    if (openId && confirmations.length > 0) {
-      const match = confirmations.find((b: any) => String(b.id) === openId);
-      if (match) setSelected(match);
-    }
+    const params = new URLSearchParams(search);
+    const openId = params.get("open");
+    const weekId = params.get("week");
+    if (!openId || confirmations.length === 0 || openedFor.current === search) return;
+    // A weekly booking has a row per week: the week asked for, else the one needing hours, else the next class.
+    const matches = confirmations.filter((b: any) => String(b.id) === openId);
+    const match = (weekId ? matches.find((b: any) => String(b.period?.id) === weekId) : undefined)
+      ?? matches.find((b: any) => b.periodDue) ?? matches.find((b: any) => isUpcoming(b)) ?? matches[0];
+    if (match) { openedFor.current = search; setSelected(match); }
   }, [search, confirmations]);
 
   if (selected) return <BookingDetail booking={selected} onBack={() => setSelected(null)} />;
@@ -1269,6 +1376,8 @@ function BookingsTab() {
     // invoice date instead of wherever its start date would put it.
     filtered.sort((a: any, b: any) => (listDate(b)?.getTime() ?? 0) - (listDate(a)?.getTime() ?? 0));
   }
+  // Weeks waiting on hours float to the top — that's the thing to act on.
+  filtered.sort((a: any, b: any) => (b.periodDue ? 1 : 0) - (a.periodDue ? 1 : 0));
 
   // Group by date string
   const groups: { label: string; items: any[] }[] = [];
@@ -1291,8 +1400,6 @@ function BookingsTab() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-[#111]">Bookings</h1>
-
-      <ArtistRecurringBookings />
 
       {/* Filter tabs */}
       <div className="flex gap-2">
@@ -1321,7 +1428,7 @@ function BookingsTab() {
               <p className="text-xs font-semibold text-gray-400 mb-2 px-1">{g.label}</p>
               <div className="space-y-2">
                 {g.items.map((b: any) => (
-                  <BookingRow key={b.id} booking={b} onClick={() => setSelected(b)} />
+                  <BookingRow key={b.key ?? b.id} booking={b} onClick={() => setSelected(b)} />
                 ))}
               </div>
             </div>
@@ -1400,6 +1507,7 @@ function ConfirmationCard({ booking }: { booking: any }) {
       });
       fileUrl = res.url;
     }
+    if (!fileUrl) return; // a receipt is required — the server rejects expenses without one
     addReimbursement.mutate({
       bookingId: booking.id,
       value: parseFloat(reimbValue),

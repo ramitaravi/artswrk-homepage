@@ -4,7 +4,7 @@ import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ON
 import { isJobPubliclyLive } from "@shared/jobStatus";
 import { bookingMoney, resolveBookingBaseAmount, isHourlyBooking, processingFeeFor } from "@shared/bookingRates";
 import { getPasswordError, PASSWORD_MAX_LENGTH } from "@shared/password";
-import { assertReimbursementWriteAccess } from "./reimbursementAccess";
+import { assertReimbursementRemovable, assertReimbursementWriteAccess } from "./reimbursementAccess";
 
 /**
  * Shared by every flow where a user SETS a password (signup, reset, first
@@ -4168,7 +4168,8 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         bookingId: z.number(),
         value: z.number().positive(),
         note: z.string().max(500).optional(),
-        fileUrl: z.string().url().optional(),
+        /** Every expense needs a receipt — the studio is billed for it. */
+        fileUrl: z.string().url("Attach a receipt for this expense"),
         expenseDate: z.date().optional(),
         /** The week it belongs to — required for weekly class bookings. */
         bookingPeriodId: z.number().int().optional(),
@@ -4196,6 +4197,21 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           bookingPeriodId: input.bookingPeriodId ?? null,
         });
         return { success: true, id };
+      }),
+
+    /** Remove an expense the artist added, until it has been invoiced. */
+    removeReimbursement: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const { getReimbursementById, deleteReimbursement } = await import("./db");
+        const reimbursement = await getReimbursementById(input.id);
+        const booking = reimbursement?.bookingId != null ? await getBookingById(reimbursement.bookingId) : null;
+        const period = reimbursement?.bookingPeriodId != null ? await getBookingPeriodById(reimbursement.bookingPeriodId) : null;
+        assertReimbursementRemovable({ userId: user.id, reimbursement, booking, period: period as any });
+        await deleteReimbursement(input.id);
+        return { success: true };
       }),
 
     /** Expenses attached to one week of a recurring booking. */

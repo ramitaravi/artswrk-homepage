@@ -61,9 +61,28 @@ describe("booking release integration wiring", () => {
     expect(routerSource).toContain("rateType: input.rateType");
   });
 
-  it("renders the weekly invoice controls in the active artist dashboard", () => {
-    expect(bookingsSource).toContain("export function ArtistRecurringBookings");
-    expect(artistSource).toContain("<ArtistRecurringBookings />");
+  it("lists weekly class bookings one row per week, submitted via Complete Booking", () => {
+    // Artists see a booking per class date (as in Bubble), not a periods panel;
+    // each week's detail page opens the Submit Hours popup.
+    expect(artistSource).toContain("toPeriodRows(booking, admin)");
+    expect(artistSource).toContain("<PeriodSubmitModal");
+    expect(artistSource).toContain("Complete Booking");
+    expect(artistSource).not.toContain("<ArtistRecurringBookings />");
+    expect(bookingsSource).toContain("export function PeriodSubmitModal");
+  });
+
+  it("marks a booking Completed, not Confirmed, once its invoice is paid", () => {
+    const dbSource = readFileSync(path.join(root, "server/db.ts"), "utf8");
+    const fn = dbSource.slice(dbSource.indexOf("export async function markInvoicePaid("));
+    const body = fn.slice(0, fn.indexOf("\n}\n"));
+    expect(body).toContain("ELSE 'Completed'");
+    expect(body).not.toContain('bookingStatus: "Confirmed"');
+    // …but never closes out a weekly class booking that still has weeks to run.
+    expect(body).toContain("WHEN ${bookings.isRecurring} = 1 THEN ${bookings.bookingStatus}");
+  });
+
+  it("never shows artists what the studio is charged in the Submit Hours popup", () => {
+    expect(bookingsSource).not.toContain("Studio pays");
   });
 
   it("keeps uploaded weekly receipt URLs", () => {

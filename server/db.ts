@@ -5221,7 +5221,11 @@ export async function markInvoicePaid(
       invoicePaidAt: new Date(),
       invoiceStripePaymentIntentId: stripePaymentIntentId,
       paymentStatus: "Paid",
-      bookingStatus: "Confirmed",
+      // Paid means a one-off booking is done and settled — the same Completed +
+      // Paid pair every Bubble booking ends on. "Confirmed" left paid bookings
+      // looking open (McKell × Fancy Feet #1110001, paid 2026-09-16). A weekly
+      // class booking keeps its status: it runs for months and is paid per week.
+      bookingStatus: sql`CASE WHEN ${bookings.isRecurring} = 1 THEN ${bookings.bookingStatus} ELSE 'Completed' END`,
     })
     .where(eq(bookings.id, bookingId));
   return true;
@@ -5230,6 +5234,20 @@ export async function markInvoicePaid(
 /**
  * Get all reimbursements for a booking.
  */
+export async function getReimbursementById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(reimbursements).where(eq(reimbursements.id, id)).limit(1);
+  return rows[0];
+}
+
+/** Callers must check assertReimbursementRemovable first — this doesn't. */
+export async function deleteReimbursement(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(reimbursements).where(eq(reimbursements.id, id));
+}
+
 export async function getReimbursementsByBookingId(bookingId: number) {
   const db = await getDb();
   if (!db) return [];
