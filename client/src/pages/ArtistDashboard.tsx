@@ -12,7 +12,7 @@ import ArtistProfilePage from "./artist/ArtistProfilePage";
 import ArtistSettings from "./artist/ArtistSettings";
 import Benefits from "./dashboard/Benefits";
 import { PeriodSubmitModal } from "./dashboard/Bookings";
-import { artistBookingTasks, toPeriodRows } from "@/lib/weeklyBookings";
+import { artistBookingTasks, expandWeeklyBookingRows } from "@/lib/weeklyBookings";
 import { formatJobCardDate } from "@/lib/jobDates";
 import MessagesPage from "./dashboard/Messages";
 import {
@@ -741,13 +741,10 @@ function isUpcoming(b: any): boolean {
 function useArtistBookingRows() {
   const { data, isLoading: confirmationsLoading } = trpc.artistDashboard.myConfirmations.useQuery();
   const { data: adminBookings, isLoading: adminLoading } = trpc.bookingPeriods.myAdminBookings.useQuery();
-  const rows = useMemo(() => {
-    const adminById = new Map(((adminBookings as any[]) ?? []).map((a: any) => [a.id, a]));
-    return (data ?? []).flatMap((booking: any) => {
-      const admin = adminById.get(booking.id);
-      return admin ? toPeriodRows(booking, admin) : [booking];
-    });
-  }, [data, adminBookings]);
+  const rows = useMemo(
+    () => expandWeeklyBookingRows(data ?? [], (adminBookings as any[]) ?? []),
+    [data, adminBookings],
+  );
   return { rows, isLoading: confirmationsLoading || adminLoading };
 }
 

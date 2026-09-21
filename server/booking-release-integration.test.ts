@@ -64,7 +64,7 @@ describe("booking release integration wiring", () => {
   it("lists weekly class bookings one row per week, submitted via Complete Booking", () => {
     // Artists see a booking per class date (as in Bubble), not a periods panel;
     // each week's detail page opens the Submit Hours popup.
-    expect(artistSource).toContain("toPeriodRows(booking, admin)");
+    expect(artistSource).toContain("expandWeeklyBookingRows(data ?? [], (adminBookings as any[]) ?? [])");
     expect(artistSource).toContain("<PeriodSubmitModal");
     expect(artistSource).toContain("Complete Booking");
     expect(artistSource).not.toContain("<ArtistRecurringBookings />");

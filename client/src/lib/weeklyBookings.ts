@@ -84,6 +84,24 @@ export function toPeriodRows(parent: any, admin: any, now: Date = new Date()): a
 }
 
 /**
+ * Replace only recurring admin-booking parents with their weekly rows.
+ * One-time admin bookings also have an entry in `myAdminBookings` (and one
+ * billing period), but they remain ordinary whole-booking rows and must never
+ * be sent through the hourly weekly-invoice flow.
+ */
+export function expandWeeklyBookingRows(
+  parentBookings: any[],
+  adminBookings: any[],
+  now: Date = new Date(),
+): any[] {
+  const adminById = new Map((adminBookings ?? []).map((admin: any) => [admin.id, admin]));
+  return (parentBookings ?? []).flatMap((booking: any) => {
+    const admin: any = adminById.get(booking.id);
+    return admin?.isRecurring ? toPeriodRows(booking, admin, now) : [booking];
+  });
+}
+
+/**
  * The weeks for the artist's "Your Tasks" panel: every week that's been taught
  * and still needs hours, oldest first, from the same rows the Bookings tab shows.
  */

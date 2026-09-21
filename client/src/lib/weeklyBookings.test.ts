@@ -4,7 +4,7 @@
  * come out the same in every timezone.
  */
 import { describe, it, expect } from "vitest";
-import { artistBookingTasks, periodClassDay, periodRowStatus, toPeriodRows } from "./weeklyBookings";
+import { artistBookingTasks, expandWeeklyBookingRows, periodClassDay, periodRowStatus, toPeriodRows } from "./weeklyBookings";
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -89,6 +89,39 @@ describe("toPeriodRows", () => {
 
   it("handles a booking with no periods", () => {
     expect(toPeriodRows(parent, { ...admin, periods: [] }, now)).toEqual([]);
+  });
+});
+
+describe("expandWeeklyBookingRows", () => {
+  const now = new Date(2026, 8, 21, 15);
+
+  it("expands recurring admin bookings but leaves one-time admin bookings whole", () => {
+    const weeklyParent = { id: 10, artistRate: 55, hours: 4 };
+    const oneTimeParent = { id: 20, artistRate: 150, hours: 3 };
+    const rows = expandWeeklyBookingRows(
+      [weeklyParent, oneTimeParent],
+      [
+        {
+          id: 10,
+          isRecurring: true,
+          hourlyRate: 55,
+          hours: 4,
+          periods: [{ id: 101, periodStart: "2026-09-17T00:00:00.000Z", status: "open" }],
+        },
+        {
+          id: 20,
+          isRecurring: false,
+          artistRate: 150,
+          periods: [{ id: 201, periodStart: "2026-09-18T00:00:00.000Z", status: "open" }],
+        },
+      ],
+      now,
+    );
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ id: 10, key: "period-101", isRecurring: true });
+    expect(rows[1]).toBe(oneTimeParent);
+    expect(rows[1].period).toBeUndefined();
   });
 });
 
