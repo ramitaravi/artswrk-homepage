@@ -18,6 +18,7 @@ import { decideSend, describeMode, loadSendPolicy } from "./safety";
 import { unsubscribeUrl } from "./unsubscribe";
 import { digestModeFor, DIGEST_SCHEDULE_KEY, shouldRenderProDigest, type DigestMode } from "./digestSchedule";
 import { easternDateString } from "../reminderWindow";
+import { isStillHiring } from "./stillHiring";
 
 const MAX_JOB_CARDS = 10;
 const MAX_PRO_ITEMS = 5;
@@ -110,7 +111,8 @@ export async function runDigest(opts: RunOptions = {}): Promise<DigestResult> {
     ?? digestModeFor(unwrap(scheduleRows)[0]?.settingValue, easternDateString(new Date()));
   const proCap = digestMode === "pro" ? MAX_PRO_ITEMS_PRO_ONLY : MAX_PRO_ITEMS;
 
-  // Pending regular jobs whose start date hasn't already passed.
+  // Pending regular jobs that are still hiring — a weekly job stays in after its
+  // first class (see stillHiring.ts); a one-off whose date passed does not.
   const jobRows: any = digestMode === "pro" ? [] : await db.execute(`
     SELECT j.id, j.title, j.slug, j.description, j.startDate, j.endDate, j.dateType,
            j.locationAddress, j.locationCity, j.locationState, j.locationLat, j.locationLng,
@@ -124,9 +126,12 @@ export async function runDigest(opts: RunOptions = {}): Promise<DigestResult> {
     LEFT JOIN master_service_types m ON m.bubbleId = j.masterServiceTypeId
     WHERE ${opts.simulateJobIds?.length
              ? `j.id IN (${opts.simulateJobIds.map(Number).join(",")})`
-             : `j.networkStatus = 'pending' AND j.requestStatus = 'Active'
-                AND (j.startDate IS NULL OR j.startDate > NOW())`}`);
-  const jobs: any[] = unwrap(jobRows);
+             : `j.networkStatus = 'pending' AND j.requestStatus = 'Active'`}`);
+  // Only jobs in this list are marked sent below, so a job left out here stays
+  // pending — nothing is lost, and nothing sent here is ever sent twice.
+  const jobs: any[] = opts.simulateJobIds?.length
+    ? unwrap(jobRows)
+    : unwrap(jobRows).filter((j: any) => isStillHiring(j));
 
   const proRows: any = digestMode === "jobs" ? [] : await db.execute(`
     SELECT p.id, p.serviceType, p.slug, p.company, p.description, p.location,
