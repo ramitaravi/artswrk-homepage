@@ -6,6 +6,7 @@
  *   logged in, free   → job shown fully, upgrade to basic CTA
  *   logged in, basic+ → full access, apply button
  */
+import { formatJobDateLong, formatWeeklySchedule } from "@/lib/jobDates";
 import { useEffect, useMemo, useRef } from "react";
 import { openPendingTab, type PendingTab } from "@/lib/openCheckoutTab";
 import { Link, useParams, useLocation } from "wouter";
@@ -51,19 +52,10 @@ function formatRate(
 }
 
 function formatDate(date: Date | string | null | undefined): string {
-  if (!date) return "Flexible";
-  const d = new Date(date);
-  if (isNaN(d.getTime())) return "Flexible";
-  // Job times are stored as the wall-clock the hirer meant, in UTC — they are
-  // NOT instants to re-localize. Rendering them in the viewer's zone shifted
-  // every job (a 9am class showed as 2:00 AM) and pushed midnight ones onto
-  // the previous day, so read and format them in UTC throughout.
-  const dateStr = d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
-  // A midnight timestamp usually means only a date was picked, not a real
-  // time — showing "12:00 AM" there would read as wrong, not helpful.
-  const hasTime = d.getUTCHours() !== 0 || d.getUTCMinutes() !== 0;
-  if (!hasTime) return dateStr;
-  return `${dateStr} at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" })}`;
+  // Job times are real instants — shown in the viewer's zone, with date-only
+  // values as just the date (see lib/jobDates). This used to format in UTC,
+  // which put every timed class 4–5 hours late.
+  return formatJobDateLong(date);
 }
 
 function timeAgo(date: Date | string | null | undefined): string {
@@ -240,7 +232,7 @@ export default function JobDetail() {
   const dateLabel = job.dateType === "Ongoing" ? "Ongoing"
     : job.dateType === "Recurring" ? "Recurring"
     : job.dateType === "Dates Flexible" ? "Flexible — dates TBD"
-    : job.dateType === "Weekly" ? `Weekly${job.startDate ? " — starting " + formatDate(job.startDate) : ""}`
+    : job.dateType === "Weekly" ? formatWeeklySchedule(job)
     : job.dateType === "Multiple Dates" ? "Multiple Dates"
     : formatDate(job.startDate); // Single Date (default) — full date, and time when one was set
 

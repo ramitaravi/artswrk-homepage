@@ -4,6 +4,7 @@
  * Map: real Google Maps with job pin markers
  * Data: real DB via tRPC (enriched jobs + PRO jobs + artist applications)
  */
+import { formatJobCardDate } from "@/lib/jobDates";
 import { useState, useMemo, useRef, useEffect } from "react";
 import {
   Search, MapPin, Clock, ChevronDown, X, Star, Loader2,
@@ -96,31 +97,13 @@ function timeAgo(date: Date | string | null | undefined): string {
 
 function formatDatetime(
   start: Date | null | undefined,
-  dateType: string | null | undefined
+  dateType: string | null | undefined,
+  end?: Date | string | null
 ): string {
-  if (dateType === "Ongoing") return "Ongoing";
-  if (dateType === "Recurring") return "Recurring";
-  if (dateType === "Dates Flexible") return "Flexible";
-  if (start) {
-    const s = new Date(start);
-    if (!isNaN(s.getTime())) {
-      // Stored job times are the wall-clock the hirer meant, held in UTC — not
-      // instants to re-localize. Formatting in the viewer's zone shifted every
-      // job on the board (a 9am class read "2:00 AM"), so format in UTC. A
-      // midnight value means only a date was picked, so show no time at all.
-      const dateStr = s.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "numeric",
-        day: "numeric",
-        year: "2-digit",
-        timeZone: "UTC",
-      });
-      const hasTime = s.getUTCHours() !== 0 || s.getUTCMinutes() !== 0;
-      if (!hasTime) return dateStr;
-      return `${dateStr}, ${s.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" })}`;
-    }
-  }
-  return dateType ?? "Flexible";
+  // Job times are real instants — shown in the viewer's zone, with date-only
+  // values as just the date (see lib/jobDates). This used to format in UTC,
+  // which put every timed class 4–5 hours late: an 11:30 AM class read 4:30 PM.
+  return formatJobCardDate({ dateType, startDate: start, endDate: end }) || (dateType ?? "Flexible");
 }
 
 // Extract a city/state from job description text when locationAddress is not available
@@ -549,7 +532,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
         ? (formatLocation(j.locationAddress) ?? "Remote / Flexible")
         : (extractLocationFromDescription(j.description) ?? (j.locationLat && j.locationLng ? "See map" : "Remote / Flexible")),
       postedAgo: timeAgo(j.bubbleCreatedAt),
-      datetime: formatDatetime(j.startDate, j.dateType),
+      datetime: formatDatetime(j.startDate, j.dateType, (j as any).endDate),
       rate: formatRate(j.isHourly, j.openRate, j.artistHourlyRate, j.clientHourlyRate),
       dateType: j.dateType ?? null,
       description: j.description ?? null,
@@ -592,7 +575,7 @@ export default function Jobs({ inDashboard = false }: { inDashboard?: boolean })
         ? toJobUrl({ id: a.jobId, locationAddress: a.locationAddress, description: a.description })
         : null,
       postedAgo: timeAgo(a.createdAt),
-      datetime: formatDatetime(a.startDate, a.dateType),
+      datetime: formatDatetime(a.startDate, a.dateType, (a as any).endDate),
       rate: formatRate(a.isHourly, a.openRate, a.artistHourlyRate, a.clientHourlyRate),
       status: a.status ?? null,
       jobId: a.jobId ?? null,
