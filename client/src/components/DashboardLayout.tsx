@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { isNavItemActive } from "@shared/nav";
+import { isArtistAccount } from "@shared/accountRole";
 import RefreshAnnouncementBanner from "./RefreshAnnouncementBanner";
 
 interface NavItem {
@@ -248,7 +249,7 @@ export default function DashboardLayout({ children, fullHeight = false }: { chil
 
   const displayStudio = artswrkUser?.clientCompanyName || artswrkUser?.firstName || "Artswrk";
   const isPremium = artswrkUser?.planTier === "client_premium";
-  const isArtist = (artswrkUser?.planTier as string | undefined)?.startsWith("artist_") ?? false;
+  const isArtist = isArtistAccount(artswrkUser);
   const coreNav = isArtist ? ARTIST_CORE_NAV : CLIENT_CORE_NAV;
   const premiumNav = isArtist ? ARTIST_PREMIUM_NAV : CLIENT_PREMIUM_NAV;
   // Sidebar card subtitle: artists see their plan (more useful than their own

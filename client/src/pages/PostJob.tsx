@@ -15,6 +15,7 @@ import SharedNavbar from "@/components/Navbar";
 import InlineAuth from "@/components/InlineAuth";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { isArtistAccount } from "@shared/accountRole";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -1741,7 +1742,7 @@ export default function PostJob() {
   // in when they land here — the logged-out case (enters an artist email
   // partway through) is handled separately by InlineAuth's blockRole prop
   // below, since that path never reaches an authenticated session at all.
-  const isArtist = isAuthenticated && (user as any)?.planTier?.startsWith("artist_");
+  const isArtist = isAuthenticated && isArtistAccount(user as any);
   useEffect(() => {
     if (isArtist) navigate("/app");
   }, [isArtist]);

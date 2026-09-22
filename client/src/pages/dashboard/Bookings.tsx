@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { periodInvoiceTotals, bookingMoney } from "@shared/bookingRates";
+import { isArtistAccount } from "@shared/accountRole";
 import { periodClassDay } from "@/lib/weeklyBookings";
 import { useAuth } from "@/_core/hooks/useAuth";
 // Flexible type for both raw Booking schema rows and enriched query results
@@ -640,7 +641,7 @@ type FilterTab = "all" | "Confirmed" | "Completed" | "Cancelled";
 export default function Bookings() {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const { user } = useAuth();
-  const isArtist = ((user as any)?.planTier as string | undefined)?.startsWith("artist_") ?? false;
+  const isArtist = isArtistAccount(user as any);
 
   const { data: stats, isLoading: statsLoading } = trpc.bookings.myStats.useQuery();
   const { data: bookings, isLoading: bookingsLoading } = trpc.bookings.myBookings.useQuery({

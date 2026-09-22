@@ -10,6 +10,7 @@ import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ON
 import { isJobPubliclyLive } from "@shared/jobStatus";
 import { bookingMoney, resolveBookingBaseAmount, isHourlyBooking, processingFeeFor } from "@shared/bookingRates";
 import { getPasswordError, PASSWORD_MAX_LENGTH } from "@shared/password";
+import { isArtistAccount, isClientAccount } from "@shared/accountRole";
 import { assertReimbursementRemovable, assertReimbursementWriteAccess } from "./reimbursementAccess";
 
 /**
@@ -1682,9 +1683,7 @@ export const appRouter = router({
         const target = await getUserById(input.userId);
         if (!target) throw new Error("User not found");
         const { setUserPlanFlags } = await import("./db");
-        const targetIsArtist = (target as any).planTier
-          ? (target as any).planTier.startsWith("artist_")
-          : target.userRole === "Artist";
+        const targetIsArtist = isArtistAccount(target);
         if (targetIsArtist) {
           await setUserPlanFlags(input.userId, {
             artswrkBasic: input.plan === "basic",
@@ -2182,7 +2181,7 @@ export const appRouter = router({
       .query(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
-        if (((user as any).planTier ?? "").startsWith("artist_")) {
+        if (isArtistAccount(user)) {
           return getConversationsByArtistId(user.id, input.limit, input.offset);
         }
         return getConversationsByClientId(user.id, input.limit, input.offset);
@@ -2222,7 +2221,7 @@ export const appRouter = router({
       .query(async ({ ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) return { totalConversations: 0, totalMessages: 0, unreadMessages: 0 };
-        if (((user as any).planTier ?? "").startsWith("artist_")) return getMessageStatsByArtistId(user.id);
+        if (isArtistAccount(user)) return getMessageStatsByArtistId(user.id);
         return getMessageStatsByClientId(user.id);
       }),
 
@@ -2309,7 +2308,7 @@ export const appRouter = router({
         if (!sender) throw new Error("User not found");
 
         // Determine client vs artist role — clients start convos with artists
-        const isClient = !((sender as any).planTier ?? "").startsWith("artist_");
+        const isClient = isClientAccount(sender);
         const clientUserId = isClient ? sender.id : input.artistUserId;
         const artistUserId = isClient ? input.artistUserId : sender.id;
 
@@ -2413,7 +2412,7 @@ export const appRouter = router({
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) return { allowed: false };
         // Artists reach this page too; the client-side rule doesn't apply to them.
-        if (((user as any).planTier ?? "").startsWith("artist_")) return { allowed: true };
+        if (isArtistAccount(user)) return { allowed: true };
         return { allowed: await canClientMessageArtist(user.id, input.artistId) };
       }),
 
@@ -5573,7 +5572,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
     myAdminBookings: protectedProcedure
       .query(async ({ ctx }) => {
         const user = ctx.user as any;
-        const isArtist = (user.planTier ?? "").startsWith("artist_");
+        const isArtist = isArtistAccount(user);
         if (isArtist) return getArtistAdminBookings(user.id);
         return getClientAdminBookings(user.id);
       }),
@@ -5730,20 +5729,21 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
   benefits: router({
     list: protectedProcedure
       .input(z.object({ audienceType: z.enum(["Artist", "Client"]) }))
-      .query(async ({ input, ctx }) => {
+      .query(async ({ ctx }) => {
         const viewer = await getUserById(ctx.user.id);
         const planTier = (viewer as any)?.planTier as string | undefined;
-        const isEnterprise = !!planTier?.startsWith("enterprise_");
+        const audienceType = isArtistAccount(viewer) ? "Artist" : "Client";
+        const isEnterprise = audienceType === "Client" && !!planTier?.startsWith("enterprise_");
         // Enterprise accounts never qualify for Client benefits — there
         // simply aren't any partner benefits for that tier today, regardless
         // of on-demand vs. subscription billing status. Full exclusion, no
         // teaser either: an enterprise account never sees this exists.
         if (isEnterprise) return { locked: true as const, enterprise: true as const, benefits: [] };
 
-        const eligible = input.audienceType === "Artist"
+        const eligible = audienceType === "Artist"
           ? planTier === "artist_pro"
           : planTier === "client_premium";
-        const rows = await getBenefits(input.audienceType);
+        const rows = await getBenefits(audienceType);
         const mapped = rows.map((b) => ({
           id: b.id,
           companyName: b.companyName ?? "",

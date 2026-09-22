@@ -3,6 +3,7 @@ import { ArrowLeft, UserCog, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { IMPERSONATION_MARKER_COOKIE } from "@shared/const";
+import { isArtistAccount } from "@shared/accountRole";
 import { toast } from "sonner";
 
 type ArtistPlan = "free" | "basic" | "pro";
@@ -39,7 +40,7 @@ export default function ImpersonationBanner() {
 
   const displayName = user?.name || user?.firstName || user?.email || "another user";
   const artswrkUser = user as any;
-  const isArtist = (artswrkUser?.planTier as string | undefined)?.startsWith("artist_") ?? false;
+  const isArtist = isArtistAccount(artswrkUser);
 
   const currentArtistPlan: ArtistPlan = artswrkUser?.planTier === "artist_pro" ? "pro" : artswrkUser?.planTier === "artist_basic" ? "basic" : "free";
   const currentClientPlan: ClientPlan = (artswrkUser?.planTier as string | undefined)?.startsWith("enterprise_") ? "enterprise" : artswrkUser?.planTier === "client_premium" ? "premium" : "free";

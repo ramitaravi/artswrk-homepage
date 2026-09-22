@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import CompanyManager from "@/components/CompanyManager";
 import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
 import { useLocationField } from "@/hooks/useLocationField";
+import { isArtistAccount } from "@shared/accountRole";
 
 type Tab = "profile" | "account" | "subscription" | "help";
 
@@ -208,7 +209,7 @@ function AccountTab() {
     onError: (e) => toast.error(e.message || "Failed to send reset email"),
   });
 
-  const isArtist = (artswrkUser?.planTier as string | undefined)?.startsWith("artist_") ?? false;
+  const isArtist = isArtistAccount(artswrkUser);
   const email = user?.email || artswrkUser?.email || "";
 
   return (

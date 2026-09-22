@@ -10,6 +10,7 @@ import { Search, MessageSquare, Send, ArrowLeft, ChevronRight } from "lucide-rea
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
+import { isArtistAccount } from "@shared/accountRole";
 
 // ── BBCode / URL parser ────────────────────────────────────────────────────────
 
@@ -300,7 +301,7 @@ export default function Messages() {
   // dispatcher (4abfa1f) and DashboardLayout.tsx.
   const artswrkUser = user as any;
   const myUserId = artswrkUser?.id;
-  const isArtist = (artswrkUser?.planTier as string | undefined)?.startsWith("artist_") ?? false;
+  const isArtist = isArtistAccount(artswrkUser);
 
   const utils = trpc.useUtils();
 

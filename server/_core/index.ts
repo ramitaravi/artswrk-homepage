@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import { and, eq } from "drizzle-orm";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
@@ -57,7 +58,7 @@ async function revokeByCustomerId(customerId: string, productId: string | undefi
     const res = await db.update(users).set({
       artswrkPro: false, artistStripeProductId: null,
       planTier: "artist_free", stripeSubscriptionId: null, stripePriceId: null,
-    }).where(eq(users.stripeCustomerId, customerId));
+    }).where(and(eq(users.stripeCustomerId, customerId), eq(users.userRole, "Artist")));
     if ((res as any).affectedRows) console.log(`[Webhook] Revoked artist PRO (${reason}) for customer ${customerId}`);
     return;
   }
@@ -65,7 +66,7 @@ async function revokeByCustomerId(customerId: string, productId: string | undefi
     const res = await db.update(users).set({
       artswrkBasic: false, artistStripeProductId: null,
       planTier: "artist_free", stripeSubscriptionId: null, stripePriceId: null,
-    }).where(eq(users.stripeCustomerId, customerId));
+    }).where(and(eq(users.stripeCustomerId, customerId), eq(users.userRole, "Artist")));
     if ((res as any).affectedRows) console.log(`[Webhook] Revoked artist Basic (${reason}) for customer ${customerId}`);
     return;
   }
@@ -80,7 +81,7 @@ async function revokeByCustomerId(customerId: string, productId: string | undefi
     const res = await db.update(users).set({
       enterpriseStripeSubscriptionId: null, enterprisePlan: null,
       planTier: "enterprise_on_demand", stripeSubscriptionId: null, stripePriceId: null,
-    }).where(eq(users.enterpriseStripeCustomerId, customerId));
+    }).where(and(eq(users.enterpriseStripeCustomerId, customerId), eq(users.userRole, "Client")));
     if ((res as any).affectedRows) console.log(`[Webhook] Revoked enterprise subscription (${reason}) for customer ${customerId}`);
     return;
   }
@@ -91,7 +92,7 @@ async function revokeByCustomerId(customerId: string, productId: string | undefi
   const clientRes = await db.update(users).set({
     clientPremium: false, clientSubscriptionId: null,
     planTier: "client_on_demand", stripeSubscriptionId: null, stripePriceId: null,
-  }).where(eq(users.clientStripeCustomerId, customerId));
+  }).where(and(eq(users.clientStripeCustomerId, customerId), eq(users.userRole, "Client")));
   if ((clientRes as any).affectedRows) console.log(`[Webhook] Revoked client Premium (${reason}) for customer ${customerId}`);
 }
 
@@ -108,7 +109,7 @@ async function updateByCustomerId(customerId: string, productId: string | undefi
     await db.update(users).set({
       artswrkPro: isActive,
       planTier: isActive ? "artist_pro" : "artist_free",
-    }).where(eq(users.stripeCustomerId, customerId));
+    }).where(and(eq(users.stripeCustomerId, customerId), eq(users.userRole, "Artist")));
     console.log(`[Webhook] Updated artist PRO status to ${isActive} for customer ${customerId}`);
     return;
   }
@@ -116,7 +117,7 @@ async function updateByCustomerId(customerId: string, productId: string | undefi
     await db.update(users).set({
       artswrkBasic: isActive,
       planTier: isActive ? "artist_basic" : "artist_free",
-    }).where(eq(users.stripeCustomerId, customerId));
+    }).where(and(eq(users.stripeCustomerId, customerId), eq(users.userRole, "Artist")));
     console.log(`[Webhook] Updated artist Basic status to ${isActive} for customer ${customerId}`);
     return;
   }
@@ -127,7 +128,7 @@ async function updateByCustomerId(customerId: string, productId: string | undefi
     await db.update(users).set({
       enterprisePlan: isActive ? "subscriber" : null,
       planTier: isActive ? "enterprise_subscription" : "enterprise_on_demand",
-    }).where(eq(users.enterpriseStripeCustomerId, customerId));
+    }).where(and(eq(users.enterpriseStripeCustomerId, customerId), eq(users.userRole, "Client")));
     console.log(`[Webhook] Updated enterprise subscriber status to ${isActive} for customer ${customerId}`);
     return;
   }
@@ -135,7 +136,7 @@ async function updateByCustomerId(customerId: string, productId: string | undefi
   const clientRes = await db.update(users).set({
     clientPremium: isActive,
     planTier: isActive ? "client_premium" : "client_on_demand",
-  }).where(eq(users.clientStripeCustomerId, customerId));
+  }).where(and(eq(users.clientStripeCustomerId, customerId), eq(users.userRole, "Client")));
   if ((clientRes as any).affectedRows) console.log(`[Webhook] Updated client Premium status to ${isActive} for customer ${customerId}`);
 }
 

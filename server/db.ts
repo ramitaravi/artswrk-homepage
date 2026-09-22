@@ -6,6 +6,7 @@ import { ENV } from './_core/env';
 import { extractCity, DEFAULT_RADIUS_MILES } from "../shared/location";
 import { easternDateTimeToUtc, utcDateString } from "../shared/adminBookingSchedule";
 import { reminderWindow, periodReminderDueSql, periodReminderIsTodaySql, easternDateString } from "./reminderWindow";
+import { planTierMatchesUserRole } from "../shared/accountRole";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -66,6 +67,14 @@ export function normalizeSocialLink(raw: string, platform: "instagram" | "tiktok
 // ever a boolean overlay on a Client row — never its own userRole value).
 export const ARTIST_PLAN_TIERS = ["artist_free", "artist_basic", "artist_pro"] as const;
 export const CLIENT_PLAN_TIERS = ["client_on_demand", "client_premium", "enterprise_on_demand", "enterprise_subscription"] as const;
+
+async function assertPlanTierCompatibleWithUserRole(userId: number, planTier: string): Promise<void> {
+  const user = await getUserById(userId);
+  if (!user) throw new Error("User not found");
+  if (!planTierMatchesUserRole({ userRole: user.userRole, planTier })) {
+    throw new Error(`Cannot assign ${planTier} to a ${user.userRole} account.`);
+  }
+}
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
@@ -1928,6 +1937,7 @@ export async function saveClientStripeCustomerId(userId: number, stripeCustomerI
 export async function saveClientSubscriptionId(userId: number, subscriptionId: string, priceId?: string | null) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await assertPlanTierCompatibleWithUserRole(userId, "client_premium");
   await db
     .update(users)
     .set({
@@ -1995,6 +2005,7 @@ export async function setUserPlanFlags(
 ): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  if (flags.planTier) await assertPlanTierCompatibleWithUserRole(userId, flags.planTier);
   await db.update(users).set(flags).where(eq(users.id, userId));
 }
 
@@ -2265,7 +2276,7 @@ export async function getArtistsList({
   if (!db) return { artists: [], total: 0 };
 
   const conditions = [
-    inArray(users.planTier, ARTIST_PLAN_TIERS),
+    eq(users.userRole, "Artist"),
     // Deactivated accounts are scrubbed to "Deleted user" — never list them.
     isNull(users.deactivatedAt),
     // Only show artists with at least a name or firstName populated
@@ -2550,7 +2561,7 @@ export async function getFeaturedArtists(limit = 24) {
     .from(users)
     .where(
       and(
-        inArray(users.planTier, ARTIST_PLAN_TIERS),
+        eq(users.userRole, "Artist"),
         isNull(users.deactivatedAt),
         isNotNull(users.profilePicture),
         sql`${users.profilePicture} != ''`,
@@ -2634,7 +2645,7 @@ export async function getArtistTypeCounts() {
     db
       .select({ masterArtistTypes: users.masterArtistTypes, masterServiceType: users.masterServiceType })
       .from(users)
-      .where(inArray(users.planTier, ARTIST_PLAN_TIERS)),
+      .where(eq(users.userRole, "Artist")),
   ]);
 
   const nameById = new Map<string, string>();
@@ -2671,12 +2682,12 @@ export async function getAdminOverviewStats() {
   // without inflating the migration totals shown to administrators.
   const liveBubbleUser = eq(users.bubbleSourcePresent, true);
   const [totalUsers] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(liveBubbleUser);
-  const [totalArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, inArray(users.planTier, ARTIST_PLAN_TIERS)));
-  const [totalClients] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, inArray(users.planTier, CLIENT_PLAN_TIERS)));
-  const [proArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, inArray(users.planTier, ARTIST_PLAN_TIERS), eq(users.artswrkPro, true)));
-  const [basicArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, inArray(users.planTier, ARTIST_PLAN_TIERS), eq(users.artswrkBasic, true)));
-  const [priorityArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, inArray(users.planTier, ARTIST_PLAN_TIERS), eq(users.priorityList, true)));
-  const [premiumClients] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, inArray(users.planTier, CLIENT_PLAN_TIERS), eq(users.clientPremium, true)));
+  const [totalArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist")));
+  const [totalClients] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Client")));
+  const [proArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist"), eq(users.artswrkPro, true)));
+  const [basicArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist"), eq(users.artswrkBasic, true)));
+  const [priorityArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist"), eq(users.priorityList, true)));
+  const [premiumClients] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Client"), eq(users.clientPremium, true)));
   const liveBubbleBooking = eq(bookings.bubbleSourcePresent, true);
   const [totalBookings] = await db
     .select({ count: sql<number>`count(distinct ${bookings.bubbleId})` })
@@ -2756,7 +2767,7 @@ interface AdminArtistFilters {
 
 async function buildAdminArtistConditions(f: AdminArtistFilters) {
   const conditions = [
-    inArray(users.planTier, ARTIST_PLAN_TIERS),
+    eq(users.userRole, "Artist"),
     // Only show artists with at least a name or firstName populated
     or(
       and(isNotNull(users.firstName), sql`${users.firstName} != ''`),
@@ -2940,7 +2951,7 @@ export async function getAdminClients({
   const db = await getDb();
   if (!db) return { clients: [], total: 0 };
 
-  const conditions = [inArray(users.planTier, CLIENT_PLAN_TIERS)];
+  const conditions = [eq(users.userRole, "Client")];
   if (search) conditions.push(or(
     like(users.name, `%${search}%`),
     like(users.firstName, `%${search}%`),
@@ -4062,6 +4073,7 @@ export async function saveArtistStripeCustomerId(userId: number, stripeCustomerI
 export async function saveArtistProSubscription(userId: number, subscriptionId: string, priceId?: string | null): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await assertPlanTierCompatibleWithUserRole(userId, "artist_pro");
   await db.update(users).set({
     artswrkPro: true, artistStripeProductId: subscriptionId,
     planTier: "artist_pro", stripeSubscriptionId: subscriptionId,
@@ -4073,6 +4085,7 @@ export async function saveArtistProSubscription(userId: number, subscriptionId: 
 export async function cancelArtistProSubscription(userId: number): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await assertPlanTierCompatibleWithUserRole(userId, "artist_free");
   await db.update(users).set({
     artswrkPro: false, artistStripeProductId: null,
     planTier: "artist_free", stripeSubscriptionId: null, stripePriceId: null,
@@ -4111,6 +4124,7 @@ export async function getArtistSubscriptionInfo(userId: number): Promise<{
 export async function saveArtistBasicSubscription(userId: number, subscriptionId: string, priceId?: string | null): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await assertPlanTierCompatibleWithUserRole(userId, "artist_basic");
   await db.update(users).set({
     artswrkBasic: true, artistStripeProductId: subscriptionId,
     planTier: "artist_basic", stripeSubscriptionId: subscriptionId,

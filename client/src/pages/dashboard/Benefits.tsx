@@ -15,6 +15,7 @@ import { CheckCircle2, ChevronRight, ExternalLink, Lock, Sparkles } from "lucide
 import { trpc } from "@/lib/trpc";
 import { useUpgrade } from "@/lib/useUpgrade";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { isArtistAccount } from "@shared/accountRole";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -122,9 +123,7 @@ export default function Benefits() {
   const { user } = useAuth();
   const [activeCategory, setActiveCategory] = useState<string>("All");
 
-  // Determine audience type from planTier (available directly from auth)
-  const planTier = (user as any)?.planTier as string | undefined;
-  const audienceType = planTier?.startsWith("artist_") ? "Artist" : "Client";
+  const audienceType = isArtistAccount(user as any) ? "Artist" : "Client";
 
   const { data, isLoading } = trpc.benefits.list.useQuery(
     { audienceType },

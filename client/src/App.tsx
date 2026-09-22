@@ -66,6 +66,7 @@ import { useEffect, useRef } from "react";
 import { useUpgrade } from "@/lib/useUpgrade";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 import CheckoutSessionVerifier from "./components/CheckoutSessionVerifier";
+import { isArtistAccount } from "@shared/accountRole";
 
 // DashboardLayout handles auth protection internally (redirects to /login if not authenticated)
 function DashRoute({ component: Component }: { component: React.ComponentType }) {
@@ -78,20 +79,17 @@ function DashRoute({ component: Component }: { component: React.ComponentType })
 
 /**
  * Role-aware /app route dispatcher.
- * auth.me returns the full DB User object — userRole and enterprise are available immediately,
- * no secondary query needed. Using a secondary lookup caused a race where the client dashboard
- * flashed (or stuck) while the second query was in flight.
+ * auth.me returns the full DB User object — userRole, planTier and enterprise
+ * are available immediately, no secondary query needed.
  */
 function AppRoute({ clientComponent: ClientComponent = Overview }: { clientComponent?: React.ComponentType }) {
   const { user, loading } = useAuth();
 
-  // auth.me returns the full User row — planTier is on it directly. Its
-  // prefix (artist_ / client_ / enterprise_) is the single source of truth
-  // for which dashboard to show, replacing the old userRole + enterprise
-  // boolean pair.
+  // userRole is the canonical account identity. planTier controls paid access,
+  // but a stale tier must never turn a Client into an Artist (or vice versa).
   const planTier = (user as any)?.planTier as string | undefined;
-  const isArtist = planTier?.startsWith("artist_") ?? false;
-  const isEnterprise = planTier?.startsWith("enterprise_") ?? false;
+  const isArtist = isArtistAccount(user as any);
+  const isEnterprise = !isArtist && (planTier?.startsWith("enterprise_") ?? false);
 
   // Wait for auth before making routing decisions to avoid a wrong-dashboard flash
   if (loading) {
@@ -131,7 +129,7 @@ function AppRoute({ clientComponent: ClientComponent = Overview }: { clientCompo
  */
 function ArtistJobsRoute() {
   const { user, loading } = useAuth();
-  const isArtist = ((user as any)?.planTier as string | undefined)?.startsWith("artist_") ?? false;
+  const isArtist = isArtistAccount(user as any);
 
   if (loading) {
     return (
@@ -164,7 +162,7 @@ function ArtistJobsRoute() {
  */
 function BrowseCompaniesRoute() {
   const { user, loading } = useAuth();
-  const isArtist = ((user as any)?.planTier as string | undefined)?.startsWith("artist_") ?? false;
+  const isArtist = isArtistAccount(user as any);
 
   if (loading) return <DashboardLayout><div /></DashboardLayout>;
 
