@@ -2677,33 +2677,35 @@ export async function getAdminOverviewStats() {
   const db = await getDb();
   if (!db) return null;
 
-  // Source-facing headline metrics count one canonical record per live Bubble ID.
-  // Destination-only OAuth/test users and preserved historical rows remain stored
-  // without inflating the migration totals shown to administrators.
-  const liveBubbleUser = eq(users.bubbleSourcePresent, true);
-  const [totalUsers] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(liveBubbleUser);
-  const [totalArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist")));
-  const [totalClients] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Client")));
-  const [proArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist"), eq(users.artswrkPro, true)));
-  const [basicArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist"), eq(users.artswrkBasic, true)));
-  const [priorityArtists] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Artist"), eq(users.priorityList, true)));
-  const [premiumClients] = await db.select({ count: sql<number>`count(distinct ${users.bubbleId})` }).from(users).where(and(liveBubbleUser, eq(users.userRole, "Client"), eq(users.clientPremium, true)));
-  const liveBubbleBooking = eq(bookings.bubbleSourcePresent, true);
+  // Headline metrics count every live record, whether it came from the Bubble
+  // migration or was created here. Counting only Bubble-sourced rows (what this
+  // did originally, to keep migration totals honest) silently froze the admin
+  // dashboard at migration time: new signups, natively posted jobs and bookings
+  // taken on this site never appeared. Rows still dedupe by Bubble ID where one
+  // exists, so preserved historical duplicates don't inflate the totals; native
+  // rows have no Bubble ID and count once by their own id. Artist/client splits
+  // follow userRole, the same identity source the dashboards route on.
+  const userKey = sql<number>`count(distinct coalesce(${users.bubbleId}, concat('local:', ${users.id})))`;
+  const [totalUsers] = await db.select({ count: userKey }).from(users);
+  const [totalArtists] = await db.select({ count: userKey }).from(users).where(eq(users.userRole, "Artist"));
+  const [totalClients] = await db.select({ count: userKey }).from(users).where(eq(users.userRole, "Client"));
+  const [proArtists] = await db.select({ count: userKey }).from(users).where(and(eq(users.userRole, "Artist"), eq(users.artswrkPro, true)));
+  const [basicArtists] = await db.select({ count: userKey }).from(users).where(and(eq(users.userRole, "Artist"), eq(users.artswrkBasic, true)));
+  const [priorityArtists] = await db.select({ count: userKey }).from(users).where(and(eq(users.userRole, "Artist"), eq(users.priorityList, true)));
+  const [premiumClients] = await db.select({ count: userKey }).from(users).where(and(eq(users.userRole, "Client"), eq(users.clientPremium, true)));
   const [totalBookings] = await db
-    .select({ count: sql<number>`count(distinct ${bookings.bubbleId})` })
+    .select({ count: sql<number>`count(distinct coalesce(${bookings.bubbleId}, concat('local:', ${bookings.id})))` })
     .from(bookings)
-    .where(and(liveBubbleBooking, eq(bookings.bookingStatus, "Completed")));
+    .where(and(eq(bookings.bookingStatus, "Completed"), eq(bookings.deleted, false)));
   const [totalJobs] = await db
-    .select({ count: sql<number>`count(distinct ${jobs.bubbleId})` })
-    .from(jobs)
-    .where(eq(jobs.bubbleSourcePresent, true));
+    .select({ count: sql<number>`count(distinct coalesce(${jobs.bubbleId}, concat('local:', ${jobs.id})))` })
+    .from(jobs);
 
   // Bubble dashboard revenue = non-deleted completed/paid booking totals.
   const [revenueRow] = await db
     .select({ total: sql<number>`coalesce(sum(coalesce(${bookings.totalClientRate}, ${bookings.clientRate}, 0)), 0)` })
     .from(bookings)
     .where(and(
-      liveBubbleBooking,
       eq(bookings.bookingStatus, "Completed"),
       eq(bookings.paymentStatus, "Paid"),
       eq(bookings.deleted, false),
@@ -2714,7 +2716,6 @@ export async function getAdminOverviewStats() {
     .select({ total: sql<number>`coalesce(sum(coalesce(${bookings.grossProfit}, 0)), 0)` })
     .from(bookings)
     .where(and(
-      liveBubbleBooking,
       eq(bookings.bookingStatus, "Completed"),
       eq(bookings.paymentStatus, "Paid"),
       eq(bookings.deleted, false),
@@ -2725,7 +2726,6 @@ export async function getAdminOverviewStats() {
     .select({ total: sql<number>`coalesce(sum(coalesce(${bookings.totalClientRate}, ${bookings.clientRate}, 0)), 0)` })
     .from(bookings)
     .where(and(
-      liveBubbleBooking,
       eq(bookings.bookingStatus, "Confirmed"),
       eq(bookings.paymentStatus, "Unpaid"),
       eq(bookings.deleted, false),
