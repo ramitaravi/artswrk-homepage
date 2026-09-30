@@ -598,6 +598,12 @@ export const bookings = mysqlTable("bookings", {
   isRecurring: boolean("isRecurring").default(false),
   /** weekly | biweekly | monthly | quarterly — set when isRecurring = true */
   recurringCadence: varchar("recurringCadence", { length: 32 }),
+  /**
+   * Links the class dates of one weekly class. Each date is its own ordinary
+   * booking — its own hours, invoice and Pay Now — and this only groups them
+   * for labelling and season-wide edits. Never a status: a series has none.
+   */
+  recurringSeriesId: int("recurringSeriesId"),
 
   // ── Timestamps ─────────────────────────────────────────────────────────────
   createdAt: timestamp("createdAt").defaultNow().notNull(),

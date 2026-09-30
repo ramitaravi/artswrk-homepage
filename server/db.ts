@@ -1051,7 +1051,7 @@ export async function getBookingsByClientId(
  */
 export async function getBookingStatsByClientId(clientUserId: number) {
   const db = await getDb();
-  if (!db) return { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, awaitingPayment: 0, totalRevenue: 0 };
+  if (!db) return { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, awaitingPayment: 0, weeksAwaitingPayment: 0, weeksAwaitingCents: 0, totalRevenue: 0 };
 
   const statusResult = await db
     .select({
@@ -1064,7 +1064,7 @@ export async function getBookingStatsByClientId(clientUserId: number) {
     .where(and(eq(bookings.clientUserId, clientUserId), eq(bookings.deleted, false)))
     .groupBy(bookings.bookingStatus, bookings.paymentStatus);
 
-  const stats = { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, awaitingPayment: 0, totalRevenue: 0 };
+  const stats = { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, awaitingPayment: 0, weeksAwaitingPayment: 0, weeksAwaitingCents: 0, totalRevenue: 0 };
   for (const row of statusResult) {
     const count = Number(row.count);
     stats.total += count;
@@ -1083,6 +1083,22 @@ export async function getBookingStatsByClientId(clientUserId: number) {
     // through 'Pay Now' at all, so this naturally excludes those too.
     if (row.bookingStatus === 'Pay Now') stats.awaitingPayment += count;
   }
+
+  // Weekly class bookings never reach 'Pay Now': they run all season, and it is
+  // each WEEK that gets invoiced. Counting only the booking status meant a studio
+  // whose teacher had submitted four weeks of hours saw no task at all, and no
+  // prompt that money was owed.
+  const [weeks] = (await db.execute(`
+    SELECT COUNT(*) AS n, COALESCE(SUM(bp.invoiceTotalCents), 0) AS cents
+    FROM booking_periods bp
+    JOIN bookings b ON b.id = bp.bookingId
+    WHERE b.clientUserId = ${clientUserId}
+      AND (b.deleted IS NULL OR b.deleted = 0)
+      AND bp.status = 'artist_submitted'
+  `))[0] as unknown as Array<{ n: number; cents: number }>;
+  stats.weeksAwaitingPayment = Number(weeks?.n ?? 0);
+  stats.weeksAwaitingCents = Number(weeks?.cents ?? 0);
+
   return stats;
 }
 
@@ -1171,7 +1187,15 @@ export async function getClientBookingDetail(bookingId: number, clientUserId: nu
     ...safe
   } = row;
 
-  return { ...safe, pricing: buildClientPricing(row) };
+  // A weekly class's dates, so the detail page can show the one the studio
+  // clicked rather than the season it belongs to.
+  const periods = await db
+    .select()
+    .from(bookingPeriods)
+    .where(eq(bookingPeriods.bookingId, bookingId))
+    .orderBy(asc(bookingPeriods.periodNumber));
+
+  return { ...safe, periods, pricing: buildClientPricing(row) };
 }
 
 /**
@@ -1603,14 +1627,48 @@ export async function getWalletStatsByClientId(clientUserId: number) {
       inArray(bookings.bookingStatus, ['Completed', 'Confirmed', 'Pay Now'])
     ));
 
-  const [futureRow] = await db
-    .select({ total: sql<number>`SUM(COALESCE(clientRate, 0))` })
-    .from(bookings)
-    .where(and(
-      eq(bookings.clientUserId, clientUserId),
-      eq(bookings.deleted, false),
-      eq(bookings.bookingStatus, 'Confirmed')
-    ));
+  // Everything the studio still has to pay for, across every kind of booking.
+  //
+  // Summing clientRate over confirmed bookings counted a weekly class once, at
+  // its hourly rate — a season of thirty-nine classes showed up as $80. An
+  // hourly booking's real cost is rate x hours plus the processing fee, and a
+  // weekly class owes that for every class date still to come.
+  const HOURLY_TOTAL = `ROUND(b.clientRate * b.hours * 1.05, 2)`;
+  const [futureRows] = await db.execute(`
+    SELECT
+      COALESCE(SUM(CASE
+        WHEN b.rateType = 'hourly' AND b.hours IS NOT NULL THEN ${HOURLY_TOTAL}
+        ELSE COALESCE(b.totalClientRate, b.clientRate, 0)
+      END), 0) AS total,
+      COUNT(*) AS n
+    FROM bookings b
+    WHERE b.clientUserId = ${clientUserId}
+      AND b.deleted = 0
+      AND b.bookingStatus = 'Confirmed'
+      -- The season row is not a booking anyone pays; its class dates are.
+      AND NOT (COALESCE(b.isAdminBooking, 0) = 1 AND COALESCE(b.isRecurring, 0) = 1)
+  `);
+
+  // Class dates that still live as billing periods (weekly classes created
+  // before they were stored one booking per date).
+  const [futurePeriodRows] = await db.execute(`
+    SELECT
+      COALESCE(SUM(${HOURLY_TOTAL}), 0) AS total,
+      COUNT(*) AS n
+    FROM booking_periods p
+    JOIN bookings b ON b.id = p.bookingId
+    WHERE b.clientUserId = ${clientUserId}
+      AND b.deleted = 0
+      AND p.status IN ('upcoming', 'open')
+      AND b.hours IS NOT NULL
+  `);
+
+  const futureBookings = (futureRows as unknown as Array<{ total: number; n: number }>)[0];
+  const futurePeriods = (futurePeriodRows as unknown as Array<{ total: number; n: number }>)[0];
+  const futureRow = {
+    total: Number(futureBookings?.total ?? 0) + Number(futurePeriods?.total ?? 0),
+    count: Number(futureBookings?.n ?? 0) + Number(futurePeriods?.n ?? 0),
+  };
 
   const [pendingRow] = await db
     .select({ count: sql<number>`COUNT(*)` })
@@ -1632,19 +1690,12 @@ export async function getWalletStatsByClientId(clientUserId: number) {
       inArray(payments.stripeStatus, ['paid', 'succeeded'])
     ));
 
-  const [futureCountRow] = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(bookings)
-    .where(and(
-      eq(bookings.clientUserId, clientUserId),
-      eq(bookings.deleted, false),
-      eq(bookings.bookingStatus, 'Confirmed')
-    ));
-
   return {
     totalSpent: Number(totalRow?.total ?? 0),
-    futurePayments: Number(futureRow?.total ?? 0),
-    futureCount: Number(futureCountRow?.count ?? 0),
+    futurePayments: futureRow.total,
+    // Counted from the same rows as the total above, so the figure and the
+    // "N bookings upcoming" under it can never disagree.
+    futureCount: futureRow.count,
     pendingCount: Number(pendingRow?.count ?? 0),
     // stripeAmount is in cents — divide by 100 for dollars
     totalPaidAmount: Number(paidRow?.total ?? 0) / 100,
@@ -5374,7 +5425,100 @@ export function computeAdminPeriods(
   return periods;
 }
 
-/** Create an admin booking (no job/applicant required) and generate its billing periods. */
+/**
+ * A weekly class, created as one ordinary booking per class date.
+ *
+ * Every date carries the same rate, hours and description, and each one behaves
+ * exactly like a one-off booking: the artist completes it and submits hours on
+ * the day, the studio gets a Pay Now button for that date. `recurringSeriesId`
+ * links them so the dashboard can label them ("Weekly class · Mondays") and a
+ * whole season can be re-rated or cancelled at once; it carries no status.
+ *
+ * Returns the first date's booking id, which is also the series id.
+ */
+async function createClassDateBookings(input: {
+  artistUserId: number;
+  clientUserId: number;
+  artistRateDollars: number;
+  clientRateDollars: number;
+  startDate: Date;
+  endDate: Date;
+  isRecurring: boolean;
+  recurringCadence?: string;
+  locationAddress?: string | null;
+  locationLat?: string | null;
+  locationLng?: string | null;
+  locationCity?: string | null;
+  locationState?: string | null;
+  locationPlaceId?: string | null;
+  description?: string;
+  reminderTime?: string | null;
+  hours?: number | null;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+
+  const classDates = computeAdminPeriods(
+    input.startDate, input.endDate, true, input.recurringCadence, input.reminderTime,
+  );
+  if (classDates.length === 0) throw new Error("That start and end date produce no class dates");
+
+  // The class day itself, at the time class starts (the reminder time when the
+  // admin gave one). Stored as a real instant so the day-of reminder and the
+  // dashboard both read the date the studio means, in any timezone.
+  const startOf = (d: { start: Date; notifyAt: Date }) => (input.reminderTime ? d.notifyAt : d.start);
+
+  const row = (d: { start: Date; notifyAt: Date }, seriesId: number | null) => ({
+    clientUserId: input.clientUserId,
+    artistUserId: input.artistUserId,
+    rateType: "hourly" as const,
+    hourlyRate: input.artistRateDollars,
+    flatRate: null,
+    artistRate: input.artistRateDollars,
+    clientRate: input.clientRateDollars,
+    startDate: startOf(d),
+    endDate: startOf(d),
+    locationAddress: input.locationAddress ?? null,
+    locationLat: input.locationLat ?? null,
+    locationLng: input.locationLng ?? null,
+    locationCity: input.locationCity ?? null,
+    locationState: input.locationState ?? null,
+    locationPlaceId: input.locationPlaceId ?? null,
+    description: input.description ?? null,
+    hours: input.hours ?? null,
+    bookingStatus: "Confirmed",
+    paymentStatus: "Unpaid",
+    paymentMethod: "artswrk",
+    isAdminBooking: true,
+    // Each row IS a single date now — the season lives in recurringSeriesId.
+    isRecurring: false,
+    recurringCadence: input.recurringCadence ?? null,
+    recurringSeriesId: seriesId,
+  });
+
+  // The first date's id names the series, so the rows can point at it.
+  const [first] = await db.insert(bookings).values(row(classDates[0], null) as any);
+  const seriesId = (first as any).insertId as number;
+  await db.update(bookings).set({ recurringSeriesId: seriesId } as any).where(eq(bookings.id, seriesId));
+
+  if (classDates.length > 1) {
+    await db.insert(bookings).values(classDates.slice(1).map((d) => row(d, seriesId)) as any);
+  }
+
+  return seriesId;
+}
+
+/**
+ * Create an admin booking (no job/applicant required).
+ *
+ * A one-off booking is a single row, as always. A weekly class is created as
+ * ONE BOOKING PER CLASS DATE, all sharing a series id: each date carries its
+ * own hours, invoice and Pay Now button, which is the flow studios already
+ * know from one-off bookings. The older model — one booking spanning the
+ * season with hidden billing periods — buried the two or three dates that
+ * needed paying under a hundred that didn't, and left the booking reading
+ * "Confirmed" while weeks of money sat owed.
+ */
 export async function createAdminBooking(input: {
   artistUserId: number;
   clientUserId: number;
@@ -5399,6 +5543,9 @@ export async function createAdminBooking(input: {
 }): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
+
+  // Each class date of a weekly class is its own booking.
+  if (input.isRecurring) return createClassDateBookings(input);
 
   const [result] = await db.insert(bookings).values({
     clientUserId: input.clientUserId,

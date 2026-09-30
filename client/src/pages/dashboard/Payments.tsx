@@ -1,13 +1,14 @@
 /*
  * ARTSWRK DASHBOARD — PAYMENTS & WALLET
  * Layout matches the original Artswrk Bubble app:
- * Left: Wallet card (total spent) + Future Payments + Pending Pay Now
+ * Left: Wallet card (total spent) + Future Payments + Needs payment
  * Right: Recent Transactions list (artist photo, name, date, amount)
  */
 
 import { Link } from "wouter";
 import { Receipt } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { groupClientBookings, toClientDateCards } from "@/lib/weeklyBookings";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 function getArtistInitials(firstName?: string | null, lastName?: string | null, name?: string | null) {
@@ -78,7 +79,12 @@ export default function Payments() {
   const { user } = useAuth();
 
   const { data: wallet, isLoading: walletLoading } = trpc.payments.walletStats.useQuery();
-  const { data: pending } = trpc.payments.pendingPayments.useQuery();
+  // Class dates whose hours are in and whose invoice is waiting. These are the
+  // only bookings on this page a studio can actually settle right now.
+  const { data: adminBookings } = trpc.bookingPeriods.myAdminBookings.useQuery();
+  const needsPayment = groupClientBookings(toClientDateCards(adminBookings as any[]))
+    .find((g) => g.key === "pay")?.rows ?? [];
+  const needsPaymentTotal = needsPayment.reduce((sum: number, b: any) => sum + Number(b.totalClientRate ?? 0), 0);
   const { data: recentPayments, isLoading: paymentsLoading } = trpc.payments.myPayments.useQuery({ limit: 100 });
 
   const clientName = user
@@ -87,7 +93,6 @@ export default function Payments() {
 
   const totalSpent = wallet?.totalSpent ?? 0;
   const futurePayments = wallet?.futurePayments ?? 0;
-  const pendingCount = wallet?.pendingCount ?? 0;
   const futureCount = wallet?.futureCount ?? 0;
 
   return (
@@ -139,65 +144,45 @@ export default function Payments() {
             </p>
           </div>
 
-          {/* Pending Payments */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <p className="text-sm font-semibold text-gray-700">Pending Payments</p>
-              {pendingCount > 0 && (
-                <span className="bg-[#F25722] text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                  {pendingCount}
-                </span>
-              )}
-            </div>
-
-            {!pending || pending.length === 0 ? (
-              <p className="text-sm text-gray-400">No pending payments</p>
-            ) : (
+          {/* Needs payment — current class dates with a real invoice behind them. */}
+          {needsPayment.length > 0 && (
+            <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-5">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-sm font-semibold text-gray-700">Needs payment</p>
+                <span className="bg-[#F25722] text-white text-xs font-bold px-2 py-0.5 rounded-full">{needsPayment.length}</span>
+              </div>
+              <p className="text-xs text-gray-500 mb-4">{formatDollars(needsPaymentTotal)} owed across {needsPayment.length} class date{needsPayment.length !== 1 ? "s" : ""}</p>
               <div className="space-y-3">
-                {pending.map((b) => {
+                {needsPayment.map((b: any) => {
                   const artistName = b.artistFirstName && b.artistLastName
                     ? `${b.artistFirstName} ${b.artistLastName[0]}.`
-                    : b.artistName ?? "Unknown Artist";
+                    : b.artistName ?? "Artist";
                   return (
-                    <div key={b.id} className="flex items-center gap-3">
-                      <ArtistAvatar
-                        firstName={b.artistFirstName}
-                        lastName={b.artistLastName}
-                        name={b.artistName}
-                        profilePicture={b.artistProfilePicture}
-                        size="md"
-                      />
+                    <div key={b.key} className="flex items-center gap-3">
+                      <ArtistAvatar firstName={b.artistFirstName} lastName={b.artistLastName} name={b.artistName} profilePicture={b.artistProfilePicture} size="md" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-[#111] truncate">{artistName}</p>
-                        <p className="text-xs text-gray-400">{formatDollars(b.clientRate ?? 0)}</p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(b.startDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                          {b.hours ? ` · ${b.hours}h` : ""}
+                        </p>
                       </div>
-                      {/* No Pay Now button. It linked to bookings.stripeCheckoutUrl —
-                          a Stripe Payment Link imported from Bubble, pointing at
-                          whatever product Bubble had configured rather than at
-                          this booking. Clicking it billed the client for a
-                          stranger's booking; the money would not have reached
-                          the artist named on this row. Every one of these
-                          bookings came from Bubble and none has a checkout this
-                          app created, so there is nothing correct to link to
-                          yet — see the note below the list. */}
-                      <Link
-                        href={`/app/bookings/${b.id}`}
-                        className="px-4 py-1.5 rounded-full text-xs font-bold text-[#111] border border-gray-200 hover:bg-gray-50 transition-colors flex-shrink-0"
+                      <p className="text-sm font-black text-[#111]">{formatDollars(b.totalClientRate)}</p>
+                      <a
+                        href={b.invoiceStripeCheckoutUrl ?? `/invoice/${b.invoicePaymentToken}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-1.5 rounded-full text-xs font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex-shrink-0"
                       >
-                        View booking
-                      </Link>
+                        Pay now
+                      </a>
                     </div>
                   );
                 })}
-                <p className="pt-1 text-xs leading-relaxed text-gray-400">
-                  These bookings were made on the old Artswrk. To settle one, message
-                  the artist or email{" "}
-                  <a href="mailto:contact@artswrk.com" className="underline">contact@artswrk.com</a>{" "}
-                  and we'll invoice you directly.
-                </p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
         </div>
 
         {/* ── Right Column: Recent Transactions ── */}

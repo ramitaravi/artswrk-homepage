@@ -4,7 +4,7 @@
  * come out the same in every timezone.
  */
 import { describe, it, expect } from "vitest";
-import { artistBookingTasks, expandWeeklyBookingRows, periodClassDay, periodRowStatus, toPeriodRows } from "./weeklyBookings";
+import { artistBookingTasks, expandWeeklyBookingRows, groupClientBookings, isSeasonRow, periodClassDay, periodRowStatus, toClientDateCards, toPeriodRows } from "./weeklyBookings";
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -145,5 +145,90 @@ describe("artistBookingTasks", () => {
     const oneOff = { id: 10, startDate: "2026-10-05T00:00:00.000Z", bookingStatus: "Confirmed" };
     const ids = artistBookingTasks([...weekly, oneOff]).hoursDue.map((r) => r.period?.id ?? r.id);
     expect(ids).toEqual([1, 2]);
+  });
+});
+
+describe("toClientDateCards", () => {
+  const season = {
+    id: 1140006,
+    isRecurring: true,
+    hours: 3,
+    clientRate: 80,
+    periods: [
+      { id: 1, periodStart: "2026-09-14T00:00:00.000Z", status: "artist_submitted", actualHours: 3, invoiceTotalCents: 29000, invoicePaymentToken: "tok1" },
+      { id: 2, periodStart: "2026-09-21T00:00:00.000Z", status: "client_paid", actualHours: 3, invoiceTotalCents: 29000 },
+      { id: 3, periodStart: "2026-09-28T00:00:00.000Z", status: "upcoming", actualHours: null },
+      { id: 4, periodStart: "2026-10-05T00:00:00.000Z", status: "skipped", actualHours: null },
+    ],
+  };
+
+  it("gives the studio one card per class date, not the season", () => {
+    const cards = toClientDateCards([season]);
+    expect(cards).toHaveLength(3);               // the skipped week is dropped
+    expect(cards.every((c) => c.periods.length === 0)).toBe(true);
+  });
+
+  it("puts each date's own status and invoice on its card", () => {
+    // Fixed "now" — a date's status depends on whether its class has happened.
+    const [first, second, third] = toClientDateCards([season], new Date("2026-09-25T12:00:00Z"));
+    expect(first.bookingStatus).toBe("Pay Now");
+    expect(first.invoicePaymentToken).toBe("tok1");
+    expect(second.bookingStatus).toBe("Completed");
+    expect(second.paymentStatus).toBe("Paid");
+    expect(third.bookingStatus).toBe("Confirmed");
+    expect(third.hours).toBe(3);                 // falls back to scheduled hours
+  });
+
+  it("dates read as the class day, never the day before", () => {
+    const [first] = toClientDateCards([season]);
+    expect(ymd(new Date(first.startDate))).toBe("2026-09-14");
+  });
+
+  it("says who a passed class is waiting on, rather than 'Confirmed'", () => {
+    // Sep 28 has happened and no hours are in: the studio is waiting on the teacher.
+    const [, , third] = toClientDateCards([season], new Date("2026-09-30T12:00:00Z"));
+    expect(third.bookingStatus).toBe("Awaiting Invoice");
+  });
+
+  it("leaves one-off bookings alone", () => {
+    const oneOff = { id: 5, isRecurring: false, periods: [] };
+    expect(toClientDateCards([oneOff])).toEqual([oneOff]);
+  });
+});
+
+describe("groupClientBookings", () => {
+  const now = new Date("2026-09-30T12:00:00Z");
+  const rows = [
+    { id: 1, bookingStatus: "Completed", startDate: "2022-01-18T12:00:00Z" },       // ancient history
+    { id: 2, bookingStatus: "Completed", startDate: "2026-06-18T12:00:00Z" },       // recent history
+    { id: 3, bookingStatus: "Pay Now", startDate: "2026-09-14T12:00:00Z" },
+    { id: 4, bookingStatus: "Pay Now", startDate: "2026-09-21T12:00:00Z" },
+    { id: 5, bookingStatus: "Awaiting Invoice", startDate: "2026-09-17T12:00:00Z" },
+    { id: 6, bookingStatus: "Confirmed", startDate: "2026-10-05T12:00:00Z" },
+    { id: 7, bookingStatus: "Confirmed", startDate: "2026-09-16T12:00:00Z", isAdminBooking: true, isRecurring: true }, // season row
+  ];
+
+  it("leads with what the studio owes, then who it waits on", () => {
+    const [first, second] = groupClientBookings(rows, now);
+    expect(first.title).toBe("Needs payment");
+    expect(first.rows.map((r: any) => r.id)).toEqual([3, 4]);
+    expect(second.title).toBe("Waiting on artist");
+    expect(second.rows.map((r: any) => r.id)).toEqual([5]);
+  });
+
+  it("never shows the season row itself", () => {
+    const ids = groupClientBookings(rows, now).flatMap((g) => g.rows.map((r: any) => r.id));
+    expect(ids).not.toContain(7);
+    expect(isSeasonRow(rows[6])).toBe(true);
+  });
+
+  it("puts history newest first, not 2022 at the top", () => {
+    const past = groupClientBookings(rows, now).find((g) => g.key === "past");
+    expect(past?.rows.map((r: any) => r.id)).toEqual([2, 1]);
+  });
+
+  it("drops empty groups", () => {
+    const keys = groupClientBookings([rows[0]], now).map((g) => g.key);
+    expect(keys).toEqual(["past"]);
   });
 });

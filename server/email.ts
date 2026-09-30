@@ -1,3 +1,4 @@
+import { classDateLabel } from "@shared/classDate";
 import sgMail from "@sendgrid/mail";
 import {
   renderEmailShell, detailsCard, sanitizeUserText, p as para, b, quote,
@@ -893,23 +894,36 @@ export async function sendPaymentReminderEmail({
  * scheduled sweep (server/bookingReminders.ts), not on demand.
  */
 export async function sendCompleteBookingReminderEmail({
-  to, firstName, bookingUrl,
+  to, firstName, bookingUrl, classDate,
 }: {
   to: string; firstName: string; bookingUrl: string;
+  /** The class this reminder is for. A teacher with four weekly classes gets
+   *  several of these; without the date they cannot tell them apart. */
+  classDate?: string | Date | null;
 }): Promise<boolean> {
+  const dateLabel = classDateLabel(classDate);
   const html = renderEmailShell({
     accent: "artist",
     headline: "Complete Your Booking",
-    preheader: "Verify your hours and mark your booking complete to get paid.",
+    preheader: dateLabel
+      ? `Submit your hours for ${dateLabel} to get paid.`
+      : "Verify your hours and mark your booking complete to get paid.",
     bodyHtml:
       para("Hello " + b(firstName) + ",") +
-      para("We hope your Artswrk booking went well today. To get paid, please log in to verify total hours, upload any reimbursements, and mark your booking as “complete.”") +
+      para(dateLabel
+        ? "We hope your " + b(dateLabel) + " class went well. To get paid, please log in to verify total hours, upload any reimbursements, and mark your booking as “complete.”"
+        : "We hope your Artswrk booking went well today. To get paid, please log in to verify total hours, upload any reimbursements, and mark your booking as “complete.”") +
       para("If you haven’t connected to Stripe yet, you will be prompted to do so before you’re able to complete your booking."),
     ctaText: "Complete Booking",
     ctaUrl: bookingUrl,
     footerNote: "Best,<br>The Artswrk Team",
   });
-  return sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject: "Artswrk: Complete Your Booking", html });
+  return sendSimpleEmail({
+    to,
+    cc: SUPPORT_EMAIL,
+    subject: dateLabel ? `Artswrk: Complete Your Booking — ${dateLabel}` : "Artswrk: Complete Your Booking",
+    html,
+  });
 }
 
 /** One studio + weekday of recurring classes, for the "classes set up" email. */

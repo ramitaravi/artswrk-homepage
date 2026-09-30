@@ -27,6 +27,7 @@ const APP_URL = process.env.VITE_APP_URL || "https://artswrk.com";
 interface DueBooking {
   id: number;
   paymentMethod: string | null;
+  startDate: Date | null;
   artistEmail: string | null;
   artistFirstName: string | null;
 }
@@ -37,7 +38,7 @@ export async function getDueCompletionReminders(now: Date = new Date()): Promise
   if (!db) return [];
   const w = reminderWindow(now);
   const rows = await db.execute(`
-    SELECT b.id, b.paymentMethod, a.email AS artistEmail, a.firstName AS artistFirstName
+    SELECT b.id, b.paymentMethod, b.startDate, a.email AS artistEmail, a.firstName AS artistFirstName
     FROM bookings b
     JOIN users a ON b.artistUserId = a.id
     WHERE COALESCE(b.bookingStatus, '') NOT IN ('Cancelled', 'Completed')
@@ -83,6 +84,7 @@ export async function sendDuePeriodReminders(now: Date = new Date()): Promise<{ 
           to: period.artistEmail,
           firstName: period.artistFirstName ?? "there",
           bookingUrl: `${APP_URL}/app/bookings`,
+          classDate: period.periodStart,
         });
         sent++;
       } else {
@@ -117,7 +119,7 @@ export async function handleScheduledBookingCompletionReminders(req: Request, re
           if (booking.paymentMethod === "direct") {
             await sendConfirmDirectPaymentReminderEmail({ to: booking.artistEmail, firstName, bookingUrl });
           } else {
-            await sendCompleteBookingReminderEmail({ to: booking.artistEmail, firstName, bookingUrl });
+            await sendCompleteBookingReminderEmail({ to: booking.artistEmail, firstName, bookingUrl, classDate: (booking as any).startDate });
           }
         }
         await markReminderSent(booking.id);

@@ -3,17 +3,17 @@
  * Real data from the bookings table, linked to jobs + interested artists.
  */
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useLocation, Link } from "wouter";
 import {
   Calendar, Clock, MapPin, DollarSign, CheckCircle, AlertCircle,
   ChevronDown, ChevronUp, ChevronRight, CreditCard,
-  TrendingUp, Loader2, RefreshCw, Send, ArrowRight, Building2, Paperclip, X
+  TrendingUp, Loader2, RefreshCw, Send, ArrowRight, Building2, Paperclip, X, Search
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { periodInvoiceTotals, bookingMoney } from "@shared/bookingRates";
 import { isArtistAccount } from "@shared/accountRole";
-import { periodClassDay } from "@/lib/weeklyBookings";
+import { groupClientBookings, periodClassDay, toClientDateCards } from "@/lib/weeklyBookings";
 import { useAuth } from "@/_core/hooks/useAuth";
 // Flexible type for both raw Booking schema rows and enriched query results
 type AnyBooking = {
@@ -48,6 +48,29 @@ type AnyBooking = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/** True when both ends of a booking fall on the same calendar day. */
+function sameDay(a: Date | string | null | undefined, b: Date | string | null | undefined) {
+  if (!a || !b) return true;
+  const x = new Date(a), y = new Date(b);
+  return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate();
+}
+
+/** A class date, written the way a studio says it: "Mon, Sep 14". */
+function formatClassDate(d: Date | string | null | undefined) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+}
+
+/** "Weekly class · Mondays" — the season a date belongs to, never a status. */
+function weeklyClassLabel(booking: { startDate?: Date | string | null; recurringCadence?: string | null }) {
+  const cadence = booking.recurringCadence === "biweekly" ? "Every other week"
+    : booking.recurringCadence === "monthly" ? "Monthly class"
+    : booking.recurringCadence === "quarterly" ? "Quarterly" : "Weekly class";
+  if (!booking.startDate) return cadence;
+  const day = new Date(booking.startDate).toLocaleDateString("en-US", { weekday: "long" });
+  return `${cadence} · ${day}s`;
+}
+
 function formatDate(d: Date | null | undefined) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -75,7 +98,7 @@ function avatarColor(id: string) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-type BookingStatus = "Confirmed" | "Completed" | "Cancelled" | "Pay Now";
+type BookingStatus = "Confirmed" | "Completed" | "Cancelled" | "Pay Now" | "Awaiting Invoice";
 type PaymentStatus = "Paid" | "Unpaid";
 
 const BOOKING_STATUS_CONFIG: Record<BookingStatus, { label: string; className: string; icon: React.ReactNode }> = {
@@ -83,6 +106,9 @@ const BOOKING_STATUS_CONFIG: Record<BookingStatus, { label: string; className: s
   Completed: { label: "Completed", icon: <CheckCircle size={12} />, className: "text-gray-500 bg-gray-100" },
   Cancelled: { label: "Cancelled", icon: <AlertCircle size={12} />, className: "text-red-500 bg-red-50" },
   "Pay Now": { label: "Pay Now", icon: <CreditCard size={12} />, className: "text-amber-600 bg-amber-50" },
+  // The class happened; the teacher hasn't sent their hours yet. Nothing for
+  // the studio to do but it is not "Confirmed" either — it is waiting on someone.
+  "Awaiting Invoice": { label: "Awaiting artist invoice", icon: <Clock size={12} />, className: "text-blue-600 bg-blue-50" },
 };
 
 const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, { label: string; className: string }> = {
@@ -91,6 +117,11 @@ const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, { label: string; className: s
 };
 
 // ── Booking Row ───────────────────────────────────────────────────────────────
+
+/** Every row across the groups — what the All pill counts. */
+function filteredTotal(groups: { rows: any[] }[]): number {
+  return groups.reduce((n, g) => n + g.rows.length, 0);
+}
 
 function BookingRow({ booking }: { booking: AnyBooking }) {
   const [, navigate] = useLocation();
@@ -113,12 +144,26 @@ function BookingRow({ booking }: { booking: AnyBooking }) {
     ? `${artistFirstName} ${artistLastName[0]}.`
     : artistName ?? `Artist #${artistId.slice(-6) || "—"}`;
 
-  function handleArtistClick() {
+  function handleArtistClick(e: React.MouseEvent) {
+    e.stopPropagation();
     if (artistUserId) navigate(`/app/artists/${artistUserId}`);
   }
 
+  const detailHref = (booking as any).isClassDate && (booking as any).periodId
+    ? `/app/bookings/${booking.id}?date=${(booking as any).periodId}`
+    : `/app/bookings/${booking.id}`;
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+    // The whole card is the target — a studio scanning a list clicks the row,
+    // not the small link at its edge. Controls inside stop the click so Pay now
+    // still goes to checkout and the artist's name still opens their profile.
+    <div
+      role="link"
+      tabIndex={0}
+      onClick={() => navigate(detailHref)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(detailHref); } }}
+      className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F25722]/40"
+    >
       {/* Main row */}
       <div className="p-5">
         <div className="flex items-start justify-between gap-4">
@@ -172,8 +217,10 @@ function BookingRow({ booking }: { booking: AnyBooking }) {
               {/* Meta row */}
               <div className="flex items-center gap-4 flex-wrap">
                 {booking.startDate && (
-                  <span className="flex items-center gap-1 text-xs text-gray-500">
-                    <Calendar size={11} /> {formatDate(booking.startDate)}
+                  // The date is what a studio scans for, so it leads the meta row
+                  // in the page's text colour rather than sitting in grey.
+                  <span className="flex items-center gap-1.5 text-sm font-bold text-[#111]">
+                    <Calendar size={13} className="text-gray-400" /> {formatClassDate(booking.startDate)}
                   </span>
                 )}
                 {booking.hours && (
@@ -200,12 +247,20 @@ function BookingRow({ booking }: { booking: AnyBooking }) {
                 field is no longer even fetched for clients. */}
             {/* Pay Now removed — see dashboard/Payments.tsx. It linked to a
                 Bubble Payment Link that charges for a different booking. */}
-            <button
-              onClick={() => navigate(`/app/bookings/${booking.id}`)}
-              className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              Details <ChevronRight size={14} />
-            </button>
+            {bookingStatus === "Pay Now" && ((booking as any).invoiceStripeCheckoutUrl || (booking as any).invoicePaymentToken) ? (
+              <a
+                href={(booking as any).invoiceStripeCheckoutUrl ?? `/invoice/${(booking as any).invoicePaymentToken}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-1 text-xs font-bold text-white hirer-grad-bg px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+              >
+                Pay now <ChevronRight size={13} />
+              </a>
+            ) : null}
+            <span className="flex items-center gap-1 text-xs text-gray-400">
+              View details <ChevronRight size={14} />
+            </span>
           </div>
         </div>
       </div>
@@ -517,14 +572,26 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
                       </span>
                     );
                   })()}
-                  {booking.isRecurring && <span className="text-[10px] font-semibold text-gray-500 capitalize">{booking.recurringCadence}</span>}
+                  {(booking.recurringSeriesId || booking.isRecurring) && (
+                    <span className="text-[10px] font-semibold text-gray-500">
+                      {weeklyClassLabel(booking)}
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm font-bold text-[#111]">
                   {isArtist ? (clientName ?? "Client") : (artistName ?? "Artist")}
                 </p>
                 {booking.description && <p className="text-xs text-gray-500 line-clamp-1">{booking.description}</p>}
                 <div className="flex items-center gap-3 mt-1 flex-wrap">
-                  <span className="flex items-center gap-1 text-xs text-gray-500"><Calendar size={11} /> {formatDate(booking.startDate)} – {formatDate(booking.endDate)}</span>
+                  <span className="flex items-center gap-1 text-xs text-gray-500">
+                    <Calendar size={11} />
+                    {/* A class date is one day. Only a booking that really spans
+                        days shows a range — a single date shown as "Sep 14 – Sep 14"
+                        reads like something is missing. */}
+                    {sameDay(booking.startDate, booking.endDate)
+                      ? formatClassDate(booking.startDate)
+                      : `${formatDate(booking.startDate)} – ${formatDate(booking.endDate)}`}
+                  </span>
                   {booking.locationAddress && <span className="flex items-center gap-1 text-xs text-gray-500 truncate max-w-[160px]"><MapPin size={11} /> {booking.locationAddress}</span>}
                 </div>
               </div>
@@ -535,7 +602,21 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
                   Bubble-migrated bookings are the opposite: their rate is the
                   booking total, which is why BookingRow above shows no "/hr". */}
               <p className="text-sm font-black text-[#111]">${isArtist ? booking.artistRate : booking.clientRate}/hr</p>
-              <p className="text-[10px] text-gray-400">{paidPeriods.length}/{periods.length} paid</p>
+              {periods.length > 0 ? (
+                <p className="text-[10px] text-gray-400">{paidPeriods.length}/{periods.length} paid</p>
+              ) : booking.hours != null ? (
+                <p className="text-[10px] text-gray-400">{booking.hours}h scheduled</p>
+              ) : null}
+              {!isArtist && periods.length === 0 && booking.bookingStatus === "Pay Now" && (
+                <a
+                  href={booking.invoiceStripeCheckoutUrl ?? (booking.invoicePaymentToken ? `/invoice/${booking.invoicePaymentToken}` : "/app/bookings")}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs font-bold text-white hirer-grad-bg px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  Pay now →
+                </a>
+              )}
               {isArtist && openPeriods.length > 0 && (
                 <button
                   onClick={() => setSubmitPeriod({ ...openPeriods[0], scheduledHours: booking.hours })}
@@ -568,7 +649,15 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
             {periods.map((p: any, i: number) => (
               <div key={p.id} className="flex items-center justify-between bg-white rounded-xl px-4 py-2.5 border border-gray-100">
                 <div>
-                  <p className="text-xs font-semibold text-[#111]">Period {i + 1} · {formatDate(p.periodStart)} – {formatDate(p.periodEnd)}</p>
+                  <p className="text-xs font-semibold text-[#111]">
+                    {booking.isRecurring
+                      // A weekly class is one class day, not a date range. periodStart
+                      // is that day at UTC midnight, so formatting it directly renders
+                      // the day before for anyone west of UTC — the studio reads its
+                      // Monday class as Sunday.
+                      ? periodClassDay(p).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+                      : `Period ${i + 1} · ${formatDate(p.periodStart)} – ${formatDate(p.periodEnd)}`}
+                  </p>
                   {p.actualHours != null && <p className="text-[10px] text-gray-500">{p.actualHours}h logged</p>}
                 </div>
                 <div className="flex items-center gap-2">
@@ -593,8 +682,19 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
                   {isArtist && p.status === "open" && (
                     <button onClick={() => setSubmitPeriod({ ...p, scheduledHours: booking.hours })} className="text-[10px] font-bold text-[#F25722] hover:underline">Submit →</button>
                   )}
-                  {!isArtist && p.status === "artist_submitted" && p.invoiceStripeCheckoutUrl && (
-                    <a href={p.invoiceStripeCheckoutUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-[#F25722] hover:underline">Pay →</a>
+                  {!isArtist && p.status === "artist_submitted" && (p.invoiceStripeCheckoutUrl || p.invoicePaymentToken) && (
+                    // Checkout is created when the studio opens the invoice, so a
+                    // submitted week has a token long before it has a Stripe URL.
+                    // Without this fallback the studio saw hours submitted and no
+                    // way to pay them.
+                    <a
+                      href={p.invoiceStripeCheckoutUrl ?? `/invoice/${p.invoicePaymentToken}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] font-bold text-[#F25722] hover:underline"
+                    >
+                      Review &amp; pay →
+                    </a>
                   )}
                 </div>
               </div>
@@ -636,10 +736,11 @@ export function ArtistRecurringBookings() {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-type FilterTab = "all" | "Confirmed" | "Completed" | "Cancelled";
+type FilterTab = "all" | "pay" | "awaiting" | "upcoming" | "past";
 
 export default function Bookings() {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const [search, setSearch] = useState("");
   const { user } = useAuth();
   const isArtist = isArtistAccount(user as any);
 
@@ -651,26 +752,50 @@ export default function Bookings() {
 
   const isLoading = statsLoading || bookingsLoading;
 
-  // "Pay Now" bookings float to the top regardless of tab — that's the one
-  // status that means the client actually owes money right now, so it
-  // should be the easiest thing on the page to spot and act on.
-  const filtered = (bookings ?? [])
-    .filter((b) => {
-      if (activeTab === "all") return true;
-      return b.bookingStatus === activeTab;
-    })
-    .sort((a, b) => {
-      const aPayNow = a.bookingStatus === "Pay Now" ? 0 : 1;
-      const bPayNow = b.bookingStatus === "Pay Now" ? 0 : 1;
-      return aPayNow - bPayNow;
-    });
+  // A studio's weekly classes are listed one class date at a time, in the same
+  // row as every other booking — a season with dates folded inside it was the
+  // thing nobody could read. Artists keep the season card below, where their
+  // week-by-week Submit Hours lives.
+  const classDates = useMemo(
+    () => (isArtist ? [] : toClientDateCards(adminBookings as any[])),
+    [isArtist, adminBookings],
+  );
 
-  const tabs: { key: FilterTab; label: string; count: number }[] = [
-    { key: "all", label: "All", count: stats?.total ?? 0 },
-    { key: "Confirmed", label: "Confirmed", count: stats?.confirmed ?? 0 },
-    { key: "Completed", label: "Completed", count: stats?.completed ?? 0 },
-    { key: "Cancelled", label: "Cancelled", count: stats?.cancelled ?? 0 },
-  ];
+  // Search across the things a studio actually remembers a booking by: who
+  // taught it, what the class was, where it was, and the date as they would
+  // say it ("sep 14", "monday").
+  const matches = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return () => true;
+    return (b: any) => {
+      const date = b.startDate
+        ? new Date(b.startDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+        : "";
+      const name = [b.artistFirstName, b.artistLastName, b.artistName, b.artistSlug].filter(Boolean).join(" ");
+      return [name, b.description, b.locationAddress, date, b.bookingStatus]
+        .filter(Boolean)
+        .some((field: string) => String(field).toLowerCase().includes(q));
+    };
+  }, [search]);
+
+  const allGroups = useMemo(
+    () => groupClientBookings([...(bookings ?? []), ...classDates].filter(matches)),
+    [bookings, classDates, matches],
+  );
+  const groups = activeTab === "all" ? allGroups : allGroups.filter((g) => g.key === activeTab);
+  const filtered = groups.flatMap((g) => g.rows);
+
+  // The pills are the sections: a studio filters by what it has to do, not by a
+  // status word. A pill with nothing behind it is hidden rather than shown empty.
+  const countFor = (key: string) => allGroups.find((g) => g.key === key)?.rows.length ?? 0;
+  const tabs: { key: FilterTab; label: string; count: number; urgent?: boolean }[] = ([
+    { key: "all", label: "All", count: filteredTotal(allGroups) },
+    { key: "pay", label: "Needs payment", count: countFor("pay"), urgent: true },
+    { key: "awaiting", label: "Awaiting invoice", count: countFor("awaiting") },
+    { key: "upcoming", label: "Upcoming", count: countFor("upcoming") },
+    { key: "past", label: "Past", count: countFor("past") },
+  ] as { key: FilterTab; label: string; count: number; urgent?: boolean }[])
+    .filter((t) => t.key === "all" || t.count > 0);
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
@@ -723,31 +848,55 @@ export default function Bookings() {
         </div>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex items-center gap-1 bg-white rounded-xl border border-gray-200 p-1 w-fit mb-5 flex-wrap">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
-            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-              activeTab === t.key ? "hirer-grad-bg text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
-            }`}
-          >
-            {t.label}
-            <span className={`text-xs rounded-full px-1.5 py-0.5 ${
-              activeTab === t.key ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
-            }`}>
-              {t.count}
-            </span>
-          </button>
-        ))}
+      {/* Filter pills + search */}
+      <div className="flex flex-wrap items-center gap-3 mb-5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {tabs.map((t) => {
+            const active = activeTab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setActiveTab(t.key)}
+                className={`px-3.5 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                  active
+                    ? "hirer-grad-bg text-white border-transparent shadow-sm"
+                    : t.urgent
+                      // Money owed stays visible even when the pill is not selected.
+                      ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                      : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {t.label}
+                <span className={`text-[10px] rounded-full px-1.5 py-0.5 ${
+                  active ? "bg-white/25 text-white" : t.urgent ? "bg-amber-200/60 text-amber-800" : "bg-gray-100 text-gray-500"
+                }`}>
+                  {t.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            id="booking-search"
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search artist, class or date"
+            className="w-full pl-9 pr-3 py-2 rounded-full border border-gray-200 text-xs font-medium text-[#111] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#F25722]/30 focus:border-[#F25722]"
+          />
+        </div>
       </div>
 
       {/* Weekly and manually entered bookings. Artists and studios see these as
           ordinary bookings — never labeled "admin". */}
-      {!adminLoading && (adminBookings as any[])?.length > 0 && (
+      {isArtist && !adminLoading && (adminBookings as any[])?.length > 0 && (
         <div className="mb-3">
           <div className="space-y-3">
+            {/* Studios see each class date as its own booking. Artists keep the
+                season card, where their week-by-week Submit Hours lives. */}
+            {/* Artists only: the season card with per-week Submit Hours. */}
             {(adminBookings as any[]).map((b: any) => (
               <AdminBookingCard key={b.id} booking={b} isArtist={isArtist} onPeriodsUpdated={() => refetchAdmin()} />
             ))}
@@ -776,9 +925,20 @@ export default function Bookings() {
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
-          {filtered.map((booking) => (
-            <BookingRow key={booking.id} booking={booking} />
+        <div className="space-y-8">
+          {groups.map((group) => (
+            <section key={group.key}>
+              <div className="flex items-baseline gap-2 mb-3">
+                <h2 className="text-sm font-black text-[#111] uppercase tracking-wide">{group.title}</h2>
+                <span className="text-xs font-semibold text-gray-400">{group.rows.length}</span>
+              </div>
+              {group.hint && <p className="text-xs text-gray-500 -mt-2 mb-3">{group.hint}</p>}
+              <div className="space-y-3">
+                {group.rows.map((booking: any) => (
+                  <BookingRow key={booking.key ?? booking.id} booking={booking} />
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}

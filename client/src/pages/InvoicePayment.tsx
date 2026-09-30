@@ -12,7 +12,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { Loader2, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, ExternalLink, ChevronLeft } from "lucide-react";
 import { processingFeeFor, PROCESSING_FEE_RATE } from "@shared/bookingRates";
 
 export default function InvoicePayment() {
@@ -141,6 +141,17 @@ export default function InvoicePayment() {
       </header>
 
       <div className="max-w-2xl mx-auto px-4 py-12">
+        {/* This page is opened two ways: from an emailed link, where there is
+            nowhere to go back to, and from the dashboard, where landing in a
+            page with no way out reads as a dead end. The link is shown either
+            way — a studio that isn't signed in lands on the login page, which
+            is still better than being stuck. */}
+        <a
+          href="/app/bookings"
+          className="inline-flex items-center gap-1.5 mb-6 text-sm font-semibold text-gray-500 hover:text-[#111] transition-colors"
+        >
+          <ChevronLeft size={16} /> Back to bookings
+        </a>
         {isPaid ? (
           /* ── Paid confirmation ── */
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

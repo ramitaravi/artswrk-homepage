@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { groupClientBookings, toClientDateCards } from "@/lib/weeklyBookings";
 import { useUpgrade } from "@/lib/useUpgrade";
 import { JobCard } from "@/components/ClientJobCard";
 import { toSimpleJobStatus } from "@shared/jobStatus";
@@ -138,9 +139,18 @@ function PostJobBox() {
 
 /** `onClick` wins over `href` — the upgrade row goes straight to Stripe rather
  *  than navigating to a page that would only show another upgrade button. */
-type TaskItem = { key: string; icon: React.ReactNode; label: string; sublabel?: string; href?: string; onClick?: () => void; upsell?: boolean };
+type TaskDetail = { key: string; title: string; meta?: string; amount?: string; payUrl?: string; bookingUrl?: string };
+type TaskItem = {
+  key: string; icon: React.ReactNode; label: string; sublabel?: string;
+  href?: string; onClick?: () => void; upsell?: boolean;
+  /** Rows revealed when the task is opened, each with its own actions. */
+  details?: TaskDetail[];
+};
 
 function TaskRow({ task }: { task: TaskItem }) {
+  const [open, setOpen] = useState(false);
+  const expandable = Boolean(task.details?.length);
+
   const body = (
       <div className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
         task.upsell
@@ -154,9 +164,51 @@ function TaskRow({ task }: { task: TaskItem }) {
           <p className="text-xs font-semibold text-[#111]">{task.label}</p>
           {task.sublabel && <p className="text-xs text-gray-500 mt-0.5">{task.sublabel}</p>}
         </div>
-        <ChevronRight size={14} className="text-gray-400 flex-shrink-0" />
+        <ChevronRight size={14} className={`text-gray-400 flex-shrink-0 transition-transform ${expandable && open ? "rotate-90" : ""}`} />
       </div>
   );
+
+  // A task that stands for several dates opens in place: the studio sees which
+  // classes it owes for and can pay one, without leaving the home page.
+  if (expandable) {
+    return (
+      <div>
+        <button type="button" onClick={() => setOpen((o) => !o)} className="block w-full text-left">{body}</button>
+        {open && (
+          <div className="mt-1 ml-11 space-y-1">
+            {task.details!.map((d) => (
+              <div key={d.key} className="flex items-center gap-2 py-1.5">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-[#111]">{d.title}</p>
+                  {d.meta && <p className="text-[11px] text-gray-500">{d.meta}</p>}
+                </div>
+                {d.amount && <p className="text-xs font-black text-[#111]">{d.amount}</p>}
+                {d.payUrl && (
+                  <a
+                    href={d.payUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1 rounded-full text-[11px] font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex-shrink-0"
+                  >
+                    Pay now
+                  </a>
+                )}
+                {d.bookingUrl && (
+                  <Link
+                    href={d.bookingUrl}
+                    className="px-3 py-1 rounded-full text-[11px] font-bold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors flex-shrink-0"
+                  >
+                    View booking
+                  </Link>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (task.onClick) {
     return <button type="button" onClick={task.onClick} className="block w-full text-left">{body}</button>;
   }
@@ -677,8 +729,16 @@ export default function Overview() {
   // The client can't pay until the artist invoices, so this task should only
   // fire once that's actually happened.
   const unpaidBookings = (bookingStats as any)?.awaitingPayment ?? 0;
+
   const unreadMessages = (messageStats as any)?.unreadMessages ?? 0;
   const isPremium = (user as any)?.planTier === "client_premium";
+
+  // The class dates waiting on payment, shown on the home page rather than only
+  // counted: a number tells a studio something is owed, a list lets them pay it.
+  const { data: adminBookings } = trpc.bookingPeriods.myAdminBookings.useQuery();
+  const needsPayment = groupClientBookings(toClientDateCards(adminBookings as any[]))
+    .find((g) => g.key === "pay")?.rows ?? [];
+  const needsPaymentTotal = needsPayment.reduce((sum: number, b: any) => sum + Number(b.totalClientRate ?? 0), 0);
 
   const { data: benefitsData } = trpc.benefits.list.useQuery({ audienceType: "Client" });
   const benefitsCount = benefitsData?.benefits?.length ?? 0;
@@ -701,6 +761,21 @@ export default function Overview() {
       label: `Pay ${unpaidBookings} artist${unpaidBookings !== 1 ? "s" : ""}`,
       sublabel: "Invoice" + (unpaidBookings !== 1 ? "s" : "") + " ready for payment",
       href: "/app/bookings",
+    },
+    needsPayment.length > 0 && {
+      key: "pay-weeks",
+      icon: <CalendarCheck size={16} className="text-[#F25722]" />,
+      label: `Pay ${needsPayment.length} class date${needsPayment.length !== 1 ? "s" : ""}`,
+      sublabel: `$${needsPaymentTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} due — hours submitted by your artists`,
+      details: needsPayment.slice(0, 8).map((b: any) => ({
+        key: b.key,
+        title: new Date(b.startDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+        meta: [b.artistFirstName ? `${b.artistFirstName} ${b.artistLastName?.[0] ?? ""}.` : b.artistName, b.hours ? `${b.hours}h` : null]
+          .filter(Boolean).join(" · "),
+        amount: `$${Number(b.totalClientRate ?? 0).toFixed(2)}`,
+        payUrl: b.invoiceStripeCheckoutUrl ?? (b.invoicePaymentToken ? `/invoice/${b.invoicePaymentToken}` : undefined),
+        bookingUrl: b.isClassDate ? undefined : `/app/bookings/${b.id}`,
+      })),
     },
     unreadMessages > 0 && {
       key: "messages",
@@ -752,6 +827,7 @@ export default function Overview() {
 
       {/* ── Tasks (only what's actually applicable) ──────────────────────── */}
       <TasksCard tasks={tasks} />
+
 
       {/* ── Benefits teaser — only promoted once there's something real to show.
           Enterprise gets benefits:[] from the server, so this naturally never

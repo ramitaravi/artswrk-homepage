@@ -137,6 +137,14 @@ export default function ClientBookingDetail() {
 
   const { data: booking, isLoading, error } = trpc.bookings.clientDetail.useQuery({ id }, { enabled: !!id });
 
+  // A weekly class is one booking per class date. Until the stored data catches
+  // up, a date arrives as ?date=<period id> on its season's booking, and this
+  // page shows that date's own hours, total and invoice.
+  const periodId = Number(new URLSearchParams(typeof window === "undefined" ? "" : window.location.search).get("date"));
+  const classDate = periodId
+    ? ((booking as any)?.periods ?? []).find((p: any) => p.id === periodId)
+    : null;
+
   if (isLoading) {
     return (
       <div className="p-4 md:p-6 max-w-3xl mx-auto flex items-center justify-center py-24 text-gray-400">
@@ -273,6 +281,42 @@ export default function ClientBookingDetail() {
         </div>
       </div>
 
+      {classDate && (
+        <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-5 mb-4">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">This class</p>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <p className="text-xl font-black text-[#111]">
+                {new Date(classDate.periodStart).toLocaleDateString("en-US", {
+                  weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC",
+                })}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                {classDate.actualHours != null
+                  ? `${classDate.actualHours} hours submitted`
+                  : `${b.hours ?? "—"} hours scheduled`}
+                {classDate.status === "client_paid" ? " · paid" : ""}
+              </p>
+            </div>
+            <div className="text-right">
+              {classDate.invoiceTotalCents != null && (
+                <p className="text-xl font-black text-[#111]">${(classDate.invoiceTotalCents / 100).toFixed(2)}</p>
+              )}
+              {classDate.status === "artist_submitted" && (classDate.invoiceStripeCheckoutUrl || classDate.invoicePaymentToken) && (
+                <a
+                  href={classDate.invoiceStripeCheckoutUrl ?? `/invoice/${classDate.invoicePaymentToken}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block mt-2 px-4 py-2 rounded-full text-xs font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity"
+                >
+                  Pay now
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Booking details */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -332,9 +376,14 @@ export default function ClientBookingDetail() {
           )}
         </div>
 
-        {/* Financials */}
+        {/* Financials — the season's rate, which is not what a single class
+            costs. When one class date is open, its own money is shown above,
+            so this becomes the rate the class is billed at rather than a total
+            anyone owes. */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Financials</p>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+            {classDate ? "Rate for this class" : "Financials"}
+          </p>
           {/* Client-facing figures ONLY. Artist rate, Stripe fee and gross
               profit are Artswrk's margin — they are not fetched for this page
               (see getClientBookingDetail), so there is nothing to leak here. */}
@@ -405,7 +454,10 @@ export default function ClientBookingDetail() {
               <ExternalLink size={11} /> Paid externally (outside Stripe)
             </p>
           )}
-          {b.artswrkInvoiceSubmittedAt && (
+          {/* Weekly class bookings carry a placeholder invoice date (2001-01-01)
+              from when they were created, which read as a real submission. A
+              date that old is never a real invoice. */}
+          {b.artswrkInvoiceSubmittedAt && new Date(b.artswrkInvoiceSubmittedAt).getFullYear() > 2010 && !classDate && (
             <p className="text-xs text-gray-400 mt-3">
               Invoice submitted {formatDate(b.artswrkInvoiceSubmittedAt)}
             </p>

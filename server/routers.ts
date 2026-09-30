@@ -8,6 +8,7 @@ import bcrypt from "bcryptjs";
 import { APP_URL } from "./emailTemplates";
 import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ONE_YEAR_MS } from "@shared/const";
 import { isJobPubliclyLive } from "@shared/jobStatus";
+import { classDateLabel } from "@shared/classDate";
 import { bookingMoney, resolveBookingBaseAmount, isHourlyBooking, processingFeeFor } from "@shared/bookingRates";
 import { getPasswordError, PASSWORD_MAX_LENGTH } from "@shared/password";
 import { isArtistAccount, isClientAccount } from "@shared/accountRole";
@@ -5293,7 +5294,10 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
               price_data: {
                 currency: "usd",
                 unit_amount: totalCents,
-                product_data: { name: `Payment for ${artistName}`, description: jobTitle },
+                product_data: {
+                  name: booking.startDate ? `Payment for ${artistName} — ${classDateLabel(booking.startDate)}` : `Payment for ${artistName}`,
+                  description: jobTitle,
+                },
               },
               quantity: 1,
             }],
@@ -5352,7 +5356,9 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
 
         const clientUser = parentBooking.clientUserId ? await getUserById(parentBooking.clientUserId) : null;
         const artistName = (period as any).artistName ?? (period as any).artistFirstName ?? "Artist";
-        const periodLabel = new Date((period as any).periodStart).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+        // The class date, not the month: a studio paying four Mondays needs each
+        // charge on their statement to say which one.
+        const periodLabel = classDateLabel((period as any).periodStart);
         const paymentPageUrl = `${APP_URL}/invoice/${(period as any).invoicePaymentToken}`;
 
         const stripe = getStripe();
@@ -5541,14 +5547,14 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         // Email client to review
         const clientUser = booking.clientUserId ? await getUserById(booking.clientUserId) : null;
         if (clientUser?.email) {
-          const periodLabel = new Date(period.periodStart).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+          const periodLabel = classDateLabel(period.periodStart);
           const artistName = (user.name ?? (`${user.firstName ?? ""} ${(user as any).lastName ?? ""}`.trim())) || "Your artist";
           const { sendSimpleEmail: _sendClientInvoice } = await import("./email");
           await _sendClientInvoice({
             to: clientUser.email,
             cc: "support@artswrk.com",
-            subject: `Invoice ready for review — ${artistName} (${periodLabel})`,
-            html: `<p>Hi ${(clientUser as any).clientCompanyName ?? clientUser.firstName ?? "there"},</p><p>${artistName} has submitted their hours for <strong>${periodLabel}</strong> — ready for your review.</p><p><strong>Estimated total: $${(totalCents / 100).toFixed(2)}</strong>${totalReimb > 0 ? ` (incl. $${totalReimb.toFixed(2)} reimbursements)` : ""}</p><p>If the hours need adjusting, you can update them on the review page before paying.</p><p><a href="${paymentPageUrl}" style="background:#F25722;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Review Invoice →</a></p><p>Best,<br/>The Artswrk Team</p>`,
+            subject: `Invoice ready for review — ${artistName}, ${periodLabel}`,
+            html: `<p>Hi ${(clientUser as any).clientCompanyName ?? clientUser.firstName ?? "there"},</p><p>${artistName} has submitted their hours for the <strong>${periodLabel}</strong> class — ready for your review.</p><p><strong>Estimated total: $${(totalCents / 100).toFixed(2)}</strong>${totalReimb > 0 ? ` (incl. $${totalReimb.toFixed(2)} reimbursements)` : ""}</p><p>If the hours need adjusting, you can update them on the review page before paying.</p><p><a href="${paymentPageUrl}" style="background:#F25722;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Review Invoice →</a></p><p>Best,<br/>The Artswrk Team</p>`,
           }).catch(() => {});
         }
 
