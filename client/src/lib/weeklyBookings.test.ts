@@ -190,9 +190,9 @@ describe("toClientDateCards", () => {
     expect(third.bookingStatus).toBe("Awaiting Invoice");
   });
 
-  it("leaves one-off bookings alone", () => {
+  it("does not duplicate one-off admin bookings already returned by myBookings", () => {
     const oneOff = { id: 5, isRecurring: false, periods: [] };
-    expect(toClientDateCards([oneOff])).toEqual([oneOff]);
+    expect(toClientDateCards([oneOff])).toEqual([]);
   });
 });
 

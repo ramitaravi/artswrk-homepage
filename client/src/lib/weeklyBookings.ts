@@ -131,7 +131,9 @@ export function toClientDateCards(adminBookings: any[], now: Date = new Date()):
   };
 
   return (adminBookings ?? []).flatMap((booking: any) => {
-    if (!booking?.isRecurring) return [booking];
+    // Ordinary admin bookings already appear in myBookings. This helper only
+    // expands legacy weekly season rows into their per-date virtual cards.
+    if (!booking?.isRecurring) return [];
     return (booking.periods ?? [])
       .filter((period: any) => period.status !== "skipped")
       .map((period: any) => {

@@ -82,8 +82,11 @@ export default function Payments() {
   // Class dates whose hours are in and whose invoice is waiting. These are the
   // only bookings on this page a studio can actually settle right now.
   const { data: adminBookings } = trpc.bookingPeriods.myAdminBookings.useQuery();
-  const needsPayment = groupClientBookings(toClientDateCards(adminBookings as any[]))
-    .find((g) => g.key === "pay")?.rows ?? [];
+  const { data: bookings } = trpc.bookings.myBookings.useQuery({ limit: 200 });
+  const needsPayment = (groupClientBookings([
+    ...(bookings ?? []), ...toClientDateCards(adminBookings as any[]),
+  ]).find((g) => g.key === "pay")?.rows ?? [])
+    .filter((b: any) => b.invoiceStripeCheckoutUrl || b.invoicePaymentToken);
   const needsPaymentTotal = needsPayment.reduce((sum: number, b: any) => sum + Number(b.totalClientRate ?? 0), 0);
   const { data: recentPayments, isLoading: paymentsLoading } = trpc.payments.myPayments.useQuery({ limit: 100 });
 
@@ -158,7 +161,7 @@ export default function Payments() {
                     ? `${b.artistFirstName} ${b.artistLastName[0]}.`
                     : b.artistName ?? "Artist";
                   return (
-                    <div key={b.key} className="flex items-center gap-3">
+                    <div key={b.key ?? b.id} className="flex items-center gap-3">
                       <ArtistAvatar firstName={b.artistFirstName} lastName={b.artistLastName} name={b.artistName} profilePicture={b.artistProfilePicture} size="md" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-[#111] truncate">{artistName}</p>

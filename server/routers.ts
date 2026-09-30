@@ -4295,6 +4295,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
       .input(z.object({
         bookingId: z.number(),
         artistRate: z.number().optional(),
+        hours: z.number().positive().max(24).optional(),
         notes: z.string().max(1000).optional(),
         origin: z.string().url().optional(),
       }))
@@ -4321,6 +4322,10 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         if ((booking as any).isAdminBooking && (booking as any).isRecurring) {
           throw new Error("This is a weekly booking — submit your hours for the specific week instead, from the Bookings page.");
         }
+        const isClassDate = !!(booking as any).recurringSeriesId;
+        if (isClassDate && ((booking as any).invoicePaymentToken || (booking as any).artswrkInvoiceSubmittedAt)) {
+          throw new Error("An invoice has already been submitted for this class date.");
+        }
 
         // Every payout must land in the artist's own connected Stripe account —
         // never let an invoice go out (and get paid) with nowhere for the money to go.
@@ -4334,7 +4339,17 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
 
         const reimbList = await getReimbursementsByBookingId(input.bookingId);
         const totalReimb = reimbList.reduce((s: number, r: any) => s + (r.value ?? 0), 0);
-        const artistRate = input.artistRate ?? 0;
+        const actualHours = input.hours ?? booking.hours;
+        if (isClassDate && (!(booking as any).hourlyRate || !actualHours || actualHours <= 0)) {
+          throw new Error("Enter the hours worked for this class before invoicing.");
+        }
+        // Class-date rows store an hourly unit rate, unlike legacy booking rows
+        // whose artistRate is already the whole booking amount. The client may
+        // never choose the unit rate or amount to charge for a class date.
+        const artistRate = isClassDate
+          ? bookingMoney({ rateType: (booking as any).rateType, hourlyRate: (booking as any).hourlyRate,
+              hours: booking.hours }, { hoursOverride: actualHours }).base
+          : (input.artistRate ?? 0);
         const processingFee = processingFeeFor(artistRate + totalReimb);
         const totalDollars = artistRate + totalReimb + processingFee;
         const totalCents = Math.round(totalDollars * 100);
@@ -4352,6 +4367,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         await markArtswrkInvoiceSubmitted(input.bookingId, user.id, {
           invoicePaymentToken,
           invoiceTotalCents: totalCents,
+          ...(isClassDate ? { hours: actualHours! } : {}),
         });
 
         // Format date for email
@@ -5265,7 +5281,14 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           // studio's card, so it must not guess. Covered by
           // shared/bookingRates.test.ts.
           const finalHours = input.hours ?? booking.hours ?? 0;
-          const baseAmount = resolveBookingBaseAmount(
+          const baseAmount = booking.recurringSeriesId
+            ? bookingMoney({
+                rateType: booking.rateType,
+                hourlyRate: booking.hourlyRate,
+                flatRate: booking.flatRate,
+                hours: booking.hours,
+              }, { hoursOverride: finalHours }).base
+            : resolveBookingBaseAmount(
             {
               isHourlyRate: booking.isHourlyRate,
               storedTotal: booking.artistRate,
@@ -5320,7 +5343,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           if (!session.url) throw new Error("Could not create payment link");
 
           await approveArtswrkInvoice(booking.id, {
-            hours: isHourlyBooking({ isHourlyRate: booking.isHourlyRate }) ? finalHours : undefined,
+            hours: booking.recurringSeriesId || isHourlyBooking({ isHourlyRate: booking.isHourlyRate }) ? finalHours : undefined,
             invoiceStripeCheckoutUrl: session.url,
             invoiceTotalCents: totalCents,
           });
