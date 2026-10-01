@@ -86,7 +86,7 @@ export default function Payments() {
   const needsPayment = (groupClientBookings([
     ...(bookings ?? []), ...toClientDateCards(adminBookings as any[]),
   ]).find((g) => g.key === "pay")?.rows ?? [])
-    .filter((b: any) => b.invoiceStripeCheckoutUrl || b.invoicePaymentToken);
+    .filter((b: any) => !!b.invoicePaymentToken);
   const needsPaymentTotal = needsPayment.reduce((sum: number, b: any) => sum + Number(b.totalClientRate ?? 0), 0);
   const { data: recentPayments, isLoading: paymentsLoading } = trpc.payments.myPayments.useQuery({ limit: 100 });
 

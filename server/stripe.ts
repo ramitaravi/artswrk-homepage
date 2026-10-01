@@ -7,11 +7,13 @@
 import Stripe from "stripe";
 import { SignJWT, jwtVerify } from "jose";
 import { ENV } from "./_core/env";
-import { STRIPE_PRODUCTS } from "./stripe-products";
+import { STRIPE_PRODUCTS, getStripeMode } from "./stripe-products";
+import { assertProductionStripeMode } from "../shared/stripeCheckoutMode";
 
 let _stripe: Stripe | null = null;
 
 export function getStripe(): Stripe {
+  assertProductionStripeMode(getStripeMode(ENV.stripeSecretKey), process.env.NODE_ENV);
   if (!_stripe) {
     if (!ENV.stripeSecretKey) {
       throw new Error("STRIPE_SECRET_KEY is not configured");
