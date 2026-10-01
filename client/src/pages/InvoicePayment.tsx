@@ -91,9 +91,16 @@ export default function InvoicePayment() {
   const bookingDetailsText = (jobDescriptionText
     ? bookingDescriptionText
     : bookingDescriptionText.split("\n").slice(1).join("\n")).trim();
-  const bookingDate = booking.startDate
-    ? new Date(booking.startDate).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" })
-    : new Date((booking as any).artswrkInvoiceSubmittedAt ?? Date.now()).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" });
+  // A class-date invoice carries periodStart, not startDate — reading only
+  // startDate fell through to "today", so every weekly invoice showed the date
+  // the studio happened to open it rather than the class it is paying for.
+  const invoiceDateValue = (booking as any).periodStart
+    ?? booking.startDate
+    ?? (booking as any).bookingStart
+    ?? null;
+  const bookingDate = invoiceDateValue
+    ? new Date(invoiceDateValue).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+    : "";
 
   const reimbTotal = (booking as any).reimbursementsTotal ?? 0;
   const hoursNum = parseFloat(hoursInput) || 0;

@@ -32,6 +32,7 @@ import {
   getMasterServiceTypeName,
 } from "./db";
 import { sendJobPostedEmail } from "./email";
+import { classDateLabel } from "@shared/classDate";
 
 /**
  * Checkout Session webhook payloads don't include price/line-item detail by
@@ -225,7 +226,9 @@ export async function applyCheckoutSessionCompleted(session: any): Promise<void>
           });
         }
 
-        const periodLabel = period ? new Date(period.periodStart).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "";
+        // Receipts name the class date. "September 2026" on a receipt for one
+        // of four Monday classes tells neither side which one was paid.
+        const periodLabel = period ? classDateLabel(period.periodStart) : "";
 
         if (booking?.artistUserId) {
           const artist = await getUser(booking.artistUserId);

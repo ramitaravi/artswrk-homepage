@@ -249,7 +249,10 @@ function BookingRow({ booking }: { booking: AnyBooking }) {
                 Bubble Payment Link that charges for a different booking. */}
             {bookingStatus === "Pay Now" && ((booking as any).invoiceStripeCheckoutUrl || (booking as any).invoicePaymentToken) ? (
               <a
-                href={(booking as any).invoiceStripeCheckoutUrl ?? `/invoice/${(booking as any).invoicePaymentToken}`}
+                // Always the review page: it shows the hours and reimbursements
+                // being charged, then creates checkout. Some dates had a Stripe
+                // link and some didn't, so the same button behaved two ways.
+                href={`/invoice/${(booking as any).invoicePaymentToken}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
@@ -688,7 +691,7 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
                     // Without this fallback the studio saw hours submitted and no
                     // way to pay them.
                     <a
-                      href={p.invoiceStripeCheckoutUrl ?? `/invoice/${p.invoicePaymentToken}`}
+                      href={`/invoice/${p.invoicePaymentToken}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[10px] font-bold text-[#F25722] hover:underline"

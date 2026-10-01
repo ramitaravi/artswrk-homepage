@@ -170,7 +170,7 @@ function proSectionTeaser(d: DigestData): string {
         <div style="font-size:13px;color:#4b5563;margin-top:12px;line-height:1.55;">
           PRO jobs pay $500+ per booking. Unlock the client, location, rate and how to apply with Artswrk PRO — $110/yr, unlimited jobs, zero commission.
         </div>
-        <div style="margin-top:12px;">${button("https://app.artswrk.com/pro", "Upgrade to PRO")}</div>
+        <div style="margin-top:12px;">${button(`${new URL(d.jobsUrl).origin}/pro`, "Upgrade to PRO")}</div>
       </div>`;
 }
 

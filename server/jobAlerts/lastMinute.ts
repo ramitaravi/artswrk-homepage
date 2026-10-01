@@ -36,7 +36,11 @@ export interface LastMinuteResult {
   plan: Array<{ userId: number; email: string; willSend: boolean; reason?: string }>;
 }
 
-const appUrl = () => process.env.VITE_APP_URL || "https://app.artswrk.com";
+/** The live site. The old default was app.artswrk.com, the pre-cutover host —
+ *  and with VITE_APP_URL unset in production, which it is, every job in every
+ *  alert email linked artists to the old site: PRO jobs to the old PRO page,
+ *  everything else to a broken jobs page. */
+const appUrl = () => process.env.VITE_APP_URL || process.env.APP_URL || "https://artswrk.com";
 
 /** Does this job start inside the urgent window? */
 export function isLastMinute(startDate: Date | null | undefined, now = new Date()): boolean {

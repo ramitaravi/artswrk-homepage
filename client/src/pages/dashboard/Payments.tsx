@@ -169,7 +169,7 @@ export default function Payments() {
                       </div>
                       <p className="text-sm font-black text-[#111]">{formatDollars(b.totalClientRate)}</p>
                       <a
-                        href={b.invoiceStripeCheckoutUrl ?? `/invoice/${b.invoicePaymentToken}`}
+                        href={`/invoice/${b.invoicePaymentToken}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-4 py-1.5 rounded-full text-xs font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity flex-shrink-0"

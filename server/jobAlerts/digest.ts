@@ -59,7 +59,11 @@ type Bucket = {
   ridealongPro: any[];
 };
 
-const appUrl = () => process.env.VITE_APP_URL || "https://app.artswrk.com";
+/** The live site. The old default was app.artswrk.com, the pre-cutover host —
+ *  and with VITE_APP_URL unset in production, which it is, every job in every
+ *  alert email linked artists to the old site: PRO jobs to the old PRO page,
+ *  everything else to a broken jobs page. */
+const appUrl = () => process.env.VITE_APP_URL || process.env.APP_URL || "https://artswrk.com";
 
 /**
  * True when it is currently the 1 PM hour in New York. The platform cron is

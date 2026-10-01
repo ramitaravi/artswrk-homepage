@@ -304,7 +304,7 @@ export default function ClientBookingDetail() {
               )}
               {classDate.status === "artist_submitted" && (classDate.invoiceStripeCheckoutUrl || classDate.invoicePaymentToken) && (
                 <a
-                  href={classDate.invoiceStripeCheckoutUrl ?? `/invoice/${classDate.invoicePaymentToken}`}
+                  href={`/invoice/${classDate.invoicePaymentToken}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-block mt-2 px-4 py-2 rounded-full text-xs font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity"

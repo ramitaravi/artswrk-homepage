@@ -773,7 +773,7 @@ export default function Overview() {
         meta: [b.artistFirstName ? `${b.artistFirstName} ${b.artistLastName?.[0] ?? ""}.` : b.artistName, b.hours ? `${b.hours}h` : null]
           .filter(Boolean).join(" · "),
         amount: `$${Number(b.totalClientRate ?? 0).toFixed(2)}`,
-        payUrl: b.invoiceStripeCheckoutUrl ?? (b.invoicePaymentToken ? `/invoice/${b.invoicePaymentToken}` : undefined),
+        payUrl: b.invoicePaymentToken ? `/invoice/${b.invoicePaymentToken}` : undefined,
         bookingUrl: b.isClassDate ? undefined : `/app/bookings/${b.id}`,
       })),
     },
