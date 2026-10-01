@@ -14,6 +14,9 @@ vi.mock("./db", async (importOriginal) => {
 });
 vi.mock("./stripe", () => ({
   getStripe: vi.fn(() => ({ checkout: { sessions: { create: stripeMocks.create } } })),
+  // A stored checkout URL is only reused when it matches the server's Stripe
+  // mode; these cases start with no stored URL, so a fresh session is created.
+  checkoutUrlMatchesMode: vi.fn(() => false),
 }));
 
 import { appRouter } from "./routers";

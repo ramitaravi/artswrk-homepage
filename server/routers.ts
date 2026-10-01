@@ -38,7 +38,7 @@ import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUse
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail, sendArtistBookingConfirmedEmail, sendClientBookingConfirmedEmail, sendClientPayArtistEmail, sendInquiryIntroEmail } from "./email";
 import crypto from "crypto";
-import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistBasicCheckoutSession, createArtistPortalSession, createEnterpriseJobUnlockCheckoutSession, createEnterpriseSubscriptionCheckoutSession, createClientJobUnlockCheckoutSession, createClientSubscriptionCheckoutSession } from "./stripe";
+import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistBasicCheckoutSession, createArtistPortalSession, createEnterpriseJobUnlockCheckoutSession, createEnterpriseSubscriptionCheckoutSession, createClientJobUnlockCheckoutSession, createClientSubscriptionCheckoutSession, checkoutUrlMatchesMode } from "./stripe";
 import { calcBoostTotal } from "./stripe-products";
 import { storagePut } from "./storage";
 import { artistResumes } from "../drizzle/schema";
@@ -5266,7 +5266,10 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           // itself too, or the studio gets a second checkout for work already paid.
           if (String(booking.paymentStatus ?? "").toLowerCase() === "paid") throw new Error("This booking has already been paid");
           if (booking.bookingStatus === "Cancelled") throw new Error("This booking was cancelled");
-          if (booking.invoiceStripeCheckoutUrl) return { checkoutUrl: booking.invoiceStripeCheckoutUrl };
+          // Reuse the stored session only if this server could have made it.
+          if (checkoutUrlMatchesMode(booking.invoiceStripeCheckoutUrl)) {
+            return { checkoutUrl: booking.invoiceStripeCheckoutUrl };
+          }
           if (!booking.artistUserId) throw new Error("Booking not found");
 
           const connectAccountId = await getArtistStripeConnectAccount(booking.artistUserId);
@@ -5354,7 +5357,9 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const period = await getBookingPeriodByInvoiceToken(input.token);
         if (!period) throw new Error("Invoice not found");
         if ((period as any).invoicePaidAt) throw new Error("This invoice has already been paid");
-        if ((period as any).invoiceStripeCheckoutUrl) return { checkoutUrl: (period as any).invoiceStripeCheckoutUrl };
+        if (checkoutUrlMatchesMode((period as any).invoiceStripeCheckoutUrl)) {
+          return { checkoutUrl: (period as any).invoiceStripeCheckoutUrl };
+        }
 
         const parentBooking = await getBookingById((period as any).bookingId);
         if (!parentBooking?.artistUserId) throw new Error("Booking not found");
