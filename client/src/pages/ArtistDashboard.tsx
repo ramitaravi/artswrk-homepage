@@ -802,6 +802,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
   const [reimbFile, setReimbFile] = useState<File | null>(null);
   const [invoiceNotes, setInvoiceNotes] = useState("");
   const [artistRate, setArtistRate] = useState(booking.artistRate?.toString() ?? "");
+  const [classHours, setClassHours] = useState(booking.hours?.toString() ?? "");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const studio = booking.clientCompanyName ?? booking.clientFirstName ?? `Studio #${booking.clientUserId}`;
@@ -816,6 +817,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
   const [submitOpen, setSubmitOpen] = useState(false);
   /** Weekly classes are invoiced per week (rate x hours), never as one flat total. */
   const isWeeklyClassBooking = !!period || (!!booking.isAdminBooking && !!booking.isRecurring);
+  const isClassDateBooking = !!booking.recurringSeriesId;
   const isDirectConfirmed = !!booking.directPayConfirmedAt;
   const rate = parseFloat(artistRate) || 0;
 
@@ -863,7 +865,10 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
   // Multiplying by hours here double-counted every hourly booking, and because
   // "hourly" was inferred from `hours` being set at all, it also multiplied 365
   // FLAT-rate bookings that happen to record hours. Never multiply.
-  const earnedAmount = rate;
+  const actualClassHours = Number(classHours);
+  const earnedAmount = isClassDateBooking
+    ? Number(booking.hourlyRate ?? booking.artistRate ?? 0) * (Number.isFinite(actualClassHours) ? actualClassHours : 0)
+    : rate;
   const processingFee = processingFeeFor(earnedAmount + totalReimb);
   const invoiceTotal = earnedAmount + totalReimb + processingFee;
 
@@ -1129,8 +1134,8 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
               // rate x hours — showing the bare rate read "$55.00" for a
               // 4.75-hour class day worth $261.25 (McKell, 2026-09-17).
               const hasHours = booking.hours != null && booking.hours > 0;
-              const perHour = isWeeklyClassBooking && hasHours;
-              const baseAmount = perHour ? booking.artistRate * booking.hours : booking.artistRate;
+              const perHour = (isWeeklyClassBooking || isClassDateBooking) && hasHours;
+              const baseAmount = perHour ? Number(booking.hourlyRate ?? booking.artistRate) * booking.hours : booking.artistRate;
               return (
                 <div className="border-t border-gray-50 pt-4 space-y-1.5 text-sm">
                   {hasHours && (
@@ -1246,15 +1251,23 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
               {!isWeeklyClassBooking && effectiveMethod === "artswrk" && !isInvoiceSubmitted && connectStatus?.connected && (
                 <div className="space-y-3 border-t border-gray-50 pt-4">
                   <p className="text-xs font-bold text-gray-500">Submit Invoice to Artswrk</p>
-                  <input
-                    type="number" min="0" placeholder="Your rate for this job ($)"
-                    value={artistRate} onChange={(e) => setArtistRate(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#ec008c]"
-                  />
-                  {rate > 0 && (
+                  {isClassDateBooking ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-600">Your agreed rate: ${Number(booking.hourlyRate ?? booking.artistRate).toFixed(2)}/hr</p>
+                      <label className="block text-xs font-semibold text-gray-500" htmlFor="class-hours">Hours worked for this class</label>
+                      <input id="class-hours" type="number" min="0.25" max="24" step="0.25"
+                        value={classHours} onChange={(e) => setClassHours(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#ec008c]" />
+                    </div>
+                  ) : (
+                    <input type="number" min="0" placeholder="Your rate for this job ($)"
+                      value={artistRate} onChange={(e) => setArtistRate(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#ec008c]" />
+                  )}
+                  {earnedAmount > 0 && (
                     <div className="bg-pink-50 rounded-xl p-3 space-y-1.5 text-xs">
-                      {booking.hours > 0 && (
-                        <div className="flex justify-between text-gray-600"><span>Hours</span><span>{booking.hours} hrs</span></div>
+                      {(isClassDateBooking ? actualClassHours > 0 : booking.hours > 0) && (
+                        <div className="flex justify-between text-gray-600"><span>Hours</span><span>{isClassDateBooking ? actualClassHours : booking.hours} hrs</span></div>
                       )}
                       <div className="flex justify-between text-gray-600"><span>Your rate</span><span>${earnedAmount.toFixed(2)}</span></div>
                       <div className="flex justify-between text-gray-600"><span>Reimbursements</span><span>${totalReimb.toFixed(2)}</span></div>
@@ -1269,8 +1282,8 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                     className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-[#ec008c] resize-none"
                   />
                   <button
-                    onClick={() => submitInvoice.mutate({ bookingId: booking.id, artistRate: earnedAmount || undefined, notes: invoiceNotes || undefined, origin: window.location.origin })}
-                    disabled={submitInvoice.isPending || rate <= 0}
+                    onClick={() => submitInvoice.mutate({ bookingId: booking.id, artistRate: isClassDateBooking ? undefined : earnedAmount || undefined, hours: isClassDateBooking ? actualClassHours : undefined, notes: invoiceNotes || undefined, origin: window.location.origin })}
+                    disabled={submitInvoice.isPending || earnedAmount <= 0 || (isClassDateBooking && (!Number.isFinite(actualClassHours) || actualClassHours > 24))}
                     className="w-full py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#ff7171] to-[#ec008c] hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {submitInvoice.isPending ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}

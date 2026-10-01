@@ -7,6 +7,7 @@ import { extractCity, DEFAULT_RADIUS_MILES } from "../shared/location";
 import { easternDateTimeToUtc, utcDateString } from "../shared/adminBookingSchedule";
 import { reminderWindow, periodReminderDueSql, periodReminderIsTodaySql, easternDateString } from "./reminderWindow";
 import { planTierMatchesUserRole } from "../shared/accountRole";
+import { processingFeeFor } from "../shared/bookingRates";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -1022,6 +1023,12 @@ export async function getBookingsByClientId(
       paymentMethod: bookings.paymentMethod,
       directPayConfirmedAt: bookings.directPayConfirmedAt,
       artswrkInvoiceSubmittedAt: bookings.artswrkInvoiceSubmittedAt,
+      invoicePaymentToken: bookings.invoicePaymentToken,
+      invoiceStripeCheckoutUrl: bookings.invoiceStripeCheckoutUrl,
+      invoiceTotalCents: bookings.invoiceTotalCents,
+      isAdminBooking: bookings.isAdminBooking,
+      isRecurring: bookings.isRecurring,
+      recurringSeriesId: bookings.recurringSeriesId,
       addedToSpreadsheet: bookings.addedToSpreadsheet,
       deleted: bookings.deleted,
       createdAt: bookings.createdAt,
@@ -1163,6 +1170,8 @@ export async function getClientBookingDetail(bookingId: number, clientUserId: nu
        -- unit rate line and, on new bookings, the processing fee.
        b.artistRate AS _artistRate,
        b.bubbleId AS _bubbleId,
+       b.recurringSeriesId AS _recurringSeriesId,
+       b.hourlyRate AS _hourlyRate,
        ia.isHourlyRate AS _isHourlyRate,
        ia.clientHourlyRate AS _clientHourlyRate,
        ia.clientFlatRate AS _clientFlatRate,
@@ -1183,7 +1192,8 @@ export async function getClientBookingDetail(bookingId: number, clientUserId: nu
   if (!row) return null;
 
   const {
-    _artistRate, _bubbleId, _isHourlyRate, _clientHourlyRate, _clientFlatRate, _iaHours,
+    _artistRate, _bubbleId, _recurringSeriesId, _hourlyRate,
+    _isHourlyRate, _clientHourlyRate, _clientFlatRate, _iaHours,
     ...safe
   } = row;
 
@@ -1216,7 +1226,7 @@ export async function getClientBookingDetail(bookingId: number, clientUserId: nu
  * Rates on `bookings` are booking TOTALS, so the per-unit figure for the
  * "$50 × 2 hrs" line comes from the interested_artists record.
  */
-function buildClientPricing(row: any): {
+export function buildClientPricing(row: any): {
   isHourly: boolean;
   unitRate: number | null;
   hours: number | null;
@@ -1230,6 +1240,18 @@ function buildClientPricing(row: any): {
   const reimbursements = Number(row.reimbursementsTotal ?? 0);
   const clientRate = Number(row.clientRate ?? 0);
   const artistRate = Number(row._artistRate ?? 0);
+
+  if (row._recurringSeriesId) {
+    const hours = row.hours != null ? Number(row.hours) : null;
+    const unitRate = Number(row._hourlyRate ?? 0);
+    const subtotal = unitRate * (hours ?? 0);
+    const processingFee = processingFeeFor(subtotal + reimbursements);
+    return {
+      isHourly: true, unitRate, hours, subtotal, processingFee, reimbursements,
+      total: row.invoiceTotalCents != null ? Number(row.invoiceTotalCents) / 100 : subtotal + reimbursements + processingFee,
+      hasProcessingFee: true,
+    };
+  }
 
   // Legacy: what they were billed is the subtotal, no fee was ever charged.
   // New: the agreed rate is the subtotal and the difference is the 5% fee.
@@ -4966,6 +4988,9 @@ export async function getArtistConfirmedBookings(artistUserId: number) {
       paymentMethod: bookings.paymentMethod,
       artistRate: bookings.artistRate,
       clientRate: bookings.clientRate,
+      rateType: bookings.rateType,
+      hourlyRate: bookings.hourlyRate,
+      recurringSeriesId: bookings.recurringSeriesId,
       hours: bookings.hours,
       startDate: bookings.startDate,
       endDate: bookings.endDate,
@@ -5103,6 +5128,7 @@ export async function markArtswrkInvoiceSubmitted(
     invoicePaymentToken?: string;
     invoiceStripeCheckoutUrl?: string;
     invoiceTotalCents?: number;
+    hours?: number;
   }
 ): Promise<boolean> {
   const db = await getDb();
@@ -5112,6 +5138,7 @@ export async function markArtswrkInvoiceSubmitted(
     .set({
       artswrkInvoiceSubmittedAt: new Date(),
       bookingStatus: "Pay Now",
+      ...(opts?.hours !== undefined ? { hours: opts.hours } : {}),
       ...(opts?.invoicePaymentToken ? { invoicePaymentToken: opts.invoicePaymentToken } : {}),
       ...(opts?.invoiceStripeCheckoutUrl ? { invoiceStripeCheckoutUrl: opts.invoiceStripeCheckoutUrl } : {}),
       ...(opts?.invoiceTotalCents !== undefined ? { invoiceTotalCents: opts.invoiceTotalCents } : {}),
@@ -5137,6 +5164,10 @@ export async function getBookingByInvoiceToken(token: string) {
       paymentMethod: bookings.paymentMethod,
       artistRate: bookings.artistRate,
       hours: bookings.hours,
+      rateType: bookings.rateType,
+      hourlyRate: bookings.hourlyRate,
+      flatRate: bookings.flatRate,
+      recurringSeriesId: bookings.recurringSeriesId,
       invoicePaymentToken: bookings.invoicePaymentToken,
       invoiceStripeCheckoutUrl: bookings.invoiceStripeCheckoutUrl,
       invoiceTotalCents: bookings.invoiceTotalCents,
@@ -5254,11 +5285,21 @@ export async function recordArtswrkPayment(params: {
   // charge here destroys it: Kaylee's $50/hr became "$131/hr" after one week was
   // paid (2026-09-15), which also corrupted every future week's estimate.
   const [parent] = await db
-    .select({ isAdminBooking: bookings.isAdminBooking, isRecurring: bookings.isRecurring })
+    .select({ isAdminBooking: bookings.isAdminBooking, isRecurring: bookings.isRecurring, recurringSeriesId: bookings.recurringSeriesId })
     .from(bookings)
     .where(eq(bookings.id, params.bookingId))
     .limit(1);
-  if (parent?.isAdminBooking && parent?.isRecurring) return;
+  // Both old season rows and new per-date rows store a per-hour rate in
+  // artistRate/clientRate. Replacing either with a paid total corrupts the
+  // rate shown on future invoices and on the artist's dashboard.
+  if (parent?.isAdminBooking && (parent.isRecurring || parent.recurringSeriesId)) {
+    await db.update(bookings).set({
+      totalClientRate: grossDollars,
+      totalArtistRate: artistNetDollars,
+      grossProfit: feeDollars,
+    }).where(eq(bookings.id, params.bookingId));
+    return;
+  }
 
   await db
     .update(bookings)
@@ -5837,6 +5878,7 @@ export async function getArtistAdminBookings(artistUserId: number) {
     FROM bookings b
     LEFT JOIN users c ON b.clientUserId = c.id
     WHERE b.artistUserId = ${artistUserId} AND b.isAdminBooking = 1
+      AND b.deleted = 0 AND b.recurringSeriesId IS NULL
     ORDER BY b.startDate DESC
   `);
   const bookingRows = (rows[0] as unknown as any[]);
@@ -5869,6 +5911,7 @@ export async function getClientAdminBookings(clientUserId: number) {
     FROM bookings b
     LEFT JOIN users a ON b.artistUserId = a.id
     WHERE b.clientUserId = ${clientUserId} AND b.isAdminBooking = 1
+      AND b.deleted = 0 AND b.isRecurring = 1
     ORDER BY b.startDate DESC
   `);
   const bookingRows = (rows[0] as unknown as any[]);

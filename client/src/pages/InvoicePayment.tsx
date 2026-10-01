@@ -35,11 +35,12 @@ export default function InvoicePayment() {
   );
 
   const isPeriodInvoice = !!(booking as any)?.isPeriodInvoice;
+  const isClassDateInvoice = !!(booking as any)?.recurringSeriesId;
   // Recurring period invoices are always billed hourly. For a regular booking,
   // read the applicant record's real isHourlyRate flag — inferring "hourly"
   // from `hours` being set treats the 365 flat bookings that also record hours
   // as hourly, and this page is where the studio approves the charge.
-  const isHourly = isPeriodInvoice
+  const isHourly = isPeriodInvoice || isClassDateInvoice
     ? true
     : ((booking as any)?.isHourlyRate === 1 || (booking as any)?.isHourlyRate === true);
   const initialHours = isPeriodInvoice ? (booking as any)?.actualHours : booking?.hours;
@@ -119,9 +120,9 @@ export default function InvoicePayment() {
     liveTotalDollars = (booking.invoiceTotalCents ?? 0) / 100;
     liveFee = processingFeeFor(liveTotalDollars / (1 + PROCESSING_FEE_RATE));
     liveBase = liveTotalDollars - liveFee - reimbTotal;
-  } else if (isPeriodInvoice) {
+  } else if (isPeriodInvoice || isClassDateInvoice) {
     // Recurring weeks carry the standard processing fee, same as the server charge.
-    liveBase = clientRate * hoursNum;
+    liveBase = (isPeriodInvoice ? clientRate : Number((booking as any).hourlyRate ?? 0)) * hoursNum;
     liveFee = processingFeeFor(liveBase + reimbTotal);
     liveTotalDollars = liveBase + reimbTotal + liveFee;
   } else {
@@ -221,7 +222,7 @@ export default function InvoicePayment() {
                       />
                     )}
                     <span className="text-gray-400 text-xs">
-                      ({isPeriodInvoice ? `$${clientRate}/hr` : `$${artistRate}/hr`})
+                      ({isPeriodInvoice ? `$${clientRate}/hr` : isClassDateInvoice ? `$${(booking as any).hourlyRate}/hr` : `$${artistRate}/hr`})
                     </span>
                   </div>
                 )}
