@@ -8,7 +8,7 @@ import Stripe from "stripe";
 import { SignJWT, jwtVerify } from "jose";
 import { ENV } from "./_core/env";
 import { STRIPE_PRODUCTS, getStripeMode } from "./stripe-products";
-import { assertProductionStripeMode } from "../shared/stripeCheckoutMode";
+import { assertProductionStripeMode, canReuseCheckoutUrl } from "../shared/stripeCheckoutMode";
 
 let _stripe: Stripe | null = null;
 
@@ -23,6 +23,19 @@ export function getStripe(): Stripe {
     });
   }
   return _stripe;
+}
+
+/**
+ * True when a stored Checkout URL was created with the key this server is
+ * using now. Checkout sessions are per-mode: a cs_test_ session opened with a
+ * live key tells the customer "your card was declined, your request was in
+ * test mode". That is exactly what a studio saw, because development runs
+ * against the live database with a test key, so approving an invoice locally
+ * wrote a test-mode URL onto a real booking. A stored URL is therefore never
+ * trusted on its own — it has to match the current mode.
+ */
+export function checkoutUrlMatchesMode(url: string | null | undefined): boolean {
+  return canReuseCheckoutUrl(url, getStripeMode(ENV.stripeSecretKey));
 }
 
 export interface CreateCheckoutOptions {

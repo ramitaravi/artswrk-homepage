@@ -40,7 +40,7 @@ import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplic
 import crypto from "crypto";
 import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistBasicCheckoutSession, createArtistPortalSession, createEnterpriseJobUnlockCheckoutSession, createEnterpriseSubscriptionCheckoutSession, createClientJobUnlockCheckoutSession, createClientSubscriptionCheckoutSession } from "./stripe";
 import { calcBoostTotal, getStripeMode } from "./stripe-products";
-import { assertProductionStripeMode, canReuseCheckoutUrl, checkoutUrlMode } from "../shared/stripeCheckoutMode";
+import { assertProductionStripeMode, canReuseCheckoutUrl } from "../shared/stripeCheckoutMode";
 import { storagePut } from "./storage";
 import { artistResumes } from "../drizzle/schema";
 import { sdk } from "./_core/sdk";
@@ -5277,9 +5277,6 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           if (canReuseCheckoutUrl(booking.invoiceStripeCheckoutUrl, stripeMode)) {
             return { checkoutUrl: booking.invoiceStripeCheckoutUrl! };
           }
-          if (booking.invoiceStripeCheckoutUrl && checkoutUrlMode(booking.invoiceStripeCheckoutUrl) === "unknown") {
-            throw new Error("This invoice's existing payment link needs manual review. Please contact Artswrk support.");
-          }
           if (!booking.artistUserId) throw new Error("Booking not found");
 
           const connectAccountId = await getArtistStripeConnectAccount(booking.artistUserId);
@@ -5374,9 +5371,6 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         assertProductionStripeMode(stripeMode, process.env.NODE_ENV);
         if (canReuseCheckoutUrl((period as any).invoiceStripeCheckoutUrl, stripeMode)) {
           return { checkoutUrl: (period as any).invoiceStripeCheckoutUrl };
-        }
-        if ((period as any).invoiceStripeCheckoutUrl && checkoutUrlMode((period as any).invoiceStripeCheckoutUrl) === "unknown") {
-          throw new Error("This invoice's existing payment link needs manual review. Please contact Artswrk support.");
         }
 
         const parentBooking = await getBookingById((period as any).bookingId);
