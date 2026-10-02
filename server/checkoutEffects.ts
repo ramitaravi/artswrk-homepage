@@ -227,8 +227,13 @@ export async function applyCheckoutSessionCompleted(session: any): Promise<void>
         }
 
         // Receipts name the class date. "September 2026" on a receipt for one
-        // of four Monday classes tells neither side which one was paid.
-        const periodLabel = period ? classDateLabel(period.periodStart) : "";
+        // of four Monday classes tells neither side which one was paid — and a
+        // class date is now an ordinary booking with no period behind it, so
+        // the booking's own date is what names it. Falling through to "" left
+        // receipts titled "Booking #1200042".
+        const periodLabel = period
+          ? classDateLabel(period.periodStart)
+          : classDateLabel(booking?.startDate);
 
         if (booking?.artistUserId) {
           const artist = await getUser(booking.artistUserId);
@@ -325,7 +330,8 @@ export async function applyCheckoutSessionCompleted(session: any): Promise<void>
             await sendArtistPaymentReceivedEmail({
               to: artist.email,
               firstName: artist.firstName ?? artist.name ?? "there",
-              bookingLabel: `Booking #${bookingId}`,
+              // The date the artist taught, not an id they have never seen.
+              bookingLabel: classDateLabel(booking?.startDate) || `Booking #${bookingId}`,
               amount: totalDollars.toFixed(2),
             });
             console.log(`[Checkout] Sent payment confirmation to artist ${artist.email}`);
@@ -345,7 +351,7 @@ export async function applyCheckoutSessionCompleted(session: any): Promise<void>
               to: client.email,
               firstName: (client as any).clientCompanyName ?? client.firstName ?? "there",
               artistName: artist?.name ?? artist?.firstName ?? "your artist",
-              date: `Booking #${bookingId}`,
+              date: classDateLabel(booking?.startDate) || `Booking #${bookingId}`,
               total: grossDollars.toFixed(2),
             }).catch((e: any) => console.error("[Checkout] Client confirmation email failed:", e.message));
           }
