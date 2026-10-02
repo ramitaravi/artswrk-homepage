@@ -7,11 +7,13 @@
 import Stripe from "stripe";
 import { SignJWT, jwtVerify } from "jose";
 import { ENV } from "./_core/env";
-import { STRIPE_PRODUCTS } from "./stripe-products";
+import { STRIPE_PRODUCTS, getStripeMode } from "./stripe-products";
+import { assertProductionStripeMode, canReuseCheckoutUrl } from "../shared/stripeCheckoutMode";
 
 let _stripe: Stripe | null = null;
 
 export function getStripe(): Stripe {
+  assertProductionStripeMode(getStripeMode(ENV.stripeSecretKey), process.env.NODE_ENV);
   if (!_stripe) {
     if (!ENV.stripeSecretKey) {
       throw new Error("STRIPE_SECRET_KEY is not configured");
@@ -33,13 +35,7 @@ export function getStripe(): Stripe {
  * trusted on its own — it has to match the current mode.
  */
 export function checkoutUrlMatchesMode(url: string | null | undefined): boolean {
-  if (!url) return false;
-  const live = !ENV.stripeSecretKey.startsWith("sk_test_");
-  if (url.includes("cs_test_")) return !live;
-  if (url.includes("cs_live_")) return live;
-  // An unrecognised shape (a Bubble-era payment link, say) is not something
-  // this app created, so it is not reused.
-  return false;
+  return canReuseCheckoutUrl(url, getStripeMode(ENV.stripeSecretKey));
 }
 
 export interface CreateCheckoutOptions {

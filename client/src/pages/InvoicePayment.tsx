@@ -14,6 +14,7 @@ import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Loader2, CheckCircle2, AlertCircle, ExternalLink, ChevronLeft } from "lucide-react";
 import { processingFeeFor, PROCESSING_FEE_RATE, resolveInvoiceTotals, bookingMoney } from "@shared/bookingRates";
+import { canReuseCheckoutUrl } from "@shared/stripeCheckoutMode";
 
 /** Last resort for a legacy booking that stores only a total and its hours. */
 function unitRateFromTotal(total: number, hours: number | null | undefined): string {
@@ -90,7 +91,8 @@ export default function InvoicePayment() {
   const isPaid = alreadyPaid || !!booking.invoicePaidAt
     || String((booking as any).paymentStatus ?? "").toLowerCase() === "paid";
   const checkoutUrl = booking.invoiceStripeCheckoutUrl;
-  const isApproved = !!checkoutUrl;
+  const isApproved = canReuseCheckoutUrl(checkoutUrl, booking.checkoutMode);
+  const needsFreshCheckout = !!checkoutUrl && !isApproved;
   const artistName = booking.artistName ?? booking.artistFirstName ?? "Your artist";
   // A booking created without a job (e.g. itemized hourly work) has only its
   // own description: its first line titles the invoice, the rest is the detail.
@@ -310,7 +312,11 @@ export default function InvoicePayment() {
 
             {/* CTA */}
             <div className="px-10 py-8 text-center">
-              {isApproved ? (
+              {!booking.paymentsAvailable ? (
+                <p role="alert" className="text-sm text-red-600">
+                  Online payments are temporarily unavailable. Please contact Artswrk support; do not enter a real card on a test payment page.
+                </p>
+              ) : isApproved ? (
                 <a
                   href={checkoutUrl}
                   target="_blank"
@@ -327,7 +333,7 @@ export default function InvoicePayment() {
                     className="inline-flex items-center gap-2 bg-[#111] text-white text-lg font-semibold px-12 py-5 rounded-full hover:bg-gray-800 transition-colors disabled:opacity-50"
                   >
                     {approve.isPending ? <Loader2 size={18} className="animate-spin" /> : null}
-                    Approve & Continue to Payment
+                    {needsFreshCheckout ? "Get a new secure payment link" : "Approve & Continue to Payment"}
                   </button>
                   {approveError && (
                     <p className="text-sm text-red-500 mt-3">{approveError}</p>

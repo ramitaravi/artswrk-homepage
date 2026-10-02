@@ -11,6 +11,7 @@ type PriceCheck = {
 };
 
 const mode = getStripeMode(ENV.stripeSecretKey);
+const requireProduction = process.argv.includes("--production");
 
 const checks: PriceCheck[] = [
   {
@@ -127,8 +128,11 @@ async function main() {
     && publishableMode === mode
     && ENV.stripeWebhookSecret.startsWith("whsec_");
   const connectOnboardingReady = ENV.stripeConnectClientId.startsWith("ca_");
+  const productionPaymentsReady = checkoutPaymentsReady && connectOnboardingReady
+    && mode === "live" && account.charges_enabled === true;
   const summary = {
     mode,
+    requireProduction,
     account: {
       chargesEnabled: account.charges_enabled,
       payoutsEnabled: account.payouts_enabled,
@@ -143,7 +147,11 @@ async function main() {
     prices: results,
     checkoutPaymentsReady,
     connectOnboardingReady,
-    ok: checkoutPaymentsReady && connectOnboardingReady,
+    productionPaymentsReady,
+    // Webhook presence is not proof that this secret matches the production
+    // endpoint: verify a signed delivery in Stripe before announcing readiness.
+    webhookDeliveryVerified: false,
+    ok: requireProduction ? productionPaymentsReady : checkoutPaymentsReady && connectOnboardingReady,
   };
 
   console.log(JSON.stringify(summary, null, 2));

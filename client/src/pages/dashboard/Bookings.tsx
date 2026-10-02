@@ -247,7 +247,7 @@ function BookingRow({ booking }: { booking: AnyBooking }) {
                 field is no longer even fetched for clients. */}
             {/* Pay Now removed — see dashboard/Payments.tsx. It linked to a
                 Bubble Payment Link that charges for a different booking. */}
-            {bookingStatus === "Pay Now" && ((booking as any).invoiceStripeCheckoutUrl || (booking as any).invoicePaymentToken) ? (
+            {bookingStatus === "Pay Now" && (booking as any).invoicePaymentToken ? (
               <a
                 // Always the review page: it shows the hours and reimbursements
                 // being charged, then creates checkout. Some dates had a Stripe
@@ -610,9 +610,9 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
               ) : booking.hours != null ? (
                 <p className="text-[10px] text-gray-400">{booking.hours}h scheduled</p>
               ) : null}
-              {!isArtist && periods.length === 0 && booking.bookingStatus === "Pay Now" && (
+              {!isArtist && periods.length === 0 && booking.bookingStatus === "Pay Now" && booking.invoicePaymentToken && (
                 <a
-                  href={booking.invoiceStripeCheckoutUrl ?? (booking.invoicePaymentToken ? `/invoice/${booking.invoicePaymentToken}` : "/app/bookings")}
+                  href={`/invoice/${booking.invoicePaymentToken}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-xs font-bold text-white hirer-grad-bg px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
@@ -628,9 +628,9 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
                   <Send size={11} /> Submit Hours
                 </button>
               )}
-              {!isArtist && submittedPeriods.length > 0 && submittedPeriods[0].invoiceStripeCheckoutUrl && (
+              {!isArtist && submittedPeriods.length > 0 && submittedPeriods[0].invoicePaymentToken && (
                 <a
-                  href={submittedPeriods[0].invoiceStripeCheckoutUrl}
+                  href={`/invoice/${submittedPeriods[0].invoicePaymentToken}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-xs font-bold text-white hirer-grad-bg px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
@@ -685,7 +685,7 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
                   {isArtist && p.status === "open" && (
                     <button onClick={() => setSubmitPeriod({ ...p, scheduledHours: booking.hours })} className="text-[10px] font-bold text-[#F25722] hover:underline">Submit →</button>
                   )}
-                  {!isArtist && p.status === "artist_submitted" && (p.invoiceStripeCheckoutUrl || p.invoicePaymentToken) && (
+                  {!isArtist && p.status === "artist_submitted" && p.invoicePaymentToken && (
                     // Checkout is created when the studio opens the invoice, so a
                     // submitted week has a token long before it has a Stripe URL.
                     // Without this fallback the studio saw hours submitted and no

@@ -38,8 +38,9 @@ import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUse
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail, sendArtistBookingConfirmedEmail, sendClientBookingConfirmedEmail, sendClientPayArtistEmail, sendInquiryIntroEmail } from "./email";
 import crypto from "crypto";
-import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistBasicCheckoutSession, createArtistPortalSession, createEnterpriseJobUnlockCheckoutSession, createEnterpriseSubscriptionCheckoutSession, createClientJobUnlockCheckoutSession, createClientSubscriptionCheckoutSession, checkoutUrlMatchesMode } from "./stripe";
-import { calcBoostTotal } from "./stripe-products";
+import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistBasicCheckoutSession, createArtistPortalSession, createEnterpriseJobUnlockCheckoutSession, createEnterpriseSubscriptionCheckoutSession, createClientJobUnlockCheckoutSession, createClientSubscriptionCheckoutSession } from "./stripe";
+import { calcBoostTotal, getStripeMode } from "./stripe-products";
+import { assertProductionStripeMode, canReuseCheckoutUrl } from "../shared/stripeCheckoutMode";
 import { storagePut } from "./storage";
 import { artistResumes } from "../drizzle/schema";
 import { sdk } from "./_core/sdk";
@@ -5240,10 +5241,12 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
       .query(async ({ input }) => {
         // Check regular booking first, then admin booking periods
         const booking = await getBookingByInvoiceToken(input.token);
-        if (booking) return booking;
+        const checkoutMode = getStripeMode(ENV.stripeSecretKey);
+        const paymentsAvailable = process.env.NODE_ENV !== "production" || checkoutMode === "live";
+        if (booking) return { ...booking, checkoutMode, paymentsAvailable };
         const period = await getBookingPeriodByInvoiceToken(input.token);
         if (!period) throw new Error("Invoice not found");
-        return period;
+        return { ...period, checkoutMode, paymentsAvailable };
       }),
 
     /**
@@ -5266,9 +5269,13 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           // itself too, or the studio gets a second checkout for work already paid.
           if (String(booking.paymentStatus ?? "").toLowerCase() === "paid") throw new Error("This booking has already been paid");
           if (booking.bookingStatus === "Cancelled") throw new Error("This booking was cancelled");
-          // Reuse the stored session only if this server could have made it.
-          if (checkoutUrlMatchesMode(booking.invoiceStripeCheckoutUrl)) {
-            return { checkoutUrl: booking.invoiceStripeCheckoutUrl };
+          const stripeMode = getStripeMode(ENV.stripeSecretKey);
+          assertProductionStripeMode(stripeMode, process.env.NODE_ENV);
+          // Test Checkout sessions remain test-only after a live-key switch.
+          // Recreate a live session on explicit invoice approval, never reuse
+          // the old test link or change an invoice already marked paid.
+          if (canReuseCheckoutUrl(booking.invoiceStripeCheckoutUrl, stripeMode)) {
+            return { checkoutUrl: booking.invoiceStripeCheckoutUrl! };
           }
           if (!booking.artistUserId) throw new Error("Booking not found");
 
@@ -5357,7 +5364,12 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const period = await getBookingPeriodByInvoiceToken(input.token);
         if (!period) throw new Error("Invoice not found");
         if ((period as any).invoicePaidAt) throw new Error("This invoice has already been paid");
-        if (checkoutUrlMatchesMode((period as any).invoiceStripeCheckoutUrl)) {
+        if (String((period as any).status ?? "").toLowerCase() === "paid") {
+          throw new Error("This invoice has already been paid");
+        }
+        const stripeMode = getStripeMode(ENV.stripeSecretKey);
+        assertProductionStripeMode(stripeMode, process.env.NODE_ENV);
+        if (canReuseCheckoutUrl((period as any).invoiceStripeCheckoutUrl, stripeMode)) {
           return { checkoutUrl: (period as any).invoiceStripeCheckoutUrl };
         }
 

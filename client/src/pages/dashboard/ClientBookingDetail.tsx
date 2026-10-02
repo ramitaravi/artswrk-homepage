@@ -198,14 +198,13 @@ export default function ClientBookingDetail() {
 
   // "Pay Now" is the status that means the client owes money right now.
   const needsPayment = bookingStatus === "Pay Now" && paymentStatus !== "Paid" && !b.invoicePaidAt;
-  // Only links this app generated for THIS booking: the Stripe session once the
-  // studio has approved, otherwise this booking's own invoice review page —
-  // approving there is what creates the session. Never fall back to
+  // Always use this booking's invoice review page: an already-approved
+  // test-mode Checkout URL cannot accept a live card after switching keys.
+  // Never fall back to
   // bookings.stripeCheckoutUrl: 2,622 rows carry a legacy Bubble Payment Link
   // that charges for a different artist's booking entirely (a client clicking
   // it is shown someone else's name and amount).
-  const payUrl: string | null =
-    b.invoiceStripeCheckoutUrl || (b.invoicePaymentToken ? `/invoice/${b.invoicePaymentToken}` : null);
+  const payUrl: string | null = b.invoicePaymentToken ? `/invoice/${b.invoicePaymentToken}` : null;
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto">

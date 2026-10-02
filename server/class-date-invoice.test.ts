@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrpcContext } from "./_core/context";
+import { ENV } from "./_core/env";
 
 const stripeMocks = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock("./db", async (importOriginal) => {
@@ -38,7 +39,9 @@ const invoice = {
 };
 
 describe("per-class invoice checkout", () => {
+  const originalStripeKey = ENV.stripeSecretKey;
   beforeEach(() => {
+    ENV.stripeSecretKey = originalStripeKey;
     vi.clearAllMocks();
     vi.mocked(db.getBookingByInvoiceToken).mockResolvedValue(invoice as any);
     vi.mocked(db.getArtistStripeConnectAccount).mockResolvedValue("acct_test");
@@ -47,6 +50,7 @@ describe("per-class invoice checkout", () => {
     ) as any);
     stripeMocks.create.mockResolvedValue({ url: "https://checkout.stripe.test/test" });
   });
+  afterEach(() => { ENV.stripeSecretKey = originalStripeKey; });
 
   it("charges 3 hours × $80 plus $50 expense and the 5% fee", async () => {
     const result = await appRouter.createCaller(context).invoice.approve({ token: "token" });
@@ -63,6 +67,27 @@ describe("per-class invoice checkout", () => {
     const payload = stripeMocks.create.mock.calls[0][0] as any;
     expect(payload.line_items[0].price_data.unit_amount).toBe(38900);
     expect(db.approveArtswrkInvoice).toHaveBeenCalledWith(1201, expect.objectContaining({ hours: 4, invoiceTotalCents: 38900 }));
+  });
+
+  it("replaces an unpaid test Checkout link after switching the app to live mode", async () => {
+    ENV.stripeSecretKey = "sk_live_unit_test_placeholder";
+    vi.mocked(db.getBookingByInvoiceToken).mockResolvedValue({
+      ...invoice,
+      invoiceStripeCheckoutUrl: "https://checkout.stripe.com/c/pay/cs_test_oldsession",
+    } as any);
+    const result = await appRouter.createCaller(context).invoice.approve({ token: "token" });
+    expect(result.checkoutUrl).toBe("https://checkout.stripe.test/test");
+    expect(stripeMocks.create).toHaveBeenCalledOnce();
+    expect(db.approveArtswrkInvoice).toHaveBeenCalledWith(1201, expect.objectContaining({ invoiceTotalCents: 30500 }));
+  });
+
+  it("never recreates an unpaid session that already belongs to the active mode", async () => {
+    ENV.stripeSecretKey = "sk_live_unit_test_placeholder";
+    const liveUrl = "https://checkout.stripe.com/c/pay/cs_live_existing";
+    vi.mocked(db.getBookingByInvoiceToken).mockResolvedValue({ ...invoice, invoiceStripeCheckoutUrl: liveUrl } as any);
+    const result = await appRouter.createCaller(context).invoice.approve({ token: "token" });
+    expect(result.checkoutUrl).toBe(liveUrl);
+    expect(stripeMocks.create).not.toHaveBeenCalled();
   });
 });
 
