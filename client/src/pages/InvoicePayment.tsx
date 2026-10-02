@@ -13,7 +13,15 @@ import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Loader2, CheckCircle2, AlertCircle, ExternalLink, ChevronLeft } from "lucide-react";
-import { processingFeeFor, PROCESSING_FEE_RATE } from "@shared/bookingRates";
+import { processingFeeFor, PROCESSING_FEE_RATE, resolveInvoiceTotals, bookingMoney } from "@shared/bookingRates";
+
+/** Last resort for a legacy booking that stores only a total and its hours. */
+function unitRateFromTotal(total: number, hours: number | null | undefined): string {
+  const h = Number(hours ?? 0);
+  if (!h) return String(total);
+  const unit = total / h;
+  return Number.isInteger(unit) ? String(unit) : unit.toFixed(2);
+}
 
 export default function InvoicePayment() {
   const { token } = useParams<{ token: string }>();
@@ -121,16 +129,38 @@ export default function InvoicePayment() {
     liveFee = processingFeeFor(liveTotalDollars / (1 + PROCESSING_FEE_RATE));
     liveBase = liveTotalDollars - liveFee - reimbTotal;
   } else if (isPeriodInvoice || isClassDateInvoice) {
-    // Recurring weeks carry the standard processing fee, same as the server charge.
-    liveBase = (isPeriodInvoice ? clientRate : Number((booking as any).hourlyRate ?? 0)) * hoursNum;
-    liveFee = processingFeeFor(liveBase + reimbTotal);
-    liveTotalDollars = liveBase + reimbTotal + liveFee;
+    // A class is billed rate × hours. bookingMoney is what invoice.approve
+    // charges with, so the preview and the charge come from one function.
+    const money = bookingMoney(
+      {
+        rateType: "hourly",
+        hourlyRate: isPeriodInvoice ? clientRate : Number((booking as any).hourlyRate ?? 0),
+        flatRate: null,
+        hours: Number(initialHours ?? hoursNum),
+      },
+      { hoursOverride: hoursNum, reimbursements: reimbTotal },
+    );
+    liveBase = money.base;
+    liveFee = money.processingFee;
+    liveTotalDollars = money.clientTotal;
   } else {
-    const base = isHourly ? artistRate * hoursNum : artistRate;
-    const fee = processingFeeFor(base + reimbTotal);
-    liveBase = base;
-    liveFee = fee;
-    liveTotalDollars = base + reimbTotal + fee;
+    // The SAME function the server charges with (invoice.approve calls
+    // resolveBookingBaseAmount). This page used to multiply artistRate by the
+    // hours, but artistRate is a TOTAL — a $50/hr booking of 4 hours stores
+    // $200, so the studio was shown $800 for a charge the server computes as
+    // $200. A preview that disagrees with the charge is worse than no preview.
+    const totals = resolveInvoiceTotals(
+      {
+        isHourlyRate: (booking as any).isHourlyRate,
+        storedTotal: artistRate,
+        unitHourlyRate: (booking as any).artistHourlyRate ?? (booking as any).hourlyRate ?? null,
+        storedHours: booking.hours,
+      },
+      { adjustedHours: hoursNum, reimbursements: reimbTotal },
+    );
+    liveBase = totals.baseAmount;
+    liveFee = totals.processingFee;
+    liveTotalDollars = totals.total;
   }
 
   const handleApprove = () => {
@@ -222,7 +252,13 @@ export default function InvoicePayment() {
                       />
                     )}
                     <span className="text-gray-400 text-xs">
-                      ({isPeriodInvoice ? `$${clientRate}/hr` : isClassDateInvoice ? `$${(booking as any).hourlyRate}/hr` : `$${artistRate}/hr`})
+                      ({isPeriodInvoice
+                        ? `$${clientRate}/hr`
+                        : isClassDateInvoice
+                          ? `$${(booking as any).hourlyRate}/hr`
+                          // artistRate is the booking total; the per-hour figure
+                          // is the unit rate, which is a different column.
+                          : `$${(booking as any).artistHourlyRate ?? (booking as any).hourlyRate ?? unitRateFromTotal(artistRate, booking.hours)}/hr`})
                     </span>
                   </div>
                 )}
