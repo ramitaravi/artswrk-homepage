@@ -711,6 +711,27 @@ function AdminArtistForm({
           <label className={labelCls}>Bio</label>
           <textarea value={bio} onChange={e => setBio(e.target.value)} placeholder="Tell their story…" rows={4} className={`${inputCls} resize-none`} />
         </div>
+
+        {/* Artswrk staff are often on artist accounts, so admin access is
+            managed here too, not only on the client form. */}
+        {initial?.id && (
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-200 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-[#111]">Artswrk admin</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">
+                {(initial as any).role === "admin"
+                  ? "Can see and edit every account, job and booking."
+                  : "No access to the admin dashboard."}
+              </p>
+            </div>
+            <AdminAccessToggle
+              userId={initial.id}
+              isAdmin={(initial as any).role === "admin"}
+              name={[firstName, lastName].filter(Boolean).join(" ") || email || "this account"}
+              size="md"
+            />
+          </div>
+        )}
       </div>
 
       {/* Specialties */}
@@ -1224,6 +1245,8 @@ function ArtistsSection() {
   const [onboardingStep, setOnboardingStepFilter] = useState<number | undefined>(undefined);
   const [missingProfilePicture, setMissingProfilePicture] = useState(false);
   const [stripeConnected, setStripeConnected] = useState(false);
+  /** Artswrk staff only — who can open this dashboard. */
+  const [adminOnly, setAdminOnly] = useState(false);
   const [createdFrom, setCreatedFrom] = useState("");
   const [createdTo, setCreatedTo] = useState("");
   const [modifiedFrom, setModifiedFrom] = useState("");
@@ -1253,6 +1276,7 @@ function ArtistsSection() {
     serviceType: serviceType || undefined,
     state: state || undefined,
     plan: plan || undefined,
+    adminOnly: adminOnly || undefined,
     affiliationId,
     onboardingStep,
     missingProfilePicture: missingProfilePicture || undefined,
@@ -1563,6 +1587,10 @@ function ArtistsSection() {
               <label className="flex items-center gap-2 text-xs font-medium text-gray-600 cursor-pointer pb-2">
                 <input type="checkbox" checked={stripeConnected} onChange={e => { setStripeConnected(e.target.checked); setPage(1); }} className="rounded border-gray-300 text-[#F25722] focus:ring-[#F25722]" />
                 Stripe Connect linked
+              </label>
+              <label className="flex items-center gap-2 text-xs font-medium text-gray-600 cursor-pointer pb-2">
+                <input type="checkbox" checked={adminOnly} onChange={e => { setAdminOnly(e.target.checked); setPage(1); }} className="rounded border-gray-300 text-[#F25722] focus:ring-[#F25722]" />
+                Artswrk admins
               </label>
             </div>
           )}
@@ -2114,6 +2142,59 @@ function BenefitLogoInput({ value, onChange }: { value: string; onChange: (v: st
  * logo was blank or still showing the old one.
  */
 /** The same upload, as the logo square at the top of the enterprise modal. */
+/**
+ * Artswrk admin access for one account.
+ *
+ * Granting it used to mean someone editing the database by hand. The server
+ * refuses two cases outright — changing your own access, and removing the last
+ * admin — so this control can be plain.
+ */
+function AdminAccessToggle({ userId, isAdmin, name, onChanged, size = "sm" }: {
+  userId: number;
+  isAdmin: boolean;
+  name: string;
+  onChanged?: () => void;
+  size?: "sm" | "md";
+}) {
+  const [busy, setBusy] = useState(false);
+  const setRole = trpc.admin.setUserRole.useMutation();
+
+  const toggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const next = isAdmin ? "user" : "admin";
+    if (!confirm(next === "admin"
+      ? `Give ${name} admin access? They'll be able to see and edit every account, job and booking.`
+      : `Remove admin access from ${name}?`)) return;
+    setBusy(true);
+    try {
+      const { admins } = await setRole.mutateAsync({ userId, role: next });
+      onChanged?.();
+      alert(next === "admin" ? `${name} is now an admin (${admins} total).` : `${name} is no longer an admin (${admins} remain).`);
+    } catch (err: any) {
+      alert(err?.message ?? "Could not change admin access.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pad = size === "md" ? "px-3 py-1.5 text-xs" : "px-2.5 py-1 text-[11px]";
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      disabled={busy}
+      title={isAdmin ? "Remove admin access" : "Make this account an admin"}
+      className={`${pad} rounded-full font-bold border transition-colors disabled:opacity-50 ${
+        isAdmin
+          ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+          : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+      }`}
+    >
+      {busy ? "Saving…" : isAdmin ? "Admin ✓" : "Make admin"}
+    </button>
+  );
+}
+
 function AccountLogoThumb({ userId, value, onChange, fallback, label }: {
   userId: number;
   value: string;
@@ -2313,6 +2394,27 @@ function AdminClientForm({
           onChange={setProfilePicture}
           initials={(firstName[0] || "?").toUpperCase()}
         />
+
+        {/* Admin access sits with the account's identity, not its plan: it has
+            nothing to do with what they pay for. */}
+        {initial?.id && (
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-200 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-[#111]">Artswrk admin</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">
+                {(initial as any).role === "admin"
+                  ? "Can see and edit every account, job and booking."
+                  : "No access to the admin dashboard."}
+              </p>
+            </div>
+            <AdminAccessToggle
+              userId={initial.id}
+              isAdmin={(initial as any).role === "admin"}
+              name={[firstName, lastName].filter(Boolean).join(" ") || email || "this account"}
+              size="md"
+            />
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -2733,6 +2835,8 @@ function ClientsSection() {
   const [state, setState] = useState("");
   const [plan, setPlan] = useState("");
   const [businessType, setBusinessType] = useState("");
+  /** Artswrk staff only — who can open this dashboard. */
+  const [adminOnly, setAdminOnly] = useState(false);
   const [page, setPage] = useState(1);
   const LIMIT = 50;
 
@@ -2753,6 +2857,7 @@ function ClientsSection() {
 
   const { data, isLoading } = trpc.admin.clients.useQuery({
     search: debouncedSearch || undefined,
+    adminOnly: adminOnly || undefined,
     companySearch: debouncedCompany || undefined,
     locationSearch: debouncedLocation || undefined,
     hiringCategory: (hiringCategory || undefined) as any,
@@ -2843,6 +2948,17 @@ function ClientsSection() {
           <option value="Business">Business</option>
           <option value="Individual">Individual</option>
         </select>
+        <button
+          type="button"
+          onClick={() => { setAdminOnly(v => !v); setPage(1); }}
+          className={`px-3 py-2 rounded-xl border text-xs font-semibold transition-colors ${
+            adminOnly
+              ? "bg-purple-50 text-purple-700 border-purple-200"
+              : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+          }`}
+        >
+          Artswrk admins
+        </button>
         <div className="flex items-center gap-2 flex-1 min-w-[150px] bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
           <Search size={13} className="text-gray-400 flex-shrink-0" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search Clients..." className="bg-transparent text-xs text-[#111] placeholder-gray-400 focus:outline-none w-full" />

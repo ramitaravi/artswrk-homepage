@@ -328,6 +328,7 @@ export const appRouter = router({
     artists: protectedProcedure
       .input(z.object({
         search: z.string().optional(),
+        adminOnly: z.boolean().optional(),
         locationSearch: z.string().optional(),
         artistType: z.string().optional(),
         serviceType: z.string().optional(),
@@ -1337,6 +1338,7 @@ export const appRouter = router({
     clients: protectedProcedure
       .input(z.object({
         search: z.string().optional(),
+        adminOnly: z.boolean().optional(),
         companySearch: z.string().optional(),
         locationSearch: z.string().optional(),
         hiringCategory: clientHiringCategorySchema,
@@ -1349,6 +1351,23 @@ export const appRouter = router({
       .query(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
         return getAdminClients(input);
+      }),
+
+    /**
+     * Grant or remove Artswrk admin access.
+     *
+     * Until now this column could only be changed in the database, so adding a
+     * teammate meant someone running SQL. The guards live in setUserRole: you
+     * cannot change your own access, and the last admin cannot be removed.
+     */
+    setUserRole: protectedProcedure
+      .input(z.object({ userId: z.number().int(), role: z.enum(["admin", "user"]) }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const me = await getUserByOpenId(ctx.user.openId);
+        if (!me) throw new Error("User not found");
+        const { setUserRole } = await import("./db");
+        return setUserRole(input.userId, input.role, me.id);
       }),
 
     /** All jobs with search + filters */

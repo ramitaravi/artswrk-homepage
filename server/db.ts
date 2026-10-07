@@ -2823,6 +2823,8 @@ export async function getAdminOverviewStats() {
 /** Admin: list all artists with search + filters */
 interface AdminArtistFilters {
   search?: string;
+  /** Only Artswrk staff — people who can open the admin dashboard. */
+  adminOnly?: boolean;
   locationSearch?: string;
   artistType?: string;
   serviceType?: string;
@@ -2847,6 +2849,7 @@ async function buildAdminArtistConditions(f: AdminArtistFilters) {
       and(isNotNull(users.name), sql`${users.name} != ''`),
     )!,
   ];
+  if (f.adminOnly) conditions.push(eq(users.role, "admin"));
   // Fuzzy search: name/email plus free-text credits ("Wicked", "Rockette", etc.)
   if (f.search) conditions.push(or(
     like(users.name, `%${f.search}%`),
@@ -2941,6 +2944,7 @@ export async function getAdminArtists({
       masterServiceType: users.masterServiceType,
       artswrkPro: users.artswrkPro,
       artswrkBasic: users.artswrkBasic,
+      role: users.role,
       onboardingStep: users.onboardingStep,
       artistStripeAccountId: users.artistStripeAccountId,
       createdAt: users.createdAt,
@@ -3002,6 +3006,7 @@ export async function addArtistAffiliation(artistUserId: number, affiliationId: 
 /** Admin: list all clients with search + filters */
 export async function getAdminClients({
   search,
+  adminOnly,
   companySearch,
   locationSearch,
   hiringCategory,
@@ -3012,6 +3017,8 @@ export async function getAdminClients({
   offset = 0,
 }: {
   search?: string;
+  /** Only Artswrk staff — people who can open the admin dashboard. */
+  adminOnly?: boolean;
   companySearch?: string;
   locationSearch?: string;
   hiringCategory?: string;
@@ -3025,6 +3032,7 @@ export async function getAdminClients({
   if (!db) return { clients: [], total: 0 };
 
   const conditions = [eq(users.userRole, "Client")];
+  if (adminOnly) conditions.push(eq(users.role, "admin"));
   if (search) conditions.push(or(
     like(users.name, `%${search}%`),
     like(users.firstName, `%${search}%`),
@@ -3062,6 +3070,7 @@ export async function getAdminClients({
       location: sql<string | null>`COALESCE(${users.location}, (SELECT cc.locationAddress FROM client_companies cc WHERE cc.ownerUserId = ${users.id} ORDER BY cc.id ASC LIMIT 1))`,
       clientCompanyName: sql<string | null>`COALESCE(${users.clientCompanyName}, (SELECT cc.name FROM client_companies cc WHERE cc.ownerUserId = ${users.id} ORDER BY cc.id ASC LIMIT 1))`,
       clientPremium: users.clientPremium,
+      role: users.role,
       hiringCategory: users.hiringCategory,
       businessOrIndividual: users.businessOrIndividual,
       createdAt: users.createdAt,
@@ -3074,6 +3083,39 @@ export async function getAdminClients({
     .offset(offset);
 
   return { clients, total: Number(countRow?.count ?? 0) };
+}
+
+/**
+ * Make someone an Artswrk admin, or take it away.
+ *
+ * Admin access is this one column — there has never been a way to grant it
+ * except by editing the database. Two things it refuses: removing your own
+ * access, which locks you out of the screen you are standing on, and removing
+ * the last admin, which locks everyone out.
+ */
+export async function setUserRole(
+  userId: number,
+  role: "admin" | "user",
+  actingUserId: number,
+): Promise<{ admins: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  if (userId === actingUserId) throw new Error("You can't change your own admin access.");
+
+  const [target] = await db.select({ id: users.id, role: users.role, email: users.email })
+    .from(users).where(eq(users.id, userId)).limit(1);
+  if (!target) throw new Error("Account not found");
+
+  if (role === "user" && target.role === "admin") {
+    const [{ count }] = await db.select({ count: sql<number>`count(*)` })
+      .from(users).where(eq(users.role, "admin"));
+    if (Number(count) <= 1) throw new Error("That's the last admin — promote someone else first.");
+  }
+
+  await db.update(users).set({ role } as any).where(eq(users.id, userId));
+  const [{ count: admins }] = await db.select({ count: sql<number>`count(*)` })
+    .from(users).where(eq(users.role, "admin"));
+  return { admins: Number(admins) };
 }
 
 /** Admin: list all jobs with search + filters */
