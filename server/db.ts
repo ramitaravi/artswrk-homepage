@@ -3648,6 +3648,48 @@ export async function getEnterpriseClients(opts: {
 
 // ── Client Companies ──────────────────────────────────────────────────────────
 
+/**
+ * Save an account's logo everywhere a screen might read it from.
+ *
+ * The picture for one account lives in three columns — users.enterpriseLogoUrl,
+ * users.profilePicture and client_companies.logo — and different pages read
+ * different ones (the enterprise dashboard the first, messaging the second, the
+ * public company page the third). Writing one left the others stale.
+ *
+ * A company keeps its own logo if it has one that isn't the account's old
+ * picture: a multi-brand account like Ensemble Schools has a logo per company
+ * and must not have them flattened to one.
+ */
+export async function saveAccountLogo(userId: number, url: string): Promise<{ companiesUpdated: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+
+  const [current] = await db
+    .select({ enterpriseLogoUrl: users.enterpriseLogoUrl, profilePicture: users.profilePicture })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const previous = [current?.enterpriseLogoUrl, current?.profilePicture].filter(Boolean) as string[];
+
+  await db.update(users)
+    .set({ enterpriseLogoUrl: url, profilePicture: url } as any)
+    .where(eq(users.id, userId));
+
+  const companies = await db
+    .select({ id: clientCompanies.id, logo: clientCompanies.logo })
+    .from(clientCompanies)
+    .where(eq(clientCompanies.ownerUserId, userId));
+
+  const toUpdate = companies.filter((c) => !c.logo || previous.includes(c.logo));
+  for (const company of toUpdate) {
+    await db.update(clientCompanies)
+      .set({ logo: url } as any)
+      .where(eq(clientCompanies.id, company.id));
+  }
+
+  return { companiesUpdated: toUpdate.length };
+}
+
 /** Get all client companies for an enterprise user */
 export async function getClientCompaniesByUserId(userId: number): Promise<ClientCompany[]> {
   const db = await getDb();

@@ -2105,6 +2105,156 @@ function BenefitLogoInput({ value, onChange }: { value: string; onChange: (v: st
 }
 
 // ─── Admin Client Form ────────────────────────────────────────────────────────
+/**
+ * Upload or paste a logo for someone else's account.
+ *
+ * Admin had only a URL box, so fixing a studio's logo meant hosting the file
+ * somewhere first. Saving writes the logo everywhere it is read from — the
+ * account's enterprise logo and profile picture, and any company page whose
+ * logo was blank or still showing the old one.
+ */
+/** The same upload, as the logo square at the top of the enterprise modal. */
+function AccountLogoThumb({ userId, value, onChange, fallback, label }: {
+  userId: number;
+  value: string;
+  onChange: (url: string) => void;
+  fallback: string;
+  label: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const upload = trpc.admin.uploadAccountLogo.useMutation();
+  const save = trpc.admin.setAccountLogo.useMutation();
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { alert("That image is over 5MB — please use a smaller one."); return; }
+    setBusy(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+        reader.onerror = () => reject(new Error("Could not read that file"));
+        reader.readAsDataURL(file);
+      });
+      const { url } = await upload.mutateAsync({ userId, base64, contentType: file.type, filename: file.name });
+      const { companiesUpdated } = await save.mutateAsync({ userId, url });
+      onChange(url);
+      alert(companiesUpdated > 0
+        ? `Logo saved, including ${companiesUpdated} company page${companiesUpdated === 1 ? "" : "s"}.`
+        : "Logo saved.");
+    } catch (err: any) {
+      alert(err?.message ?? "Could not upload that image.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <label className="relative group w-14 h-14 flex-shrink-0 cursor-pointer" title="Change logo">
+      <input
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+        className="sr-only"
+        disabled={busy}
+        onChange={handleFile}
+      />
+      {value ? (
+        <img
+          src={value.startsWith("//") ? "https:" + value : value}
+          alt={label}
+          className="w-14 h-14 rounded-xl object-contain bg-gray-50 border border-gray-100"
+        />
+      ) : (
+        <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-xl">
+          {fallback}
+        </div>
+      )}
+      <span className="absolute inset-0 rounded-xl bg-black/55 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex items-center justify-center text-[9px] font-bold text-white text-center leading-tight px-1">
+        {busy ? "Saving…" : "Change"}
+      </span>
+    </label>
+  );
+}
+
+function AccountLogoInput({ userId, value, onChange, initials }: {
+  userId?: number;
+  value: string;
+  onChange: (url: string) => void;
+  initials: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const upload = trpc.admin.uploadAccountLogo.useMutation();
+  const save = trpc.admin.setAccountLogo.useMutation();
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!userId) { alert("Save this account first, then add a logo."); return; }
+    if (file.size > 5 * 1024 * 1024) { alert("That image is over 5MB — please use a smaller one."); return; }
+    setBusy(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+        reader.onerror = () => reject(new Error("Could not read that file"));
+        reader.readAsDataURL(file);
+      });
+      const { url } = await upload.mutateAsync({ userId, base64, contentType: file.type, filename: file.name });
+      const { companiesUpdated } = await save.mutateAsync({ userId, url });
+      onChange(url);
+      alert(companiesUpdated > 0
+        ? `Logo saved, including ${companiesUpdated} company page${companiesUpdated === 1 ? "" : "s"}.`
+        : "Logo saved.");
+    } catch (err: any) {
+      alert(err?.message ?? "Could not upload that image.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-4">
+      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-xl flex-shrink-0 overflow-hidden">
+        {value ? (
+          <img src={value} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+        ) : (
+          <span>{initials}</span>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <label className="block text-xs font-semibold text-gray-500 mb-1.5">Profile picture / logo</label>
+        <div className="flex items-center gap-2 flex-wrap">
+          <label className="px-3 py-1.5 rounded-lg text-xs font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity cursor-pointer">
+            {busy ? "Uploading…" : "Upload image"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+              className="sr-only"
+              disabled={busy}
+              onChange={handleFile}
+            />
+          </label>
+          {value && (
+            <button type="button" onClick={() => onChange("")} className="px-3 py-1.5 rounded-lg text-xs font-bold text-gray-500 border border-gray-200 hover:bg-gray-50 transition-colors">
+              Remove
+            </button>
+          )}
+          <input
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="…or paste a URL"
+            className="flex-1 min-w-[160px] px-3 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#F25722]"
+          />
+        </div>
+        <p className="text-[11px] text-gray-400 mt-1.5">Saved to the account and its company pages. PRO jobs keep the logo they were posted with.</p>
+      </div>
+    </div>
+  );
+}
+
 function AdminClientForm({
   initial,
   onSave,
@@ -2157,19 +2307,12 @@ function AdminClientForm({
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
         <h3 className="text-sm font-black text-[#111] uppercase tracking-wider">Basic Info</h3>
 
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-xl flex-shrink-0 overflow-hidden">
-            {profilePicture ? (
-              <img src={profilePicture} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-            ) : (
-              <span>{(firstName[0] || "?").toUpperCase()}</span>
-            )}
-          </div>
-          <div className="flex-1">
-            <label className={labelCls}>Profile Picture URL</label>
-            <input value={profilePicture} onChange={e => setProfilePicture(e.target.value)} placeholder="https://..." className={inputCls} />
-          </div>
-        </div>
+        <AccountLogoInput
+          userId={initial?.id}
+          value={profilePicture}
+          onChange={setProfilePicture}
+          initials={(firstName[0] || "?").toUpperCase()}
+        />
 
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -4766,7 +4909,9 @@ function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; 
     await setPlan.mutateAsync({ userId: client.id, plan: "subscriber", interval });
   }
 
-  const logo = client.enterpriseLogoUrl || client.profilePicture;
+  // The enterprise modal is where an admin goes to fix a studio's branding, so
+  // the logo is editable here rather than a read-only thumbnail.
+  const [logo, setLogo] = useState<string>(client.enterpriseLogoUrl || client.profilePicture || "");
   const companyName = client.clientCompanyName || displayName(client);
 
   return (
@@ -4774,13 +4919,13 @@ function EnterpriseClientModal({ client, onClose }: { client: EnterpriseClient; 
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-start gap-4 p-6 border-b border-gray-100">
-          {logo ? (
-            <img src={logo.startsWith('//') ? 'https:' + logo : logo} alt={companyName} className="w-14 h-14 rounded-xl object-contain bg-gray-50 border border-gray-100 flex-shrink-0" />
-          ) : (
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-xl flex-shrink-0">
-              {companyName[0]}
-            </div>
-          )}
+          <AccountLogoThumb
+            userId={client.id}
+            value={logo}
+            onChange={setLogo}
+            fallback={companyName[0]}
+            label={companyName}
+          />
           <div className="flex-1 min-w-0">
             <h2 className="text-xl font-black text-[#111] truncate">{companyName}</h2>
             <p className="text-sm text-gray-500">{client.email}</p>

@@ -1171,9 +1171,44 @@ function MasterView({
 
   // Use job logo as fallback since the logged-in user may be a different account
   const firstJobLogo = jobs.length > 0 ? fixUrl(jobs[0].logo) : null;
-  const rawLogo = user?.enterpriseLogoUrl || user?.profilePicture;
+  const [justUploaded, setJustUploaded] = useState<string | null>(null);
+  const rawLogo = justUploaded || user?.enterpriseLogoUrl || user?.profilePicture;
   const logoUrl = fixUrl(rawLogo) || firstJobLogo;
   const displayName = user?.name || user?.firstName || "Enterprise";
+
+  // Changing the logo: upload, then save it to the account and its companies.
+  const [savingLogo, setSavingLogo] = useState(false);
+  const uploadLogo = trpc.enterprise.uploadLogo.useMutation();
+  const saveLogo = trpc.enterprise.updateMyLogo.useMutation();
+
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("That image is over 5MB — please use a smaller one.");
+      return;
+    }
+    setSavingLogo(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+        reader.onerror = () => reject(new Error("Could not read that file"));
+        reader.readAsDataURL(file);
+      });
+      const { url } = await uploadLogo.mutateAsync({ base64, contentType: file.type, filename: file.name });
+      const { companiesUpdated } = await saveLogo.mutateAsync({ url });
+      setJustUploaded(url);
+      toast.success(companiesUpdated > 0
+        ? `Logo updated, including ${companiesUpdated} company page${companiesUpdated === 1 ? "" : "s"}.`
+        : "Logo updated.");
+    } catch (err: any) {
+      toast.error(err?.message ?? "Could not update your logo.");
+    } finally {
+      setSavingLogo(false);
+    }
+  };
 
   const tabs: { id: MasterTab; label: string }[] = [
     { id: "jobs", label: "Jobs" },
@@ -1202,20 +1237,38 @@ function MasterView({
         {/* Top: logo + name + CTA */}
         <div className="px-8 py-7 flex items-center justify-between gap-4">
           <div className="flex items-center gap-5 min-w-0">
-            {logoUrl ? (
-              <div className="w-20 h-20 rounded-full bg-white flex-shrink-0 overflow-hidden ring-4 ring-white/20 shadow-lg">
-                <img
-                  src={logoUrl}
-                  alt={displayName}
-                  className="w-full h-full object-cover"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                />
-              </div>
-            ) : (
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex-shrink-0 flex items-center justify-center text-white font-black text-2xl ring-4 ring-white/20 shadow-lg">
-                {initials(displayName)}
-              </div>
-            )}
+            {/* The logo is the one piece of their own branding an enterprise
+                account could never change: Settings is not reachable for them,
+                so it is edited where they actually see it. */}
+            <label
+              className="relative group cursor-pointer flex-shrink-0"
+              title="Change your logo"
+            >
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+                className="sr-only"
+                disabled={savingLogo}
+                onChange={handleLogoChange}
+              />
+              {logoUrl ? (
+                <div className="w-20 h-20 rounded-full bg-white overflow-hidden ring-4 ring-white/20 shadow-lg">
+                  <img
+                    src={logoUrl}
+                    alt={displayName}
+                    className="w-full h-full object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                </div>
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-2xl ring-4 ring-white/20 shadow-lg">
+                  {initials(displayName)}
+                </div>
+              )}
+              <span className="absolute inset-0 rounded-full bg-black/55 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex items-center justify-center text-[10px] font-bold text-white text-center leading-tight px-2">
+                {savingLogo ? "Saving…" : "Change logo"}
+              </span>
+            </label>
             <div className="min-w-0">
               <p className="text-white/40 text-[11px] font-semibold uppercase tracking-widest mb-1">Enterprise Dashboard</p>
               <h1 className="text-2xl font-black text-white truncate">{displayName}</h1>

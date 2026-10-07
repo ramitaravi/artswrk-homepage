@@ -700,6 +700,44 @@ export const appRouter = router({
       }),
 
     /** Update client fields — admin only */
+    /**
+     * Upload a logo for another account, on their behalf.
+     *
+     * Keyed by the TARGET user id: the self-serve uploader keys by whoever is
+     * signed in, so an admin fixing a studio's logo filed it under the admin.
+     */
+    uploadAccountLogo: protectedProcedure
+      .input(z.object({
+        userId: z.number().int(),
+        base64: z.string().max(8 * 1024 * 1024),
+        contentType: z.string().default("image/png"),
+        filename: z.string().max(200).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        if (!/^image\/(png|jpe?g|gif|webp|svg\+xml)$/i.test(input.contentType)) {
+          throw new Error("A logo must be an image (png, jpg, gif, webp or svg).");
+        }
+        const { storagePut } = await import("./storage");
+        const ext = (input.contentType.split("/")[1] ?? "png").replace("+xml", "");
+        const safe = (input.filename ?? "logo").replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 60);
+        const { url } = await storagePut(
+          `enterprise-logos/${input.userId}-${Date.now()}-${safe}.${ext}`,
+          Buffer.from(input.base64, "base64"),
+          input.contentType,
+        );
+        return { url };
+      }),
+
+    /** Save a logo for an account, across the user and its companies. */
+    setAccountLogo: protectedProcedure
+      .input(z.object({ userId: z.number().int(), url: z.string().url().max(2048) }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const { saveAccountLogo } = await import("./db");
+        return saveAccountLogo(input.userId, input.url);
+      }),
+
     updateClient: protectedProcedure
       .input(z.object({
         id: z.number(),
@@ -3604,6 +3642,50 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         }
 
         return { success: true, jobId };
+      }),
+
+    /**
+     * Upload a new logo for the signed-in enterprise account.
+     *
+     * Stored under the account's own id, so an admin uploading on someone's
+     * behalf never files it under their own prefix.
+     */
+    uploadLogo: protectedProcedure
+      .input(z.object({
+        base64: z.string().max(8 * 1024 * 1024),
+        contentType: z.string().default("image/png"),
+        filename: z.string().max(200).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (!/^image\/(png|jpe?g|gif|webp|svg\+xml)$/i.test(input.contentType)) {
+          throw new Error("A logo must be an image (png, jpg, gif, webp or svg).");
+        }
+        const { storagePut } = await import("./storage");
+        const ext = (input.contentType.split("/")[1] ?? "png").replace("+xml", "");
+        const safe = (input.filename ?? "logo").replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 60);
+        const { url } = await storagePut(
+          `enterprise-logos/${ctx.user.id}-${Date.now()}-${safe}.${ext}`,
+          Buffer.from(input.base64, "base64"),
+          input.contentType,
+        );
+        return { url };
+      }),
+
+    /**
+     * Save that logo everywhere the account's picture is read from.
+     *
+     * An enterprise account's image lives in three places — the user's
+     * enterprise logo, the user's profile picture, and each company row — and
+     * different screens read different ones, so writing a single column left a
+     * stale picture somewhere. Companies are only updated when they have no
+     * logo of their own or were still showing the old one, so a multi-company
+     * account (one logo per brand) never has its brands overwritten.
+     */
+    updateMyLogo: protectedProcedure
+      .input(z.object({ url: z.string().url().max(2048) }))
+      .mutation(async ({ input, ctx }) => {
+        const { saveAccountLogo } = await import("./db");
+        return saveAccountLogo(ctx.user.id, input.url);
       }),
 
     /** Update a PRO job owned by the logged-in enterprise user */
