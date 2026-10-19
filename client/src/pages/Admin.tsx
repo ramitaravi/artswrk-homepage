@@ -26,6 +26,9 @@ import RichText from "@/components/RichText";
 import { periodInvoiceTotals } from "@shared/bookingRates";
 import { hmMinusMinutes } from "@shared/adminBookingSchedule";
 import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
+import TypeaheadMultiSelect from "@/components/TypeaheadMultiSelect";
+import ImageUploadField from "@/components/ImageUploadField";
+import { hasCoordinates, textLocation, type PlaceLocation } from "@shared/location";
 import { useLocationField } from "@/hooks/useLocationField";
 import { toast } from "sonner";
 
@@ -583,6 +586,10 @@ function AdminArtistForm({
   const { data: masterArtistTypeOptions = [] } = trpc.artists.getMasterArtistTypes.useQuery();
   const { data: masterServiceTypeOptions = [] } = trpc.artists.getMasterServiceTypes.useQuery();
   const { data: masterStyleOptions = [] } = trpc.artists.getMasterStyleTypes.useQuery();
+  // The admin list, which includes affiliations no artist carries yet — the
+  // public filter list hides those, so a new one could never get its first
+  // artist.
+  const { data: allAffiliations = [] } = trpc.admin.allAffiliations.useQuery();
 
   const [firstName, setFirstName] = useState(initial?.firstName ?? "");
   const [lastName, setLastName] = useState(initial?.lastName ?? "");
@@ -590,7 +597,24 @@ function AdminArtistForm({
   const [password, setPassword] = useState("");
   const [pronouns, setPronouns] = useState(initial?.pronouns ?? "");
   const [phoneNumber, setPhoneNumber] = useState(initial?.phoneNumber ?? "");
-  const [location, setLocation] = useState(initial?.location ?? "");
+  // The whole Places payload, not just its label. `users` has had
+  // locationLat/Lng/City/State/Country/PlaceId all along and this form only
+  // ever sent the string, so every admin-added artist was missing the
+  // coordinates that radius and city search run on.
+  const [place, setPlace] = useState<PlaceLocation>(() =>
+    initial?.locationLat
+      ? {
+          formatted: initial.location ?? "",
+          lat: Number(initial.locationLat),
+          lng: Number(initial.locationLng),
+          city: initial.locationCity ?? undefined,
+          state: initial.locationState ?? undefined,
+          country: initial.locationCountry ?? undefined,
+          placeId: initial.locationPlaceId ?? undefined,
+        }
+      : textLocation(initial?.location ?? ""),
+  );
+  const location = place.formatted;
   const [bio, setBio] = useState(initial?.bio ?? "");
   const [website, setWebsite] = useState(initial?.website ?? "");
   const [instagram, setInstagram] = useState(initial?.instagram ?? "");
@@ -604,10 +628,12 @@ function AdminArtistForm({
   const [styles, setStyles] = useState<string[]>(initial?.masterStyleNames ?? []);
   const [artswrkPro, setArtswrkPro] = useState<boolean>(!!initial?.artswrkPro);
   const [artswrkBasic, setArtswrkBasic] = useState<boolean>(!!initial?.artswrkBasic);
+  const [affiliationIds, setAffiliationIds] = useState<number[]>(initial?.affiliationIds ?? []);
+  const [newAffiliations, setNewAffiliations] = useState<string[]>([]);
   const [sendWelcome, setSendWelcome] = useState(true);
   const [welcomeSubject, setWelcomeSubject] = useState("Welcome to Artswrk! 🎉");
   const [welcomeHtml, setWelcomeHtml] = useState(
-    `<p>Hey ${firstName || "there"},</p><p>The Artswrk Team here — so glad we connected!</p><p>Artswrk is the platform connecting artists to work. So excited to get you on our roster!</p><p>We've added you to our email list, so you'll get regular job updates from us. Below are your next steps:</p><ol><li><strong>Create your password:</strong> Using your email address, click here to set a password and login.</li><li><strong>Complete your profile:</strong> We added key details for you, but we want to know more! Add your resume, bio, and anything else that will help you get booked.</li><li><strong>Submit to open jobs:</strong> Check out the jobs board and send in a submission if you are interested and available. Not seeing any for you just yet? No worries — we are adding new clients every single day and will email you new opportunities.</li><li><strong>Once you're booked:</strong> Artswrk handles all payments &amp; 1099s on behalf of you and the client, so you can focus on WRK.</li><li><strong>Join Artswrk PRO:</strong> To get first dibs on higher-paying jobs, plus access to our health insurance and sick pay partners, upgrade your account for $110/year — annual only, and it starts with a 7-day free trial.</li></ol><p>If you have any questions, feel free to reply back to this email anytime. Artswrk is committed to innovating how you make money as an artist, and we are so thrilled to have you on the platform.</p><p>Talk soon,<br/>Nick Silverio &amp; Ramita Ravi<br/>Co-Founders, Artswrk</p>`
+    `<p>Hey ${firstName || "there"},</p><p>The Artswrk Team here — so glad we connected!</p><p>Artswrk is the platform connecting artists to work. So excited to get you on our roster!</p><p>We've added you to our email list, so you'll get regular job updates from us. Below are your next steps:</p><ol><li><strong>Create your password:</strong> Go to <a href="https://artswrk.com/app">artswrk.com/app</a> - Using your email address, create a password and login.</li><li><strong>Complete your profile:</strong> We added key details for you, but we want to know more! Add your resume, bio, and anything else that will help you get booked.</li><li><strong>Submit to open jobs:</strong> Check out the jobs board and send in a submission if you are interested and available. Not seeing any for you just yet? No worries — we are adding new clients every single day and will email you new opportunities.</li><li><strong>Once you're booked:</strong> Artswrk handles all payments &amp; 1099s on behalf of you and the client, so you can focus on WRK.</li><li><strong>Join Artswrk PRO:</strong> To get first dibs on higher-paying jobs, plus access to thousands in partner benefits, upgrade your account for $110/year — annual only, and it starts with a 7-day free trial.</li></ol><p>If you have any questions, feel free to reply back to this email anytime. Artswrk is committed to innovating how you make money as an artist, and we are so thrilled to have you on the platform.</p><p>Talk soon,<br/>Nick Silverio &amp; Ramita Ravi<br/>Co-Founders, Artswrk</p>`
   );
 
   // Picking an artist type auto-selects its associated service types as a
@@ -623,16 +649,49 @@ function AdminArtistForm({
         setServices(prev => Array.from(new Set([...prev, ...impliedServices])));
       }
     }
+    // Drop services belonging to a type that is no longer selected, so the
+    // record can't keep a Dance service after Dance has been removed.
+    const removed = types.filter(t => !nextTypes.includes(t));
+    if (removed.length) {
+      const orphaned = new Set(
+        masterServiceTypeOptions
+          .filter((sv: any) => removed.includes(sv.artistTypeName))
+          .map((sv: any) => sv.name),
+      );
+      setServices(prev => prev.filter(sv => !orphaned.has(sv)));
+    }
     setTypes(nextTypes);
   }
+
+  // Services bubble up under the artist types chosen above. Before a type is
+  // picked there is nothing sensible to offer, and offering all of them is how
+  // a tap dancer ended up tagged with music lessons.
+  const serviceOptions = masterServiceTypeOptions
+    .filter((sv: any) => types.length === 0 || types.includes(sv.artistTypeName))
+    .map((sv: any) => ({ value: sv.name, label: sv.name, hint: sv.artistTypeName }));
+
+  // A location with no coordinates is a string nobody can search on. The
+  // field accepts free text for odd cases, but the form will not save it.
+  const locationReady = hasCoordinates(place);
+  const canSubmit = !!firstName.trim() && !!lastName.trim() && !!email.trim()
+    && locationReady && types.length > 0;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (isSaving) return;
+    if (!locationReady) {
+      toast.error("Pick the location from the dropdown so it saves with coordinates.");
+      return;
+    }
+    if (types.length === 0) {
+      toast.error("Pick at least one artist type.");
+      return;
+    }
     onSave({
-      firstName, lastName, email, pronouns, phoneNumber, location, bio, website,
+      firstName, lastName, email, pronouns, phoneNumber, location, place, bio, website,
       instagram, tiktok, youtube, portfolio, tagline, profilePicture, masterArtistTypes: types,
       masterServiceType: services, masterStyles: styles, artswrkPro, artswrkBasic,
+      affiliationIds, newAffiliations,
       ...(isCreate ? {
         password: password || undefined,
         sendWelcomeEmail: sendWelcome,
@@ -651,20 +710,12 @@ function AdminArtistForm({
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
         <h3 className="text-sm font-black text-[#111] uppercase tracking-wider">Basic Info</h3>
 
-        {/* Profile picture URL */}
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white font-black text-xl flex-shrink-0 overflow-hidden">
-            {profilePicture ? (
-              <img src={profilePicture} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-            ) : (
-              <span>{(firstName[0] || "?").toUpperCase()}</span>
-            )}
-          </div>
-          <div className="flex-1">
-            <label className={labelCls}>Profile Picture URL</label>
-            <input value={profilePicture} onChange={e => setProfilePicture(e.target.value)} placeholder="https://..." className={inputCls} />
-          </div>
-        </div>
+        <ImageUploadField
+          value={profilePicture}
+          onChange={setProfilePicture}
+          label="Profile Picture"
+          fallbackInitial={firstName[0] || "?"}
+        />
 
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -695,10 +746,21 @@ function AdminArtistForm({
             <input value={pronouns} onChange={e => setPronouns(e.target.value)} placeholder="She/her" className={inputCls} />
           </div>
           <div>
-            <label className={labelCls}>Location</label>
-            <div className="rounded-xl border border-gray-200 focus-within:border-[#F25722] transition-colors bg-white">
-              <LocationAutocompleteInput value={location} onChange={r => setLocation(r.formatted)} placeholder="New York, NY" icon={false} />
+            <label className={labelCls}>Location <span className="text-[#F25722]">*</span></label>
+            <div className={`rounded-xl border transition-colors bg-white focus-within:border-[#F25722] ${location && !locationReady ? "border-amber-300" : "border-gray-200"}`}>
+              <LocationAutocompleteInput value={location} onChange={setPlace} placeholder="New York, NY" icon={false} />
             </div>
+            {location && !locationReady ? (
+              <p className="text-[11px] text-amber-600 mt-1.5">
+                Pick one of the suggestions — typed text saves no coordinates, and search runs on those.
+              </p>
+            ) : (
+              <p className="text-[11px] text-gray-400 mt-1.5">
+                {locationReady
+                  ? `Saved with coordinates${place.city ? ` · ${place.city}${place.stateCode ? `, ${place.stateCode}` : ""}` : ""}`
+                  : "Start typing and choose from the dropdown."}
+              </p>
+            )}
           </div>
         </div>
 
@@ -737,9 +799,57 @@ function AdminArtistForm({
       {/* Specialties */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
         <h3 className="text-sm font-black text-[#111] uppercase tracking-wider">Specialties</h3>
-        <ChipPicker label="Artist Types" options={masterArtistTypeOptions.map(t => t.name)} selected={types} onChange={handleTypesChange} />
-        <ChipPicker label="Services" options={masterServiceTypeOptions.map(t => t.name)} selected={services} onChange={setServices} />
-        <ChipPicker label="Styles" options={masterStyleOptions.map(t => t.name)} selected={styles} onChange={setStyles} />
+        <TypeaheadMultiSelect
+          id="artist-types"
+          label="Artist Types"
+          required
+          options={masterArtistTypeOptions.map((t: any) => ({ value: t.name, label: t.name }))}
+          selected={types}
+          onChange={handleTypesChange}
+          placeholder="Type to search artist types…"
+          emptyHint="Required. Services below are drawn from whichever types you pick."
+        />
+        <TypeaheadMultiSelect
+          id="artist-services"
+          label="Services"
+          options={serviceOptions}
+          selected={services}
+          onChange={setServices}
+          placeholder={types.length ? "Type to search services…" : "Pick an artist type first"}
+          emptyHint={types.length ? "Picking a type pre-fills these — add or remove any of them." : undefined}
+        />
+        <TypeaheadMultiSelect
+          id="artist-styles"
+          label="Styles"
+          options={masterStyleOptions.map((t: any) => ({ value: t.name, label: t.name }))}
+          selected={styles}
+          onChange={setStyles}
+          placeholder="Type to search styles…"
+        />
+
+        {/* Affiliations — schools, studios and programs an artist belongs to.
+            Admin-only: there is no artist-facing write path for these. */}
+        <TypeaheadMultiSelect
+          id="artist-affiliations"
+          label="Affiliations"
+          options={[
+            ...allAffiliations.map((a: any) => ({
+              value: String(a.id),
+              label: a.display,
+              hint: a.artistCount === 0 ? "new" : `${a.artistCount}`,
+            })),
+            ...newAffiliations.map((n) => ({ value: `new:${n}`, label: n, hint: "will be created" })),
+          ]}
+          selected={[...affiliationIds.map(String), ...newAffiliations.map((n) => `new:${n}`)]}
+          onChange={(next) => {
+            setAffiliationIds(next.filter((v) => !v.startsWith("new:")).map(Number));
+            setNewAffiliations(next.filter((v) => v.startsWith("new:")).map((v) => v.slice(4)));
+          }}
+          allowCreate
+          onCreate={(name) => setNewAffiliations((prev) => prev.includes(name) ? prev : [...prev, name])}
+          placeholder="Type to search, or add a new one…"
+          emptyHint="e.g. BOCO, NYU Tisch, Broadway Dance Center. Type a name that isn't listed to create it."
+        />
       </div>
 
       {/* Social & Web */}
@@ -827,7 +937,8 @@ function AdminArtistForm({
         </button>
         <button
           type="submit"
-          disabled={isSaving}
+          disabled={isSaving || !canSubmit}
+          title={canSubmit ? undefined : "Name, email, a location picked from the dropdown, and at least one artist type are required."}
           className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isSaving && <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />}

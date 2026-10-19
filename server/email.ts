@@ -355,8 +355,18 @@ export async function sendSimpleEmail({
  * the $10.99/mo plan having been discontinued 2026-08-28.
  */
 export async function sendArtistWelcomeEmail({
-  to, firstName,
-}: { to: string; firstName: string }): Promise<boolean> {
+  to, firstName, claimUrl,
+}: {
+  to: string;
+  firstName: string;
+  /**
+   * A password-claim link, for an account that was created FOR someone and
+   * still has no password of their own. Without it the button says "Go to My
+   * Dashboard", which is a dead end for exactly those people -- they have
+   * nothing to sign in with.
+   */
+  claimUrl?: string;
+}): Promise<boolean> {
   const step = (icon: string, title: string, body: string) =>
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;">' +
       '<tr><td style="background:#f9f9f9;border-radius:12px;padding:14px 16px;">' +
@@ -383,8 +393,8 @@ export async function sendArtistWelcomeEmail({
            "Hundreds of jobs, from creative work to side jobs. Something new is posted every day.") +
       step("\u{1F4B3}", "Choose your plan",
            "Basic ($30/year) or PRO ($110/year \u2014 annual only, starting with a 7-day free trial). No commission on anything you earn, ever \u2014 discuss your rate freely with clients. The average Basic booking is $250; on PRO it\u2019s $500+. One booking pays the year off."),
-    ctaText: "Go to My Dashboard",
-    ctaUrl: APP_URL + "/app",
+    ctaText: claimUrl ? "Create Your Password" : "Go to My Dashboard",
+    ctaUrl: claimUrl ?? APP_URL + "/app",
     footerNote: 'Questions? Email <a href="mailto:contact@artswrk.com" style="color:#ec008c;font-weight:600;">contact@artswrk.com</a> \u2014 we\u2019re happy to help, or to hear feedback.<br><br>Best,<br>Nick &amp; Rami<br>Co-Founders, Artswrk',
   });
   return sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject: "Welcome to Artswrk! \u{1F389}", html });
@@ -455,6 +465,79 @@ export async function sendProJobPostedEmail(data: {
  * account" moment) and doubles as an early-warning if that flow breaks for
  * someone — no confirmation email means nobody's actually getting through.
  */
+/**
+ * One internal alert for every way someone arrives on the platform.
+ *
+ * Until now only ONE of the four routes told anybody: the /app claim flow.
+ * A self-signup, an onboarding completion, and the invite link an admin sends
+ * all happened in silence, so there was no way to confirm an invite had landed
+ * short of querying the database.
+ *
+ * Internal only — always to support, never to the person who joined.
+ */
+export type JoinEvent =
+  /** Signed themselves up from the site. */
+  | "signup"
+  /** Claimed an account an admin created for them, via the emailed link. */
+  | "admin_invite_claimed"
+  /** Set a password on a legacy account with none, from /app. */
+  | "legacy_claimed"
+  /** Finished the onboarding questions. */
+  | "onboarded";
+
+const JOIN_EVENT_COPY: Record<JoinEvent, { headline: string; subject: string; lead: string }> = {
+  signup: {
+    headline: "New signup \u{1F389}",
+    subject: "just joined Artswrk",
+    lead: "signed themselves up from the site.",
+  },
+  admin_invite_claimed: {
+    headline: "Admin invite claimed \u{2705}",
+    subject: "claimed the account you created for them",
+    lead: "used the invite link from an admin-created account and set their password. The invite landed.",
+  },
+  legacy_claimed: {
+    headline: "First login \u2014 password just set \u{1F511}",
+    subject: "just logged in for the first time",
+    lead: "set a password for the first time and logged in \u2014 a legacy account with no password on file.",
+  },
+  onboarded: {
+    headline: "Onboarding finished \u{1F3AF}",
+    subject: "finished onboarding",
+    lead: "completed their onboarding questions.",
+  },
+};
+
+export async function sendJoinAlertEmail({
+  name, email, userRole, userId, event, addedByAdmin,
+}: {
+  name: string;
+  email: string;
+  userRole?: string | null;
+  userId: number;
+  event: JoinEvent;
+  addedByAdmin?: boolean;
+}): Promise<boolean> {
+  const copy = JOIN_EVENT_COPY[event];
+  const html = renderEmailShell({
+    accent: "internal",
+    headline: copy.headline,
+    preheader: name + " (" + (userRole ?? "unknown role") + ") \u2014 " + copy.subject,
+    bodyHtml:
+      para(b(name) + " " + copy.lead) +
+      detailsCard([
+        { label: "Name", value: name },
+        { label: "Email", value: email },
+        { label: "Role", value: userRole ?? "unknown" },
+        { label: "User ID", value: String(userId) },
+        { label: "Origin", value: addedByAdmin ? "Added by an admin" : "Self signup" },
+      ]),
+    ctaText: "View in Admin",
+    ctaUrl: APP_URL + "/admin-dashboard",
+  });
+  return sendSimpleEmail({ to: SUPPORT_EMAIL, subject: name + " " + copy.subject, html });
+}
+
 export async function sendFirstLoginAlertEmail({
   name, email, userRole, userId,
 }: { name: string; email: string; userRole?: string | null; userId: number }): Promise<boolean> {

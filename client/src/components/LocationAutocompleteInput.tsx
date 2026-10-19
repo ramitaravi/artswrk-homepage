@@ -169,9 +169,18 @@ export default function LocationAutocompleteInput({
         onKeyDown={(e) => {
           // Enter while the Places dropdown is open picks a prediction — it
           // must not also submit the surrounding form.
-          if (e.key === "Enter" && document.querySelector(".pac-container.pac-open")) {
-            e.preventDefault();
-          }
+          //
+          // This used to look for ".pac-container.pac-open". Google never adds
+          // a "pac-open" class: the container it appends to <body> is
+          // "pac-container pac-logo hdpi" and it is shown and hidden purely
+          // with `display`. So the guard matched nothing, every Enter fell
+          // through to the form, and a half-typed location submitted the
+          // surrounding form with whatever had been filled in so far.
+          if (e.key !== "Enter") return;
+          const open = Array.from(document.querySelectorAll(".pac-container")).some(
+            (el) => getComputedStyle(el).display !== "none" && el.querySelector(".pac-item"),
+          );
+          if (open) e.preventDefault();
         }}
         placeholder={placeholder}
         data-testid={testId}

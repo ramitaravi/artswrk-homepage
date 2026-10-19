@@ -134,11 +134,12 @@ function Logo() {
 }
 
 function StepSidebar({ step, completedSteps }: { step: Step; completedSteps: Set<number> }) {
+  // Fills its parent rather than setting its own width: this was w-64 nested
+  // inside a w-64 p-8 wrapper, so the content was 64px wider than the box it
+  // sat in and the progress bar ran past its own column. The logo lived here
+  // too, directly under the navbar's — two ARTSWRK marks stacked.
   return (
-    <div className="hidden lg:flex flex-col w-64 shrink-0">
-      <div className="mb-8">
-        <Logo />
-      </div>
+    <div className="flex flex-col h-full w-full">
       <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Artist Onboarding</p>
       <div className="space-y-1">
         {STEPS.map((s, i) => {
@@ -148,8 +149,9 @@ function StepSidebar({ step, completedSteps }: { step: Step; completedSteps: Set
           return (
             <div
               key={num}
+              // The sidebar is white, so a white "current" card was invisible.
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-                current ? "bg-white shadow-sm" : "hover:bg-white/50"
+                current ? "bg-pink-50 ring-1 ring-pink-100" : "hover:bg-gray-50"
               }`}
             >
               <div
@@ -174,19 +176,26 @@ function StepSidebar({ step, completedSteps }: { step: Step; completedSteps: Set
         })}
       </div>
 
-      {/* Progress bar */}
-      <div className="mt-auto pt-8">
-        <div className="flex justify-between text-xs text-gray-400 mb-1.5">
-          <span>Progress</span>
-          <span>{Math.round(((step - 1) / STEPS.length) * 100)}%</span>
-        </div>
-        <div className="h-1.5 bg-gray-100 rounded-full">
-          <div
-            className="h-full rounded-full artist-grad-bg transition-all duration-500"
-            style={{ width: `${((step - 1) / STEPS.length) * 100}%` }}
-          />
-        </div>
-      </div>
+      {/* Progress. Counts the steps actually finished — (step - 1) / total
+          read 75% while you were standing on the last step of four, and could
+          never reach 100% however much you did. */}
+      {(() => {
+        const pct = Math.round((completedSteps.size / STEPS.length) * 100);
+        return (
+          <div className="mt-auto pt-8">
+            <div className="flex justify-between text-xs text-gray-400 mb-1.5">
+              <span>Progress</span>
+              <span>{pct}%</span>
+            </div>
+            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full artist-grad-bg transition-all duration-500"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -733,16 +742,12 @@ function Step4Plan({
   onGoToArtswrk,
   onChooseBasic,
   onChoosePro,
-  interval,
-  setInterval: setIntervalFn,
   loading,
 }: {
   onBack: () => void;
   onGoToArtswrk: () => void;
   onChooseBasic: () => void;
   onChoosePro: () => void;
-  interval: "monthly" | "annual";
-  setInterval: (v: "monthly" | "annual") => void;
   loading: boolean;
 }) {
   return (
@@ -752,23 +757,12 @@ function Step4Plan({
         <p className="text-sm text-gray-500">Subscribe to Artswrk to take full advantage of the platform. Get paid to connect with work you love 💖</p>
       </div>
 
-      {/* Interval toggle */}
-      <div className="flex items-center justify-center gap-1 bg-gray-100 rounded-xl p-1 mb-5 w-fit mx-auto">
-        <button
-          type="button"
-          onClick={() => setIntervalFn("monthly")}
-          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${interval === "monthly" ? "bg-white shadow text-[#111]" : "text-gray-500"}`}
-        >
-          Monthly
-        </button>
-        <button
-          type="button"
-          onClick={() => setIntervalFn("annual")}
-          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${interval === "annual" ? "bg-white shadow text-[#111]" : "text-gray-500"}`}
-        >
-          Annual <span className="text-[#F25722]">–17% off</span>
-        </button>
-      </div>
+      {/* Both plans are annual. There is no monthly option to choose between,
+          and the toggle that used to sit here was display-only — it never
+          reached Stripe, so it offered a plan that could not be bought. */}
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest text-center mb-5">
+        Billed annually
+      </p>
 
       <div className="grid grid-cols-2 gap-3 mb-4">
         {/* Basic */}
@@ -779,8 +773,8 @@ function Step4Plan({
             </div>
             <span className="font-bold text-sm text-[#111]">Basic</span>
           </div>
-          <p className="text-2xl font-black text-[#111] mb-0.5">$30<span className="text-sm font-normal text-gray-400">/unlock</span></p>
-          <p className="text-xs text-gray-400 mb-3">Per year · pay per job</p>
+          <p className="text-2xl font-black text-[#111] mb-0.5">$30<span className="text-sm font-normal text-gray-400">/year</span></p>
+          <p className="text-xs text-gray-400 mb-3">Annual unlock · set it and forget it</p>
           <ul className="space-y-1.5 mb-4 flex-1">
             {["Unlock jobs on demand", "Apply to studio gigs", "Basic profile listing", "Email support"].map((f) => (
               <li key={f} className="flex items-start gap-1.5 text-xs text-gray-600">
@@ -810,10 +804,7 @@ function Step4Plan({
             </div>
             <span className="font-bold text-sm text-[#111]">PRO</span>
           </div>
-          {/* Annual-only since 2026-08-28. The interval toggle is display-only
-              (it never reaches Stripe) and Basic already ignores it, so PRO
-              shows the same price either way rather than a monthly plan that
-              can no longer be bought. */}
+          {/* Annual-only since 2026-08-28. */}
           <p className="text-2xl font-black text-[#111] mb-0.5">
             $110<span className="text-sm font-normal text-gray-400">/year</span>
           </p>
@@ -871,7 +862,6 @@ export default function ArtistOnboarding() {
   );
 
   // Step 4
-  const [interval, setInterval] = useState<"monthly" | "annual">("monthly");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const [, navigate] = useLocation();
@@ -1042,7 +1032,7 @@ export default function ArtistOnboarding() {
     <div className="min-h-screen bg-[#fafafa] flex pt-16">
       <Navbar />
       {/* Sidebar */}
-      <div className="hidden lg:flex flex-col w-64 shrink-0 p-8 border-r border-gray-100 bg-white">
+      <div className="hidden lg:flex flex-col w-64 shrink-0 px-6 py-8 border-r border-gray-100 bg-white">
         <StepSidebar step={step} completedSteps={completedSteps} />
       </div>
 
@@ -1083,8 +1073,6 @@ export default function ArtistOnboarding() {
                 onGoToArtswrk={handleGoToArtswrk}
                 onChooseBasic={handleChooseBasic}
                 onChoosePro={handleChoosePro}
-                interval={interval}
-                setInterval={setInterval}
                 loading={checkoutLoading}
               />
             )}

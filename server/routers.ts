@@ -5,7 +5,7 @@ import {
   visibleProJobApplyFields,
 } from "../shared/enterprise";
 import bcrypt from "bcryptjs";
-import { APP_URL } from "./emailTemplates";
+import { APP_URL, SUPPORT_EMAIL } from "./emailTemplates";
 import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ONE_YEAR_MS } from "@shared/const";
 import { isJobPubliclyLive } from "@shared/jobStatus";
 import { classDateLabel } from "@shared/classDate";
@@ -34,7 +34,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, approveArtswrkInvoice, approveBookingPeriodInvoice, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, getArtistPastClients, createArtistInvoiceBooking, declineArtswrkInvoice, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getArtistInvoicesAwaiting, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, approveArtswrkInvoice, approveBookingPeriodInvoice, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, getArtistPastClients, createArtistInvoiceBooking, declineArtswrkInvoice, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getArtistInvoicesAwaiting, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllAffiliationsForAdmin, getArtistAffiliationIds, findOrCreateAffiliation, setArtistAffiliations, addArtistAffiliation, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail, sendArtistBookingConfirmedEmail, sendClientBookingConfirmedEmail, sendClientPayArtistEmail, sendInquiryIntroEmail } from "./email";
 import crypto from "crypto";
@@ -60,6 +60,43 @@ const SALT_ROUNDS = 12;
  * DB-level enum (stays varchar) so the Bubble sync can't be broken by a
  * value outside this list — enforced here at the write layer instead.
  */
+/**
+ * A location picked from Google Places, as the admin forms send it.
+ *
+ * `users` has had locationLat/Lng/City/State/Country/PlaceId all along, but the
+ * admin create/edit path only ever wrote the `location` STRING and dropped the
+ * rest. Coordinates are what radius and city filtering run on, so every artist
+ * added by an admin was invisible to "who do we have near X" — the single most
+ * common thing these records get used for.
+ */
+const placeSchema = z.object({
+  formatted: z.string().min(1),
+  placeId: z.string().optional(),
+  lat: z.number().optional(),
+  lng: z.number().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  stateCode: z.string().optional(),
+  country: z.string().optional(),
+  countryCode: z.string().optional(),
+});
+
+/** The structured columns a picked place fills in. Free-typed text clears them. */
+function placeColumns(place?: z.infer<typeof placeSchema>) {
+  return {
+    location: place?.formatted ?? null,
+    locationLat: place?.lat != null ? String(place.lat) : null,
+    locationLng: place?.lng != null ? String(place.lng) : null,
+    locationCity: place?.city ?? null,
+    locationState: place?.state ?? null,
+    locationCountry: place?.country ?? null,
+    locationPlaceId: place?.placeId ?? null,
+  };
+}
+
+/** The step an artist reaches only by finishing onboarding (see ArtistOnboarding). */
+const ONBOARDING_FINAL_STEP = 5;
+
 const CLIENT_HIRING_CATEGORIES = ["Dance Studio", "Dance Competition", "Music School", "Event Company", "Other"] as const;
 const clientHiringCategorySchema = z.enum(CLIENT_HIRING_CATEGORIES).optional();
 
@@ -310,6 +347,8 @@ export const appRouter = router({
         return {
           success: true,
           isTemporary: user.passwordIsTemporary ?? true,
+          // A returning artist who never finished onboarding goes there first.
+          needsOnboarding: !user.userSignedUp,
           isAdmin,
           enterprise: !!(user as any).enterprise,
           user: {
@@ -386,6 +425,22 @@ export const appRouter = router({
         await deletePasswordResetToken(input.token);
 
         if (isFirstClaim && userBefore?.email) {
+          // Tell support the invite actually landed. This is the whole point of
+          // the alert for admin-added accounts: without it there was no way to
+          // confirm an invite worked short of querying the database.
+          try {
+            const { sendJoinAlertEmail } = await import("./email");
+            await sendJoinAlertEmail({
+              name: userBefore.name || userBefore.firstName || "Someone",
+              email: userBefore.email,
+              userRole: userBefore.userRole,
+              userId: userBefore.id,
+              event: "admin_invite_claimed",
+              addedByAdmin: !!userBefore.addedByAdmin,
+            });
+          } catch (err) {
+            console.error("[resetPassword] Join alert failed (non-fatal):", err instanceof Error ? err.message : err);
+          }
           (async () => {
             try {
               const { upsertContact } = await import("./brevo");
@@ -431,6 +486,11 @@ export const appRouter = router({
           firstName: user.firstName ?? user.name ?? null,
           profilePicture: user.profilePicture ?? null,
           clientCompanyName: user.clientCompanyName ?? null,
+          // An account someone set up FOR them is a different moment from a
+          // migrated Bubble account: "welcome, we're glad you're here", not
+          // "welcome back, the site got a refresh".
+          addedByAdmin: !!user.addedByAdmin,
+          needsOnboarding: !user.userSignedUp,
         };
       }),
 
@@ -438,6 +498,32 @@ export const appRouter = router({
      * Set a password for a user who has never had one (imported from Bubble).
      * Auto-logs them in after setting the password.
      */
+    /**
+     * What a reset link is for, so the page can greet the right person.
+     *
+     * An invite and a forgotten password arrive at the same URL but are not
+     * the same moment: one is "welcome, here is your account", the other is
+     * "set a new password". Only the holder of the token learns anything, and
+     * only a first name — the token IS the proof of email ownership.
+     */
+    checkResetToken: publicProcedure
+      .input(z.object({ token: z.string().min(1) }))
+      .query(async ({ input }) => {
+        const record = await getPasswordResetToken(input.token);
+        if (!record) return { valid: false as const };
+        if (record.expiresAt && new Date(record.expiresAt) < new Date()) {
+          return { valid: false as const, expired: true };
+        }
+        const user = record.userId ? await getUserById(record.userId) : null;
+        if (!user) return { valid: false as const };
+        return {
+          valid: true as const,
+          firstName: user.firstName ?? user.name?.split(" ")[0] ?? null,
+          // Never had a password of their own: this is an invite being claimed.
+          isFirstClaim: !user.passwordHash || (user.passwordIsTemporary ?? false),
+        };
+      }),
+
     setInitialPassword: publicProcedure
       .input(z.object({
         email: z.string().email(),
@@ -453,12 +539,15 @@ export const appRouter = router({
 
         // Internal signal, not user-facing — never block their login on it.
         try {
-          const { sendFirstLoginAlertEmail } = await import("./email");
-          await sendFirstLoginAlertEmail({
+          const { sendJoinAlertEmail } = await import("./email");
+          await sendJoinAlertEmail({
             name: user.name || user.firstName || "Someone",
             email: user.email ?? input.email,
             userRole: user.userRole,
             userId: user.id,
+            // No token was involved here — see the security note on this flow.
+            event: user.addedByAdmin ? "admin_invite_claimed" : "legacy_claimed",
+            addedByAdmin: !!user.addedByAdmin,
           });
         } catch (notifyErr) {
           console.error("[setInitialPassword] Internal alert email failed (non-fatal):", notifyErr);
@@ -474,6 +563,10 @@ export const appRouter = router({
         const isAdmin = user.role === "admin" || user.openId === ENV.ownerOpenId;
         return {
           success: true,
+          // Top level, where the caller reads it: straight into onboarding when
+          // they have never answered it. Their profile is already part-filled
+          // from whatever the admin entered for them.
+          needsOnboarding: !user.userSignedUp,
           isAdmin,
           enterprise: !!(user as any).enterprise,
           user: {
@@ -597,7 +690,10 @@ export const appRouter = router({
           resolveMasterServiceTypeNames(user.masterServiceType ? JSON.parse(user.masterServiceType as string) : []),
           resolveMasterStyleTypeNames(user.masterStyles ? JSON.parse(user.masterStyles as string) : []),
         ]);
-        return { ...user, masterArtistTypeNames, masterServiceTypeNames, masterStyleNames };
+        // Current affiliations, so the edit form opens with them already
+        // ticked rather than looking like the artist has none.
+        const affiliationIds = await getArtistAffiliationIds(input.id);
+        return { ...user, masterArtistTypeNames, masterServiceTypeNames, masterStyleNames, affiliationIds };
       }),
 
     /** Update artist fields — admin only */
@@ -610,6 +706,9 @@ export const appRouter = router({
         pronouns: z.string().optional(),
         phoneNumber: z.string().optional(),
         location: z.string().optional(),
+        place: placeSchema.optional(),
+        affiliationIds: z.array(z.number().int()).optional(),
+        newAffiliations: z.array(z.string().trim().min(1).max(200)).optional(),
         bio: z.string().optional(),
         website: z.string().optional(),
         instagram: z.string().optional(),
@@ -632,7 +731,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
-        const { id, masterArtistTypes, masterServiceType, masterStyles, artistDisciplines, website, instagram, tiktok, youtube, portfolio, ...rest } = input;
+        const { id, masterArtistTypes, masterServiceType, masterStyles, artistDisciplines, website, instagram, tiktok, youtube, portfolio, place, affiliationIds, newAffiliations, ...rest } = input;
         const { getDb } = await import("./db");
         const { users: usersTable } = await import("../drizzle/schema");
         const { eq } = await import("drizzle-orm");
@@ -654,7 +753,18 @@ export const appRouter = router({
           ...(serviceTypeIds !== undefined ? { masterServiceType: JSON.stringify(serviceTypeIds) } : {}),
           ...(styleIds !== undefined ? { masterStyles: JSON.stringify(styleIds) } : {}),
           ...(artistDisciplines !== undefined ? { artistDisciplines: JSON.stringify(artistDisciplines) } : {}),
+          // A re-picked place rewrites every location column together; editing
+          // only the label would leave stale coordinates behind it.
+          ...(place !== undefined ? placeColumns(place) : {}),
         }).where(eq(usersTable.id, id));
+
+        if (affiliationIds !== undefined || newAffiliations !== undefined) {
+          const ids = [...(affiliationIds ?? [])];
+          for (const display of newAffiliations ?? []) {
+            ids.push(await findOrCreateAffiliation(display));
+          }
+          await setArtistAffiliations(id, ids);
+        }
         return getUserById(id);
       }),
 
@@ -667,7 +777,9 @@ export const appRouter = router({
         password: passwordSchema.optional(),
         pronouns: z.string().optional(),
         phoneNumber: z.string().optional(),
-        location: z.string().optional(),
+        location: z.string().min(1, "Location is required."),
+        /** The full Places payload behind `location`, when one was picked. */
+        place: placeSchema.optional(),
         bio: z.string().optional(),
         website: z.string().optional(),
         instagram: z.string().optional(),
@@ -675,8 +787,12 @@ export const appRouter = router({
         youtube: z.string().optional(),
         portfolio: z.string().optional(),
         profilePicture: z.string().optional(),
-        masterArtistTypes: z.array(z.string()).default([]),
+        masterArtistTypes: z.array(z.string()).min(1, "Pick at least one artist type."),
         masterServiceType: z.array(z.string()).default([]),
+        /** Existing affiliations to tag this artist with. */
+        affiliationIds: z.array(z.number().int()).default([]),
+        /** Affiliations to create on the fly and tag them with. */
+        newAffiliations: z.array(z.string().trim().min(1).max(200)).default([]),
         masterStyles: z.array(z.string()).default([]),
         tagline: z.string().optional(),
         artswrkPro: z.boolean().default(false),
@@ -720,7 +836,8 @@ export const appRouter = router({
           userRole: "Artist" as const,
           pronouns: input.pronouns ?? null,
           phoneNumber: input.phoneNumber ?? null,
-          location: input.location ?? null,
+          // The whole place, not just its label — see placeColumns.
+          ...placeColumns(input.place ?? { formatted: input.location }),
           bio: input.bio ?? null,
           website: input.website ? normalizeSocialLink(input.website, "website") : null,
           instagram: input.instagram ? normalizeSocialLink(input.instagram, "instagram") : null,
@@ -739,8 +856,13 @@ export const appRouter = router({
             : input.artswrkBasic
               ? "artist_basic" as const
               : "artist_free" as const,
-          userSignedUp: true,
-          onboardingStep: 4,
+          // NOT signed up and NOT onboarded: an admin filled in what they
+          // could, and the artist still has to add their resume and the rest.
+          // This used to be userSignedUp: true / onboardingStep: 4, which
+          // marked them complete before they had answered anything and
+          // disqualified them from every prompt that would have caught it.
+          userSignedUp: false,
+          onboardingStep: 1,
           // Every account created from this admin form is, by definition,
           // admin-added — tag it so support/reporting can tell these apart
           // from real self-signups, matching the Bubble-sourced meaning of
@@ -754,8 +876,25 @@ export const appRouter = router({
           values.passwordIsTemporary = false;
         }
 
-        const result = await db.insert(usersTable).values(values);
+        // drizzle's mysql2 driver resolves insert() to [ResultSetHeader, fields],
+        // so the new id is at result[0].insertId. Reading result.insertId gave
+        // undefined: the account was created, but the response carried no id,
+        // the admin landed on "Artist not found", and the welcome email died
+        // inside its own catch because the reset token was keyed to undefined.
+        // Same bug, same shape, as the one pinned by messaging-insert-id.test.ts.
+        const [result] = await db.insert(usersTable).values(values);
         const newId = (result as any).insertId as number;
+        if (!newId) throw new Error("The account was created but its id could not be read — tell an engineer before retrying.");
+
+        // Affiliations, before the email goes out — if tagging fails we want
+        // to know before the artist has been told they're on the roster.
+        const affiliationIds = [...input.affiliationIds];
+        for (const display of input.newAffiliations) {
+          affiliationIds.push(await findOrCreateAffiliation(display));
+        }
+        for (const affiliationId of affiliationIds) {
+          await addArtistAffiliation(newId, affiliationId);
+        }
 
         // Awaited, not fire-and-forget — an un-awaited send here would still
         // usually complete on its own, but it has nothing keeping it alive if
@@ -774,7 +913,11 @@ export const appRouter = router({
             const token = crypto.randomBytes(32).toString("hex");
             const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
             await createPasswordResetToken(newId, token, expiresAt);
-            const claimUrl = `${origin}/reset-password?token=${token}`;
+            // Straight to the app. They enter their email there and are
+            // prompted to create a password in place, then go on to onboarding.
+            // (The token is still minted so /reset-password?token= keeps
+            // working for anyone who needs it, e.g. a support resend.)
+            const claimUrl = `${origin}/app`;
 
             if (input.welcomeEmailSubject && input.welcomeEmailHtml) {
               const ctaBlock = `
@@ -783,13 +926,21 @@ export const appRouter = router({
                 </div>`;
               emailSent = await sendSimpleEmail({
                 to: input.email,
+                // Copied to support so there is proof the send happened, and a
+                // copy of the exact claim link if the artist says it never came.
+                cc: SUPPORT_EMAIL,
                 subject: input.welcomeEmailSubject,
                 html: `<div style="font-family:'Helvetica Neue',sans-serif;max-width:580px;margin:0 auto">${input.welcomeEmailHtml}${ctaBlock}</div>`,
               });
             } else {
+              // sendArtistWelcomeEmail already CCs support itself.
               emailSent = await sendArtistWelcomeEmail({ to: input.email, firstName: input.firstName });
             }
           } catch (err) {
+            // false, not null: null means "no email was asked for", and leaving
+            // it null here hid a failure that never even reached the send --
+            // the admin saw no warning at all.
+            emailSent = false;
             console.error("[Admin] Welcome email failed:", err instanceof Error ? err.message : err);
           }
         }
@@ -805,8 +956,25 @@ export const appRouter = router({
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
         const artist = await getUserById(input.artistId);
         if (!artist?.email) throw new Error("Artist has no email address");
-        await sendArtistWelcomeEmail({ to: artist.email, firstName: artist.firstName || artist.name?.split(" ")[0] || "there" });
-        return { success: true };
+
+        // An admin-added account has no password, and the original claim link
+        // expires after 7 days -- 2,559 of these are already past that. Mint a
+        // fresh one on every resend, or the email hands them a dashboard
+        // button they cannot get through.
+        let claimUrl: string | undefined;
+        if (artist.passwordIsTemporary ?? true) {
+          const token = crypto.randomBytes(32).toString("hex");
+          await createPasswordResetToken(artist.id, token, new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+          claimUrl = `${APP_URL}/reset-password?token=${token}`;
+        }
+
+        const sent = await sendArtistWelcomeEmail({
+          to: artist.email,
+          firstName: artist.firstName || artist.name?.split(" ")[0] || "there",
+          claimUrl,
+        });
+        if (!sent) throw new Error("The email could not be sent — check the server logs.");
+        return { success: true, claimLinkIncluded: !!claimUrl };
       }),
 
     /** Bulk email a set of artists (or any user IDs) with admin-authored rich-text content. */
@@ -912,6 +1080,56 @@ export const appRouter = router({
      * Keyed by the TARGET user id: the self-serve uploader keys by whoever is
      * signed in, so an admin fixing a studio's logo filed it under the admin.
      */
+    /**
+     * Every affiliation, with how many artists carry it.
+     *
+     * Separate from artists.getAffiliations, which is the public FILTER list
+     * and rightly hides empty ones. An admin picker has to show them all, or a
+     * newly created affiliation can never be attached to its first artist.
+     */
+    allAffiliations: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+      return getAllAffiliationsForAdmin();
+    }),
+
+    /** Create an affiliation, or return the existing one with that name. */
+    createAffiliation: protectedProcedure
+      .input(z.object({ display: z.string().trim().min(1).max(200) }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        const id = await findOrCreateAffiliation(input.display);
+        return { id, display: input.display.trim() };
+      }),
+
+    /**
+     * An image for a record that may not exist yet.
+     *
+     * uploadAccountLogo needs a userId to key its storage path, so it cannot
+     * be used on the create form — the artist has no id until they are saved.
+     */
+    uploadImage: protectedProcedure
+      .input(z.object({
+        base64: z.string().max(8 * 1024 * 1024),
+        contentType: z.string().default("image/png"),
+        filename: z.string().max(200).optional(),
+        folder: z.enum(["profile-pictures", "affiliation-logos"]).default("profile-pictures"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        if (!/^image\/(png|jpe?g|gif|webp)$/i.test(input.contentType)) {
+          throw new Error("That needs to be a png, jpg, gif or webp image.");
+        }
+        const { storagePut } = await import("./storage");
+        const ext = (input.contentType.split("/")[1] ?? "png").replace("jpeg", "jpg");
+        const safe = (input.filename ?? "image").replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 60);
+        const { url } = await storagePut(
+          `${input.folder}/${Date.now()}-${safe}.${ext}`,
+          Buffer.from(input.base64, "base64"),
+          input.contentType,
+        );
+        return { url };
+      }),
+
     uploadAccountLogo: protectedProcedure
       .input(z.object({
         userId: z.number().int(),
@@ -1063,8 +1281,15 @@ export const appRouter = router({
           values.passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
           values.passwordIsTemporary = false;
         }
-        const result = await db.insert(usersTable).values(values);
+        // drizzle's mysql2 driver resolves insert() to [ResultSetHeader, fields],
+        // so the new id is at result[0].insertId. Reading result.insertId gave
+        // undefined: the account was created, but the response carried no id,
+        // the admin landed on "Artist not found", and the welcome email died
+        // inside its own catch because the reset token was keyed to undefined.
+        // Same bug, same shape, as the one pinned by messaging-insert-id.test.ts.
+        const [result] = await db.insert(usersTable).values(values);
         const newId = (result as any).insertId as number;
+        if (!newId) throw new Error("The account was created but its id could not be read — tell an engineer before retrying.");
         return getUserById(newId);
       }),
 
@@ -3307,6 +3532,18 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         });
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        try {
+          const { sendJoinAlertEmail } = await import("./email");
+          await sendJoinAlertEmail({
+            name: [input.firstName, input.lastName].filter(Boolean).join(" ") || email,
+            email,
+            userRole: (newUser as any).userRole ?? null,
+            userId: newUser.id,
+            event: "signup",
+          });
+        } catch (err) {
+          console.error("[register] Join alert failed (non-fatal):", err instanceof Error ? err.message : err);
+        }
         return { success: true, userId: newUser.id };
       }),
 
@@ -3363,6 +3600,24 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           ? await buildLocationColumns(input.location, locationData)
           : {};
         await updateUserOnboarding(user.id, { ...rest, ...location } as any);
+
+        // Onboarding saves step by step; only the last step means "they're in".
+        // Alerting on every step would bury the signal in noise.
+        if (input.onboardingStep != null && input.onboardingStep >= ONBOARDING_FINAL_STEP) {
+          try {
+            const { sendJoinAlertEmail } = await import("./email");
+            await sendJoinAlertEmail({
+              name: user.name || user.firstName || "Someone",
+              email: user.email ?? "",
+              userRole: user.userRole,
+              userId: user.id,
+              event: "onboarded",
+              addedByAdmin: !!user.addedByAdmin,
+            });
+          } catch (err) {
+            console.error("[onboarding] Join alert failed (non-fatal):", err instanceof Error ? err.message : err);
+          }
+        }
         return { success: true };
       }),
 
@@ -3430,10 +3685,29 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         await updateUserOnboarding(user.id, { ...rest, ...location } as any);
         // Send welcome email on first completion
         if (input.userSignedUp && !wasSignedUp && user.email) {
-          sendArtistWelcomeEmail({
-            to: user.email,
-            firstName: user.firstName ?? user.name ?? "there",
-          }).catch((err) => console.error("[welcome email]", err));
+          // An admin-added artist was already welcomed by the invite that got
+          // them here. A second one on finishing onboarding reads as a glitch.
+          if (!user.addedByAdmin) {
+            sendArtistWelcomeEmail({
+              to: user.email,
+              firstName: user.firstName ?? user.name ?? "there",
+            }).catch((err) => console.error("[welcome email]", err));
+          }
+
+          // Same moment, internal copy: the artist is now fully on the platform.
+          try {
+            const { sendJoinAlertEmail } = await import("./email");
+            await sendJoinAlertEmail({
+              name: user.name || user.firstName || "Someone",
+              email: user.email,
+              userRole: user.userRole,
+              userId: user.id,
+              event: "onboarded",
+              addedByAdmin: !!user.addedByAdmin,
+            });
+          } catch (err) {
+            console.error("[artistOnboarding] Join alert failed (non-fatal):", err instanceof Error ? err.message : err);
+          }
         }
         return { success: true };
       }),

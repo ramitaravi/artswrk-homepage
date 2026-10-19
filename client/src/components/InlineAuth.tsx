@@ -16,6 +16,8 @@ import { PASSWORD_RULES, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH, isPasswordVal
 export interface AuthResult {
   isAdmin?: boolean;
   enterprise?: boolean;
+  /** Never been through onboarding — send them there before the dashboard. */
+  needsOnboarding?: boolean;
   user?: { userRole?: string | null };
 }
 
@@ -47,6 +49,10 @@ interface UserInfo {
   userRole: string | null;
   profilePicture: string | null;
   clientCompanyName: string | null;
+  /** The account was set up for them by an admin — a welcome, not a welcome back. */
+  addedByAdmin?: boolean;
+  /** They have never been through onboarding, so send them there after sign-in. */
+  needsOnboarding?: boolean;
 }
 
 function RoleBadge({ role }: { role: string | null }) {
@@ -113,12 +119,11 @@ export default function InlineAuth({
         }
         return;
       }
-      setUserInfo({
-        firstName: data.firstName,
-        userRole: data.userRole,
-        profilePicture: data.profilePicture,
-        clientCompanyName: data.clientCompanyName,
-      });
+      // Spread, don't hand-copy: this was listing four fields by name, so
+      // addedByAdmin arrived from the server and was thrown away here, and an
+      // invited artist kept getting the "welcome back, the site had a refresh"
+      // copy meant for migrated Bubble accounts.
+      setUserInfo({ ...data });
       if (blockRole && data.userRole === blockRole) {
         setStage("blocked");
         return;
@@ -299,8 +304,14 @@ export default function InlineAuth({
               {(userInfo.firstName || email)[0].toUpperCase()}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-bold text-[#111] truncate">Hey {displayName}!</p>
-              <p className="text-xs text-gray-500">Welcome back to Artswrk ⭐️ Our site went through a refresh. Create a new password to log into the new & improved Artswrk!</p>
+              <p className="text-sm font-bold text-[#111] truncate">
+                {userInfo.addedByAdmin ? `Welcome to Artswrk, ${displayName}! 🎉` : `Hey ${displayName}!`}
+              </p>
+              <p className="text-xs text-gray-500">
+                {userInfo.addedByAdmin
+                  ? "We're so glad you're here. Create a password below to set up your account — we've already filled in some of your profile for you."
+                  : "Welcome back to Artswrk ⭐️ Our site went through a refresh. Create a new password to log into the new & improved Artswrk!"}
+              </p>
             </div>
           </div>
           <form onSubmit={handleSetPasswordSubmit} className="space-y-3">

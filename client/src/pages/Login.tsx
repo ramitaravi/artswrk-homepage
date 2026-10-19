@@ -24,6 +24,11 @@ export default function Login() {
     if (next) return next;
     if (data.isAdmin) return "/admin-dashboard";
     if (data.enterprise) return "/enterprise";
+    // An artist who has never onboarded goes there first — including one an
+    // admin added, whose profile is already part-filled from what was entered
+    // for them. Landing them on an empty-looking dashboard instead was why
+    // admin-added artists never onboarded at all.
+    if (data.needsOnboarding && data.user?.userRole === "Artist") return "/artist-onboarding";
     return "/app";
   }
 

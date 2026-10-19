@@ -29,6 +29,16 @@ export default function ResetPassword() {
     }
   }, []);
 
+  // An invite and a forgotten password land on the same URL. They are not the
+  // same moment, and "Set new password / Choose a strong password" is a cold
+  // greeting for someone being welcomed onto the platform for the first time.
+  const { data: tokenInfo } = trpc.auth.checkResetToken.useQuery(
+    { token },
+    { enabled: !!token, retry: false },
+  );
+  const isInvite = tokenInfo?.valid === true && tokenInfo.isFirstClaim;
+  const greetingName = tokenInfo?.valid === true ? tokenInfo.firstName : null;
+
   const resetPassword = trpc.auth.resetPassword.useMutation({
     onSuccess: () => {
       setSuccess(true);
@@ -94,16 +104,37 @@ export default function ResetPassword() {
           ) : (
             /* ── Form state ── */
             <>
-              <h1 className="text-2xl font-black text-[#111] mb-1">Set new password</h1>
-              <p className="text-gray-500 text-sm mb-7">
-                Choose a strong password.
-              </p>
+              {isInvite ? (
+                <>
+                  <h1 className="text-2xl font-black text-[#111] mb-1">Welcome to Artswrk! 🎉</h1>
+                  <p className="text-gray-500 text-sm mb-5">
+                    {greetingName ? `Hey ${greetingName} — create` : "Create"} your password below to get started.
+                  </p>
+                  <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 mb-6">
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-sm font-black flex-shrink-0">
+                      {(greetingName || "A")[0].toUpperCase()}
+                    </div>
+                    <p className="text-xs text-gray-500 min-w-0">
+                      Your profile is already set up. Once you pick a password you'll be signed
+                      straight in, and you can add your resume, bio and anything else that helps
+                      you get booked.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h1 className="text-2xl font-black text-[#111] mb-1">Set new password</h1>
+                  <p className="text-gray-500 text-sm mb-7">
+                    Choose a strong password.
+                  </p>
+                </>
+              )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* New password */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                    New password
+                    {isInvite ? "Create password" : "New password"}
                   </label>
                   <div className="relative">
                     <input
@@ -173,7 +204,7 @@ export default function ResetPassword() {
                   disabled={loading || !password || !confirm || !isPasswordValid(password)}
                   className="w-full py-3.5 rounded-xl text-sm font-bold text-white hirer-grad-bg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? "Updating…" : "Update password"}
+                  {loading ? "Updating…" : isInvite ? "Create password & sign in" : "Update password"}
                 </button>
               </form>
             </>

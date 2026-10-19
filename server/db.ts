@@ -6441,3 +6441,78 @@ export async function declineArtswrkInvoice(bookingId: number): Promise<void> {
     } as any)
     .where(eq(bookings.id, bookingId));
 }
+
+/**
+ * Every affiliation, including ones no artist carries yet.
+ *
+ * getAllAffiliations inner-joins user_affiliations, so it only ever returns
+ * affiliations that already have at least one artist — 27 of the 36 on file.
+ * That is right for a public filter (an empty one filters to nothing) and
+ * wrong for an admin picker, where it also made a new affiliation impossible:
+ * you could not tag the first artist with it, so it never became selectable.
+ */
+export async function getAllAffiliationsForAdmin(): Promise<Array<{
+  id: number; display: string; logoUrl: string | null; artistCount: number;
+}>> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      id: affiliations.id,
+      display: affiliations.display,
+      logoUrl: affiliations.logoUrl,
+      artistCount: sql<number>`COUNT(${userAffiliations.id})`,
+    })
+    .from(affiliations)
+    .leftJoin(userAffiliations, eq(userAffiliations.affiliationId, affiliations.id))
+    .groupBy(affiliations.id, affiliations.display, affiliations.logoUrl)
+    .orderBy(affiliations.display);
+  return rows.map((r) => ({ ...r, artistCount: Number(r.artistCount ?? 0) }));
+}
+
+/**
+ * The affiliation with this name, creating it if it is new.
+ *
+ * Matched case-insensitively on purpose: every text column here is
+ * utf8mb4_bin, so a plain equality check treats "BOCO" and "boco" as
+ * different schools and would quietly split one affiliation into two.
+ */
+export async function findOrCreateAffiliation(display: string): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const name = display.trim();
+  if (!name) throw new Error("An affiliation needs a name.");
+
+  const existing = await db
+    .select({ id: affiliations.id })
+    .from(affiliations)
+    .where(sql`LOWER(${affiliations.display}) = LOWER(${name})`)
+    .limit(1);
+  if (existing[0]) return existing[0].id;
+
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const [result] = await db.insert(affiliations).values({ display: name, slug } as any);
+  return (result as any).insertId as number;
+}
+
+/** Replace an artist's affiliations with exactly this set. */
+export async function setArtistAffiliations(artistUserId: number, affiliationIds: number[]): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.delete(userAffiliations).where(eq(userAffiliations.artistUserId, artistUserId));
+  const unique = [...new Set(affiliationIds)];
+  if (unique.length) {
+    await db.insert(userAffiliations).values(unique.map((affiliationId) => ({ artistUserId, affiliationId })));
+  }
+}
+
+/** The affiliation ids an artist currently carries, for prefilling the admin form. */
+export async function getArtistAffiliationIds(artistUserId: number): Promise<number[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({ affiliationId: userAffiliations.affiliationId })
+    .from(userAffiliations)
+    .where(eq(userAffiliations.artistUserId, artistUserId));
+  return rows.map((r) => r.affiliationId).filter((id): id is number => id != null);
+}
