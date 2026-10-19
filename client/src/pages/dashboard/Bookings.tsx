@@ -285,6 +285,9 @@ export function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
   const [expNote, setExpNote] = useState("");
   const [expValue, setExpValue] = useState("");
   const [expFile, setExpFile] = useState<File | null>(null);
+  // Some expenses genuinely have no receipt — a cash toll, a lost slip — and a
+  // hard file requirement meant those artists could not finish the booking.
+  const [noReceipt, setNoReceipt] = useState(false);
   /** Nothing is invoiced until the artist has seen the full breakdown. */
   const [confirming, setConfirming] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -297,7 +300,7 @@ export function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
   const addExpense = trpc.artistDashboard.addReimbursement.useMutation({
     onSuccess: () => {
       utils.artistDashboard.getPeriodReimbursements.invalidate({ periodId: period.id });
-      setExpNote(""); setExpValue(""); setExpFile(null);
+      setExpNote(""); setExpValue(""); setExpFile(null); setNoReceipt(false);
       if (fileRef.current) fileRef.current.value = "";
     },
     onError: (e: any) => alert("Couldn't add that expense: " + e.message),
@@ -324,8 +327,9 @@ export function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
 
   async function saveExpense() {
     const value = parseFloat(expValue);
-    // A receipt is required for every expense.
-    if (!value || isNaN(value) || !expFile) return;
+    // Either a receipt, or the artist saying outright that there isn't one.
+    if (!value || isNaN(value)) return;
+    if (!expFile && !noReceipt) return;
     let fileUrl: string | undefined;
     if (expFile) {
       const base64 = await new Promise<string>((res, rej) => {
@@ -337,8 +341,10 @@ export function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
       const up = await uploadReceipt.mutateAsync({ fileName: expFile.name, fileBase64: base64, mimeType: expFile.type });
       fileUrl = up.url;
     }
-    if (!fileUrl) return; // a receipt is required — the server rejects expenses without one
-    addExpense.mutate({ bookingId: booking.id, bookingPeriodId: period.id, value, note: expNote || undefined, fileUrl });
+    addExpense.mutate({
+      bookingId: booking.id, bookingPeriodId: period.id, value,
+      note: expNote || undefined, fileUrl, noReceipt: !fileUrl,
+    });
   }
 
   function doSubmit() {
@@ -392,7 +398,9 @@ export function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
                 <div key={r.id} className="flex items-center gap-2 text-xs bg-gray-50 rounded-lg pl-3 pr-1.5 py-1.5">
                   <span className="text-gray-600 truncate flex-1 min-w-0">
                     {r.note || "Expense"}
-                    {r.fileUrl && <> · <a href={r.fileUrl} target="_blank" rel="noopener noreferrer" className="text-[#ec008c] hover:underline">receipt</a></>}
+                    {r.fileUrl
+                      ? <> · <a href={r.fileUrl} target="_blank" rel="noopener noreferrer" className="text-[#ec008c] hover:underline">receipt</a></>
+                      : <span className="text-gray-400"> · no receipt</span>}
                   </span>
                   <span className="font-semibold text-[#111]">${Number(r.value).toFixed(2)}</span>
                   <button
@@ -434,7 +442,7 @@ export function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
                 }`}
               >
                 <Paperclip size={12} className="flex-shrink-0" />
-                <span className="truncate">{expFile ? expFile.name.slice(0, 22) : "Attach receipt *"}</span>
+                <span className="truncate">{expFile ? expFile.name.slice(0, 22) : noReceipt ? "Attach receipt" : "Attach receipt *"}</span>
               </button>
               {expFile && (
                 <button
@@ -450,13 +458,21 @@ export function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
             <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={e => setExpFile(e.target.files?.[0] ?? null)} />
             <button
               type="button" onClick={saveExpense}
-              title={!expFile ? "Attach a receipt first" : undefined}
-              disabled={!expValue || !expFile || addExpense.isPending || uploadReceipt.isPending}
+              title={!expFile && !noReceipt ? "Attach a receipt, or tick \"I don't have a receipt\"" : undefined}
+              disabled={!expValue || (!expFile && !noReceipt) || addExpense.isPending || uploadReceipt.isPending}
               className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors disabled:opacity-50"
             >
               {addExpense.isPending || uploadReceipt.isPending ? "Adding…" : "+ Add"}
             </button>
           </div>
+          <label className="flex items-center gap-2 text-[11px] text-gray-500 cursor-pointer select-none">
+            <input
+              type="checkbox" checked={noReceipt}
+              onChange={e => { setNoReceipt(e.target.checked); if (e.target.checked) { setExpFile(null); if (fileRef.current) fileRef.current.value = ""; } }}
+              className="rounded border-gray-300 text-[#ec008c] focus:ring-[#ec008c]"
+            />
+            I don't have a receipt for this
+          </label>
         </div>
 
         <div className="p-3 bg-blue-50 rounded-xl text-xs text-blue-700">

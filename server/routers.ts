@@ -9,7 +9,7 @@ import { APP_URL } from "./emailTemplates";
 import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ONE_YEAR_MS } from "@shared/const";
 import { isJobPubliclyLive } from "@shared/jobStatus";
 import { classDateLabel } from "@shared/classDate";
-import { bookingMoney, resolveBookingBaseAmount, isHourlyBooking, processingFeeFor } from "@shared/bookingRates";
+import { bookingMoney, resolveBookingBaseAmount, isHourlyBooking, isHourlyRateBooking, maxInvoiceHours, processingFeeFor } from "@shared/bookingRates";
 import { getPasswordError, PASSWORD_MAX_LENGTH } from "@shared/password";
 import { isArtistAccount, isClientAccount } from "@shared/accountRole";
 import { assertReimbursementRemovable, assertReimbursementWriteAccess } from "./reimbursementAccess";
@@ -34,7 +34,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, approveArtswrkInvoice, approveBookingPeriodInvoice, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getArtistInvoicesAwaiting, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, approveArtswrkInvoice, approveBookingPeriodInvoice, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, getArtistPastClients, createArtistInvoiceBooking, declineArtswrkInvoice, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getArtistInvoicesAwaiting, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail, sendArtistBookingConfirmedEmail, sendClientBookingConfirmedEmail, sendClientPayArtistEmail, sendInquiryIntroEmail } from "./email";
 import crypto from "crypto";
@@ -62,6 +62,211 @@ const SALT_ROUNDS = 12;
  */
 const CLIENT_HIRING_CATEGORIES = ["Dance Studio", "Dance Competition", "Music School", "Event Company", "Other"] as const;
 const clientHiringCategorySchema = z.enum(CLIENT_HIRING_CATEGORIES).optional();
+
+/**
+ * Text from a person, going into an HTML email.
+ *
+ * The decline reason is typed by the client and lands in the artist's inbox,
+ * so it is the one string in these emails we don't control.
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * Submit an artist's invoice for a booking: works out what the studio owes,
+ * stores the payment token and total, and emails them the review link.
+ *
+ * Lifted out of the `submitArtswrkInvoice` procedure so the artist's own
+ * "track hours and invoice" flow sends exactly the same invoice, by the same
+ * math, rather than a second implementation that drifts from this one.
+ */
+async function submitInvoiceForBooking(
+  openId: string,
+  input: { bookingId: number; artistRate?: number; hours?: number; notes?: string; origin?: string },
+) {
+  const user = await getUserByOpenId(openId);
+  if (!user) throw new Error("User not found");
+
+  // Fetch the booking to get the client's info
+  const booking = await getBookingById(input.bookingId);
+  if (!booking) throw new Error("Booking not found");
+  if (booking.artistUserId !== user.id) throw new Error("Not authorized");
+  // Nothing to invoice on a settled booking. invoice.approve already refuses
+  // these, but without this the studio still got an invoice email — and the
+  // 2026-09-14 reminder misfire pointed artists at years-old Completed/Paid
+  // bookings from Bubble.
+  if (String((booking as any).paymentStatus ?? "").toLowerCase() === "paid" || (booking as any).bookingStatus === "Completed") {
+    throw new Error("This booking is already completed and paid, so there's nothing to invoice.");
+  }
+  if ((booking as any).bookingStatus === "Cancelled") throw new Error("This booking was cancelled, so there's nothing to invoice.");
+  // A weekly class booking is invoiced one week at a time, where the rate
+  // is multiplied by the hours taught. This path treats the rate as the
+  // whole total, so it billed $50 + expenses instead of $50 x 4 hours
+  // (Kaylee DaCosta, 2026-09-15).
+  if ((booking as any).isAdminBooking && (booking as any).isRecurring) {
+    throw new Error("This is a weekly booking — submit your hours for the specific week instead, from the Bookings page.");
+  }
+  // Any booking whose stored rate is per hour: a class date, or admin
+  // work billed hourly. This was `!!recurringSeriesId`, so an hourly
+  // admin booking fell through to `input.artistRate` — and once the
+  // dashboard stopped sending a rate for hourly work, that would have
+  // invoiced the studio $0.
+  const isHourly = isHourlyRateBooking(booking as any);
+  if (isHourly && ((booking as any).invoicePaymentToken || (booking as any).artswrkInvoiceSubmittedAt)) {
+    throw new Error("An invoice has already been submitted for this booking.");
+  }
+
+  // Every payout must land in the artist's own connected Stripe account —
+  // never let an invoice go out (and get paid) with nowhere for the money to go.
+  const connectAccountId = await getArtistStripeConnectAccount(user.id);
+  if (!connectAccountId) {
+    throw new Error("Connect your Stripe payout account before invoicing a studio. Go to Settings → Manage Payouts.");
+  }
+
+  // Fetch the client (studio) user
+  const clientUser = booking.clientUserId ? await getUserById(booking.clientUserId) : null;
+
+  const reimbList = await getReimbursementsByBookingId(input.bookingId);
+  const totalReimb = reimbList.reduce((s: number, r: any) => s + (r.value ?? 0), 0);
+  const actualHours = input.hours ?? booking.hours;
+  if (isHourly && (!(booking as any).hourlyRate || !actualHours || actualHours <= 0)) {
+    throw new Error("Enter the hours worked before invoicing.");
+  }
+  const hoursCap = maxInvoiceHours(booking as any);
+  if (isHourly && Number(actualHours) > hoursCap) {
+    throw new Error(`That's more than ${hoursCap} hours — check the number before invoicing.`);
+  }
+  // Hourly rows store a per-hour unit rate, unlike legacy booking rows
+  // whose artistRate is already the whole booking amount. The artist may
+  // never choose the unit rate or amount to charge on an hourly booking.
+  const artistRate = isHourly
+    ? bookingMoney({ rateType: (booking as any).rateType, hourlyRate: (booking as any).hourlyRate,
+        hours: booking.hours }, { hoursOverride: actualHours }).base
+    : (input.artistRate ?? 0);
+  const processingFee = processingFeeFor(artistRate + totalReimb);
+  const totalDollars = artistRate + totalReimb + processingFee;
+  const totalCents = Math.round(totalDollars * 100);
+
+  // Generate a unique invoice payment token
+  const { randomBytes } = await import("crypto");
+  const invoicePaymentToken = randomBytes(24).toString("hex");
+
+  // Determine origin for redirect URLs
+  const origin = input.origin ?? APP_URL;  // was a hardcoded manus.space staging host
+  const paymentPageUrl = `${origin}/invoice/${invoicePaymentToken}`;
+
+  // Persist token + estimated total on the booking — no checkout URL yet,
+  // that gets created when the studio approves.
+  await markArtswrkInvoiceSubmitted(input.bookingId, user.id, {
+    invoicePaymentToken,
+    invoiceTotalCents: totalCents,
+    ...(isHourly ? { hours: actualHours! } : {}),
+  });
+
+  // Format date for email
+  const bookingDate = booking.startDate
+    ? new Date(booking.startDate).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" })
+    : new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" });
+
+  const artistDisplayName = user.name ?? user.firstName ?? "Your artist";
+  const studioName = clientUser?.clientCompanyName ?? clientUser?.firstName ?? "there";
+  const reimbText = totalReimb > 0
+    ? `$${totalReimb.toFixed(2)} (${reimbList.length} item${reimbList.length !== 1 ? "s" : ""})`
+    : "No reimbursements added";
+
+  // Build the studio payment email (matches the design in the screenshot)
+  const emailHtml = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Georgia,serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:32px 0">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;max-width:600px">
+  <!-- Header -->
+  <tr><td style="padding:28px 40px 20px;border-bottom:1px solid #eee;text-align:center">
+    <span style="font-size:22px;font-weight:900;letter-spacing:-0.5px">
+<span style="background:linear-gradient(90deg,#FFBC5D,#F25722);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">ARTS</span><span style="background:#111;color:#fff;padding:2px 8px;border-radius:4px;margin-left:2px;font-size:20px">WRK</span>
+    </span>
+  </td></tr>
+  <!-- Title -->
+  <tr><td style="padding:32px 40px 0">
+    <h1 style="margin:0;font-size:24px;font-weight:700;color:#111">Payment Request for ${artistDisplayName} ${bookingDate}</h1>
+  </td></tr>
+  <!-- Divider -->
+  <tr><td style="padding:20px 40px"><hr style="border:none;border-top:1px solid #eee;margin:0"></td></tr>
+  <!-- Greeting -->
+  <tr><td style="padding:0 40px 20px">
+    <p style="margin:0 0 16px;font-size:16px;color:#444">Hi ${studioName},</p>
+    <p style="margin:0;font-size:16px;color:#444">Your booking has been completed by ${artistDisplayName} and is ready for your review.</p>
+  </td></tr>
+  <!-- Booking details block -->
+  <tr><td style="padding:0 40px 24px">
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-left:3px solid #ec008c;padding-left:16px">
+<tr><td style="padding-bottom:12px">
+  <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#999;letter-spacing:1px;text-transform:uppercase">YOUR BOOKING:</p>
+  <p style="margin:0 0 4px;font-size:15px;color:#333"><strong>Date:</strong> ${bookingDate}</p>
+  <p style="margin:0 0 4px;font-size:15px;color:#333"><strong>Total Base Rate:</strong> $${artistRate.toFixed(2)}</p>
+  <p style="margin:0 0 4px;font-size:15px;color:#333"><strong>Reimbursements:</strong> ${reimbText}</p>
+  <p style="margin:0;font-size:15px;color:#333"><strong>Total Payment Amount:</strong> $${totalDollars.toFixed(2)}</p>
+</td></tr>
+    </table>
+  </td></tr>
+  <!-- Divider -->
+  <tr><td style="padding:0 40px 24px"><hr style="border:none;border-top:1px solid #eee;margin:0"></td></tr>
+  <!-- Payment details -->
+  <tr><td style="padding:0 40px 24px">
+    <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#999;letter-spacing:1px;text-transform:uppercase">PAYMENT DETAILS</p>
+    <p style="margin:0;font-size:16px;color:#444;line-height:1.6">If the hours need adjusting, you can update them on the review page below before paying. Once you approve, you'll be able to pay digitally with a card or Apple Pay, and will receive a receipt upon payment.</p>
+  </td></tr>
+  <!-- CTA Button -->
+  <tr><td style="padding:0 40px 32px;text-align:center">
+    <a href="${paymentPageUrl}" style="display:inline-block;background:#111;color:#fff;font-size:18px;font-weight:600;padding:18px 48px;border-radius:50px;text-decoration:none;letter-spacing:0.3px">Review Invoice →</a>
+  </td></tr>
+  <!-- Divider -->
+  <tr><td style="padding:0 40px 24px"><hr style="border:none;border-top:1px solid #eee;margin:0"></td></tr>
+  <!-- Footer -->
+  <tr><td style="padding:0 40px 32px">
+    <p style="margin:0 0 16px;font-size:15px;color:#444">As always, if you have any questions or concerns, don't hesitate to reach out to us.</p>
+    <p style="margin:0;font-size:15px;color:#444">Best,<br>The Artswrk Team</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+
+  // Send to the studio (client) via the SendGrid "Client - Pay Artist" template + CC Artswrk internally
+  const studioEmail = clientUser?.email;
+  try {
+    if (studioEmail) {
+      await sendClientPayArtistEmail({
+        to: studioEmail,
+        artistName: artistDisplayName,
+        clientRate: `$${artistRate.toFixed(2)}`,
+        date: bookingDate,
+        reimbursements: reimbText,
+        startDate: bookingDate,
+        totalClientRate: `$${totalDollars.toFixed(2)}`,
+        payUrl: paymentPageUrl,
+      });
+    }
+    // Always notify the internal Artswrk team with the full detail
+    await sendSimpleEmail({
+      to: "contact@artswrk.com",
+      subject: `[Invoice] ${artistDisplayName} → ${studioName} — $${totalDollars.toFixed(2)} — Booking #${input.bookingId}`,
+      html: emailHtml,
+    });
+  } catch (e) {
+    console.error("[submitArtswrkInvoice] Email send failed:", e);
+    // Don't throw — invoice is already saved
+  }
+
+  return { success: true, paymentPageUrl, invoicePaymentToken };
+  return { success: true, paymentPageUrl, invoicePaymentToken };
+}
 
 export const appRouter = router({
   system: systemRouter,
@@ -4314,11 +4519,21 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         bookingId: z.number(),
         value: z.number().positive(),
         note: z.string().max(500).optional(),
-        /** Every expense needs a receipt — the studio is billed for it. */
-        fileUrl: z.string().url("Attach a receipt for this expense"),
+        /** The receipt. The studio is billed for this, so it is the default. */
+        fileUrl: z.string().url("Attach a receipt for this expense").optional(),
+        /**
+         * Submitted without a receipt, on the artist's word. Some expenses
+         * genuinely have none — a cash toll, a lost slip — and requiring a
+         * file meant those artists could not complete the booking at all.
+         * The studio sees "no receipt" on the invoice and can query it.
+         */
+        noReceipt: z.boolean().optional(),
         expenseDate: z.date().optional(),
         /** The week it belongs to — required for weekly class bookings. */
         bookingPeriodId: z.number().int().optional(),
+      }).refine((v) => !!v.fileUrl || v.noReceipt === true, {
+        message: "Attach a receipt, or tick \"I don't have a receipt\".",
+        path: ["fileUrl"],
       }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
@@ -4397,7 +4612,47 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
       .input(z.object({
         bookingId: z.number(),
         artistRate: z.number().optional(),
-        hours: z.number().positive().max(24).optional(),
+        // The real cap depends on the booking — see maxInvoiceHours below. A
+        // blanket 24 silently disabled Submit on McKell's 36h10m admin booking.
+        hours: z.number().positive().max(500).optional(),
+        notes: z.string().max(1000).optional(),
+        origin: z.string().url().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+      return submitInvoiceForBooking(ctx.user.openId, input);
+      }),
+
+    /** The clients this artist may raise an invoice against. */
+    myClients: protectedProcedure.query(async ({ ctx }) => {
+      const user = await getUserByOpenId(ctx.user.openId);
+      if (!user) throw new Error("User not found");
+      return getArtistPastClients(user.id);
+    }),
+
+    /**
+     * The artist raises their own invoice for work already done.
+     *
+     * They pick a client they have worked with, say what the work was, and
+     * enter either hours at a rate or a flat amount. It becomes an ordinary
+     * booking and goes straight down the existing invoice path, so the client
+     * reviews and pays it exactly as they do one that came out of a job.
+     *
+     * Not every client is a studio — competitions, event companies and
+     * individuals book artists too, so nothing here calls them one.
+     *
+     * The client always approves before anything is charged, and can adjust
+     * the hours on the review page — this creates a request for payment, never
+     * a payment.
+     */
+    createInvoice: protectedProcedure
+      .input(z.object({
+        clientUserId: z.number().int(),
+        rateType: z.enum(["hourly", "flat"]),
+        hourlyRate: z.number().positive().max(1000).optional(),
+        hours: z.number().positive().max(500).optional(),
+        flatRate: z.number().positive().max(100000).optional(),
+        workDate: z.string(),
+        description: z.string().min(3).max(2000),
         notes: z.string().max(1000).optional(),
         origin: z.string().url().optional(),
       }))
@@ -4405,169 +4660,61 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new Error("User not found");
 
-        // Fetch the booking to get the client's info
-        const booking = await getBookingById(input.bookingId);
-        if (!booking) throw new Error("Booking not found");
-        if (booking.artistUserId !== user.id) throw new Error("Not authorized");
-        // Nothing to invoice on a settled booking. invoice.approve already refuses
-        // these, but without this the studio still got an invoice email — and the
-        // 2026-09-14 reminder misfire pointed artists at years-old Completed/Paid
-        // bookings from Bubble.
-        if (String((booking as any).paymentStatus ?? "").toLowerCase() === "paid" || (booking as any).bookingStatus === "Completed") {
-          throw new Error("This booking is already completed and paid, so there's nothing to invoice.");
-        }
-        if ((booking as any).bookingStatus === "Cancelled") throw new Error("This booking was cancelled, so there's nothing to invoice.");
-        // A weekly class booking is invoiced one week at a time, where the rate
-        // is multiplied by the hours taught. This path treats the rate as the
-        // whole total, so it billed $50 + expenses instead of $50 x 4 hours
-        // (Kaylee DaCosta, 2026-09-15).
-        if ((booking as any).isAdminBooking && (booking as any).isRecurring) {
-          throw new Error("This is a weekly booking — submit your hours for the specific week instead, from the Bookings page.");
-        }
-        const isClassDate = !!(booking as any).recurringSeriesId;
-        if (isClassDate && ((booking as any).invoicePaymentToken || (booking as any).artswrkInvoiceSubmittedAt)) {
-          throw new Error("An invoice has already been submitted for this class date.");
-        }
-
-        // Every payout must land in the artist's own connected Stripe account —
-        // never let an invoice go out (and get paid) with nowhere for the money to go.
+        // Nowhere to send the money is the one thing that must be caught before
+        // a client is emailed a payment link.
         const connectAccountId = await getArtistStripeConnectAccount(user.id);
         if (!connectAccountId) {
-          throw new Error("Connect your Stripe payout account before invoicing a studio. Go to Settings → Manage Payouts.");
+          throw new Error("Connect your Stripe payout account before invoicing a client. Go to Settings → Manage Payouts.");
         }
 
-        // Fetch the client (studio) user
-        const clientUser = booking.clientUserId ? await getUserById(booking.clientUserId) : null;
-
-        const reimbList = await getReimbursementsByBookingId(input.bookingId);
-        const totalReimb = reimbList.reduce((s: number, r: any) => s + (r.value ?? 0), 0);
-        const actualHours = input.hours ?? booking.hours;
-        if (isClassDate && (!(booking as any).hourlyRate || !actualHours || actualHours <= 0)) {
-          throw new Error("Enter the hours worked for this class before invoicing.");
+        // Only a client they have actually worked with. Without this an artist
+        // could send a payment request to anyone on the platform.
+        const clients = await getArtistPastClients(user.id);
+        const client = clients.find((c) => c.clientUserId === input.clientUserId);
+        if (!client) {
+          throw new Error("You can only invoice a client you've worked with before.");
         }
-        // Class-date rows store an hourly unit rate, unlike legacy booking rows
-        // whose artistRate is already the whole booking amount. The client may
-        // never choose the unit rate or amount to charge for a class date.
-        const artistRate = isClassDate
-          ? bookingMoney({ rateType: (booking as any).rateType, hourlyRate: (booking as any).hourlyRate,
-              hours: booking.hours }, { hoursOverride: actualHours }).base
-          : (input.artistRate ?? 0);
-        const processingFee = processingFeeFor(artistRate + totalReimb);
-        const totalDollars = artistRate + totalReimb + processingFee;
-        const totalCents = Math.round(totalDollars * 100);
 
-        // Generate a unique invoice payment token
-        const { randomBytes } = await import("crypto");
-        const invoicePaymentToken = randomBytes(24).toString("hex");
+        const workDate = new Date(input.workDate);
+        if (Number.isNaN(workDate.getTime())) throw new Error("Enter a valid date for the work.");
+        // An invoice is for work already done; a future date is a typo.
+        const endOfToday = new Date(); endOfToday.setHours(23, 59, 59, 999);
+        if (workDate > endOfToday) throw new Error("Pick the date the work happened — it can't be in the future.");
 
-        // Determine origin for redirect URLs
-        const origin = input.origin ?? APP_URL;  // was a hardcoded manus.space staging host
-        const paymentPageUrl = `${origin}/invoice/${invoicePaymentToken}`;
+        const money = bookingMoney(
+          input.rateType === "hourly"
+            ? { rateType: "hourly", hourlyRate: input.hourlyRate ?? 0, hours: input.hours ?? 0 }
+            : { rateType: "flat", flatRate: input.flatRate ?? 0 },
+        );
+        if (money.base <= 0) throw new Error("Enter the hours and rate, or a flat amount.");
+        // Stripe will not take less than 50c, and the studio shouldn't be
+        // emailed a link that dead-ends at checkout.
+        if (money.clientTotal < 1) throw new Error("That total is too small to charge.");
 
-        // Persist token + estimated total on the booking — no checkout URL yet,
-        // that gets created when the studio approves.
-        await markArtswrkInvoiceSubmitted(input.bookingId, user.id, {
-          invoicePaymentToken,
-          invoiceTotalCents: totalCents,
-          ...(isClassDate ? { hours: actualHours! } : {}),
+        const bookingId = await createArtistInvoiceBooking({
+          artistUserId: user.id,
+          clientUserId: input.clientUserId,
+          rateType: input.rateType,
+          hourlyRate: input.rateType === "hourly" ? (input.hourlyRate ?? null) : null,
+          flatRate: input.rateType === "flat" ? (input.flatRate ?? null) : null,
+          // To the cent. 18 x 36.17 is 651.0600000000001 in binary floating
+          // point, and that is what would have gone into the money column.
+          totalDollars: Math.round(money.base * 100) / 100,
+          hours: input.rateType === "hourly" ? (input.hours ?? null) : null,
+          startDate: workDate,
+          description: input.description,
         });
 
-        // Format date for email
-        const bookingDate = booking.startDate
-          ? new Date(booking.startDate).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" })
-          : new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" });
-
-        const artistDisplayName = user.name ?? user.firstName ?? "Your artist";
-        const studioName = clientUser?.clientCompanyName ?? clientUser?.firstName ?? "there";
-        const reimbText = totalReimb > 0
-          ? `$${totalReimb.toFixed(2)} (${reimbList.length} item${reimbList.length !== 1 ? "s" : ""})`
-          : "No reimbursements added";
-
-        // Build the studio payment email (matches the design in the screenshot)
-        const emailHtml = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:Georgia,serif">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:32px 0">
-<tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;max-width:600px">
-  <!-- Header -->
-  <tr><td style="padding:28px 40px 20px;border-bottom:1px solid #eee;text-align:center">
-    <span style="font-size:22px;font-weight:900;letter-spacing:-0.5px">
-      <span style="background:linear-gradient(90deg,#FFBC5D,#F25722);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">ARTS</span><span style="background:#111;color:#fff;padding:2px 8px;border-radius:4px;margin-left:2px;font-size:20px">WRK</span>
-    </span>
-  </td></tr>
-  <!-- Title -->
-  <tr><td style="padding:32px 40px 0">
-    <h1 style="margin:0;font-size:24px;font-weight:700;color:#111">Payment Request for ${artistDisplayName} ${bookingDate}</h1>
-  </td></tr>
-  <!-- Divider -->
-  <tr><td style="padding:20px 40px"><hr style="border:none;border-top:1px solid #eee;margin:0"></td></tr>
-  <!-- Greeting -->
-  <tr><td style="padding:0 40px 20px">
-    <p style="margin:0 0 16px;font-size:16px;color:#444">Hi ${studioName},</p>
-    <p style="margin:0;font-size:16px;color:#444">Your booking has been completed by ${artistDisplayName} and is ready for your review.</p>
-  </td></tr>
-  <!-- Booking details block -->
-  <tr><td style="padding:0 40px 24px">
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-left:3px solid #ec008c;padding-left:16px">
-      <tr><td style="padding-bottom:12px">
-        <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#999;letter-spacing:1px;text-transform:uppercase">YOUR BOOKING:</p>
-        <p style="margin:0 0 4px;font-size:15px;color:#333"><strong>Date:</strong> ${bookingDate}</p>
-        <p style="margin:0 0 4px;font-size:15px;color:#333"><strong>Total Base Rate:</strong> $${artistRate.toFixed(2)}</p>
-        <p style="margin:0 0 4px;font-size:15px;color:#333"><strong>Reimbursements:</strong> ${reimbText}</p>
-        <p style="margin:0;font-size:15px;color:#333"><strong>Total Payment Amount:</strong> $${totalDollars.toFixed(2)}</p>
-      </td></tr>
-    </table>
-  </td></tr>
-  <!-- Divider -->
-  <tr><td style="padding:0 40px 24px"><hr style="border:none;border-top:1px solid #eee;margin:0"></td></tr>
-  <!-- Payment details -->
-  <tr><td style="padding:0 40px 24px">
-    <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#999;letter-spacing:1px;text-transform:uppercase">PAYMENT DETAILS</p>
-    <p style="margin:0;font-size:16px;color:#444;line-height:1.6">If the hours need adjusting, you can update them on the review page below before paying. Once you approve, you'll be able to pay digitally with a card or Apple Pay, and will receive a receipt upon payment.</p>
-  </td></tr>
-  <!-- CTA Button -->
-  <tr><td style="padding:0 40px 32px;text-align:center">
-    <a href="${paymentPageUrl}" style="display:inline-block;background:#111;color:#fff;font-size:18px;font-weight:600;padding:18px 48px;border-radius:50px;text-decoration:none;letter-spacing:0.3px">Review Invoice →</a>
-  </td></tr>
-  <!-- Divider -->
-  <tr><td style="padding:0 40px 24px"><hr style="border:none;border-top:1px solid #eee;margin:0"></td></tr>
-  <!-- Footer -->
-  <tr><td style="padding:0 40px 32px">
-    <p style="margin:0 0 16px;font-size:15px;color:#444">As always, if you have any questions or concerns, don't hesitate to reach out to us.</p>
-    <p style="margin:0;font-size:15px;color:#444">Best,<br>The Artswrk Team</p>
-  </td></tr>
-</table>
-</td></tr></table>
-</body></html>`;
-
-        // Send to the studio (client) via the SendGrid "Client - Pay Artist" template + CC Artswrk internally
-        const studioEmail = clientUser?.email;
-        try {
-          if (studioEmail) {
-            await sendClientPayArtistEmail({
-              to: studioEmail,
-              artistName: artistDisplayName,
-              clientRate: `$${artistRate.toFixed(2)}`,
-              date: bookingDate,
-              reimbursements: reimbText,
-              startDate: bookingDate,
-              totalClientRate: `$${totalDollars.toFixed(2)}`,
-              payUrl: paymentPageUrl,
-            });
-          }
-          // Always notify the internal Artswrk team with the full detail
-          await sendSimpleEmail({
-            to: "contact@artswrk.com",
-            subject: `[Invoice] ${artistDisplayName} → ${studioName} — $${totalDollars.toFixed(2)} — Booking #${input.bookingId}`,
-            html: emailHtml,
-          });
-        } catch (e) {
-          console.error("[submitArtswrkInvoice] Email send failed:", e);
-          // Don't throw — invoice is already saved
-        }
-
-        return { success: true, paymentPageUrl, invoicePaymentToken };
+        // The same function the booking flow uses, so the client gets the same
+        // invoice, the same review page and the same charge.
+        const result = await submitInvoiceForBooking(ctx.user.openId, {
+          bookingId,
+          artistRate: input.rateType === "flat" ? money.base : undefined,
+          hours: input.rateType === "hourly" ? (input.hours ?? undefined) : undefined,
+          notes: input.notes,
+          origin: input.origin,
+        });
+        return { ...result, bookingId, total: money.clientTotal, artistTotal: money.artistTotal };
       }),
 
     /** Upload a reimbursement receipt file to S3 and return the URL. */
@@ -5351,6 +5498,85 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
       }),
 
     /**
+     * The client sends an invoice back instead of paying it.
+     *
+     * Hours they can simply correct on the review page before approving — that
+     * is a factual fix and the rate is unchanged. A disputed RATE is different:
+     * letting a client rewrite the rate an artist agreed to, and charge it,
+     * would settle the argument in the client's favour by default. So a rate
+     * dispute comes back here — the invoice is withdrawn, the artist is told
+     * why, and they resubmit. Nothing is charged either way.
+     *
+     * Public + token-scoped, the same trust model as approve: whoever holds
+     * the emailed link can act on this invoice.
+     */
+    decline: publicProcedure
+      .input(z.object({
+        token: z.string(),
+        reason: z.string().trim().min(3, "Tell the artist what needs changing.").max(1000),
+      }))
+      .mutation(async ({ input }) => {
+        const booking = await getBookingByInvoiceToken(input.token);
+        if (!booking) throw new Error("Invoice not found");
+        if (booking.invoicePaidAt) throw new Error("This invoice has already been paid.");
+        if (String(booking.paymentStatus ?? "").toLowerCase() === "paid") {
+          throw new Error("This booking has already been paid.");
+        }
+
+        // Withdraw it first: until this lands, the emailed link is still payable.
+        await declineArtswrkInvoice(booking.id);
+
+        const artist = booking.artistUserId ? await getUserById(booking.artistUserId) : null;
+        const client = booking.clientUserId ? await getUserById(booking.clientUserId) : null;
+        const clientName = client?.clientCompanyName ?? client?.firstName ?? "Your client";
+        const workDate = booking.startDate
+          ? new Date(booking.startDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+          : "your booking";
+
+        // Both halves of the record: a message they can reply to, and an email
+        // so they find out without logging in.
+        try {
+          if (booking.clientUserId && booking.artistUserId) {
+            const conversation = await getOrCreateConversation(booking.clientUserId, booking.artistUserId);
+            await sendMessageToConversation({
+              conversationId: conversation.id,
+              senderUserId: booking.clientUserId,
+              content: `Invoice for ${workDate} sent back for changes:\n\n${input.reason}`,
+            });
+          }
+        } catch (e) {
+          console.error("[invoice.decline] Could not post the message:", e);
+        }
+
+        try {
+          if (artist?.email) {
+            await sendSimpleEmail({
+              to: artist.email,
+              subject: `${clientName} asked for a change to your invoice (${workDate})`,
+              html: `<p>Hi ${artist.firstName ?? artist.name ?? "there"},</p>
+<p><strong>${clientName}</strong> has sent your invoice for ${workDate} back for changes, so nothing has been charged.</p>
+<p style="border-left:3px solid #ec008c;padding-left:16px;color:#444">${escapeHtml(input.reason)}</p>
+<p>The booking is back on your dashboard — update the hours or the rate and submit it again.</p>
+<p><a href="${APP_URL}/app/bookings" style="display:inline-block;background:#111;color:#fff;padding:12px 28px;border-radius:50px;text-decoration:none;font-weight:600">Open my bookings</a></p>
+<p>Best,<br>The Artswrk Team</p>`,
+            });
+          }
+          await sendSimpleEmail({
+            to: "contact@artswrk.com",
+            subject: `[Invoice declined] ${clientName} → ${artist?.name ?? "artist"} — Booking #${booking.id}`,
+            html: `<p>${clientName} sent back the invoice for booking #${booking.id} (${workDate}).</p>
+<p><strong>Reason:</strong> ${escapeHtml(input.reason)}</p>`,
+          });
+        } catch (e) {
+          console.error("[invoice.decline] Email send failed:", e);
+          // Don't throw — the invoice is already withdrawn, which is the part
+          // that matters. A failed email must not leave it payable.
+        }
+
+        return { success: true };
+      }),
+
+    /**
      * Studio reviews (and optionally adjusts hours) then approves an
      * invoice — THIS is what creates the Stripe Checkout session/payment
      * link, not the artist's original submission. Public + token-scoped,
@@ -5392,7 +5618,13 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           // studio's card, so it must not guess. Covered by
           // shared/bookingRates.test.ts.
           const finalHours = input.hours ?? booking.hours ?? 0;
-          const baseAmount = booking.recurringSeriesId
+          // Every per-hour booking is rate x hours, not just a class date.
+          // This read `recurringSeriesId` alone, so McKell's hourly admin
+          // booking fell through to resolveBookingBaseAmount — which, with no
+          // applicant record behind it, returns the stored artistRate. The
+          // studio would have been charged $18 for 36h10m of work she had
+          // already invoiced at $651.
+          const baseAmount = isHourlyRateBooking(booking)
             ? bookingMoney({
                 rateType: booking.rateType,
                 hourlyRate: booking.hourlyRate,
@@ -5454,7 +5686,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           if (!session.url) throw new Error("Could not create payment link");
 
           await approveArtswrkInvoice(booking.id, {
-            hours: booking.recurringSeriesId || isHourlyBooking({ isHourlyRate: booking.isHourlyRate }) ? finalHours : undefined,
+            hours: isHourlyRateBooking(booking) || isHourlyBooking({ isHourlyRate: booking.isHourlyRate }) ? finalHours : undefined,
             invoiceStripeCheckoutUrl: session.url,
             invoiceTotalCents: totalCents,
           });

@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Loader2, CheckCircle2, AlertCircle, ExternalLink, ChevronLeft } from "lucide-react";
-import { processingFeeFor, PROCESSING_FEE_RATE, resolveInvoiceTotals, bookingMoney } from "@shared/bookingRates";
+import { processingFeeFor, PROCESSING_FEE_RATE, resolveInvoiceTotals, bookingMoney, isHourlyRateBooking } from "@shared/bookingRates";
 import { canReuseCheckoutUrl } from "@shared/stripeCheckoutMode";
 
 /** Last resort for a legacy booking that stores only a total and its hours. */
@@ -28,6 +28,10 @@ export default function InvoicePayment() {
   const { token } = useParams<{ token: string }>();
   const [alreadyPaid, setAlreadyPaid] = useState(false);
   const [approveError, setApproveError] = useState<string | null>(null);
+  // Sending it back, for when the problem is the rate rather than the hours.
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
+  const [declined, setDeclined] = useState(false);
 
   // Detect ?paid=1 in URL (Stripe success redirect)
   useEffect(() => {
@@ -44,7 +48,9 @@ export default function InvoicePayment() {
   );
 
   const isPeriodInvoice = !!(booking as any)?.isPeriodInvoice;
-  const isClassDateInvoice = !!(booking as any)?.recurringSeriesId;
+  // Any booking billed per hour, not only a class date: an hourly admin
+  // booking previewed at its bare unit rate ($18 for 36h10m of work).
+  const isClassDateInvoice = !isPeriodInvoice && isHourlyRateBooking(booking as any);
   // Recurring period invoices are always billed hourly. For a regular booking,
   // read the applicant record's real isHourlyRate flag — inferring "hourly"
   // from `hours` being set treats the 365 flat bookings that also record hours
@@ -59,6 +65,10 @@ export default function InvoicePayment() {
     if (initialHours != null) setHoursInput(String(initialHours));
   }, [initialHours]);
 
+  const decline = trpc.invoice.decline.useMutation({
+    onSuccess: () => { setDeclined(true); setDeclineOpen(false); },
+    onError: (err) => setApproveError(err.message),
+  });
   const approve = trpc.invoice.approve.useMutation({
     onSuccess: (data) => {
       window.location.href = data.checkoutUrl;
@@ -295,7 +305,10 @@ export default function InvoicePayment() {
                   </p>
                 </div>
                 {!isApproved && isHourly && (
-                  <p className="text-xs text-gray-400">Adjust hours above if they don't match — the total updates automatically.</p>
+                  <p className="text-xs text-gray-400">
+                    Adjust hours above if they don't match — the total updates automatically. If the
+                    rate itself is wrong, send the invoice back instead.
+                  </p>
                 )}
               </div>
             </div>
@@ -325,16 +338,72 @@ export default function InvoicePayment() {
                 >
                   Continue to Payment <ExternalLink size={18} />
                 </a>
+              ) : declined ? (
+                <div className="max-w-md mx-auto">
+                  <p className="text-base font-semibold text-[#111] mb-2">Sent back to {artistName}</p>
+                  <p className="text-sm text-gray-500">
+                    Nothing has been charged. They'll get your note, make the change and send a new
+                    invoice — this link no longer works.
+                  </p>
+                </div>
               ) : (
                 <div>
                   <button
                     onClick={handleApprove}
-                    disabled={approve.isPending}
+                    disabled={approve.isPending || decline.isPending}
                     className="inline-flex items-center gap-2 bg-[#111] text-white text-lg font-semibold px-12 py-5 rounded-full hover:bg-gray-800 transition-colors disabled:opacity-50"
                   >
                     {approve.isPending ? <Loader2 size={18} className="animate-spin" /> : null}
                     {needsFreshCheckout ? "Get a new secure payment link" : "Approve & Continue to Payment"}
                   </button>
+
+                  {/* The hours are editable above, so this is for the rest: a
+                      rate that was never agreed, work that didn't happen, a
+                      line that belongs on someone else's invoice. */}
+                  {!declineOpen ? (
+                    <div className="mt-4">
+                      <button
+                        onClick={() => { setApproveError(null); setDeclineOpen(true); }}
+                        className="text-sm font-semibold text-gray-500 underline underline-offset-4 hover:text-[#111] transition-colors"
+                      >
+                        Something's not right — send it back
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mt-6 max-w-md mx-auto text-left">
+                      <label htmlFor="decline-reason" className="block text-sm font-semibold text-[#111] mb-2">
+                        What needs changing?
+                      </label>
+                      <textarea
+                        id="decline-reason"
+                        value={declineReason}
+                        onChange={(e) => setDeclineReason(e.target.value)}
+                        rows={3}
+                        placeholder="e.g. We agreed $50/hr for this, not $60."
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#ec008c] resize-none font-sans"
+                      />
+                      <p className="text-xs text-gray-400 mt-2">
+                        {artistName} gets this note and can send a corrected invoice. Nothing is charged.
+                      </p>
+                      <div className="flex gap-3 mt-4">
+                        <button
+                          onClick={() => { setDeclineOpen(false); setDeclineReason(""); }}
+                          className="px-5 py-3 rounded-full border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => decline.mutate({ token: token ?? "", reason: declineReason.trim() })}
+                          disabled={declineReason.trim().length < 3 || decline.isPending}
+                          className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-[#111] text-white text-sm font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50"
+                        >
+                          {decline.isPending ? <Loader2 size={16} className="animate-spin" /> : null}
+                          Send back to {artistName}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {approveError && (
                     <p className="text-sm text-red-500 mt-3">{approveError}</p>
                   )}

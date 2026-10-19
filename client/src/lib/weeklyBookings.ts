@@ -1,3 +1,5 @@
+import { isHourlyRateBooking as isHourly } from "@shared/bookingRates";
+
 /**
  * Weekly class bookings, as artists see them.
  *
@@ -102,12 +104,26 @@ export function expandWeeklyBookingRows(
 }
 
 /**
- * The weeks for the artist's "Your Tasks" panel: every week that's been taught
- * and still needs hours, oldest first, from the same rows the Bookings tab shows.
+ * The bookings for the artist's "Your Tasks" panel: everything worked but not
+ * yet completed, oldest first, from the same rows the Bookings tab shows.
+ *
+ * This used to look only at `periodDue`, a flag that exists on legacy weekly
+ * rows alone — so a flattened class date, or a plain admin booking like
+ * McKell's 36 hours of studio admin, never appeared as a task at all. The
+ * artist's half of the handshake was invisible on the page that exists to
+ * tell them what to do next.
  */
-export function artistBookingTasks(rows: any[]): { hoursDue: any[] } {
-  const when = (b: any) => new Date(b.startDate).getTime();
-  return { hoursDue: rows.filter((b) => b.periodDue).sort((a, b) => when(a) - when(b)) };
+export function artistBookingTasks(rows: any[], now: Date = new Date()): { hoursDue: any[] } {
+  const when = (b: any) => new Date(b?.startDate ?? b?.jobStartDate ?? 0).getTime();
+  return {
+    hoursDue: (rows ?? []).filter((b) => needsArtistAction(b, now)).sort((a, b) => when(a) - when(b)),
+  };
+}
+
+/** Where a task row sends the artist — the exact week, when there is one. */
+export function artistTaskHref(booking: any): string {
+  const week = booking?.period?.id;
+  return `/app/bookings?open=${booking?.id}${week ? `&week=${week}` : ""}`;
 }
 
 /**
@@ -233,3 +249,67 @@ export function groupClientBookings(rows: any[], now: Date = new Date()): Bookin
     { key: "past", title: "Past bookings", rows: past },
   ].filter((g) => g.rows.length > 0);
 }
+
+/**
+ * What the artist is owed for a booking, as a number of dollars.
+ *
+ * An hourly booking stores the RATE; everything else stores the total. The
+ * artist's list printed the stored figure either way, so a 4-hour class at $55
+ * read as "+$55.00" — the hourly rate dressed up as the payment. Class dates
+ * stopped being flagged as recurring when they became ordinary bookings, which
+ * is what broke it.
+ */
+export function artistBookingTotal(booking: any): number | null {
+  const hours = Number(booking?.hours ?? 0);
+  if (isHourly(booking) && hours > 0) {
+    // hourlyRate is the unit rate. artistRate is not: on a confirmed applicant
+    // it already holds the whole total ($60/hr x 3.25 hrs is stored as 195),
+    // so multiplying it turned a $195 booking into $633.75. Legacy weekly rows
+    // predate the column and carry their unit rate in artistRate instead.
+    const unit = booking?.hourlyRate ?? booking?.artistRate ?? booking?.clientRate;
+    return typeof unit === "number" ? unit * hours : null;
+  }
+  const rate = booking?.artistRate ?? booking?.clientRate;
+  return typeof rate === "number" ? rate : null;
+}
+
+/**
+ * A booking whose date has passed that the artist hasn't completed yet — the
+ * only thing on the page standing between them and being paid.
+ */
+export function needsArtistAction(booking: any, now: Date = new Date()): boolean {
+  if (booking?.periodDue) return true;
+  // Already invoiced: it is the studio's move now. markArtswrkInvoiceSubmitted
+  // also flips the status to "Pay Now", but a booking that carries a submitted
+  // invoice is never the artist's to complete, whatever its status says.
+  if (booking?.artswrkInvoiceSubmittedAt || booking?.periodSubmittedAt || booking?.invoicePaidAt) return false;
+  const status = String(booking?.bookingStatus ?? "").toLowerCase();
+  if (status === "completed" || status === "cancelled" || status === "paid" || status === "pay now") return false;
+  const raw = booking?.startDate ?? booking?.jobStartDate;
+  if (!raw) return false;
+  const day = new Date(raw);
+  if (Number.isNaN(day.getTime())) return false;
+  return day.getTime() < startOfDay(now).getTime();
+}
+
+/**
+ * The order an artist reads their bookings in: work they still owe hours for
+ * first (oldest first — the one they are most behind on), then what is coming
+ * up soonest, then everything settled, newest first.
+ */
+export function sortArtistBookings(rows: any[], now: Date = new Date()): any[] {
+  const when = (b: any) => new Date(b?.startDate ?? b?.jobStartDate ?? 0).getTime();
+  const today = startOfDay(now).getTime();
+  const rank = (b: any) => (needsArtistAction(b, now) ? 0 : when(b) >= today ? 1 : 2);
+  return [...(rows ?? [])].sort((a, b) => {
+    const ra = rank(a), rb = rank(b);
+    if (ra !== rb) return ra - rb;
+    return ra === 2 ? when(b) - when(a) : when(a) - when(b);
+  });
+}
+
+/**
+ * The hourly test and hours formatter live in shared/ so the artist dashboard
+ * and the invoice endpoint agree on what a booking is worth.
+ */
+export { isHourlyRateBooking, maxInvoiceHours, formatHours } from "@shared/bookingRates";

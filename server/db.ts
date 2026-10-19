@@ -6313,3 +6313,131 @@ export async function getPublicCompanyPage(userId: number) {
     jobs: activeJobs,
   };
 }
+
+/**
+ * The studios an artist may invoice: every one they already have a booking
+ * with, most recently worked first.
+ *
+ * An artist writing their own invoice chooses from this list and nothing else.
+ * A free-text studio field would let anyone send a payment request to any
+ * email on the platform, so the relationship has to already exist — the same
+ * rule the messaging side uses.
+ */
+export async function getArtistPastClients(artistUserId: number): Promise<Array<{
+  clientUserId: number;
+  name: string;
+  logo: string | null;
+  lastWorkedAt: Date | null;
+  lastHourlyRate: number | null;
+}>> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      clientUserId: bookings.clientUserId,
+      companyName: users.clientCompanyName,
+      firstName: users.firstName,
+      name: users.name,
+      logo: users.profilePicture,
+      startDate: bookings.startDate,
+      hourlyRate: bookings.hourlyRate,
+      artistRate: bookings.artistRate,
+      rateType: bookings.rateType,
+    })
+    .from(bookings)
+    .innerJoin(users, eq(bookings.clientUserId, users.id))
+    .where(and(eq(bookings.artistUserId, artistUserId), eq(bookings.deleted, false)))
+    .orderBy(desc(bookings.startDate));
+
+  const seen = new Map<number, {
+    clientUserId: number; name: string; logo: string | null;
+    lastWorkedAt: Date | null; lastHourlyRate: number | null;
+  }>();
+  for (const r of rows) {
+    if (r.clientUserId == null || seen.has(r.clientUserId)) continue;
+    seen.set(r.clientUserId, {
+      clientUserId: r.clientUserId,
+      name: r.companyName ?? r.name ?? r.firstName ?? `Studio #${r.clientUserId}`,
+      logo: r.logo ?? null,
+      lastWorkedAt: r.startDate ?? null,
+      // Prefills the rate box with what this studio last paid them per hour.
+      // Only a genuine per-hour rate: artistRate is a total on most rows.
+      lastHourlyRate: r.rateType === "hourly" ? (r.hourlyRate ?? null) : null,
+    });
+  }
+  return [...seen.values()];
+}
+
+/**
+ * A booking the artist raised themselves to invoice a studio for time worked.
+ *
+ * Stored as an ordinary completed booking so it behaves like every other one
+ * downstream — the studio's review page, the Stripe charge, the receipt, the
+ * wallet and the revenue reports all read it without a special case.
+ */
+export async function createArtistInvoiceBooking(input: {
+  artistUserId: number;
+  clientUserId: number;
+  /** "hourly" bills rate x hours; "flat" bills the amount as given. */
+  rateType: "hourly" | "flat";
+  hourlyRate: number | null;
+  flatRate: number | null;
+  /** The booking total either way — what the artist is owed before the fee. */
+  totalDollars: number;
+  hours: number | null;
+  startDate: Date;
+  description: string;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [result] = await db.insert(bookings).values({
+    clientUserId: input.clientUserId,
+    artistUserId: input.artistUserId,
+    rateType: input.rateType,
+    hourlyRate: input.hourlyRate,
+    flatRate: input.flatRate,
+    // Legacy columns hold the booking TOTAL, as they do on every other row.
+    artistRate: input.totalDollars,
+    clientRate: input.totalDollars,
+    startDate: input.startDate,
+    endDate: input.startDate,
+    description: input.description,
+    hours: input.hours,
+    bookingStatus: "Confirmed",
+    paymentStatus: "Unpaid",
+    paymentMethod: "artswrk",
+    // Raised outside the job flow, like an admin booking, so the dashboards
+    // that key off a job application don't go looking for one.
+    isAdminBooking: true,
+    isRecurring: false,
+  } as any);
+  return (result as any).insertId as number;
+}
+
+/**
+ * The client sent an invoice back instead of paying it.
+ *
+ * Everything the submission wrote is undone — the payment token, the stored
+ * total and any checkout link — and the booking returns to Confirmed, which
+ * puts it back on the artist's dashboard as work to complete. They fix the
+ * hours or the rate and submit again; the old link stops working, so a
+ * disputed amount can never be paid by someone following a stale email.
+ *
+ * The reason itself is not a column: it goes to the artist by email and into
+ * their conversation with the client, where it stays readable by both sides.
+ */
+export async function declineArtswrkInvoice(bookingId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(bookings)
+    .set({
+      artswrkInvoiceSubmittedAt: null,
+      invoicePaymentToken: null,
+      invoiceTotalCents: null,
+      invoiceStripeCheckoutUrl: null,
+      bookingStatus: "Confirmed",
+      paymentStatus: "Unpaid",
+    } as any)
+    .where(eq(bookings.id, bookingId));
+}

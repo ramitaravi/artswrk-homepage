@@ -210,3 +210,55 @@ export function formatPitchedRate(a: {
   if (a.clientFlatRate) return `${money(a.clientFlatRate)} flat`;
   return null;
 }
+
+/**
+ * True when a booking is billed PER HOUR — its base is `hourlyRate x hours`.
+ *
+ * Three kinds qualify: a converted class date, a legacy weekly class, and any
+ * admin booking created with an hourly rate — McKell's 36h10m of studio admin,
+ * for instance. Checking only `recurringSeriesId` made her $18/hr read as an
+ * $18 job, and invoice.approve would have charged the studio $18 for 36 hours
+ * of work.
+ *
+ * `hourlyRate` is the unit rate; `artistRate` is NOT, and the two columns
+ * disagree across live rows — an admin booking copies the unit rate into both,
+ * while a confirmed applicant stores the TOTAL in artistRate ($60/hr x 3.25 hrs
+ * is hourlyRate 60, artistRate 195). Multiply `hourlyRate`, never `artistRate`.
+ *
+ * Shared by the artist dashboard, the studio's invoice page and the approve
+ * endpoint, so the number the artist submits is the number the studio pays.
+ */
+export function isHourlyRateBooking(booking: {
+  rateType?: string | null;
+  recurringSeriesId?: number | null;
+  isAdminBooking?: boolean | number | null;
+  isRecurring?: boolean | number | null;
+} | null | undefined): boolean {
+  return booking?.rateType === "hourly"
+    || Boolean(booking?.recurringSeriesId)
+    || Boolean(booking?.isAdminBooking && booking?.isRecurring);
+}
+
+/**
+ * The most hours one booking may be invoiced for.
+ *
+ * A single class date can't run longer than a day, so 24 catches a typo there.
+ * An admin booking bills a whole period of work in one line — 36h10m of studio
+ * admin, a month of rehearsal support — and the 24-hour cap silently disabled
+ * the Submit button with no explanation.
+ */
+export function maxInvoiceHours(booking: { recurringSeriesId?: number | null } | null | undefined): number {
+  return booking?.recurringSeriesId ? 24 : 500;
+}
+
+/**
+ * Hours, written the way a person would. The database holds 36h10m as
+ * 36.166666666666664, and that is what the artist was being shown.
+ */
+export function formatHours(hours: number | string | null | undefined): string {
+  // Number(null) is 0, not NaN — without this a booking with no hours read "0 hrs".
+  if (hours == null || hours === "") return "";
+  const n = Number(hours);
+  if (!Number.isFinite(n)) return "";
+  return String(Math.round(n * 100) / 100);
+}

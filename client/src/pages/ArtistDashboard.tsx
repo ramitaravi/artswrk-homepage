@@ -12,7 +12,7 @@ import ArtistProfilePage from "./artist/ArtistProfilePage";
 import ArtistSettings from "./artist/ArtistSettings";
 import Benefits from "./dashboard/Benefits";
 import { PeriodSubmitModal } from "./dashboard/Bookings";
-import { artistBookingTasks, expandWeeklyBookingRows } from "@/lib/weeklyBookings";
+import { artistBookingTasks, artistBookingTotal, artistTaskHref, expandWeeklyBookingRows, formatHours, isHourlyRateBooking, maxInvoiceHours, needsArtistAction, sortArtistBookings } from "@/lib/weeklyBookings";
 import { formatJobCardDate } from "@/lib/jobDates";
 import MessagesPage from "./dashboard/Messages";
 import {
@@ -50,7 +50,7 @@ import { trpc } from "@/lib/trpc";
 import { useUpgrade } from "@/lib/useUpgrade";
 import { formatLocation, getJobTitle } from "@/lib/utils";
 import { toProJobUrl } from "./ProJobDetail";
-import { processingFeeFor } from "@shared/bookingRates";
+import { processingFeeFor, bookingMoney } from "@shared/bookingRates";
 
 // ─── Placeholder data (to be replaced with real API data) ─────────────────────
 
@@ -165,13 +165,12 @@ function DashboardTab({ user }: { user: any }) {
   // weekly booking's start is its first class, so none of its weeks appeared.)
   const { rows: bookingRows } = useArtistBookingRows();
   const { hoursDue } = artistBookingTasks(bookingRows);
-  const taskCount = unreadMessages + hoursDue.length;
-  // One week due → open it; several → the Bookings page, where they sit at the top.
-  const hoursHref = hoursDue.length === 1
-    ? `/app/bookings?open=${hoursDue[0].id}&week=${hoursDue[0].period.id}`
-    : "/app/bookings";
 
   const { data: connectStatus, isLoading: connectStatusLoading } = trpc.artistDashboard.stripeConnectStatus.useQuery();
+  // Without a payout account they cannot invoice anyone — that belongs with the
+  // other things blocking them, not only in the Payouts card further down.
+  const needsPayout = !connectStatusLoading && !connectStatus?.connected;
+  const taskCount = unreadMessages + hoursDue.length + (needsPayout ? 1 : 0);
   const connectStripe = trpc.artistDashboard.createStripeConnectUrl.useMutation({
     onSuccess: ({ url }) => { window.location.href = url; },
   });
@@ -250,17 +249,24 @@ function DashboardTab({ user }: { user: any }) {
           </button>
           {tasksOpen && (
             <div className="px-5 pb-4 space-y-2">
+              {/* One line, not a row per booking: in a 288px column three of
+                  them all truncated to "Complete booking · Fancy…" and said
+                  less than a single count does. */}
               {hoursDue.length > 0 && (
                 <div
                   className="flex items-start gap-3 p-3 rounded-xl bg-amber-50 cursor-pointer hover:bg-amber-100 transition-colors"
-                  onClick={() => window.location.href = hoursHref}
+                  onClick={() => window.location.href = hoursDue.length === 1 ? artistTaskHref(hoursDue[0]) : "/app/bookings"}
                 >
                   <Clock size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-[#111]">
-                      Submit hours for {hoursDue.length} {hoursDue.length === 1 ? "booking" : "bookings"}
+                      Submit Invoice ({hoursDue.length})
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5">Tap to complete {hoursDue.length === 1 ? "it" : "them"}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {hoursDue.length === 1
+                        ? `${shortBookingDate(hoursDue[0])} — submit your hours to get paid`
+                        : "Complete these bookings to get paid"}
+                    </p>
                   </div>
                   <ChevronRight size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
                 </div>
@@ -276,6 +282,19 @@ function DashboardTab({ user }: { user: any }) {
                       {unreadMessages === 1 ? "1 unread message" : `${unreadMessages} unread messages`}
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">Tap to open your inbox</p>
+                  </div>
+                  <ChevronRight size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                </div>
+              )}
+              {needsPayout && (
+                <div
+                  className="flex items-start gap-3 p-3 rounded-xl bg-blue-50 cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => connectStripe.mutate({ origin: window.location.origin })}
+                >
+                  <Banknote size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-[#111]">Connect your payout account</p>
+                    <p className="text-xs text-gray-500 mt-0.5">You need this before you can invoice a client</p>
                   </div>
                   <ChevronRight size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
                 </div>
@@ -693,7 +712,7 @@ function JobsTab({ user }: { user: any }) {
 
 // ─── Bookings Tab ─────────────────────────────────────────────────────────────────
 
-type BookingFilter = "upcoming" | "completed" | "all";
+type BookingFilter = "action" | "upcoming" | "completed" | "all";
 
 function bookingDate(b: any): Date | null {
   return b.startDate ? new Date(b.startDate) : b.jobStartDate ? new Date(b.jobStartDate) : b.createdAt ? new Date(b.createdAt) : null;
@@ -703,6 +722,12 @@ function formatBookingDate(b: any): string {
   const d = bookingDate(b);
   if (!d) return "";
   return d.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+}
+
+/** The compact form for a task row — "Wed, Oct 8". */
+function shortBookingDate(b: any): string {
+  const d = bookingDate(b);
+  return d ? d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "";
 }
 
 /**
@@ -749,18 +774,27 @@ function useArtistBookingRows() {
 }
 
 function BookingRow({ booking, onClick }: { booking: any; onClick: () => void }) {
-  const studio = booking.clientCompanyName ?? booking.clientFirstName ?? `Studio #${booking.clientUserId}`;
+  const studio = booking.clientCompanyName ?? booking.clientFirstName ?? `Client #${booking.clientUserId}`;
   const rate = booking.artistRate ?? booking.clientRate;
-  // A weekly class booking stores an HOURLY rate; everything else stores a total.
-  const perHourWeekly = !!booking.isAdminBooking && !!booking.isRecurring && booking.hours > 0;
-  const rateLabel = typeof rate !== "number"
-    ? String(rate)
-    : perHourWeekly
-      ? `$${(rate * booking.hours).toFixed(2)} / class day ($${rate.toFixed(2)}/hr × ${booking.hours} hrs)`
-      : `+$${rate.toFixed(2)}`;
+  // What they'll be paid, not the rate it's built from — a 4-hour class at $55
+  // is $220 to the artist, and the row used to say "+$55.00".
+  const total = artistBookingTotal(booking);
+  // The per-hour rate is hourlyRate. artistRate is a TOTAL on a confirmed
+  // applicant, so reading it here printed "3.25 hrs × $195.00/hr".
+  const unitRate = booking.hourlyRate ?? rate;
+  const hourly = isHourlyRateBooking(booking) && Number(booking.hours) > 0 && typeof unitRate === "number";
+  const rateLabel = total == null
+    ? String(rate ?? "")
+    : `+$${total.toFixed(2)}`;
+  const rateDetail = hourly ? `${formatHours(booking.hours)} hrs × $${Number(unitRate).toFixed(2)}/hr` : null;
   const status = booking.bookingStatus ?? "Confirmed";
+  // A booking that has been worked and not completed is the artist's move, not
+  // the studio's. "Confirmed" read as settled and told them nothing to do.
+  const needsAction = needsArtistAction(booking);
+  const statusLabel = needsAction ? "Complete Booking" : artistStatusLabel(status);
   const statusColor =
-    status === "Completed" || status === "Paid" ? "text-green-600 bg-green-50"
+    needsAction ? "text-amber-700 bg-amber-50"
+    : status === "Completed" || status === "Paid" ? "text-green-600 bg-green-50"
     : status === "Cancelled" ? "text-red-500 bg-red-50"
     : status === "Pay Now" ? "text-[#ec008c] bg-pink-50"
     : status === "Submit Hours" ? "text-amber-700 bg-amber-50"
@@ -782,9 +816,12 @@ function BookingRow({ booking, onClick }: { booking: any; onClick: () => void })
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-[#111] truncate">{studio}</p>
         {rate != null && (
-          <p className="text-sm text-gray-700 font-semibold mt-0.5">{rateLabel}</p>
+          <p className="text-sm text-gray-700 font-semibold mt-0.5">
+            {rateLabel}
+            {rateDetail && <span className="text-xs font-normal text-gray-400 ml-1.5">{rateDetail}</span>}
+          </p>
         )}
-        <span className={`inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor}`}>{artistStatusLabel(status)}</span>
+        <span className={`inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor}`}>{statusLabel}</span>
       </div>
       <ChevronRight size={18} className="text-gray-300 flex-shrink-0" />
     </button>
@@ -802,10 +839,10 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
   const [reimbFile, setReimbFile] = useState<File | null>(null);
   const [invoiceNotes, setInvoiceNotes] = useState("");
   const [artistRate, setArtistRate] = useState(booking.artistRate?.toString() ?? "");
-  const [classHours, setClassHours] = useState(booking.hours?.toString() ?? "");
+  const [classHours, setClassHours] = useState(formatHours(booking.hours));
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const studio = booking.clientCompanyName ?? booking.clientFirstName ?? `Studio #${booking.clientUserId}`;
+  const studio = booking.clientCompanyName ?? booking.clientFirstName ?? `Client #${booking.clientUserId}`;
   // A booking with no job behind it carries its own description — use it.
   const jobTitle = (booking.jobDescription ?? booking.description ?? "").split("\n")[0].slice(0, 80) || null;
   // null paymentMethod = historical → treat as "artswrk"
@@ -817,7 +854,10 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
   const [submitOpen, setSubmitOpen] = useState(false);
   /** Weekly classes are invoiced per week (rate x hours), never as one flat total. */
   const isWeeklyClassBooking = !!period || (!!booking.isAdminBooking && !!booking.isRecurring);
-  const isClassDateBooking = !!booking.recurringSeriesId;
+  // Any booking whose stored rate is per hour — a class date, a legacy weekly
+  // class, or admin work billed hourly. The old check was recurringSeriesId
+  // alone, so McKell's 36 hours of admin support at $18/hr invoiced as $18.
+  const isClassDateBooking = isHourlyRateBooking(booking);
   const isDirectConfirmed = !!booking.directPayConfirmedAt;
   const rate = parseFloat(artistRate) || 0;
 
@@ -834,7 +874,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
     onSuccess: () => {
       utils.artistDashboard.myConfirmations.invalidate();
       utils.artistDashboard.getReimbursements.invalidate({ bookingId: booking.id });
-      setReimbNote(""); setReimbValue(""); setReimbFile(null);
+      setReimbNote(""); setReimbValue(""); setReimbFile(null); setNoReceipt(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
   });
@@ -859,6 +899,10 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
     onError: (e: any) => toast.error(e.message || "Couldn't start Stripe connect"),
   });
 
+  // An expense with no receipt, on the artist's word. Some genuinely have
+  // none — a cash toll, a lost slip — and a hard file requirement meant those
+  // artists could not finish the booking at all.
+  const [noReceipt, setNoReceipt] = useState(false);
   const totalReimb = period ? 0 : (reimbursements ?? []).reduce((s: number, r: any) => s + (r.value ?? 0), 0);
   // `rate` is bookings.artistRate, which is ALREADY the total for the booking
   // (Bubble stored $50/hr × 5 hrs as 250, and native confirms now do the same).
@@ -866,6 +910,10 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
   // "hourly" was inferred from `hours` being set at all, it also multiplied 365
   // FLAT-rate bookings that happen to record hours. Never multiply.
   const actualClassHours = Number(classHours);
+  // A class date can't run longer than a day; an admin booking bills a whole
+  // period of work in one line. A flat 24 left McKell's 36h10m booking with a
+  // permanently greyed-out Submit button and nothing to explain it.
+  const hoursCap = maxInvoiceHours(booking);
   const earnedAmount = isClassDateBooking
     ? Number(booking.hourlyRate ?? booking.artistRate ?? 0) * (Number.isFinite(actualClassHours) ? actualClassHours : 0)
     : rate;
@@ -873,8 +921,9 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
   const invoiceTotal = earnedAmount + totalReimb + processingFee;
 
   async function handleAddReimbursement() {
-    // A receipt is required for every expense.
-    if (!reimbValue || isNaN(parseFloat(reimbValue)) || !reimbFile) return;
+    // Either a receipt, or the artist saying outright that there isn't one.
+    if (!reimbValue || isNaN(parseFloat(reimbValue))) return;
+    if (!reimbFile && !noReceipt) return;
     let fileUrl: string | undefined;
     if (reimbFile) {
       const reader = new FileReader();
@@ -885,8 +934,10 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
       const res = await uploadReceipt.mutateAsync({ fileName: reimbFile.name, fileBase64: base64, mimeType: reimbFile.type });
       fileUrl = res.url;
     }
-    if (!fileUrl) return; // a receipt is required — the server rejects expenses without one
-    addReimbursement.mutate({ bookingId: booking.id, value: parseFloat(reimbValue), note: reimbNote || undefined, fileUrl });
+    addReimbursement.mutate({
+      bookingId: booking.id, value: parseFloat(reimbValue),
+      note: reimbNote || undefined, fileUrl, noReceipt: !fileUrl,
+    });
   }
 
   const dateStr = formatBookingDate(booking);
@@ -1042,10 +1093,12 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                     <div key={r.id} className="flex items-center justify-between text-xs bg-gray-50 rounded-lg px-3 py-2">
                       <span className="text-gray-500">${r.value?.toFixed(2)}</span>
                       <span className="text-gray-700 flex-1 px-3">{r.note || "Expense"}</span>
-                      {r.fileUrl && (
+                      {r.fileUrl ? (
                         <a href={r.fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-600 mr-2" title="View receipt">
                           <FileText size={12} />
                         </a>
+                      ) : (
+                        <span className="text-[10px] text-gray-400 mr-2 whitespace-nowrap" title="Added without a receipt">no receipt</span>
                       )}
                       {!isAlreadyPaid && !isInvoiceSubmitted && (
                         <button
@@ -1098,7 +1151,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                       }`}
                     >
                       <Paperclip size={12} className="flex-shrink-0" />
-                      <span className="truncate">{reimbFile ? reimbFile.name.slice(0, 18) : "Attach receipt *"}</span>
+                      <span className="truncate">{reimbFile ? reimbFile.name.slice(0, 18) : noReceipt ? "Attach receipt" : "Attach receipt *"}</span>
                     </button>
                     {reimbFile && (
                       <button
@@ -1114,13 +1167,21 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                       onChange={(e) => setReimbFile(e.target.files?.[0] ?? null)} />
                     <button
                       onClick={handleAddReimbursement}
-                      title={!reimbFile ? "Attach a receipt first" : undefined}
-                      disabled={addReimbursement.isPending || uploadReceipt.isPending || !reimbValue || !reimbFile}
+                      title={!reimbFile && !noReceipt ? "Attach a receipt, or tick \"I don't have a receipt\"" : undefined}
+                      disabled={addReimbursement.isPending || uploadReceipt.isPending || !reimbValue || (!reimbFile && !noReceipt)}
                       className="ml-auto flex items-center gap-1 text-xs font-bold text-white bg-[#ec008c] px-3 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50"
                     >
                       {(addReimbursement.isPending || uploadReceipt.isPending) ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />} Add
                     </button>
                   </div>
+                  <label className="flex items-center gap-2 text-[11px] text-gray-500 cursor-pointer select-none">
+                    <input
+                      type="checkbox" checked={noReceipt}
+                      onChange={(e) => { setNoReceipt(e.target.checked); if (e.target.checked) { setReimbFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; } }}
+                      className="rounded border-gray-300 text-[#ec008c] focus:ring-[#ec008c]"
+                    />
+                    I don't have a receipt for this
+                  </label>
                 </div>
               </div>
             )}
@@ -1141,7 +1202,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                   {hasHours && (
                     <div className="flex justify-between text-gray-500 text-xs">
                       <span>Hours</span>
-                      <span>{booking.hours} hrs{perHour ? ` × $${Number(booking.artistRate).toFixed(2)}/hr` : ""}</span>
+                      <span>{formatHours(booking.hours)} hrs{perHour ? ` × $${Number(booking.hourlyRate ?? booking.artistRate).toFixed(2)}/hr` : ""}</span>
                     </div>
                   )}
                   {perHour && totalReimb > 0 && (
@@ -1151,7 +1212,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                     </div>
                   )}
                   <div className="flex justify-between font-bold text-[#111] text-base pt-1">
-                    <span>{perHour ? "Per class day" : "Total Rate"}</span>
+                    <span>{!perHour ? "Total Rate" : booking.recurringSeriesId ? "Per class day" : "Total"}</span>
                     <span>${(baseAmount + totalReimb).toFixed(2)}</span>
                   </div>
                 </div>
@@ -1236,7 +1297,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                 <div className="border-t border-gray-50 pt-4">
                   <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-2.5">
                     <p className="text-sm font-bold text-[#111]">Connect your payout account first</p>
-                    <p className="text-xs text-gray-500">You need a connected Stripe account before you can invoice a studio — that's where the payment lands.</p>
+                    <p className="text-xs text-gray-500">You need a connected Stripe account before you can invoice a client — that's where the payment lands.</p>
                     <button
                       onClick={() => connectStripe.mutate({ origin: window.location.origin })}
                       disabled={connectStripe.isPending}
@@ -1255,9 +1316,12 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                     <div className="space-y-2">
                       <p className="text-xs text-gray-600">Your agreed rate: ${Number(booking.hourlyRate ?? booking.artistRate).toFixed(2)}/hr</p>
                       <label className="block text-xs font-semibold text-gray-500" htmlFor="class-hours">Hours worked for this class</label>
-                      <input id="class-hours" type="number" min="0.25" max="24" step="0.25"
+                      <input id="class-hours" type="number" min="0.25" max={hoursCap} step="0.25"
                         value={classHours} onChange={(e) => setClassHours(e.target.value)}
                         className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#ec008c]" />
+                      {Number.isFinite(actualClassHours) && actualClassHours > hoursCap && (
+                        <p className="text-xs text-red-500">That's over {hoursCap} hours — check the number before submitting.</p>
+                      )}
                     </div>
                   ) : (
                     <input type="number" min="0" placeholder="Your rate for this job ($)"
@@ -1267,14 +1331,14 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                   {earnedAmount > 0 && (
                     <div className="bg-pink-50 rounded-xl p-3 space-y-1.5 text-xs">
                       {(isClassDateBooking ? actualClassHours > 0 : booking.hours > 0) && (
-                        <div className="flex justify-between text-gray-600"><span>Hours</span><span>{isClassDateBooking ? actualClassHours : booking.hours} hrs</span></div>
+                        <div className="flex justify-between text-gray-600"><span>Hours</span><span>{formatHours(isClassDateBooking ? actualClassHours : booking.hours)} hrs</span></div>
                       )}
                       <div className="flex justify-between text-gray-600"><span>Your rate</span><span>${earnedAmount.toFixed(2)}</span></div>
                       <div className="flex justify-between text-gray-600"><span>Reimbursements</span><span>${totalReimb.toFixed(2)}</span></div>
                       <div className="flex justify-between font-bold text-[#111] border-t border-pink-100 pt-1.5">
                         <span>You'll receive</span><span className="text-[#ec008c]">${(earnedAmount + totalReimb).toFixed(2)}</span>
                       </div>
-                      <p className="text-[11px] text-gray-400 pt-0.5">You get your full rate — we add a small Stripe processing fee on top, billed to the studio.</p>
+                      <p className="text-[11px] text-gray-400 pt-0.5">You get your full rate — we add a small Stripe processing fee on top, billed to your client.</p>
                     </div>
                   )}
                   <textarea value={invoiceNotes} onChange={(e) => setInvoiceNotes(e.target.value)} rows={2}
@@ -1283,7 +1347,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                   />
                   <button
                     onClick={() => submitInvoice.mutate({ bookingId: booking.id, artistRate: isClassDateBooking ? undefined : earnedAmount || undefined, hours: isClassDateBooking ? actualClassHours : undefined, notes: invoiceNotes || undefined, origin: window.location.origin })}
-                    disabled={submitInvoice.isPending || earnedAmount <= 0 || (isClassDateBooking && (!Number.isFinite(actualClassHours) || actualClassHours > 24))}
+                    disabled={submitInvoice.isPending || earnedAmount <= 0 || (isClassDateBooking && (!Number.isFinite(actualClassHours) || actualClassHours > hoursCap))}
                     className="w-full py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#ff7171] to-[#ec008c] hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {submitInvoice.isPending ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
@@ -1298,7 +1362,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                   </div>
                   <div className="border-t border-green-100 pt-2.5 space-y-1.5 text-xs">
                     {booking.hours > 0 && (
-                      <div className="flex justify-between text-gray-600"><span>Hours</span><span>{booking.hours} hrs</span></div>
+                      <div className="flex justify-between text-gray-600"><span>Hours</span><span>{formatHours(booking.hours)} hrs</span></div>
                     )}
                     {totalReimb > 0 && (
                       <div className="flex justify-between text-gray-600"><span>Reimbursements</span><span>${totalReimb.toFixed(2)}</span></div>
@@ -1325,11 +1389,219 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
           onSuccess={() => {
             utils.bookingPeriods.myAdminBookings.invalidate();
             utils.artistDashboard.myConfirmations.invalidate();
-            toast.success("Hours submitted — the studio has been sent the invoice.");
+            toast.success("Hours submitted — your client has been sent the invoice.");
             onBack();
           }}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * The artist raises their own invoice for work already done.
+ *
+ * Clients they've worked with only — a free-text field would let anyone send a
+ * payment request to any account on the platform. Everything else is theirs to
+ * fill in: hours at a rate, or a flat amount for work that isn't hourly.
+ *
+ * "Client", never "studio": competitions, event companies and individuals book
+ * artists too, and being called a studio in their own invoice is wrong.
+ *
+ * This creates a request for payment, never a payment. The client reviews it,
+ * can adjust the hours, and approves before anything is charged.
+ */
+function CreateInvoiceModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const { data: clients, isLoading: clientsLoading } = trpc.artistDashboard.myClients.useQuery();
+  const { data: connectStatus } = trpc.artistDashboard.stripeConnectStatus.useQuery();
+  const connectStripe = trpc.artistDashboard.createStripeConnectUrl.useMutation({
+    onSuccess: ({ url }) => { window.location.href = url; },
+    onError: (e: any) => toast.error(e.message || "Couldn't start Stripe connect"),
+  });
+
+  const [clientUserId, setClientUserId] = useState<string>("");
+  const [rateType, setRateType] = useState<"hourly" | "flat">("hourly");
+  const [hours, setHours] = useState("");
+  const [hourlyRate, setHourlyRate] = useState("");
+  const [flatRate, setFlatRate] = useState("");
+  const today = new Date().toISOString().slice(0, 10);
+  const [workDate, setWorkDate] = useState(today);
+  const [description, setDescription] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const client = (clients ?? []).find((x: any) => String(x.clientUserId) === clientUserId);
+  // Prefill with what this client last paid them per hour, so the common case
+  // is pick client, type hours, send.
+  useEffect(() => {
+    if (client?.lastHourlyRate != null && !hourlyRate) setHourlyRate(String(client.lastHourlyRate));
+  }, [client?.clientUserId]);
+
+  const create = trpc.artistDashboard.createInvoice.useMutation({
+    onSuccess: (res: any) => {
+      toast.success(`Invoice sent — ${client?.name ?? "your client"} has been emailed a payment link for $${res.total.toFixed(2)}.`);
+      onSuccess();
+      onClose();
+    },
+    onError: (e: any) => toast.error(e.message || "Couldn't create that invoice"),
+  });
+
+  const money = bookingMoney(
+    rateType === "hourly"
+      ? { rateType: "hourly", hourlyRate: parseFloat(hourlyRate) || 0, hours: parseFloat(hours) || 0 }
+      : { rateType: "flat", flatRate: parseFloat(flatRate) || 0 },
+  );
+  const notConnected = connectStatus && !connectStatus.connected;
+  const ready = !!clientUserId && description.trim().length >= 3 && money.base > 0 && !notConnected;
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 overflow-y-auto" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 my-8">
+        <div>
+          <h2 className="text-lg font-black text-[#111]">Create an invoice</h2>
+          <p className="text-sm text-gray-500">Bill a client you've worked with for time you've already put in.</p>
+        </div>
+
+        {notConnected ? (
+          <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-2.5">
+            <p className="text-sm font-bold text-[#111]">Connect your payout account first</p>
+            <p className="text-xs text-gray-500">You need a connected Stripe account before you can invoice a client — that's where the payment lands.</p>
+            <button
+              onClick={() => connectStripe.mutate({ origin: window.location.origin })}
+              disabled={connectStripe.isPending}
+              className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-[#111] hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {connectStripe.isPending ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />}
+              Connect to Stripe
+            </button>
+          </div>
+        ) : (
+          <>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="inv-client">Client *</label>
+              <select
+                id="inv-client" value={clientUserId} onChange={e => setClientUserId(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:border-[#ec008c]"
+              >
+                <option value="">{clientsLoading ? "Loading…" : "Choose a client"}</option>
+                {(clients ?? []).map((x: any) => (
+                  <option key={x.clientUserId} value={String(x.clientUserId)}>{x.name}</option>
+                ))}
+              </select>
+              {!clientsLoading && (clients ?? []).length === 0 && (
+                <p className="text-xs text-gray-500 mt-1">You can invoice a client once you've had a booking with them.</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="inv-date">Invoice Date *</label>
+              <input
+                id="inv-date" type="date" value={workDate} max={today} onChange={e => setWorkDate(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#ec008c]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="inv-desc">What was the work? *</label>
+              <textarea
+                id="inv-desc" value={description} onChange={e => setDescription(e.target.value)} rows={3}
+                placeholder={"e.g. Admin support, Sept 29 – Oct 4\n  9/29  8:00–9:00 (1.0)\n  10/1  12:00–2:00 (2.0)"}
+                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#ec008c] resize-none"
+              />
+              <p className="text-[11px] text-gray-400 mt-1">Your client sees this on the invoice — break out the hours if it covers more than one day.</p>
+            </div>
+
+            <div className="flex gap-2">
+              {(["hourly", "flat"] as const).map(t => (
+                <button
+                  key={t} type="button" onClick={() => setRateType(t)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${rateType === t ? "bg-[#111] text-white" : "bg-gray-100 text-gray-500 hover:text-[#111]"}`}
+                >
+                  {t === "hourly" ? "Hourly" : "Flat amount"}
+                </button>
+              ))}
+            </div>
+
+            {rateType === "hourly" ? (
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="inv-hours">Hours *</label>
+                  <input
+                    id="inv-hours" type="number" min="0.25" max="500" step="0.25" value={hours}
+                    onChange={e => setHours(e.target.value)} placeholder="e.g. 4.5"
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#ec008c]"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="inv-rate">Your rate / hr *</label>
+                  <input
+                    id="inv-rate" type="number" min="1" max="1000" step="0.01" value={hourlyRate}
+                    onChange={e => setHourlyRate(e.target.value)} placeholder="$"
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#ec008c]"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="inv-flat">Amount *</label>
+                <input
+                  id="inv-flat" type="number" min="1" step="0.01" value={flatRate}
+                  onChange={e => setFlatRate(e.target.value)} placeholder="$"
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#ec008c]"
+                />
+              </div>
+            )}
+
+            {money.base > 0 && (
+              <div className="bg-pink-50 rounded-xl p-3 space-y-1.5 text-xs">
+                {rateType === "hourly" && (
+                  <div className="flex justify-between text-gray-600">
+                    <span>{formatHours(hours)} hrs × ${(parseFloat(hourlyRate) || 0).toFixed(2)}/hr</span>
+                    <span>${money.base.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-[#111] border-t border-pink-100 pt-1.5">
+                  <span>You'll receive</span><span className="text-[#ec008c]">${money.artistTotal.toFixed(2)}</span>
+                </div>
+                <p className="text-[11px] text-gray-400">
+                  You get your full rate — your client is billed ${money.clientTotal.toFixed(2)}, which adds a ${money.processingFee.toFixed(2)} processing fee.
+                </p>
+              </div>
+            )}
+
+            <textarea
+              value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+              placeholder="Note for your client (optional)"
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-[#ec008c] resize-none"
+            />
+
+            <div className="p-3 bg-blue-50 rounded-xl text-xs text-blue-700">
+              This emails {client?.name ?? "your client"} a link to review and pay. They approve it before anything is charged.
+            </div>
+          </>
+        )}
+
+        <div className="flex gap-3">
+          <button onClick={onClose} className="px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+          <button
+            onClick={() => create.mutate({
+              clientUserId: Number(clientUserId),
+              rateType,
+              hourlyRate: rateType === "hourly" ? parseFloat(hourlyRate) : undefined,
+              hours: rateType === "hourly" ? parseFloat(hours) : undefined,
+              flatRate: rateType === "flat" ? parseFloat(flatRate) : undefined,
+              workDate,
+              description: description.trim(),
+              notes: notes.trim() || undefined,
+              origin: window.location.origin,
+            })}
+            disabled={!ready || create.isPending}
+            className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#ff7171] to-[#ec008c] hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {create.isPending ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+            Send invoice
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1340,6 +1612,8 @@ function BookingsTab() {
   const { rows: confirmations, isLoading } = useArtistBookingRows();
   const [filter, setFilter] = useState<BookingFilter>("all");
   const [selected, setSelected] = useState<any | null>(null);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const utils = trpc.useUtils();
   const search = useSearch();
 
   // Deep-link support: /app/bookings?open=<bookingId> auto-opens that booking's
@@ -1368,26 +1642,23 @@ function BookingsTab() {
     );
   }
 
+  // Worked but not yet completed — the only bookings standing between the
+  // artist and being paid, and the only ones they have to do anything about.
+  const actionable = confirmations.filter((b: any) => needsArtistAction(b));
   const filtered = confirmations.filter((b: any) => {
+    if (filter === "action") return needsArtistAction(b);
     if (filter === "upcoming") return isUpcoming(b);
     if (filter === "completed") return !isUpcoming(b);
     return true;
   });
-  // Upcoming should read soonest-first (your next gig at the top), the
-  // opposite of the query's default most-recent-first ordering.
-  if (filter === "upcoming") {
-    filtered.sort((a: any, b: any) => {
-      const da = bookingDate(a)?.getTime() ?? 0;
-      const db = bookingDate(b)?.getTime() ?? 0;
-      return da - db;
-    });
-  } else {
-    // Newest first by filing date, so an invoiced booking sits with its
-    // invoice date instead of wherever its start date would put it.
-    filtered.sort((a: any, b: any) => (listDate(b)?.getTime() ?? 0) - (listDate(a)?.getTime() ?? 0));
-  }
-  // Weeks waiting on hours float to the top — that's the thing to act on.
-  filtered.sort((a: any, b: any) => (b.periodDue ? 1 : 0) - (a.periodDue ? 1 : 0));
+  // Anything taught but not yet completed comes first — that is the only thing
+  // standing between the artist and being paid, and it was sorting into the
+  // middle of the list by date. Then the next gig, then history newest first.
+  const ordered = filter === "completed"
+    ? [...filtered].sort((a: any, b: any) => (listDate(b)?.getTime() ?? 0) - (listDate(a)?.getTime() ?? 0))
+    : sortArtistBookings(filtered);
+  filtered.length = 0;
+  filtered.push(...ordered);
 
   // Group by date string
   const groups: { label: string; items: any[] }[] = [];
@@ -1403,16 +1674,52 @@ function BookingsTab() {
 
   const tabs: { key: BookingFilter; label: string }[] = [
     { key: "all", label: "All" },
+    ...(actionable.length > 0 ? [{ key: "action" as BookingFilter, label: `To complete (${actionable.length})` }] : []),
     { key: "upcoming", label: "Upcoming" },
     { key: "completed", label: "Completed" },
   ];
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold text-[#111]">Bookings</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-bold text-[#111]">Bookings</h1>
+        {/* Work that never came through a job posting still has to be billed —
+            this is how an artist invoices a client for it. */}
+        <button
+          type="button"
+          onClick={() => setInvoiceOpen(true)}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold text-white bg-[#111] hover:opacity-80 transition-opacity flex-shrink-0"
+        >
+          <Plus size={13} /> Create invoice
+        </button>
+      </div>
+
+      {/* The prompt that gets them paid. These rows also sort to the top of the
+          list, but on a long list the artist had no way to tell they were
+          waiting on anything at all. */}
+      {actionable.length > 0 && filter !== "action" && (
+        <button
+          type="button"
+          onClick={() => setFilter("action")}
+          className="w-full flex items-center gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-left hover:bg-amber-100 transition-colors"
+        >
+          <Clock size={18} className="text-amber-600 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-[#111]">
+              {actionable.length === 1
+                ? "1 booking is waiting on you"
+                : `${actionable.length} bookings are waiting on you`}
+            </p>
+            <p className="text-xs text-gray-600 mt-0.5">
+              Complete {actionable.length === 1 ? "it" : "them"} and submit your hours to get paid.
+            </p>
+          </div>
+          <ChevronRight size={16} className="text-amber-600 flex-shrink-0" />
+        </button>
+      )}
 
       {/* Filter tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -1428,7 +1735,7 @@ function BookingsTab() {
         <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
           <Calendar size={36} className="mx-auto text-gray-300 mb-3" />
           <p className="text-sm font-semibold text-gray-700 mb-1">No bookings yet</p>
-          <p className="text-sm text-gray-500 mb-4">When a studio confirms you for a job, it will appear here.</p>
+          <p className="text-sm text-gray-500 mb-4">When a client confirms you for a job, it will appear here.</p>
           <a href="/app/jobs" className="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80">Browse jobs →</a>
         </div>
       ) : (
@@ -1444,6 +1751,16 @@ function BookingsTab() {
             </div>
           ))}
         </div>
+      )}
+
+      {invoiceOpen && (
+        <CreateInvoiceModal
+          onClose={() => setInvoiceOpen(false)}
+          onSuccess={() => {
+            utils.artistDashboard.myConfirmations.invalidate();
+            utils.bookingPeriods.myAdminBookings.invalidate();
+          }}
+        />
       )}
     </div>
   );
@@ -1493,7 +1810,7 @@ function ConfirmationCard({ booking }: { booking: any }) {
     { enabled: expanded && booking.paymentMethod === "artswrk" }
   );
 
-  const studioName = booking.clientCompanyName ?? booking.clientFirstName ?? `Studio #${booking.clientUserId}`;
+  const studioName = booking.clientCompanyName ?? booking.clientFirstName ?? `Client #${booking.clientUserId}`;
   const jobTitle = (booking.jobDescription ?? booking.description ?? "").split("\n")[0].slice(0, 60)
     || (booking.jobId ? `Job #${booking.jobId}` : "Booking");
   const isArtswrk = booking.paymentMethod === "artswrk";
@@ -1711,7 +2028,7 @@ function ConfirmationCard({ booking }: { booking: any }) {
                     <p className="font-semibold text-[#111] mb-2">Invoice Summary</p>
                     {booking.hours > 0 && (
                       <div className="flex justify-between text-gray-600">
-                        <span>Hours</span><span>{booking.hours} hrs</span>
+                        <span>Hours</span><span>{formatHours(booking.hours)} hrs</span>
                       </div>
                     )}
                     <div className="flex justify-between text-gray-600">
@@ -1723,7 +2040,7 @@ function ConfirmationCard({ booking }: { booking: any }) {
                     <div className="flex justify-between font-bold text-[#111] border-t border-pink-100 pt-1.5 mt-1.5">
                       <span>You'll receive</span><span className="text-[#ec008c]">${(earnedAmount + totalReimb).toFixed(2)}</span>
                     </div>
-                    <p className="text-[11px] text-gray-400 pt-0.5">You get your full rate — we add a small Stripe processing fee on top, billed to the studio.</p>
+                    <p className="text-[11px] text-gray-400 pt-0.5">You get your full rate — we add a small Stripe processing fee on top, billed to your client.</p>
                   </div>
 
                   {/* Notes */}
@@ -1785,7 +2102,7 @@ function ConfirmationsTab() {
         <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
           <UserCheck size={36} className="mx-auto text-gray-300 mb-3" />
           <p className="text-sm font-semibold text-gray-700 mb-1">No confirmations yet</p>
-          <p className="text-sm text-gray-500 mb-4">When a studio confirms you for a job, it will appear here.</p>
+          <p className="text-sm text-gray-500 mb-4">When a client confirms you for a job, it will appear here.</p>
           <a href="/app/jobs" className="inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white bg-[#111] hover:opacity-80 transition-opacity">
             Browse jobs →
           </a>
