@@ -5928,7 +5928,11 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           const jobTitle = (booking.jobDescription ?? "").split("\n")[0].slice(0, 80) || `Booking #${booking.id}`;
 
           const stripe = getStripe();
-          const session = await stripe.checkout.sessions.create({
+          // Stripe's own rejection when the artist never finished onboarding
+          // reads "the account referenced in the 'destination' parameter is
+          // missing the required capabilities" -- shown verbatim to a studio
+          // who has no idea who or what that means. Say it plainly instead.
+          const createCheckout = () => stripe.checkout.sessions.create({
             mode: "payment",
             line_items: [{
               price_data: {
@@ -5957,6 +5961,16 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
             success_url: `${paymentPageUrl}?paid=1`,
             cancel_url: paymentPageUrl,
           });
+
+          let session;
+          try {
+            session = await createCheckout();
+          } catch (err) {
+            const { payoutCapabilityMessage } = await import("./stripe");
+            const friendly = payoutCapabilityMessage(err, artistName);
+            if (friendly) throw new Error(friendly);
+            throw err;
+          }
           if (!session.url) throw new Error("Could not create payment link");
 
           await approveArtswrkInvoice(booking.id, {
@@ -6158,6 +6172,15 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const connectAccountId = await getArtistStripeConnectAccount(user.id);
         if (!connectAccountId) {
           throw new Error("Connect your Stripe payout account before invoicing a studio. Go to Settings → Manage Payouts.");
+        }
+        // Having an account is not the same as having finished setting it up.
+        // Without this the invoice went out and the STUDIO hit Stripe's raw
+        // "missing the required capabilities: transfers" error at payment time,
+        // which named nobody and which they could do nothing about.
+        const { artistPayoutReadiness } = await import("./stripe");
+        const readiness = await artistPayoutReadiness(connectAccountId);
+        if (!readiness.ready) {
+          throw new Error(`${readiness.reason} Finish it in Settings → Manage Payouts, then submit this invoice again.`);
         }
 
         const reimbList = await getReimbursementsByPeriodId(input.periodId);

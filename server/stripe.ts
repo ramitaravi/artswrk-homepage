@@ -634,3 +634,49 @@ export async function createConnectOnboardingUrl(
   });
   return link.url;
 }
+
+/**
+ * Whether an artist's connected account can actually be paid.
+ *
+ * Creating the Express account is not the same as finishing onboarding. Until
+ * Stripe has what it needs (identity, bank details), the account exists but
+ * has no `transfers` capability, and any destination charge is rejected with:
+ *
+ *   "The account referenced in the 'destination' parameter is missing the
+ *    required capabilities: transfers or legacy_payments are required"
+ *
+ * We only checked that an account id EXISTED, so an artist could submit an
+ * invoice and the studio hit that raw Stripe error at the moment they tried to
+ * pay — Brittany at Fancy Feet, on Sara Pagliaro's invoice, 2026-10-19. The
+ * studio could do nothing about it and the message named nobody.
+ */
+export async function artistPayoutReadiness(accountId: string): Promise<{
+  ready: boolean;
+  reason?: string;
+}> {
+  try {
+    const account = await getStripe().accounts.retrieve(accountId);
+    const transfers = (account as any)?.capabilities?.transfers;
+    if (transfers === "active") return { ready: true };
+    if (transfers === "pending") {
+      return { ready: false, reason: "Stripe is still reviewing their payout account." };
+    }
+    return { ready: false, reason: "They haven't finished setting up their Stripe payout account." };
+  } catch (err) {
+    // Never block a payment because this lookup failed — Stripe itself is the
+    // final authority, and it will reject the charge if the account is unusable.
+    console.error("[artistPayoutReadiness] lookup failed:", err instanceof Error ? err.message : err);
+    return { ready: true };
+  }
+}
+
+/**
+ * Turn Stripe's destination-capability rejection into something the person
+ * reading it can act on. Returns null for any other error.
+ */
+export function payoutCapabilityMessage(err: unknown, artistName: string): string | null {
+  const message = err instanceof Error ? err.message : String(err ?? "");
+  if (!/required capabilities|legacy_payments|capabilities: transfers/i.test(message)) return null;
+  return `${artistName} hasn't finished setting up their Stripe payout account, so this payment can't go through yet. `
+    + `They need to complete it from Settings → Manage Payouts. Nothing has been charged.`;
+}

@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray, isNotNull, isNull, like, or, sql } from "drizzle-orm";
+import { buildJobSlug } from "@shared/jobUrl";
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import { BookingPeriod, ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, affiliations, artistResumes, benefits, bookingPeriods, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, masterArtistTypes, masterServiceTypes, masterStyleTypes, messages, payments, premiumJobInterestedArtists, premiumJobs, reimbursements, savedArtists, userAffiliations, users } from "../drizzle/schema";
@@ -1974,6 +1975,17 @@ export async function createJob(input: CreateJobInput) {
       networkStatus: (input.requestStatus ?? "Pending Payment") === "Active" ? "pending" : null,
     });
   const newId = (result as { insertId: number }).insertId;
+
+  // The slug can only be built once the id exists, because the public URL is
+  // resolved by the id on the END of it. Neither caller ever passed one, so
+  // every job posted on the new site was created with slug NULL -- 1,830 of
+  // 3,979 rows -- and anything that linked straight off `job.slug` produced a
+  // dead link. Set here so a job's canonical URL is right from the start.
+  if (!input.slug) {
+    const slug = buildJobSlug(input.title, newId);
+    await db.update(jobs).set({ slug }).where(eq(jobs.id, newId));
+  }
+
   const [job] = await db.select().from(jobs).where(eq(jobs.id, newId));
   return job;
 }

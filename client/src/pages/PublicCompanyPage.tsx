@@ -4,6 +4,7 @@
  * Shareable page: active jobs + location tabs when the studio has multiple sites.
  */
 import { useState, useMemo } from "react";
+import { jobPath } from "@shared/jobUrl";
 import { useParams, Link } from "wouter";
 import { MapPin, Globe, Instagram, CheckCircle2, Loader2, AlertCircle, Briefcase, ChevronDown, Zap } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -210,7 +211,7 @@ export default function PublicCompanyPage() {
 
                     {/* CTA */}
                     <div className="flex-shrink-0">
-                      <Link href={job.slug ? `/jobs/${job.slug}` : "/jobs"}>
+                      <Link href={jobPath(job)}>
                         <button className="px-5 py-2.5 rounded-xl bg-[#111] text-white text-xs font-bold hover:bg-gray-800 transition-colors whitespace-nowrap">
                           Apply Now
                         </button>

@@ -11,6 +11,7 @@
  *  - Enterprise: also sends email to artist on message
  */
 import { useState, useCallback, useEffect, useRef } from "react";
+import { jobUrl } from "@shared/jobUrl";
 import {
   ArrowLeft, ChevronLeft, ChevronRight, MapPin, DollarSign,
   Calendar, Lock, Unlock, ExternalLink, MessageCircle,
@@ -1759,7 +1760,9 @@ export default function ClientJobDetail() {
           </button>
           <button
             onClick={() => {
-              const url = job.slug ? `${window.location.origin}/jobs/${job.slug}` : window.location.href;
+              // window.location.href here was the CLIENT'S dashboard page, so
+              // a job with no slug got shared as a link only they could open.
+              const url = jobUrl({ id: job.id, slug: job.slug, title: jobTitle }, window.location.origin);
               navigator.clipboard.writeText(url);
               toast.success("Job link copied!");
               if (navigator.share) {

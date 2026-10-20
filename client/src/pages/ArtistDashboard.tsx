@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { jobPath } from "@shared/jobUrl";
 import RichText from "@/components/RichText";
 import { useLocation, useSearch } from "wouter";
 import ArtistProfilePage from "./artist/ArtistProfilePage";
@@ -472,7 +473,7 @@ function DashboardTab({ user }: { user: any }) {
               const ago = postedAgo(job.createdAt);
               const rate = formatRate(job);
               const dateLabel = formatJobCardDate(job);
-              const jobDetailUrl = job.slug ? `/jobs/${job.slug}` : `/jobs/arts-job-${job.id}`;
+              const jobDetailUrl = jobPath(job);
               const isApplied = appliedJobIds.has(job.id);
               return (
                 <div key={job.id} className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm transition-all duration-150">
@@ -579,7 +580,7 @@ function JobsTab({ user }: { user: any }) {
             <div className="divide-y divide-gray-50">
               {jobsFeed.map((job: any) => {
                 const isApplied = appliedRegularIds.has(job.id);
-                const jobDetailUrl = job.slug ? `/jobs/${job.slug}` : `/jobs/arts-job-${job.id}`;
+                const jobDetailUrl = jobPath(job);
                 return (
                   <div key={job.id} className="flex items-start gap-3 p-4">
                     <StudioAvatar name={job.studioName || job.creatorName || "Studio"} logo={job.logo} size="md" />

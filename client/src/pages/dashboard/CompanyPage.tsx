@@ -3,6 +3,7 @@
  * Route: /app/company
  */
 import { useState, useEffect } from "react";
+import { jobPath } from "@shared/jobUrl";
 import {
   Building2, MapPin, Globe, Instagram, Edit3, Eye, CheckCircle2,
   Copy, Check, Loader2, Briefcase, ExternalLink, Save, X,
@@ -196,7 +197,7 @@ export default function CompanyPage() {
                   <div className="flex-shrink-0 flex items-center gap-2">
                     <span className="text-xs font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full">Active</span>
                     {job.slug && (
-                      <a href={`/jobs/${job.slug}`} target="_blank" rel="noopener noreferrer">
+                      <a href={jobPath(job)} target="_blank" rel="noopener noreferrer">
                         <ExternalLink size={13} className="text-gray-300 hover:text-gray-500" />
                       </a>
                     )}
