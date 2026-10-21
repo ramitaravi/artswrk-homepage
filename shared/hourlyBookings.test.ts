@@ -8,7 +8,7 @@
  * into $18 in the other — both of them amounts charged to a studio's card.
  */
 import { describe, it, expect } from "vitest";
-import { isHourlyRateBooking, maxInvoiceHours, formatHours, bookingMoney } from "./bookingRates";
+import { isHourlyRateBooking, maxInvoiceHours, formatHours, bookingMoney, bookingRateLabel } from "./bookingRates";
 
 // Verified against production on 2026-10-08.
 const MCKELL_ADMIN = {            // 36h10m of studio admin, no applicant record
@@ -118,5 +118,43 @@ describe("the studio's side of McKell's admin invoice", () => {
     // The display rounds; the fee rounds harder, so the six cents never shows.
     expect(money(36.17).clientTotal).toBeCloseTo(684.06, 2);
     expect(money(36.17).processingFee).toBe(33);
+  });
+});
+
+describe("bookingRateLabel", () => {
+  // Camia Green, Inspirations PAC, 2026-09-22. She pitched $85/hr for a
+  // 5-hour sub. Stored correctly; displayed as "$425/hr".
+  const CAMIA = {
+    rateType: "hourly", hourlyRate: 85, flatRate: null,
+    artistRate: 425, clientRate: 446, hours: 5,
+    isAdminBooking: 0, isRecurring: 0, recurringSeriesId: null,
+  };
+
+  it("shows Camia's unit rate, never her total, as the per-hour figure", () => {
+    const label = bookingRateLabel(CAMIA as any, { side: "artist" });
+    expect(label).toContain("$85.00/hr");
+    expect(label).not.toContain("$425.00/hr");
+    expect(label).toContain("$425.00 total");
+  });
+
+  it("adds the processing fee on the studio's side only", () => {
+    expect(bookingRateLabel(CAMIA as any, { side: "client" })).toContain("$446.00 total");
+    expect(bookingRateLabel(CAMIA as any, { side: "artist" })).toContain("$425.00 total");
+  });
+
+  it("never prints /hr for a flat booking", () => {
+    const flat = { rateType: "flat", artistRate: 3600, clientRate: 3780, hours: 8 };
+    expect(bookingRateLabel(flat as any)).toBe("$3600.00 total");
+    expect(bookingRateLabel(flat as any)).not.toContain("/hr");
+  });
+
+  it("handles a legacy row whose unit rate lives in artistRate", () => {
+    const weekly = { artistRate: 55, hours: 4, isAdminBooking: 1, isRecurring: 1, hourlyRate: null };
+    expect(bookingRateLabel(weekly as any, { side: "artist" })).toBe("$55.00/hr · $220.00 total");
+  });
+
+  it("says nothing rather than something wrong", () => {
+    expect(bookingRateLabel(null)).toBe("");
+    expect(bookingRateLabel({ rateType: "flat" } as any)).toBe("");
   });
 });

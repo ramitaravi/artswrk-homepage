@@ -11,6 +11,7 @@
  *  - Enterprise: also sends email to artist on message
  */
 import { useState, useCallback, useEffect, useRef } from "react";
+import { bookingRateLabel } from "@shared/bookingRates";
 import { jobUrl } from "@shared/jobUrl";
 import {
   ArrowLeft, ChevronLeft, ChevronRight, MapPin, DollarSign,
@@ -1296,7 +1297,7 @@ function BookingsTab({ jobId }: { jobId: number }) {
                 <p className="text-sm font-bold text-[#111]">{name}</p>
                 <div className="flex items-center gap-3 mt-1 flex-wrap text-xs text-gray-400">
                   {b.startDate && <span className="flex items-center gap-1"><Calendar size={10} />{fmtDate(b.startDate)}</span>}
-                  {b.clientRate && <span className="flex items-center gap-1"><DollarSign size={10} />${b.clientRate}/hr</span>}
+                  {b.clientRate != null && <span className="flex items-center gap-1"><DollarSign size={10} />{bookingRateLabel(b, { side: "client" })}</span>}
                 </div>
               </div>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${

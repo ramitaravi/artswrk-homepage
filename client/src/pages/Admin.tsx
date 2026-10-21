@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect, useRef, type MutableRefObject } from "react";
+import { bookingRateLabel } from "@shared/bookingRates";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
@@ -4133,7 +4134,8 @@ function AdminPaymentDetail({ paymentId, onBack, onViewBooking }: {
               </div>
               {p.bookingPaymentStatus && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${paymentStatusColor(p.bookingPaymentStatus)}`}>{p.bookingPaymentStatus}</span>}
               {p.startDate && <p className="text-xs text-gray-500 mt-2">{fmtDateTime(p.startDate)}</p>}
-              {p.clientRate && <p className="text-xs text-gray-400 mt-1">Rate: {fmt$(p.clientRate * 100)}/hr</p>}
+              {/* A payment row carries the booking total, not a unit rate. */}
+              {p.clientRate != null && <p className="text-xs text-gray-400 mt-1">Booking total: {fmt$(p.clientRate * 100)}</p>}
               {onViewBooking && (
                 <button onClick={() => onViewBooking(p.bookingId)} className="mt-3 text-xs font-semibold text-[#F25722] hover:underline flex items-center gap-1">
                   View Booking →
@@ -6730,8 +6732,11 @@ function AdminBookingsSection() {
                   <p className="text-[10px] text-gray-400">{b.clientEmail}</p>
                 </td>
                 <td className="px-4 py-3 text-xs text-gray-700">
-                  <p>${b.clientRate}/hr <span className="text-gray-400">(client)</span></p>
-                  <p>${b.artistRate}/hr <span className="text-gray-400">(artist)</span></p>
+                  {/* clientRate/artistRate are booking TOTALS on a confirmed
+                      applicant; labelling them "/hr" showed Camia Green's
+                      $85/hr sub as $425/hr. */}
+                  <p>{bookingRateLabel(b, { side: "client" })} <span className="text-gray-400">(client)</span></p>
+                  <p>{bookingRateLabel(b, { side: "artist" })} <span className="text-gray-400">(artist)</span></p>
                 </td>
                 <td className="px-4 py-3 text-xs text-gray-600">
                   <p>{fmtDate(b.startDate)} → {fmtDate(b.endDate)}</p>
@@ -6885,6 +6890,7 @@ function AdminBookingCreateForm({ onBack, onCreated }: { onBack: () => void; onC
           <div>
             <label className={labelCls}>Artist Rate ($/hr) *</label>
             <input type="number" min="0" step="0.01" value={artistRate} onChange={e => setArtistRate(e.target.value)} placeholder="e.g. 70" className={inputCls} required />
+            {/* unit-rate: the create-recurring-booking FORM — the admin types per-hour rates here. */}
             {clientRate && artistRate && Number(clientRate) > Number(artistRate) && (
               <p className="text-[10px] text-green-600 mt-1 font-semibold">Artswrk margin: ${(Number(clientRate) - Number(artistRate)).toFixed(2)}/hr</p>
             )}
@@ -7022,9 +7028,11 @@ function AdminRecurringBookingDetail({ bookingId, onBack }: { bookingId: number;
             <h2 className="text-sm font-black text-[#111] uppercase tracking-wider">Booking Details</h2>
             <div className="space-y-2 text-xs">
               <div className="flex justify-between"><span className="text-gray-500">Status</span><span className="font-semibold capitalize">{booking.bookingStatus}</span></div>
+              {/* unit-rate: a recurring booking stores per-hour rates; its periods are rate x hours. */}
               <div className="flex justify-between"><span className="text-gray-500">Client Rate</span><span className="font-semibold">${booking.clientRate}/hr</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Artist Rate</span><span className="font-semibold">${booking.artistRate}/hr</span></div>
               {booking.hours != null && <div className="flex justify-between"><span className="text-gray-500">Scheduled hours</span><span className="font-semibold">{booking.hours} hrs / period</span></div>}
+              {/* unit-rate: recurring booking — these are per-hour rates, so the margin is per hour too. */}
               <div className="flex justify-between"><span className="text-gray-500">Margin</span><span className="font-semibold text-green-600">${(booking.clientRate - booking.artistRate).toFixed(2)}/hr</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Start</span><span>{fmtDate(booking.startDate)}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">End</span><span>{fmtDate(booking.endDate)}</span></div>
@@ -7089,6 +7097,7 @@ function AdminRecurringBookingDetail({ bookingId, onBack }: { bookingId: number;
                   )}
                   {p.actualHours != null && <p className="font-semibold text-[#111]">{p.actualHours}h logged</p>}
                   {p.invoiceTotalCents == null && booking.hours != null && p.status !== "skipped" && (
+                    /* unit-rate: an admin recurring booking stores the per-hour rate in clientRate — periodInvoiceTotals below multiplies it by hours. */
                     <p className="text-gray-500" title={`${booking.hours} scheduled hrs × $${booking.clientRate}/hr + 5% processing fee`}>
                       Est. {fmt$(Math.round(periodInvoiceTotals(Number(booking.clientRate ?? 0), Number(booking.hours)).total * 100))}
                     </p>

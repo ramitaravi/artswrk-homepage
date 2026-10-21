@@ -265,6 +265,8 @@ export default function InvoicePayment() {
                     )}
                     <span className="text-gray-400 text-xs">
                       ({isPeriodInvoice
+                          // unit-rate: a legacy weekly PERIOD invoice stores
+                        // the per-hour rate in clientRate, not a total.
                         ? `$${clientRate}/hr`
                         : isClassDateInvoice
                           ? `$${(booking as any).hourlyRate}/hr`

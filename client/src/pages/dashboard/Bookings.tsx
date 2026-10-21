@@ -4,6 +4,7 @@
  */
 
 import { useState, useRef, useMemo } from "react";
+import { bookingRateLabel } from "@shared/bookingRates";
 import { useLocation, Link } from "wouter";
 import {
   Calendar, Clock, MapPin, DollarSign, CheckCircle, AlertCircle,
@@ -317,10 +318,12 @@ export function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
 
   // The class this is for — the date the artist knows it by, not the billing window.
   const classDayLabel = periodClassDay(period).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
-  const artistRate = booking.hourlyRate ?? booking.artistRate ?? 0;
+  // The UNIT rate, not the booking total. Named artistRate it read exactly
+  // like the column that holds a total, which is how these get mixed up.
+  const unitRate = booking.hourlyRate ?? booking.artistRate ?? 0;
   const expenseTotal = (expenses ?? []).reduce((s: number, r: any) => s + Number(r.value ?? 0), 0);
   const money = bookingMoney(
-    { rateType: "hourly", hourlyRate: Number(artistRate), hours: Number(hours || 0) },
+    { rateType: "hourly", hourlyRate: Number(unitRate), hours: Number(hours || 0) },
     { reimbursements: expenseTotal },
   );
   const estimatedArtist = hours ? money.artistTotal.toFixed(2) : null;
@@ -371,7 +374,7 @@ export function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
 
         {estimatedArtist && (
           <div className="bg-gray-50 rounded-xl p-3 text-xs space-y-1">
-            <div className="flex justify-between"><span className="text-gray-500">${Number(artistRate).toFixed(2)}/hr × {hours} hrs</span><span className="font-semibold text-[#111]">${money.base.toFixed(2)}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">${Number(unitRate).toFixed(2)}/hr × {hours} hrs</span><span className="font-semibold text-[#111]">${money.base.toFixed(2)}</span></div>
             {expenseTotal > 0 && (
               <div className="flex justify-between"><span className="text-gray-500">Reimbursements</span><span className="font-semibold text-[#111]">${expenseTotal.toFixed(2)}</span></div>
             )}
@@ -510,7 +513,7 @@ export function PeriodSubmitModal({ period, booking, onClose, onSuccess }: {
             )}
 
             <div className="bg-gray-50 rounded-xl p-3 text-xs space-y-1.5">
-              <div className="flex justify-between"><span className="text-gray-500">${Number(artistRate).toFixed(2)}/hr × {hours} hrs</span><span className="font-semibold text-[#111]">${money.base.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">${Number(unitRate).toFixed(2)}/hr × {hours} hrs</span><span className="font-semibold text-[#111]">${money.base.toFixed(2)}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Reimbursements</span><span className="font-semibold text-[#111]">${expenseTotal.toFixed(2)}</span></div>
               <div className="flex justify-between border-t border-gray-200 pt-1.5"><span className="font-bold text-[#111]">You'll receive</span><span className="font-black text-[#ec008c]">${money.artistTotal.toFixed(2)}</span></div>
             </div>
@@ -616,11 +619,11 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
               </div>
             </div>
             <div className="text-right flex-shrink-0 flex flex-col items-end gap-2">
-              {/* AdminBookingCard only — admin/recurring bookings DO store an
-                  hourly rate (the period invoice is rate × hours server-side).
-                  Bubble-migrated bookings are the opposite: their rate is the
-                  booking total, which is why BookingRow above shows no "/hr". */}
-              <p className="text-sm font-black text-[#111]">${isArtist ? booking.artistRate : booking.clientRate}/hr</p>
+              {/* One helper decides whether a "/hr" is even truthful here.
+                  This printed `${artistRate}/hr`, and artistRate is the booking
+                  TOTAL on a confirmed applicant — Camia Green's $85/hr, 5-hour
+                  sub read as "$425/hr". */}
+              <p className="text-sm font-black text-[#111]">{bookingRateLabel(booking, { side: isArtist ? "artist" : "client" })}</p>
               {periods.length > 0 ? (
                 <p className="text-[10px] text-gray-400">{paidPeriods.length}/{periods.length} paid</p>
               ) : booking.hours != null ? (
@@ -688,8 +691,8 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
                     <span
                       className="text-[10px] text-gray-500"
                       title={isArtist
-                        ? `${booking.hours} scheduled hrs × $${booking.artistRate}/hr`
-                        : `${booking.hours} scheduled hrs × $${booking.clientRate}/hr + 5% processing fee`}
+                        ? `${booking.hours} scheduled hrs · ${bookingRateLabel(booking, { side: "artist" })}`
+                        : `${booking.hours} scheduled hrs · ${bookingRateLabel(booking, { side: "client" })} incl. the 5% processing fee`}
                     >
                       Est. ${(isArtist
                         ? Number(booking.artistRate ?? 0) * Number(booking.hours)

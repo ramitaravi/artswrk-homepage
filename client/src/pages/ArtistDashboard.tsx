@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { bookingRateLabel } from "@shared/bookingRates";
 import { jobPath } from "@shared/jobUrl";
 import RichText from "@/components/RichText";
 import { useLocation, useSearch } from "wouter";
@@ -1203,6 +1204,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                   {hasHours && (
                     <div className="flex justify-between text-gray-500 text-xs">
                       <span>Hours</span>
+                      {/* unit-rate: hourlyRate first; artistRate only as the legacy-weekly fallback, where it IS the unit. */}
                       <span>{formatHours(booking.hours)} hrs{perHour ? ` × $${Number(booking.hourlyRate ?? booking.artistRate).toFixed(2)}/hr` : ""}</span>
                     </div>
                   )}
@@ -1287,7 +1289,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                     <p className="text-sm font-bold text-[#111]">Invoice this booking week by week</p>
                     <p className="text-xs text-gray-500">
                       Go to <a href="/app/bookings" className="font-semibold text-[#ec008c] hover:underline">Bookings</a> and hit
-                      Submit Hours on the week you taught. You'll be paid ${booking.artistRate}/hr for the hours you enter, plus any expenses.
+                      Submit Hours on the week you taught. You'll be paid {bookingRateLabel(booking, { side: "artist" })} for the hours you enter, plus any expenses.
                     </p>
                   </div>
                 </div>
@@ -1315,6 +1317,7 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                   <p className="text-xs font-bold text-gray-500">Submit Invoice to Artswrk</p>
                   {isClassDateBooking ? (
                     <div className="space-y-2">
+                      {/* unit-rate: hourlyRate first; artistRate only as the legacy-weekly fallback. */}
                       <p className="text-xs text-gray-600">Your agreed rate: ${Number(booking.hourlyRate ?? booking.artistRate).toFixed(2)}/hr</p>
                       <label className="block text-xs font-semibold text-gray-500" htmlFor="class-hours">Hours worked for this class</label>
                       <input id="class-hours" type="number" min="0.25" max={hoursCap} step="0.25"

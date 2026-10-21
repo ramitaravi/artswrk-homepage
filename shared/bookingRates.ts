@@ -262,3 +262,56 @@ export function formatHours(hours: number | string | null | undefined): string {
   if (!Number.isFinite(n)) return "";
   return String(Math.round(n * 100) / 100);
 }
+
+/**
+ * What to show a person as "the rate" for a booking.
+ *
+ * The one rule this exists to stop people getting wrong: `artistRate` and
+ * `clientRate` are booking TOTALS on a confirmed applicant, while `hourlyRate`
+ * is the per-hour unit. Camia Green pitched $85/hr for a 5-hour sub at
+ * Inspirations PAC, which stores correctly as hourlyRate 85, hours 5,
+ * artistRate 425 — and a screen that printed `${artistRate}/hr` told everyone
+ * she had been booked at $425 an hour.
+ *
+ * Returns the unit rate with "/hr" ONLY when a real per-hour rate is known.
+ * Everything else is labelled as the total it actually is, because a wrong
+ * unit is worse than no unit.
+ */
+export function bookingRateLabel(
+  booking: {
+    rateType?: string | null;
+    hourlyRate?: number | null;
+    flatRate?: number | null;
+    artistRate?: number | null;
+    clientRate?: number | null;
+    hours?: number | null;
+    recurringSeriesId?: number | null;
+    isAdminBooking?: boolean | number | null;
+    isRecurring?: boolean | number | null;
+  } | null | undefined,
+  opts: { side?: "artist" | "client" } = {},
+): string {
+  if (!booking) return "";
+  const side = opts.side ?? "artist";
+  const money = (n: number) => `$${Number(n).toFixed(2)}`;
+
+  if (isHourlyRateBooking(booking)) {
+    // hourlyRate is the unit. On legacy weekly rows that predate the column,
+    // artistRate held the unit instead — fall back only when hourlyRate is absent.
+    const unit = booking.hourlyRate ?? booking.artistRate ?? booking.clientRate;
+    if (typeof unit === "number") {
+      const base = Number(unit) * Number(booking.hours ?? 0);
+      const fee = side === "client" ? processingFeeFor(base) : 0;
+      return Number(booking.hours ?? 0) > 0
+        ? `${money(unit)}/hr · ${money(base + fee)} total`
+        : `${money(unit)}/hr`;
+    }
+  }
+
+  const total = side === "client"
+    ? (booking.clientRate ?? booking.artistRate)
+    : (booking.artistRate ?? booking.clientRate);
+  if (typeof total !== "number") return "";
+  // No "/hr" here on purpose: this number is the whole booking.
+  return `${money(total)} total`;
+}
