@@ -56,3 +56,58 @@ describe("computeAdminPeriods — weekly classes with a reminder time", () => {
     expect(utcDateString(old[0].notifyAt)).toBe("2026-09-21");
   });
 });
+
+/**
+ * GitHub #4 — an hourly manual booking billed the bare unit rate.
+ *
+ * createAdminBooking's rateType/hourlyRate ternaries sat BELOW the
+ * isRecurring early-return, so for a one-off they always evaluated to null.
+ * The booking stored $60 in artistRate with nothing saying it was per-hour,
+ * and every later stage read it as the whole total: $60/hr x 3 hrs = $60.
+ */
+import { describe as describeRates, it as itRates, expect as expectRates } from "vitest";
+import { processingFeeFor } from "@shared/bookingRates";
+
+/** Mirrors the computation in createAdminBooking. */
+function adminBookingTotals(input: {
+  rateType?: "hourly" | "flat" | null;
+  artistRateDollars: number;
+  clientRateDollars: number;
+  hours?: number;
+}) {
+  const isHourly = input.rateType === "hourly";
+  const unit = input.artistRateDollars ?? 0;
+  const hours = Number(input.hours ?? 0);
+  const artistTotal = isHourly && hours > 0 ? Math.round(unit * hours * 100) / 100 : unit;
+  const clientTotal = isHourly && hours > 0
+    ? artistTotal + processingFeeFor(artistTotal)
+    : input.clientRateDollars;
+  return { artistTotal, clientTotal, rateType: isHourly ? "hourly" : "flat", hourlyRate: isHourly ? unit : null };
+}
+
+describeRates("manual admin booking rates (GitHub #4)", () => {
+  itRates("bills $60/hr x 3 hrs as $189, not $60", () => {
+    const t = adminBookingTotals({ rateType: "hourly", artistRateDollars: 60, clientRateDollars: 63, hours: 3 });
+    expectRates(t.artistTotal).toBe(180);
+    expectRates(t.clientTotal).toBe(189);   // $180 + $9 fee
+    expectRates(t.rateType).toBe("hourly");
+    expectRates(t.hourlyRate).toBe(60);     // the unit is kept, separately
+  });
+
+  itRates("bills McKell's 36h10m at $18/hr as $651, not $18", () => {
+    const t = adminBookingTotals({ rateType: "hourly", artistRateDollars: 18, clientRateDollars: 19, hours: 36.1667 });
+    expectRates(t.artistTotal).toBeCloseTo(651, 0);
+    expectRates(t.clientTotal).toBeCloseTo(684, 0);
+  });
+
+  itRates("leaves a flat booking exactly as entered", () => {
+    const t = adminBookingTotals({ rateType: "flat", artistRateDollars: 400, clientRateDollars: 420, hours: 3 });
+    expectRates(t.artistTotal).toBe(400);   // never multiplied
+    expectRates(t.clientTotal).toBe(420);
+    expectRates(t.hourlyRate).toBeNull();
+  });
+
+  itRates("tags every booking one way or the other, never null", () => {
+    expectRates(adminBookingTotals({ artistRateDollars: 100, clientRateDollars: 105 }).rateType).toBe("flat");
+  });
+});

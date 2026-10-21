@@ -1059,7 +1059,7 @@ export async function getBookingsByClientId(
  */
 export async function getBookingStatsByClientId(clientUserId: number) {
   const db = await getDb();
-  if (!db) return { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, awaitingPayment: 0, weeksAwaitingPayment: 0, weeksAwaitingCents: 0, totalRevenue: 0 };
+  if (!db) return { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, awaitingPayment: 0, weeksAwaitingPayment: 0, weeksAwaitingCents: 0, totalRevenue: 0, artistsHired: 0 };
 
   const statusResult = await db
     .select({
@@ -1072,7 +1072,7 @@ export async function getBookingStatsByClientId(clientUserId: number) {
     .where(and(eq(bookings.clientUserId, clientUserId), eq(bookings.deleted, false)))
     .groupBy(bookings.bookingStatus, bookings.paymentStatus);
 
-  const stats = { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, awaitingPayment: 0, weeksAwaitingPayment: 0, weeksAwaitingCents: 0, totalRevenue: 0 };
+  const stats = { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, awaitingPayment: 0, weeksAwaitingPayment: 0, weeksAwaitingCents: 0, totalRevenue: 0, artistsHired: 0 };
   for (const row of statusResult) {
     const count = Number(row.count);
     stats.total += count;
@@ -1106,6 +1106,18 @@ export async function getBookingStatsByClientId(clientUserId: number) {
   `))[0] as unknown as Array<{ n: number; cents: number }>;
   stats.weeksAwaitingPayment = Number(weeks?.n ?? 0);
   stats.weeksAwaitingCents = Number(weeks?.cents ?? 0);
+
+
+  // How many different artists this studio has worked with — a studio's
+  // headline number is who they have hired, not "revenue", which is the
+  // opposite of what the money did from their side.
+  const [hiredRows] = await db.execute(
+    `SELECT COUNT(DISTINCT artistUserId) AS n FROM bookings
+      WHERE clientUserId = ${clientUserId} AND deleted = 0
+        AND artistUserId IS NOT NULL
+        AND bookingStatus IN ('Completed', 'Confirmed', 'Pay Now')`
+  );
+  stats.artistsHired = Number((hiredRows as unknown as Array<{ n: number }>)[0]?.n ?? 0);
 
   return stats;
 }
@@ -1656,11 +1668,21 @@ export async function getWalletStatsByClientId(clientUserId: number) {
   // its hourly rate — a season of thirty-nine classes showed up as $80. An
   // hourly booking's real cost is rate x hours plus the processing fee, and a
   // weekly class owes that for every class date still to come.
-  const HOURLY_TOTAL = `ROUND(b.clientRate * b.hours * 1.05, 2)`;
+  // clientRate means two things, and this is where that bit hardest.
+  //
+  // On a class date or a legacy weekly booking it is the PER-HOUR rate, so the
+  // studio owes rate x hours plus the fee. On every other booking it is
+  // already the whole total WITH the fee in it, so multiplying is wrong twice
+  // over: Camia Green's $446 booking (5 hrs at $85/hr) was reported to
+  // Inspirations PAC as 446 x 5 x 1.05 = $2,341.50 of future payments.
+  const PERIOD_TOTAL = `ROUND(b.clientRate * b.hours * 1.05, 2)`;
   const [futureRows] = await db.execute(`
     SELECT
       COALESCE(SUM(CASE
-        WHEN b.rateType = 'hourly' AND b.hours IS NOT NULL THEN ${HOURLY_TOTAL}
+        WHEN (b.recurringSeriesId IS NOT NULL
+              OR (COALESCE(b.isAdminBooking, 0) = 1 AND COALESCE(b.isRecurring, 0) = 1))
+             AND b.hours IS NOT NULL
+        THEN ${PERIOD_TOTAL}
         ELSE COALESCE(b.totalClientRate, b.clientRate, 0)
       END), 0) AS total,
       COUNT(*) AS n
@@ -1676,7 +1698,9 @@ export async function getWalletStatsByClientId(clientUserId: number) {
   // before they were stored one booking per date).
   const [futurePeriodRows] = await db.execute(`
     SELECT
-      COALESCE(SUM(${HOURLY_TOTAL}), 0) AS total,
+      -- A legacy weekly booking DOES store a per-hour rate, so here the
+      -- multiplication is correct.
+      COALESCE(SUM(${PERIOD_TOTAL}), 0) AS total,
       COUNT(*) AS n
     FROM booking_periods p
     JOIN bookings b ON b.id = p.bookingId
@@ -5664,6 +5688,8 @@ export async function createAdminBooking(input: {
   startDate: Date;
   endDate: Date;
   isRecurring: boolean;
+  /** Whether artistRateDollars is a per-hour rate or the whole booking. */
+  rateType?: "hourly" | "flat" | null;
   recurringCadence?: string;
   locationAddress?: string | null;
   /** Structured Google Places data resolved from locationAddress. */
@@ -5684,14 +5710,30 @@ export async function createAdminBooking(input: {
   // Each class date of a weekly class is its own booking.
   if (input.isRecurring) return createClassDateBookings(input);
 
+  // A one-off admin booking was never tagged with a rateType at all: these
+  // ternaries sit BELOW the isRecurring early-return, so they always evaluated
+  // to null. An hourly manual booking stored the unit rate in artistRate with
+  // nothing saying it was per-hour, and every later stage read it as the whole
+  // total -- $60/hr x 3 hrs invoiced as $60 (GitHub #4).
+  const isHourly = input.rateType === "hourly";
+  const unit = input.artistRateDollars ?? 0;
+  const scheduledHours = Number(input.hours ?? 0);
+  // artistRate/clientRate always hold the booking TOTAL on this kind of row.
+  const artistTotal = isHourly && scheduledHours > 0
+    ? Math.round(unit * scheduledHours * 100) / 100
+    : unit;
+  const clientTotal = isHourly && scheduledHours > 0
+    ? artistTotal + processingFeeFor(artistTotal)
+    : input.clientRateDollars;
+
   const [result] = await db.insert(bookings).values({
     clientUserId: input.clientUserId,
     artistUserId: input.artistUserId,
-    rateType: input.isRecurring ? "hourly" : null,
-    hourlyRate: input.isRecurring ? input.artistRateDollars : null,
-    flatRate: null,
-    artistRate: input.artistRateDollars,
-    clientRate: input.clientRateDollars,
+    rateType: isHourly ? "hourly" : "flat",
+    hourlyRate: isHourly ? unit : null,
+    flatRate: isHourly ? null : unit,
+    artistRate: artistTotal,
+    clientRate: clientTotal,
     startDate: input.startDate,
     endDate: input.endDate,
     locationAddress: input.locationAddress ?? null,

@@ -2559,7 +2559,7 @@ export const appRouter = router({
     myStats: protectedProcedure
       .query(async ({ ctx }) => {
         const user = await getUserByOpenId(ctx.user.openId);
-        if (!user) return { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, totalRevenue: 0 };
+        if (!user) return { total: 0, confirmed: 0, completed: 0, cancelled: 0, paid: 0, unpaid: 0, totalRevenue: 0, artistsHired: 0, awaitingPayment: 0, weeksAwaitingPayment: 0, weeksAwaitingCents: 0 };
         return getBookingStatsByClientId(user.id);
       }),
 
@@ -6084,11 +6084,21 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         reminderTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Reminder time must be HH:mm").optional(),
         /** Scheduled hours per period — shown as the placeholder estimate until the artist submits. */
         hours: z.number().min(0).max(24).optional(),
+        /**
+         * Whether the rate entered is per-hour or the whole booking. A manual
+         * booking was never tagged either way, so an hourly one billed the
+         * bare unit rate: $60/hr x 3 hrs invoiced as $60 (GitHub #4).
+         */
+        rateType: z.enum(["hourly", "flat"]).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden");
         const bookingId = await createAdminBooking({
           ...input,
+          // A recurring class is always billed per hour. For a one-off, take
+          // what the admin chose; falling back to hourly when hours are given
+          // matches what entering hours means.
+          rateType: input.isRecurring ? "hourly" : (input.rateType ?? (input.hours ? "hourly" : "flat")),
           ...(await resolveJobLocation(input)),
           startDate: new Date(input.startDate),
           endDate: new Date(input.endDate),

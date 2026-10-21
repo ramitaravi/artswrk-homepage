@@ -858,14 +858,17 @@ export default function Bookings() {
           <p className="text-xs text-green-500 font-medium mt-1">{stats?.paid ?? 0} paid</p>
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-          <p className="text-xs font-semibold text-gray-500 mb-1">Total Revenue</p>
+          {/* "Revenue" is what the studio SPENT, which read as income on their
+              own dashboard. Who they have hired is the number that is actually
+              theirs. */}
+          <p className="text-xs font-semibold text-gray-500 mb-1">Artists Hired</p>
           {isLoading ? (
             <div className="h-8 w-20 bg-gray-100 rounded animate-pulse" />
           ) : (
-            <p className="text-2xl font-black text-[#111]">{formatCurrency(stats?.totalRevenue)}</p>
+            <p className="text-2xl font-black text-[#111]">{stats?.artistsHired ?? 0}</p>
           )}
           <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-            <TrendingUp size={10} /> Paid bookings
+            <TrendingUp size={10} /> {formatCurrency(stats?.totalRevenue)} spent all time
           </p>
         </div>
       </div>
