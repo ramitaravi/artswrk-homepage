@@ -3959,28 +3959,62 @@ function BookingsSection({ onViewPayment, initialDetailId }: { onViewPayment?: (
     <div className="space-y-5">
       <h1 className="text-2xl font-black text-[#111]">Bookings ({data?.total?.toLocaleString() ?? "…"})</h1>
 
-      {/* Filters */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-wrap gap-3">
-        <div className="flex rounded-xl border border-gray-200 overflow-hidden">
-          {[{ label: "Upcoming", val: true as boolean | undefined }, { label: "Past", val: false as boolean | undefined }, { label: "All", val: undefined as boolean | undefined }].map(opt => (
-            <button key={opt.label} onClick={() => { setUpcoming(opt.val); setPage(1); }}
-              className={`px-3 py-2 text-xs font-medium transition-colors ${upcoming === opt.val ? "bg-[#111] text-white" : "text-gray-600 hover:bg-gray-50"}`}>
-              {opt.label}
-            </button>
+      {/* Pills rather than dropdowns: with this many statuses you want to see
+          what you are filtered to without opening anything, and switching
+          should be one click. */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex rounded-xl border border-gray-200 overflow-hidden flex-shrink-0">
+            {[{ label: "Upcoming", val: true as boolean | undefined }, { label: "Past", val: false as boolean | undefined }, { label: "All", val: undefined as boolean | undefined }].map(opt => (
+              <button key={opt.label} onClick={() => { setUpcoming(opt.val); setPage(1); }}
+                className={`px-3 py-2 text-xs font-medium transition-colors ${upcoming === opt.val ? "bg-[#111] text-white" : "text-gray-600 hover:bg-gray-50"}`}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <div className="relative flex-1 min-w-[220px]">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search artist, studio, email or booking #…"
+              className="w-full pl-9 pr-8 py-2 rounded-xl border border-gray-200 text-xs text-[#111] placeholder-gray-400 focus:outline-none focus:border-[#F25722] transition-colors"
+            />
+            {searchInput && (
+              <button onClick={() => setSearchInput("")} aria-label="Clear search"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#111]">
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <FilterPill active={!bookingStatus && !paymentStatus && !rateTypeFilter}
+            onClick={() => { setBookingStatus(""); setPaymentStatus(""); setRateTypeFilter(""); setPage(1); }}>
+            All
+          </FilterPill>
+          {["Confirmed", "Pay Now", "Completed", "Cancelled"].map((st) => (
+            <FilterPill key={st} active={bookingStatus === st}
+              onClick={() => { setBookingStatus(bookingStatus === st ? "" : st); setPage(1); }}>
+              {st}
+            </FilterPill>
+          ))}
+          <span className="w-px h-5 bg-gray-200 mx-1" />
+          {["Unpaid", "Paid"].map((ps) => (
+            <FilterPill key={ps} active={paymentStatus === ps} tone="payment"
+              onClick={() => { setPaymentStatus(paymentStatus === ps ? "" : ps); setPage(1); }}>
+              {ps}
+            </FilterPill>
+          ))}
+          <span className="w-px h-5 bg-gray-200 mx-1" />
+          {(["hourly", "flat"] as const).map((rt) => (
+            <FilterPill key={rt} active={rateTypeFilter === rt}
+              onClick={() => { setRateTypeFilter(rateTypeFilter === rt ? "" : rt); setPage(1); }}>
+              {rt === "hourly" ? "Hourly" : "Flat"}
+            </FilterPill>
           ))}
         </div>
-        <select value={paymentStatus} onChange={e => { setPaymentStatus(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
-          <option value="">Payment Status</option>
-          <option value="Unpaid">Unpaid</option>
-          <option value="Paid">Paid</option>
-          <option value="Refunded">Refunded</option>
-        </select>
-        <select value={bookingStatus} onChange={e => { setBookingStatus(e.target.value); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
-          <option value="">Booking Status</option>
-          <option value="Completed">Completed</option>
-          <option value="Confirmed">Confirmed</option>
-          <option value="Cancelled">Cancelled</option>
-        </select>
       </div>
 
       {/* Table */}
@@ -4050,6 +4084,19 @@ function BookingsSection({ onViewPayment, initialDetailId }: { onViewPayment?: (
         {data && <div className="px-5 py-3"><Pagination page={page} total={data.total} limit={LIMIT} onPage={setPage} /></div>}
       </div>
     </div>
+  );
+}
+
+/** A one-click filter. Reads as a state, not a form control. */
+function FilterPill({ active, onClick, children, tone }: {
+  active: boolean; onClick: () => void; children: React.ReactNode; tone?: "payment";
+}) {
+  const on = tone === "payment" ? "bg-green-600 text-white" : "bg-[#111] text-white";
+  return (
+    <button type="button" onClick={onClick}
+      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${active ? on : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+      {children}
+    </button>
   );
 }
 

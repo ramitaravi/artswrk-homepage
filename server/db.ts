@@ -3318,7 +3318,10 @@ export async function getAdminBookings({
       c.name AS clientName, c.firstName AS clientFirstName, c.lastName AS clientLastName,
       c.clientCompanyName, c.profilePicture AS clientPhoto, c.email AS clientEmail
     ${joins}
-    ORDER BY b.startDate DESC
+    -- Upcoming reads forwards from today: the booking happening tomorrow is
+    -- the one you act on, not the one eight months out. Past and All read
+    -- backwards, newest first, which is how you look for what just happened.
+    ORDER BY b.startDate ${upcoming === true ? sql`ASC` : sql`DESC`}
     LIMIT ${limit} OFFSET ${offset}`);
 
   return { bookings: rows as unknown as any[], total };
