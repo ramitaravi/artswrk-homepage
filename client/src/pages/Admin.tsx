@@ -3719,7 +3719,7 @@ function AdminBookingDetail({ bookingId, onBack, onViewJob, onViewPayment }: {
   onViewJob?: (jobId: number) => void;
   onViewPayment: (paymentId: number) => void;
 }) {
-  const [tab, setTab] = useState<"overview" | "payments">("overview");
+  const [tab, setTab] = useState<"overview" | "payments" | "history">("overview");
   const { data: b, isLoading } = trpc.admin.getBooking.useQuery({ id: bookingId });
 
   if (isLoading) return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 border-[#F25722]/30 border-t-[#F25722] rounded-full animate-spin" /></div>;
@@ -3748,20 +3748,11 @@ function AdminBookingDetail({ bookingId, onBack, onViewJob, onViewPayment }: {
           {b.externalPayment && <span className="text-xs font-bold px-3 py-1 rounded-full bg-purple-50 text-purple-600">External Payment</span>}
         </div>
 
-        {/* Financials */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            { label: "Client Rate", value: b.clientRate ? fmt$(b.clientRate * 100) : "—", color: "text-[#111]" },
-            { label: "Artist Rate", value: b.artistRate ? fmt$(b.artistRate * 100) : "—", color: "text-gray-600" },
-            { label: "Gross Profit", value: b.grossProfit ? fmt$(b.grossProfit * 100) : "—", color: "text-green-600" },
-            { label: "Hours", value: b.hours ? `${b.hours}h` : "—", color: "text-gray-600" },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="bg-gray-50 rounded-xl p-3 text-center">
-              <p className={`text-lg font-black ${color}`}>{value}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">{label}</p>
-            </div>
-          ))}
-        </div>
+        {/* The money lives in AdminBookingMoney below, worked out from the
+            booking. This grid printed clientRate and artistRate raw -- the
+            per-hour figures on an hourly booking -- and called their
+            difference gross profit, which is always zero because the fee goes
+            ON TOP rather than being a margin in between. */}
 
         {/* Date + location */}
         <div className="flex flex-wrap gap-6 pt-4 border-t border-gray-50">
@@ -3845,39 +3836,50 @@ function AdminBookingDetail({ bookingId, onBack, onViewJob, onViewPayment }: {
 
       {/* Fixing the booking, and the record of who fixed what. Every control
           here replaces a SQL script that was run against the live database. */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <AdminBookingControls booking={b} />
-        <AdminBookingHistory bookingId={bookingId} />
-      </div>
+      {/* The money, worked out rather than read off the legacy Bubble columns,
+          which are NULL on every booking made since the migration. */}
+      <AdminBookingMoney booking={b} />
+
+      <AdminBookingControls booking={b} />
 
       {/* Tabs */}
       <div className="flex gap-0 border-b border-gray-200">
-        {([{ key: "overview", label: "Overview" }, { key: "payments", label: "Payments" }] as const).map(t => (
+        {([{ key: "overview", label: "Overview" }, { key: "payments", label: "Payments" }, { key: "history", label: "History" }] as const).map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-5 py-3 text-sm font-semibold transition-colors border-b-2 -mb-px ${tab === t.key ? 'border-[#F25722] text-[#F25722]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            className={`px-5 py-3 text-sm font-semibold transition-colors border-b-2 -mb-px ${tab === t.key ? "border-[#F25722] text-[#F25722]" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
             {t.label}
           </button>
         ))}
       </div>
 
+      {tab === "history" && <AdminBookingHistory bookingId={bookingId} />}
+
+
       {tab === "overview" && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <div className="grid grid-cols-2 gap-6">
             <div>
-              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-2">Financial Breakdown</p>
-              <div className="space-y-2">
-                {[
-                  ["Total Client Rate", b.totalClientRate ? fmt$(b.totalClientRate * 100) : "—"],
-                  ["Total Artist Rate", b.totalArtistRate ? fmt$(b.totalArtistRate * 100) : "—"],
-                  ["Stripe Fee", b.stripeFee ? fmt$(b.stripeFee * 100) : "—"],
-                  ["Post-Fee Revenue", b.postFeeRevenue ? fmt$(b.postFeeRevenue * 100) : "—"],
-                ].map(([label, value]) => (
-                  <div key={label} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">{label}</span>
-                    <span className="font-semibold text-[#111]">{value}</span>
-                  </div>
-                ))}
-              </div>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-2">Legacy Bubble figures</p>
+              {[b.totalClientRate, b.totalArtistRate, b.stripeFee, b.postFeeRevenue].every((v: any) => v == null) ? (
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  None recorded. These four columns came across from Bubble and are only
+                  filled on migrated bookings — the live figures are at the top of the page.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {[
+                    ["Total Client Rate", b.totalClientRate ? fmt$(b.totalClientRate * 100) : "—"],
+                    ["Total Artist Rate", b.totalArtistRate ? fmt$(b.totalArtistRate * 100) : "—"],
+                    ["Stripe Fee", b.stripeFee ? fmt$(b.stripeFee * 100) : "—"],
+                    ["Post-Fee Revenue", b.postFeeRevenue ? fmt$(b.postFeeRevenue * 100) : "—"],
+                  ].map(([label, value]) => (
+                    <div key={label as string} className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">{label}</span>
+                      <span className="font-semibold text-[#111]">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div>
               <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-2">IDs</p>
@@ -4132,6 +4134,40 @@ function BookingsSection({ onViewPayment, initialDetailId }: { onViewPayment?: (
           </table>
         </div>
         {data && <div className="px-5 py-3"><Pagination page={page} total={data.total} limit={LIMIT} onPage={setPage} /></div>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * What a booking is worth, worked out from the booking itself.
+ *
+ * The detail page used to print totalClientRate, totalArtistRate, stripeFee
+ * and postFeeRevenue, which are Bubble columns: NULL on every booking made
+ * since the migration, so the whole panel read "—" while the real numbers sat
+ * one column over.
+ */
+function AdminBookingMoney({ booking }: { booking: any }) {
+  const m = adminBookingMoney(booking);
+  const invoiced = booking.invoiceTotalCents != null;
+  const paid = !!booking.invoicePaidAt;
+
+  const cell = (label: string, value: string, hint?: string, tone?: string) => (
+    <div>
+      <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-1">{label}</p>
+      <p className={`text-lg font-black ${tone ?? "text-[#111]"}`}>{value}</p>
+      {hint && <p className="text-[11px] text-gray-400 mt-0.5">{hint}</p>}
+    </div>
+  );
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+        {cell("Rate", m.rateLabel, m.basisLabel ?? undefined)}
+        {cell("Artist gets", m.artistTotal != null ? fmt$(m.artistTotal * 100) : "—", "paid in full, no commission")}
+        {cell("Client pays", m.clientTotal != null ? fmt$(m.clientTotal * 100) : "—",
+          invoiced ? (paid ? "invoiced · paid" : "invoiced · awaiting payment") : "estimate until invoiced")}
+        {cell("Gross profit", m.grossProfit != null ? fmt$(m.grossProfit * 100) : "—", "5% processing", "text-green-600")}
       </div>
     </div>
   );
