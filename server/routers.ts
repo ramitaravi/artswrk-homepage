@@ -6,6 +6,10 @@ import {
 } from "../shared/enterprise";
 import bcrypt from "bcryptjs";
 import { APP_URL, SUPPORT_EMAIL } from "./emailTemplates";
+import {
+  canCancel, canEditField, canMarkPaid, cancellationNotice, hasOpenInvoice, isParty,
+  type ActorRole,
+} from "@shared/bookingEdits";
 import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ONE_YEAR_MS } from "@shared/const";
 import { isJobPubliclyLive } from "@shared/jobStatus";
 import { classDateLabel } from "@shared/classDate";
@@ -34,7 +38,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, approveArtswrkInvoice, approveBookingPeriodInvoice, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, getArtistPastClients, createArtistInvoiceBooking, declineArtswrkInvoice, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getArtistInvoicesAwaiting, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllAffiliationsForAdmin, getArtistAffiliationIds, findOrCreateAffiliation, setArtistAffiliations, addArtistAffiliation, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, approveArtswrkInvoice, approveBookingPeriodInvoice, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, getArtistPastClients, getBookingAudit, applyBookingEdit, cancelBooking, markBookingPaidManually, withdrawBookingInvoice, getLateCancellations, createArtistInvoiceBooking, declineArtswrkInvoice, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getArtistInvoicesAwaiting, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllAffiliationsForAdmin, getArtistAffiliationIds, findOrCreateAffiliation, setArtistAffiliations, addArtistAffiliation, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail, sendArtistBookingConfirmedEmail, sendClientBookingConfirmedEmail, sendClientPayArtistEmail, sendInquiryIntroEmail } from "./email";
 import crypto from "crypto";
@@ -99,6 +103,77 @@ const ONBOARDING_FINAL_STEP = 5;
 
 const CLIENT_HIRING_CATEGORIES = ["Dance Studio", "Dance Competition", "Music School", "Event Company", "Other"] as const;
 const clientHiringCategorySchema = z.enum(CLIENT_HIRING_CATEGORIES).optional();
+
+/**
+ * Which side of a booking this user is on.
+ *
+ * Admin wins over being a party to it: an Artswrk admin editing their own
+ * booking is still acting as an admin, and the audit row should say so.
+ */
+function actorRoleFor(
+  user: { id: number; role?: string | null; openId?: string | null },
+  booking: { artistUserId?: number | null; clientUserId?: number | null },
+): ActorRole {
+  if (user.role === "admin" || user.openId === ENV.ownerOpenId) return "admin";
+  if (booking.artistUserId === user.id) return "artist";
+  if (booking.clientUserId === user.id) return "client";
+  return "system";
+}
+
+/**
+ * Tell the other side, and support, that a booking changed.
+ *
+ * Whoever did not make the change needs to hear about it -- an artist whose
+ * class moved, a studio whose booking was cancelled. support@ is copied on
+ * every one so there is a trail outside the database, and late cancellations
+ * say so in the subject.
+ */
+async function notifyBookingChanged(
+  bookingId: number,
+  actorRole: ActorRole,
+  what: "edited" | "cancelled",
+  reason?: string | null,
+  notice?: { isLate: boolean; noticeHours: number | null },
+): Promise<void> {
+  try {
+    const booking = await getBookingById(bookingId);
+    if (!booking) return;
+    const [artist, client] = await Promise.all([
+      booking.artistUserId ? getUserById(booking.artistUserId) : null,
+      booking.clientUserId ? getUserById(booking.clientUserId) : null,
+    ]);
+    const artistName = artist?.name ?? artist?.firstName ?? "the artist";
+    const clientName = (client as any)?.clientCompanyName ?? client?.firstName ?? "the client";
+    const when = booking.startDate
+      ? new Date(booking.startDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+      : "an upcoming date";
+    const who = actorRole === "artist" ? artistName : actorRole === "client" ? clientName : "Artswrk";
+
+    const lateNote = notice?.isLate
+      ? `<p style="color:#b45309"><strong>Short notice:</strong> ${notice.noticeHours != null ? `${notice.noticeHours} hours` : "less than 48 hours"} before the booking.</p>`
+      : "";
+    const subject = what === "cancelled"
+      ? `${notice?.isLate ? "[Late] " : ""}Booking cancelled — ${artistName} & ${clientName}, ${when}`
+      : `Booking updated — ${artistName} & ${clientName}, ${when}`;
+    const html = `<p><strong>${who}</strong> ${what} the booking on ${when}.</p>`
+      + (reason ? `<p style="border-left:3px solid #ec008c;padding-left:16px;color:#444">${escapeHtml(reason)}</p>` : "")
+      + lateNote
+      + `<p>${artistName} &rarr; ${clientName}</p>`;
+
+    // The person who made the change does not need telling.
+    const recipients = [
+      actorRole !== "artist" ? artist?.email : null,
+      actorRole !== "client" ? (client as any)?.email : null,
+    ].filter((e): e is string => !!e);
+
+    const { sendSimpleEmail } = await import("./email");
+    for (const to of recipients) await sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject, html });
+    if (!recipients.length) await sendSimpleEmail({ to: SUPPORT_EMAIL, subject, html });
+  } catch (err) {
+    // Never let a notification failure undo a change that already landed.
+    console.error("[notifyBookingChanged] failed:", err instanceof Error ? err.message : err);
+  }
+}
 
 /**
  * Text from a person, going into an HTML email.
@@ -5757,6 +5832,158 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
       }),
   }),
   /** Public invoice payment page — fetches booking data by token for studio payment */
+  /**
+   * Changing a booking after it exists.
+   *
+   * Nine production incidents in three weeks were each resolved by running SQL
+   * by hand, because nothing in the product could edit a booking. These are
+   * the endpoints that replace those scripts. Artists, studios and admins all
+   * call the same ones -- shared/bookingEdits decides who may do what, so the
+   * rule lives in one place rather than in every screen.
+   */
+  bookingEdits: router({
+    /** The change history for a booking. */
+    history: protectedProcedure
+      .input(z.object({ bookingId: z.number().int() }))
+      .query(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const booking = await getBookingById(input.bookingId);
+        if (!booking) throw new Error("Booking not found");
+        const role = actorRoleFor(user, booking);
+        if (!isParty(booking as any, role, user.id)) throw new Error("This isn't your booking.");
+        return getBookingAudit(input.bookingId);
+      }),
+
+    /**
+     * Edit a booking. Logistics for either side; rate and hours for an admin
+     * only, because those are what both parties agreed to.
+     */
+    edit: protectedProcedure
+      .input(z.object({
+        bookingId: z.number().int(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        locationAddress: z.string().max(512).optional(),
+        description: z.string().max(5000).optional(),
+        // Admin-only below; the rulebook rejects anyone else.
+        hourlyRate: z.number().min(0).max(100000).optional(),
+        flatRate: z.number().min(0).max(1000000).optional(),
+        rateType: z.enum(["hourly", "flat"]).optional(),
+        hours: z.number().min(0).max(500).optional(),
+        reason: z.string().max(1000).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const booking = await getBookingById(input.bookingId);
+        if (!booking) throw new Error("Booking not found");
+        const role = actorRoleFor(user, booking);
+
+        const { bookingId, reason, ...raw } = input;
+        const changes: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(raw)) {
+          if (v === undefined) continue;
+          const decision = canEditField(booking as any, k as any, role, user.id);
+          if (!decision.allowed) throw new Error(decision.reason);
+          changes[k] = k === "startDate" || k === "endDate" ? new Date(v as string) : v;
+        }
+        if (!Object.keys(changes).length) return { success: true, changed: 0 };
+
+        // A rate or hours change makes the stored total wrong unless it is
+        // recomputed -- the column holds the TOTAL, and leaving the two
+        // disagreeing is what produced McKell's $18 invoice.
+        const nextRateType = (changes.rateType ?? booking.rateType) as string | null;
+        const nextHours = Number(changes.hours ?? booking.hours ?? 0);
+        const nextUnit = Number(changes.hourlyRate ?? booking.hourlyRate ?? 0);
+        if (("hourlyRate" in changes || "hours" in changes || "rateType" in changes)
+            && nextRateType === "hourly" && nextUnit > 0 && nextHours > 0) {
+          const base = Math.round(nextUnit * nextHours * 100) / 100;
+          changes.artistRate = base;
+          changes.clientRate = booking.paymentMethod === "artswrk"
+            ? base + processingFeeFor(base)
+            : base;
+        }
+
+        // An edit underneath a live invoice would let the studio pay against a
+        // figure that no longer matches the booking.
+        const open = hasOpenInvoice(booking as any);
+        if (open) {
+          await withdrawBookingInvoice({
+            bookingId, actorUserId: user.id, actorRole: role,
+            reason: "Withdrawn automatically because the booking was edited",
+          });
+        }
+
+        await applyBookingEdit({
+          bookingId, changes, actorUserId: user.id, actorRole: role, reason: reason ?? null,
+        });
+        await notifyBookingChanged(bookingId, role, "edited", reason);
+        return { success: true, changed: Object.keys(changes).length, invoiceWithdrawn: open };
+      }),
+
+    /**
+     * Cancel a booking. Allowed at any notice: blocking a late cancellation
+     * does not stop the artist being absent, it only stops it being recorded.
+     * So the notice period is captured instead.
+     */
+    cancel: protectedProcedure
+      .input(z.object({
+        bookingId: z.number().int(),
+        reason: z.string().trim().min(3, "Say why, so the other side knows.").max(1000),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const booking = await getBookingById(input.bookingId);
+        if (!booking) throw new Error("Booking not found");
+        const role = actorRoleFor(user, booking);
+
+        const decision = canCancel(booking as any, role, user.id);
+        if (!decision.allowed) throw new Error(decision.reason);
+
+        const { noticeHours, isLate } = cancellationNotice(booking.startDate);
+        await cancelBooking({
+          bookingId: input.bookingId, actorUserId: user.id, actorRole: role,
+          reason: input.reason, noticeHours,
+        });
+        await notifyBookingChanged(input.bookingId, role, "cancelled", input.reason, { isLate, noticeHours });
+        return { success: true, noticeHours, isLate };
+      }),
+
+    /** Record that a booking was paid outside Artswrk. Admin only. */
+    markPaidManually: protectedProcedure
+      .input(z.object({
+        bookingId: z.number().int(),
+        amountCents: z.number().int().positive().max(100000000),
+        reason: z.string().trim().min(3, "Say how it was paid.").max(1000),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const booking = await getBookingById(input.bookingId);
+        if (!booking) throw new Error("Booking not found");
+        const role = actorRoleFor(user, booking);
+
+        const decision = canMarkPaid(booking as any, role);
+        if (!decision.allowed) throw new Error(decision.reason);
+
+        await markBookingPaidManually({
+          bookingId: input.bookingId, totalCents: input.amountCents,
+          actorUserId: user.id, reason: input.reason,
+        });
+        return { success: true };
+      }),
+
+    /** Late cancellations, for spotting a pattern internally. Admin only. */
+    lateCancellations: protectedProcedure
+      .input(z.object({ sinceDays: z.number().int().min(1).max(730).default(180) }).optional())
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        return getLateCancellations({ sinceDays: input?.sinceDays ?? 180 });
+      }),
+  }),
+
   invoice: router({
     getByToken: publicProcedure
       .input(z.object({ token: z.string() }))

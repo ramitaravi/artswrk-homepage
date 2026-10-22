@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray, isNotNull, isNull, like, or, sql } from "drizzle-orm";
 import { buildJobSlug } from "@shared/jobUrl";
+import { LATE_CANCELLATION_HOURS } from "@shared/bookingEdits";
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import { BookingPeriod, ClientCompany, EnterpriseJobUnlock, InsertClientCompany, InsertEnterpriseJobUnlock, InsertUser, affiliations, artistResumes, benefits, bookingPeriods, bookings, clientCompanies, conversations, enterpriseJobUnlocks, interestedArtists, jobs, masterArtistTypes, masterServiceTypes, masterStyleTypes, messages, payments, premiumJobInterestedArtists, premiumJobs, reimbursements, savedArtists, userAffiliations, users } from "../drizzle/schema";
@@ -6569,4 +6570,194 @@ export async function getArtistAffiliationIds(artistUserId: number): Promise<num
     .from(userAffiliations)
     .where(eq(userAffiliations.artistUserId, artistUserId));
   return rows.map((r) => r.affiliationId).filter((id): id is number => id != null);
+}
+
+// ── Booking edits ────────────────────────────────────────────────────────────
+
+/**
+ * Record a change to a booking.
+ *
+ * `bookings` had no audit columns at all, so until now there was no way to
+ * answer "who changed this rate, and when". Every mutation below writes here
+ * before it returns. One row per field changed, so a diff reads naturally.
+ */
+export async function recordBookingAudit(entries: Array<{
+  bookingId: number;
+  actorUserId?: number | null;
+  actorRole: string;
+  action: string;
+  field?: string | null;
+  oldValue?: string | null;
+  newValue?: string | null;
+  reason?: string | null;
+}>): Promise<void> {
+  if (!entries.length) return;
+  const db = await getDb();
+  if (!db) return;
+  const rows = entries.map((e) => sql`(${e.bookingId}, ${e.actorUserId ?? null}, ${e.actorRole}, ${e.action},
+    ${e.field ?? null}, ${e.oldValue ?? null}, ${e.newValue ?? null}, ${e.reason ?? null})`);
+  await db.execute(sql`
+    INSERT INTO booking_audit (bookingId, actorUserId, actorRole, action, field, oldValue, newValue, reason)
+    VALUES ${sql.join(rows, sql`, `)}`);
+}
+
+/** A booking's change history, newest first. */
+export async function getBookingAudit(bookingId: number, limit = 200) {
+  const db = await getDb();
+  if (!db) return [];
+  const [rows] = await db.execute(sql`
+    SELECT a.id, a.actorRole, a.action, a.field, a.oldValue, a.newValue, a.reason, a.createdAt,
+           u.name AS actorName, u.email AS actorEmail
+    FROM booking_audit a
+    LEFT JOIN users u ON u.id = a.actorUserId
+    WHERE a.bookingId = ${bookingId} ORDER BY a.createdAt DESC, a.id DESC LIMIT ${limit}`);
+  return rows as unknown as any[];
+}
+
+/** Apply field changes to a booking and write one audit row per change. */
+export async function applyBookingEdit(input: {
+  bookingId: number;
+  changes: Record<string, unknown>;
+  actorUserId?: number | null;
+  actorRole: string;
+  reason?: string | null;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const before = await getBookingById(input.bookingId);
+  if (!before) throw new Error("Booking not found");
+
+  const fields = Object.keys(input.changes).filter(
+    (k) => String((before as any)[k] ?? "") !== String(input.changes[k] ?? ""),
+  );
+  if (!fields.length) return;
+
+  // Field names come from a fixed allowlist (shared/bookingEdits), never from
+  // the caller, so they are safe to inline; the VALUES are parameterised.
+  const assignments = fields.map((f) => sql`${sql.raw(f)} = ${input.changes[f] ?? null}`);
+  await db.execute(sql`
+    UPDATE bookings SET ${sql.join(assignments, sql`, `)}, updatedAt = NOW()
+    WHERE id = ${input.bookingId}`);
+
+  await recordBookingAudit(fields.map((f) => ({
+    bookingId: input.bookingId,
+    actorUserId: input.actorUserId,
+    actorRole: input.actorRole,
+    action: "edit",
+    field: f,
+    oldValue: (before as any)[f] == null ? null : String((before as any)[f]),
+    newValue: input.changes[f] == null ? null : String(input.changes[f]),
+    reason: input.reason ?? null,
+  })));
+}
+
+/**
+ * Cancel a booking, recording who, why, and how much notice there was.
+ *
+ * Cancelled rather than deleted: a class that was booked and called off is
+ * part of the record, and `deleted` hides it from every list and report.
+ */
+export async function cancelBooking(input: {
+  bookingId: number;
+  actorUserId?: number | null;
+  actorRole: string;
+  reason: string;
+  noticeHours: number | null;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.execute(sql`
+    UPDATE bookings
+    SET bookingStatus = 'Cancelled',
+        cancelledAt = NOW(), cancelledByUserId = ${input.actorUserId ?? null},
+        cancelledByRole = ${input.actorRole},
+        cancellationReason = ${input.reason}, cancellationNoticeHours = ${input.noticeHours},
+        invoicePaymentToken = NULL, invoiceStripeCheckoutUrl = NULL,
+        updatedAt = NOW()
+    WHERE id = ${input.bookingId} AND invoicePaidAt IS NULL`);
+  await recordBookingAudit([{
+    bookingId: input.bookingId,
+    actorUserId: input.actorUserId,
+    actorRole: input.actorRole,
+    action: "cancel",
+    newValue: input.noticeHours == null ? null : `${input.noticeHours}h notice`,
+    reason: input.reason,
+  }]);
+}
+
+/** Record that a booking was paid outside the platform. Admin only. */
+export async function markBookingPaidManually(input: {
+  bookingId: number;
+  totalCents: number;
+  actorUserId?: number | null;
+  reason: string;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.execute(sql`
+    UPDATE bookings
+    SET bookingStatus = 'Completed', paymentStatus = 'Paid',
+        invoiceTotalCents = ${input.totalCents}, invoicePaidAt = NOW(),
+        artswrkInvoiceSubmittedAt = COALESCE(artswrkInvoiceSubmittedAt, NOW()),
+        invoicePaymentToken = NULL, invoiceStripeCheckoutUrl = NULL,
+        updatedAt = NOW()
+    WHERE id = ${input.bookingId} AND invoicePaidAt IS NULL`);
+  await recordBookingAudit([{
+    bookingId: input.bookingId,
+    actorUserId: input.actorUserId,
+    actorRole: "admin",
+    action: "mark_paid",
+    newValue: `$${(input.totalCents / 100).toFixed(2)}`,
+    reason: input.reason,
+  }]);
+}
+
+/** Withdraw an outstanding invoice so an edit can't leave it stale. */
+export async function withdrawBookingInvoice(input: {
+  bookingId: number;
+  actorUserId?: number | null;
+  actorRole: string;
+  reason: string;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.execute(sql`
+    UPDATE bookings
+    SET artswrkInvoiceSubmittedAt = NULL, invoicePaymentToken = NULL,
+        invoiceTotalCents = NULL, invoiceStripeCheckoutUrl = NULL,
+        bookingStatus = CASE WHEN bookingStatus = 'Pay Now' THEN 'Confirmed' ELSE bookingStatus END,
+        updatedAt = NOW()
+    WHERE id = ${input.bookingId} AND invoicePaidAt IS NULL`);
+  await recordBookingAudit([{
+    bookingId: input.bookingId,
+    actorUserId: input.actorUserId,
+    actorRole: input.actorRole,
+    action: "invoice_void",
+    reason: input.reason,
+  }]);
+}
+
+/**
+ * Late cancellations, for the admin view. Deliberately not shown on an
+ * artist's or a studio's own profile — this is for spotting a pattern
+ * internally, not for publishing a score at people.
+ */
+export async function getLateCancellations(opts: { sinceDays?: number; limit?: number } = {}) {
+  const db = await getDb();
+  if (!db) return [];
+  const since = opts.sinceDays ?? 180;
+  const [rows] = await db.execute(sql`
+    SELECT b.id, b.cancelledAt, b.cancelledByRole, b.cancellationReason,
+           b.cancellationNoticeHours, b.startDate,
+           a.id AS artistId, a.name AS artistName,
+           c.id AS clientId, COALESCE(c.clientCompanyName, c.name) AS clientName
+    FROM bookings b
+    LEFT JOIN users a ON a.id = b.artistUserId
+    LEFT JOIN users c ON c.id = b.clientUserId
+    WHERE b.cancelledAt IS NOT NULL
+      AND b.cancelledAt >= NOW() - INTERVAL ${since} DAY
+      AND b.cancellationNoticeHours IS NOT NULL
+      AND b.cancellationNoticeHours < ${LATE_CANCELLATION_HOURS}
+    ORDER BY b.cancelledAt DESC LIMIT ${opts.limit ?? 100}`);
+  return rows as unknown as any[];
 }
