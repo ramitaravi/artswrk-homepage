@@ -38,11 +38,11 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, approveArtswrkInvoice, approveBookingPeriodInvoice, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, getArtistPastClients, getBookingAudit, recordBookingAudit, applyBookingEdit, cancelBooking, markBookingPaidManually, withdrawBookingInvoice, getLateCancellations, createArtistInvoiceBooking, declineArtswrkInvoice, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getArtistInvoicesAwaiting, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllAffiliationsForAdmin, getArtistAffiliationIds, findOrCreateAffiliation, setArtistAffiliations, addArtistAffiliation, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, approveArtswrkInvoice, approveBookingPeriodInvoice, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, getArtistPastClients, getBookingAudit, recordBookingAudit, applyBookingEdit, cancelBooking, markBookingPaidManually, withdrawBookingInvoice, getLateCancellations, createArtistInvoiceBooking, declineArtswrkInvoice, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getArtistInvoicesAwaiting, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllAffiliationsForAdmin, getArtistAffiliationIds, findOrCreateAffiliation, setArtistAffiliations, addArtistAffiliation, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink, getSubscriptionReconciliation, getBoostSummary } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail, sendArtistBookingConfirmedEmail, sendClientBookingConfirmedEmail, sendClientPayArtistEmail, sendInquiryIntroEmail } from "./email";
 import crypto from "crypto";
-import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistBasicCheckoutSession, createArtistPortalSession, createEnterpriseJobUnlockCheckoutSession, createEnterpriseSubscriptionCheckoutSession, createClientJobUnlockCheckoutSession, createClientSubscriptionCheckoutSession } from "./stripe";
+import { createJobPostCheckoutSession, createSubscriptionCheckoutSession, createBoostCheckoutSession, getStripe, createArtistProCheckoutSession, createArtistBasicCheckoutSession, createArtistPortalSession, createEnterpriseJobUnlockCheckoutSession, createEnterpriseSubscriptionCheckoutSession, createClientJobUnlockCheckoutSession, createClientSubscriptionCheckoutSession, getStripeActivity, getStripeSubscriptions, stripeMode } from "./stripe";
 import { calcBoostTotal, getStripeMode } from "./stripe-products";
 import { assertProductionStripeMode, canReuseCheckoutUrl } from "../shared/stripeCheckoutMode";
 import { storagePut } from "./storage";
@@ -696,6 +696,65 @@ export const appRouter = router({
       if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
       return getAdminOverviewStats();
     }),
+    /**
+     * Finance dashboard: money as Stripe reports it.
+     *
+     * Reads Stripe directly rather than our `payments` table, which has
+     * never been written to. `mode` tells the client whether these are
+     * live numbers or test-environment ones, so the UI can say so instead
+     * of presenting test data as real.
+     */
+    stripeActivity: protectedProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(100).optional(),
+        startingAfter: z.string().optional(),
+        days: z.number().min(1).max(365).optional(),
+        type: z.string().optional(),
+      }).optional())
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        return getStripeActivity({
+          limit: input?.limit,
+          startingAfter: input?.startingAfter,
+          type: input?.type,
+          createdAfter: input?.days
+            ? Math.floor(Date.now() / 1000) - input.days * 86400
+            : undefined,
+        });
+      }),
+
+    /** Active subscriptions, straight from Stripe — the only reliable count. */
+    stripeSubscriptions: protectedProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(100).optional(),
+        startingAfter: z.string().optional(),
+        status: z.enum(["active", "all", "past_due", "canceled", "trialing"]).optional(),
+      }).optional())
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+        return getStripeSubscriptions({
+          limit: input?.limit,
+          startingAfter: input?.startingAfter,
+          status: input?.status,
+        });
+      }),
+
+    /**
+     * What our own columns claim, and where they disagree. Shown next to
+     * the Stripe numbers so the gap is visible rather than hidden behind
+     * one confidently wrong total.
+     */
+    subscriptionReconciliation: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+      return { ...(await getSubscriptionReconciliation()), stripeMode: stripeMode() };
+    }),
+
+    /** Boost spend summary across all jobs. */
+    boostSummary: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.openId !== ENV.ownerOpenId && ctx.user.role !== "admin") throw new Error("Forbidden: admin only");
+      return getBoostSummary();
+    }),
+
 
     /** All artists with search + filters */
     artists: protectedProcedure
@@ -5898,6 +5957,10 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         flatRate: z.number().min(0).max(1000000).optional(),
         rateType: z.enum(["hourly", "flat"]).optional(),
         hours: z.number().min(0).max(500).optional(),
+        // Admin-set totals. null clears the override and goes back to
+        // deriving the amounts from rate x hours.
+        manualArtistTotal: z.number().min(0).max(1000000).nullable().optional(),
+        manualClientTotal: z.number().min(0).max(1000000).nullable().optional(),
         reason: z.string().max(1000).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -5923,13 +5986,51 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const nextRateType = (changes.rateType ?? booking.rateType) as string | null;
         const nextHours = Number(changes.hours ?? booking.hours ?? 0);
         const nextUnit = Number(changes.hourlyRate ?? booking.hourlyRate ?? 0);
-        if (("hourlyRate" in changes || "hours" in changes || "rateType" in changes)
+
+        // An admin setting the totals by hand outranks the derivation. Work
+        // out what the totals will be AFTER this edit -- including an
+        // override set on a previous edit and not cleared now -- so a later
+        // change to hours can never quietly undo a decision a human made.
+        const settingTotals = "manualArtistTotal" in changes || "manualClientTotal" in changes;
+        const effArtistTotal = ("manualArtistTotal" in changes
+          ? changes.manualArtistTotal : booking.manualArtistTotal) as number | null;
+        const effClientTotal = ("manualClientTotal" in changes
+          ? changes.manualClientTotal : booking.manualClientTotal) as number | null;
+        const totalsInForce = effArtistTotal != null || effClientTotal != null;
+
+        if (totalsInForce) {
+          // Mirror the decided totals into the columns the rest of the app
+          // reads, so an invoice, a wallet row and this page cannot disagree.
+          const artist = Number(effArtistTotal ?? effClientTotal ?? 0);
+          const client = Number(effClientTotal ?? effArtistTotal ?? 0);
+          changes.artistRate = artist;
+          changes.clientRate = client;
+          changes.totalArtistRate = artist;
+          changes.totalClientRate = client;
+          changes.grossProfit = Math.max(0, Math.round((client - artist) * 100) / 100);
+          if (settingTotals) {
+            changes.manualTotalsSetAt = new Date();
+            changes.manualTotalsSetByUserId = user.id;
+            changes.manualTotalsReason = reason ?? null;
+          }
+        } else if (("hourlyRate" in changes || "hours" in changes || "rateType" in changes
+                    || settingTotals)
             && nextRateType === "hourly" && nextUnit > 0 && nextHours > 0) {
+          // No override in force (either never set, or just cleared): the
+          // amounts go back to being derived.
           const base = Math.round(nextUnit * nextHours * 100) / 100;
           changes.artistRate = base;
           changes.clientRate = booking.paymentMethod === "artswrk"
             ? base + processingFeeFor(base)
             : base;
+          changes.totalArtistRate = base;
+          changes.totalClientRate = changes.clientRate;
+          changes.grossProfit = Number(changes.clientRate) - base;
+          if (settingTotals) {
+            changes.manualTotalsSetAt = null;
+            changes.manualTotalsSetByUserId = null;
+            changes.manualTotalsReason = null;
+          }
         }
 
         // An edit underneath a live invoice would let the studio pay against a

@@ -628,6 +628,17 @@ export const bookings = mysqlTable("bookings", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   bubbleCreatedAt: timestamp("bubbleCreatedAt"),
   bubbleModifiedAt: timestamp("bubbleModifiedAt"),
+  // ── Admin-set totals ──────────────────────────────────────────────────────
+  /** Set by an admin when the real amounts are not rate x hours.
+   *  NULL means "derive it"; a value means "a human decided this".
+   *  Added by drizzle/0060_manual_booking_totals.sql. */
+  manualArtistTotal: double("manualArtistTotal"),
+  /** The studio total an admin set. Independent of the artist total, so a
+   *  negotiated margin can be recorded instead of a forced 5%. */
+  manualClientTotal: double("manualClientTotal"),
+  manualTotalsSetAt: timestamp("manualTotalsSetAt"),
+  manualTotalsSetByUserId: int("manualTotalsSetByUserId"),
+  manualTotalsReason: varchar("manualTotalsReason", { length: 512 }),
 });
 
 export type Booking = typeof bookings.$inferSelect;

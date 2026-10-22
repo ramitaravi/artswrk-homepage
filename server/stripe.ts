@@ -680,3 +680,276 @@ export function payoutCapabilityMessage(err: unknown, artistName: string): strin
   return `${artistName} hasn't finished setting up their Stripe payout account, so this payment can't go through yet. `
     + `They need to complete it from Settings → Manage Payouts. Nothing has been charged.`;
 }
+
+/* ------------------------------------------------------------------ *
+ * Admin finance dashboard readers
+ *
+ * These read directly from Stripe rather than our `payments` table,
+ * because that table has never been written to. Stripe is the only
+ * record of what actually moved. Everything here is read-only.
+ *
+ * NOTE: these return live data only when STRIPE_SECRET_KEY is a live
+ * key. Under a test key they return real Stripe objects from the test
+ * environment, which will be empty or fake — `mode` tells the caller
+ * which world the numbers came from so the UI can label them.
+ * ------------------------------------------------------------------ */
+
+export type StripeMode = "live" | "test" | "unconfigured";
+
+export function stripeMode(): StripeMode {
+  const key = ENV.stripeSecretKey;
+  if (!key) return "unconfigured";
+  return key.startsWith("sk_live_") || key.startsWith("rk_live_") ? "live" : "test";
+}
+
+export interface StripeActivityRow {
+  id: string;
+  /** charge, payment, payout, transfer, refund, application_fee, … */
+  type: string;
+  /** Gross amount in cents, signed as Stripe reports it */
+  amountCents: number;
+  /** Stripe's fee on this transaction, in cents */
+  feeCents: number;
+  /** amount - fee, in cents */
+  netCents: number;
+  currency: string;
+  status: string;
+  description: string | null;
+  created: string;
+  /** Present on payouts: when it is expected to land */
+  arrivalDate: string | null;
+}
+
+export interface StripeActivity {
+  mode: StripeMode;
+  rows: StripeActivityRow[];
+  /** Cursor for the next page, or null when the list is exhausted */
+  nextCursor: string | null;
+  /** Current Stripe balance, in cents, by currency */
+  balance: { availableCents: number; pendingCents: number; currency: string }[];
+  summary: {
+    grossCents: number;
+    feesCents: number;
+    netCents: number;
+    payoutsCents: number;
+    chargeCount: number;
+    payoutCount: number;
+    refundCents: number;
+  };
+  /** Set when Stripe could not be reached; rows will be empty */
+  error: string | null;
+}
+
+/** Stripe balance-transaction types that represent money coming in. */
+const INBOUND_TYPES = new Set(["charge", "payment"]);
+
+/**
+ * Read recent Stripe balance transactions — every movement of money,
+ * including charges, refunds, Connect transfers out to artists, our
+ * application fees, and payouts to the Artswrk bank account.
+ */
+export async function getStripeActivity(opts: {
+  limit?: number;
+  startingAfter?: string;
+  /** Unix seconds; only transactions created at or after this */
+  createdAfter?: number;
+  /** Narrow to one balance-transaction type, e.g. "payout" */
+  type?: string;
+} = {}): Promise<StripeActivity> {
+  const mode = stripeMode();
+  const empty: StripeActivity = {
+    mode,
+    rows: [],
+    nextCursor: null,
+    balance: [],
+    summary: {
+      grossCents: 0, feesCents: 0, netCents: 0, payoutsCents: 0,
+      chargeCount: 0, payoutCount: 0, refundCents: 0,
+    },
+    error: null,
+  };
+  if (mode === "unconfigured") {
+    return { ...empty, error: "STRIPE_SECRET_KEY is not configured on this server." };
+  }
+
+  const limit = Math.min(Math.max(opts.limit ?? 50, 1), 100);
+  try {
+    const stripe = getStripe();
+    const [txns, balance] = await Promise.all([
+      stripe.balanceTransactions.list({
+        limit,
+        ...(opts.startingAfter ? { starting_after: opts.startingAfter } : {}),
+        ...(opts.createdAfter ? { created: { gte: opts.createdAfter } } : {}),
+        ...(opts.type ? { type: opts.type as any } : {}),
+        expand: ["data.source"],
+      }),
+      stripe.balance.retrieve(),
+    ]);
+
+    const rows: StripeActivityRow[] = txns.data.map((t) => {
+      const source = t.source && typeof t.source === "object" ? (t.source as any) : null;
+      return {
+        id: t.id,
+        type: t.type,
+        amountCents: t.amount,
+        feeCents: t.fee,
+        netCents: t.net,
+        currency: (t.currency ?? "usd").toUpperCase(),
+        status: t.status,
+        description: t.description ?? source?.description ?? null,
+        created: new Date(t.created * 1000).toISOString(),
+        arrivalDate: source?.arrival_date
+          ? new Date(source.arrival_date * 1000).toISOString()
+          : null,
+      };
+    });
+
+    const summary = rows.reduce((acc, r) => {
+      if (INBOUND_TYPES.has(r.type)) {
+        acc.grossCents += r.amountCents;
+        acc.feesCents += r.feeCents;
+        acc.netCents += r.netCents;
+        acc.chargeCount += 1;
+      } else if (r.type === "payout") {
+        // Payouts are reported negative; show them as a positive total paid out.
+        acc.payoutsCents += Math.abs(r.amountCents);
+        acc.payoutCount += 1;
+      } else if (r.type === "refund" || r.type === "payment_refund") {
+        acc.refundCents += Math.abs(r.amountCents);
+      }
+      return acc;
+    }, { ...empty.summary });
+
+    return {
+      mode,
+      rows,
+      nextCursor: txns.has_more && rows.length > 0 ? rows[rows.length - 1].id : null,
+      balance: balance.available.map((a, i) => ({
+        availableCents: a.amount,
+        pendingCents: balance.pending[i]?.amount ?? 0,
+        currency: (a.currency ?? "usd").toUpperCase(),
+      })),
+      summary,
+      error: null,
+    };
+  } catch (err: any) {
+    return { ...empty, error: err?.message ?? "Could not reach Stripe." };
+  }
+}
+
+export interface StripeSubscriptionRow {
+  id: string;
+  customerId: string | null;
+  customerEmail: string | null;
+  status: string;
+  productName: string | null;
+  /** Recurring amount in cents */
+  amountCents: number;
+  interval: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  created: string;
+}
+
+/**
+ * Read subscriptions straight from Stripe. This is the only trustworthy
+ * answer to "who is actually paying us" — our own `artswrkPro` flag and
+ * `planTier` column disagree with each other and with Stripe.
+ */
+export async function getStripeSubscriptions(opts: {
+  limit?: number;
+  startingAfter?: string;
+  /** "all" includes canceled/past_due; defaults to active only */
+  status?: "active" | "all" | "past_due" | "canceled" | "trialing";
+} = {}): Promise<{
+  mode: StripeMode;
+  rows: StripeSubscriptionRow[];
+  nextCursor: string | null;
+  mrrCents: number;
+  byStatus: Record<string, number>;
+  byProduct: Record<string, { count: number; mrrCents: number }>;
+  error: string | null;
+}> {
+  const mode = stripeMode();
+  const empty = {
+    mode, rows: [] as StripeSubscriptionRow[], nextCursor: null as string | null,
+    mrrCents: 0, byStatus: {} as Record<string, number>,
+    byProduct: {} as Record<string, { count: number; mrrCents: number }>,
+    error: null as string | null,
+  };
+  if (mode === "unconfigured") {
+    return { ...empty, error: "STRIPE_SECRET_KEY is not configured on this server." };
+  }
+
+  const limit = Math.min(Math.max(opts.limit ?? 100, 1), 100);
+  try {
+    const stripe = getStripe();
+    const subs = await stripe.subscriptions.list({
+      limit,
+      status: opts.status ?? "active",
+      ...(opts.startingAfter ? { starting_after: opts.startingAfter } : {}),
+      expand: ["data.customer", "data.items.data.price.product"],
+    });
+
+    const byStatus: Record<string, number> = {};
+    const byProduct: Record<string, { count: number; mrrCents: number }> = {};
+    let mrrCents = 0;
+
+    const rows: StripeSubscriptionRow[] = subs.data.map((s) => {
+      const item = s.items?.data?.[0];
+      const price = item?.price;
+      const product = price?.product && typeof price.product === "object"
+        ? (price.product as any)
+        : null;
+      const customer = s.customer && typeof s.customer === "object"
+        ? (s.customer as any)
+        : null;
+
+      const unit = price?.unit_amount ?? 0;
+      const qty = item?.quantity ?? 1;
+      const interval = price?.recurring?.interval ?? null;
+      const intervalCount = price?.recurring?.interval_count ?? 1;
+      const gross = unit * qty;
+      // Normalise everything to a monthly figure so MRR is comparable.
+      const monthly = interval === "year" ? Math.round(gross / (12 * intervalCount))
+        : interval === "week" ? Math.round((gross * 52) / (12 * intervalCount))
+        : interval === "day" ? Math.round((gross * 365) / (12 * intervalCount))
+        : Math.round(gross / intervalCount);
+
+      byStatus[s.status] = (byStatus[s.status] ?? 0) + 1;
+      const label = product?.name ?? price?.nickname ?? "Unnamed plan";
+      if (!byProduct[label]) byProduct[label] = { count: 0, mrrCents: 0 };
+      byProduct[label].count += 1;
+
+      if (s.status === "active" || s.status === "trialing") {
+        mrrCents += monthly;
+        byProduct[label].mrrCents += monthly;
+      }
+
+      const periodEnd = (s as any).current_period_end
+        ?? item?.current_period_end
+        ?? null;
+
+      return {
+        id: s.id,
+        customerId: customer?.id ?? (typeof s.customer === "string" ? s.customer : null),
+        customerEmail: customer?.email ?? null,
+        status: s.status,
+        productName: product?.name ?? price?.nickname ?? null,
+        amountCents: gross,
+        interval: intervalCount > 1 && interval ? `${intervalCount} ${interval}s` : interval,
+        currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+        cancelAtPeriodEnd: Boolean(s.cancel_at_period_end),
+        created: new Date(s.created * 1000).toISOString(),
+      };
+    });
+
+    return {
+      mode, rows,
+      nextCursor: subs.has_more && rows.length > 0 ? rows[rows.length - 1].id : null,
+      mrrCents, byStatus, byProduct, error: null,
+    };
+  } catch (err: any) {
+    return { ...empty, error: err?.message ?? "Could not reach Stripe." };
+  }
+}

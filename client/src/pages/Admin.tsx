@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useRef, type MutableRefObject } from "react";
 import AdminBookingControls, { AdminBookingHistory } from "@/components/AdminBookingControls";
-import { bookingRateLabel, isHourlyRateBooking, processingFeeFor } from "@shared/bookingRates";
+import { bookingRateLabel, hasManualTotals, isHourlyRateBooking, processingFeeFor } from "@shared/bookingRates";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
@@ -4283,10 +4283,28 @@ function adminBookingMoney(b: {
   hours?: number | null; artistRate?: number | null; clientRate?: number | null;
   invoiceTotalCents?: number | null; recurringSeriesId?: number | null;
   isAdminBooking?: boolean | number | null; isRecurring?: boolean | number | null;
-}): { rateLabel: string; basisLabel: string | null; artistTotal: number | null; clientTotal: number | null; grossProfit: number | null } {
+  manualArtistTotal?: number | null; manualClientTotal?: number | null;
+}): { rateLabel: string; basisLabel: string | null; artistTotal: number | null; clientTotal: number | null; grossProfit: number | null; manual: boolean } {
   const hours = Number(b.hours ?? 0);
   const hourly = isHourlyRateBooking(b as any);
   const unit = hourly ? Number(b.hourlyRate ?? b.artistRate ?? 0) : null;
+
+  // An admin decided these amounts outright. Nothing is derived from them and
+  // the gap between the two is the real margin, not an assumed 5%.
+  if (hasManualTotals(b)) {
+    const artistTotal = Number(b.manualArtistTotal ?? b.manualClientTotal ?? 0);
+    const clientTotal = b.invoiceTotalCents != null
+      ? b.invoiceTotalCents / 100
+      : Number(b.manualClientTotal ?? b.manualArtistTotal ?? 0);
+    return {
+      rateLabel: `$${artistTotal.toFixed(2)}`,
+      basisLabel: hours > 0 ? `Set by admin · ${hours} hrs` : "Set by admin",
+      artistTotal,
+      clientTotal,
+      grossProfit: Math.round((clientTotal - artistTotal) * 100) / 100,
+      manual: true,
+    };
+  }
 
   const artistTotal = hourly && unit && hours > 0
     ? Math.round(unit * hours * 100) / 100
@@ -4308,7 +4326,7 @@ function adminBookingMoney(b: {
     ? (hours > 0 ? `Hourly · ${hours} hrs` : "Hourly")
     : b.rateType === "flat" ? "Flat" : null;
 
-  return { rateLabel, basisLabel, artistTotal, clientTotal, grossProfit };
+  return { rateLabel, basisLabel, artistTotal, clientTotal, grossProfit, manual: false };
 }
 
 // ─── Payment: Detail Page ──────────────────────────────────────────────────────

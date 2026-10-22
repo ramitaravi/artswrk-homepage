@@ -115,3 +115,22 @@ describe("cancellation notice", () => {
     expect(cancellationNotice(null, now)).toEqual({ noticeHours: null, isLate: false });
   });
 });
+
+describe("admin-set totals", () => {
+  const open = { bookingStatus: "Confirmed", paymentStatus: "Unpaid", artistUserId: 1, clientUserId: 2 } as any;
+
+  it("lets an admin set the totals by hand", () => {
+    expect(canEditField(open, "manualArtistTotal", "admin").allowed).toBe(true);
+    expect(canEditField(open, "manualClientTotal", "admin").allowed).toBe(true);
+  });
+
+  it("does not let an artist or client set their own totals", () => {
+    expect(canEditField(open, "manualArtistTotal", "artist", 1).allowed).toBe(false);
+    expect(canEditField(open, "manualClientTotal", "client", 2).allowed).toBe(false);
+  });
+
+  it("will not let even an admin rewrite the totals once it is paid", () => {
+    const paid = { ...open, paymentStatus: "Paid" };
+    expect(canEditField(paid, "manualArtistTotal", "admin").allowed).toBe(false);
+  });
+});

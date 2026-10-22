@@ -691,6 +691,7 @@ export async function getAdminJobBookings(jobId: number) {
   const rows = await db.execute(
     `SELECT b.id, b.bookingStatus, b.paymentStatus, b.clientRate, b.artistRate,
        b.totalClientRate, b.totalArtistRate, b.grossProfit, b.hours,
+       b.manualArtistTotal, b.manualClientTotal, b.manualTotalsReason, b.manualTotalsSetAt,
        b.startDate, b.endDate, b.locationAddress, b.externalPayment,
        u.firstName AS artistFirstName, u.lastName AS artistLastName,
        u.name AS artistName, u.profilePicture AS artistProfilePicture, u.id AS artistId
@@ -770,6 +771,7 @@ export async function getAdminClientBookings(clientUserId: number, limit = 100, 
     `SELECT
        b.id, b.bookingStatus, b.paymentStatus, b.clientRate, b.artistRate,
        b.totalClientRate, b.totalArtistRate, b.grossProfit, b.hours,
+       b.manualArtistTotal, b.manualClientTotal, b.manualTotalsReason, b.manualTotalsSetAt,
        b.startDate, b.endDate, b.locationAddress, b.description,
        b.externalPayment, b.bubbleCreatedAt, b.createdAt,
        u.firstName AS artistFirstName, u.lastName AS artistLastName, u.name AS artistName,
@@ -822,6 +824,7 @@ export async function getAdminArtistBookings(artistUserId: number, limit = 100, 
     `SELECT
        b.id, b.bookingStatus, b.paymentStatus, b.clientRate, b.artistRate,
        b.totalClientRate, b.totalArtistRate, b.grossProfit, b.hours,
+       b.manualArtistTotal, b.manualClientTotal, b.manualTotalsReason, b.manualTotalsSetAt,
        b.startDate, b.endDate, b.locationAddress, b.description,
        b.externalPayment, b.bubbleCreatedAt, b.createdAt,
        u.clientCompanyName, u.id AS clientUserId,
@@ -3361,6 +3364,7 @@ export async function getAdminBookingById(bookingId: number) {
       b.bookingStatus, b.paymentStatus,
       b.clientRate, b.artistRate, b.totalClientRate, b.totalArtistRate,
       b.grossProfit, b.stripeFee, b.postFeeRevenue,
+      b.manualArtistTotal, b.manualClientTotal, b.manualTotalsReason, b.manualTotalsSetAt,
       b.hours, b.externalPayment,
       -- The admin booking controls decide what is allowed from these: whether
       -- money has moved, whether an invoice is out, and the unit rate to
@@ -3466,6 +3470,7 @@ export async function getAdminPaymentById(paymentId: number) {
 
       b.bookingStatus, b.paymentStatus AS bookingPaymentStatus,
       b.clientRate, b.artistRate, b.grossProfit,
+      b.manualArtistTotal, b.manualClientTotal, b.manualTotalsReason, b.manualTotalsSetAt,
       b.startDate, b.endDate,
       b.jobId AS bookingJobId,
       b.artistUserId AS bookingArtistUserId,
@@ -6816,4 +6821,101 @@ export async function getLateCancellations(opts: { sinceDays?: number; limit?: n
       AND b.cancellationNoticeHours < ${LATE_CANCELLATION_HOURS}
     ORDER BY b.cancelledAt DESC LIMIT ${opts.limit ?? 100}`);
   return rows as unknown as any[];
+}
+
+/**
+ * Admin: reconcile our subscription columns against each other.
+ *
+ * We have three competing records of who is a paying subscriber, and they
+ * disagree. Stripe is the real answer; this exists to measure the gap so
+ * admin can see which of our rows need repair, not to be trusted as truth.
+ *
+ * The Bubble migration wrote many artist subscription IDs into
+ * `clientSubscriptionId` — the client column — so an artist can look
+ * unsubscribed here while still being billed by Stripe.
+ */
+export async function getSubscriptionReconciliation() {
+  const db = await getDb();
+  if (!db) return null;
+
+  const [rows] = await db.execute(sql`
+    SELECT
+      SUM(artswrkPro = 1)                                              AS flaggedPro,
+      SUM(planTier = 'artist_pro')                                     AS tierPro,
+      SUM(artswrkBasic = 1)                                            AS flaggedBasic,
+      SUM(planTier = 'artist_basic')                                   AS tierBasic,
+      SUM(clientPremium = 1)                                           AS flaggedClientPremium,
+      SUM(planTier = 'client_premium')                                 AS tierClientPremium,
+      SUM(planTier LIKE 'artist_%' AND stripeSubscriptionId IS NOT NULL) AS artistsWithStripeId,
+      SUM(planTier LIKE 'artist_%' AND clientSubscriptionId IS NOT NULL) AS artistIdsInClientColumn,
+      SUM(planTier LIKE 'client_%' AND clientSubscriptionId IS NOT NULL) AS clientsWithStripeId,
+      SUM(artswrkPro = 1 AND stripeSubscriptionId IS NULL
+          AND clientSubscriptionId IS NULL)                            AS proWithNoStripeId,
+      SUM(artswrkPro = 1 AND stripeSubscriptionId IS NULL
+          AND clientSubscriptionId IS NOT NULL)                        AS proIdInWrongColumn,
+      SUM(planTier = 'artist_free' AND (stripeSubscriptionId IS NOT NULL
+          OR clientSubscriptionId IS NOT NULL))                        AS freeTierHoldingSubId
+    FROM users
+  `);
+  const r = (rows as unknown as any[])?.[0] ?? {};
+  const n = (k: string) => Number(r[k] ?? 0);
+
+  const [tierRows] = await db.execute(sql`
+    SELECT COALESCE(planTier, '(none)') AS tier, COUNT(*) AS n
+    FROM users GROUP BY planTier ORDER BY n DESC
+  `);
+
+  return {
+    byTier: ((tierRows as unknown as any[]) ?? []).map((t) => ({
+      tier: String(t.tier), count: Number(t.n ?? 0),
+    })),
+    flaggedPro: n("flaggedPro"),
+    tierPro: n("tierPro"),
+    flaggedBasic: n("flaggedBasic"),
+    tierBasic: n("tierBasic"),
+    flaggedClientPremium: n("flaggedClientPremium"),
+    tierClientPremium: n("tierClientPremium"),
+    artistsWithStripeId: n("artistsWithStripeId"),
+    artistIdsInClientColumn: n("artistIdsInClientColumn"),
+    clientsWithStripeId: n("clientsWithStripeId"),
+    proWithNoStripeId: n("proWithNoStripeId"),
+    proIdInWrongColumn: n("proIdInWrongColumn"),
+    freeTierHoldingSubId: n("freeTierHoldingSubId"),
+  };
+}
+
+/** Admin: boost spend summary across all jobs.
+ *
+ * Boost spend is not stored as a total — it is a daily budget times a
+ * duration, so every figure here is derived rather than read.
+ */
+export async function getBoostSummary() {
+  const db = await getDb();
+  if (!db) return null;
+  const spend = sql`COALESCE(boostDailyBudget, 0) * COALESCE(boostDurationDays, 0)`;
+  const [rows] = await db.execute(sql`
+    SELECT
+      COUNT(*)                                                    AS everBoosted,
+      COALESCE(SUM(${spend}), 0)                                  AS allTimeSpend,
+      SUM(boostEndDate IS NOT NULL AND boostEndDate > NOW())      AS liveNow,
+      SUM(boostEndDate IS NOT NULL AND boostEndDate <= NOW())     AS expired,
+      COALESCE(SUM(CASE WHEN boostStartDate >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                   THEN ${spend} ELSE 0 END), 0)                  AS last30Spend,
+      COUNT(DISTINCT clientUserId)                                AS distinctBuyers,
+      COALESCE(AVG(NULLIF(${spend}, 0)), 0)                       AS avgSpend
+    FROM jobs
+    WHERE boostStartDate IS NOT NULL
+       OR boostStripeSessionId IS NOT NULL
+       OR COALESCE(boostDailyBudget, 0) > 0
+  `);
+  const r = (rows as unknown as any[])?.[0] ?? {};
+  return {
+    everBoosted: Number(r.everBoosted ?? 0),
+    allTimeSpend: Number(r.allTimeSpend ?? 0),
+    liveNow: Number(r.liveNow ?? 0),
+    expired: Number(r.expired ?? 0),
+    last30Spend: Number(r.last30Spend ?? 0),
+    distinctBuyers: Number(r.distinctBuyers ?? 0),
+    avgSpend: Number(r.avgSpend ?? 0),
+  };
 }

@@ -3,7 +3,7 @@
  * Every case here is a real shape from production data.
  */
 import { describe, it, expect } from "vitest";
-import { isHourlyBooking, resolveBookingBaseAmount, resolveInvoiceTotals, processingFeeFor, PROCESSING_FEE_RATE } from "./bookingRates";
+import { isHourlyBooking, resolveBookingBaseAmount, resolveInvoiceTotals, processingFeeFor, PROCESSING_FEE_RATE, bookingMoney } from "./bookingRates";
 
 describe("hourly vs flat is read, never inferred", () => {
   it("a flat booking that also records hours is NOT hourly", () => {
@@ -118,5 +118,67 @@ describe("processing fee", () => {
     );
     expect(t.processingFee).toBe(20);    // 5% of 400
     expect(t.total).toBe(420);
+  });
+});
+
+describe("admin-set totals", () => {
+  it("uses the artist total a human set instead of rate x hours", () => {
+    const m = bookingMoney({
+      rateType: "hourly", hourlyRate: 18, hours: 36, manualArtistTotal: 720,
+    });
+    expect(m.artistTotal).toBe(720);
+    expect(m.base).toBe(720);
+  });
+
+  it("lets the studio total differ from the artist total by more than 5%", () => {
+    const m = bookingMoney({
+      rateType: "flat", manualArtistTotal: 500, manualClientTotal: 650,
+    });
+    expect(m.artistTotal).toBe(500);
+    expect(m.clientTotal).toBe(650);
+    // The margin is the real gap, not a fixed percentage.
+    expect(m.processingFee).toBe(150);
+  });
+
+  it("falls back to the one total that was set when only one is given", () => {
+    const artistOnly = bookingMoney({ rateType: "flat", manualArtistTotal: 300 });
+    expect(artistOnly.artistTotal).toBe(300);
+    expect(artistOnly.clientTotal).toBe(300);
+
+    const clientOnly = bookingMoney({ rateType: "flat", manualClientTotal: 420 });
+    expect(clientOnly.artistTotal).toBe(420);
+    expect(clientOnly.clientTotal).toBe(420);
+  });
+
+  it("adds reimbursements on top of both manual totals", () => {
+    const m = bookingMoney(
+      { rateType: "flat", manualArtistTotal: 200, manualClientTotal: 230 },
+      { reimbursements: 40 },
+    );
+    expect(m.artistTotal).toBe(240);
+    expect(m.clientTotal).toBe(270);
+  });
+
+  it("reports a per-hour rate derived from the manual total, not the old rate", () => {
+    const m = bookingMoney({
+      rateType: "hourly", hourlyRate: 18, hours: 10, manualArtistTotal: 250,
+    });
+    expect(m.rate).toBe(25);
+    expect(m.hours).toBe(10);
+  });
+
+  it("never reports a negative fee when the studio pays less than the artist", () => {
+    const m = bookingMoney({
+      rateType: "flat", manualArtistTotal: 500, manualClientTotal: 400,
+    });
+    expect(m.processingFee).toBe(0);
+    expect(m.clientTotal).toBe(400);
+  });
+
+  it("is untouched when no manual total is set", () => {
+    const m = bookingMoney({ rateType: "hourly", hourlyRate: 20, hours: 3 });
+    expect(m.artistTotal).toBe(60);
+    expect(m.clientTotal).toBe(63);
+    expect(m.processingFee).toBe(3);
   });
 });

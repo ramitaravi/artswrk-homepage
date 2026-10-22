@@ -71,6 +71,11 @@ export type BookingRates = {
    *  each other because of the old rate-conversion era. */
   legacyArtistTotal?: number | null;
   legacyClientTotal?: number | null;
+  /** Admin-set totals (bookings.manualArtistTotal / manualClientTotal).
+   *  When either is set, a human decided the amount and it wins over every
+   *  derived figure. NULL means "derive it as usual". */
+  manualArtistTotal?: number | null;
+  manualClientTotal?: number | null;
 };
 
 /** One line of money for a booking, or for one week of a recurring one. */
@@ -111,6 +116,31 @@ export function bookingMoney(
 ): BookingMoney {
   const reimbursements = Number(opts.reimbursements ?? 0);
   const type: RateType = rates.rateType ?? (rates.hourlyRate != null ? "hourly" : "flat");
+
+  // An admin set these by hand because the real amounts were not rate x hours.
+  // A human decision outranks any derivation, so nothing below runs. The fee
+  // becomes whatever the gap between the two totals is -- it is no longer a
+  // fixed 5%, and reporting it as 5% would be a lie.
+  if (rates.manualArtistTotal != null || rates.manualClientTotal != null) {
+    const derivedHours = Number(opts.hoursOverride ?? rates.hours ?? 0);
+    const artistBase = Number(
+      rates.manualArtistTotal ?? rates.manualClientTotal ?? 0);
+    const clientBase = Number(
+      rates.manualClientTotal ?? rates.manualArtistTotal ?? 0);
+    return {
+      rateType: type,
+      hours: type === "hourly" ? derivedHours : 0,
+      // Per-hour only where we can honestly divide; otherwise the total itself.
+      rate: type === "hourly" && derivedHours > 0
+        ? Math.round((artistBase / derivedHours) * 100) / 100
+        : artistBase,
+      base: artistBase,
+      reimbursements,
+      processingFee: Math.max(0, Math.round((clientBase - artistBase) * 100) / 100),
+      artistTotal: artistBase + reimbursements,
+      clientTotal: clientBase + reimbursements,
+    };
+  }
 
   if (type === "hourly") {
     const rate = Number(rates.hourlyRate ?? 0);
@@ -314,4 +344,48 @@ export function bookingRateLabel(
   if (typeof total !== "number") return "";
   // No "/hr" here on purpose: this number is the whole booking.
   return `${money(total)} total`;
+}
+
+/**
+ * Build a BookingRates from a booking row.
+ *
+ * Use this instead of assembling the object by hand. Every time a new rate
+ * field was added, some call sites were updated and others silently kept
+ * their old behaviour -- that is how `artistRate` came to mean a total in one
+ * place and a per-hour rate in another. One extractor means one place to
+ * change, and a field can never be read on some screens but not others.
+ */
+export function bookingRatesFrom(b: {
+  rateType?: string | null;
+  hourlyRate?: number | string | null;
+  flatRate?: number | string | null;
+  hours?: number | string | null;
+  artistRate?: number | string | null;
+  clientRate?: number | string | null;
+  manualArtistTotal?: number | string | null;
+  manualClientTotal?: number | string | null;
+} | null | undefined): BookingRates {
+  const num = (v: unknown): number | null => {
+    if (v == null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  return {
+    rateType: (b?.rateType as RateType | null) ?? null,
+    hourlyRate: num(b?.hourlyRate),
+    flatRate: num(b?.flatRate),
+    hours: num(b?.hours),
+    legacyArtistTotal: num(b?.artistRate),
+    legacyClientTotal: num(b?.clientRate),
+    manualArtistTotal: num(b?.manualArtistTotal),
+    manualClientTotal: num(b?.manualClientTotal),
+  };
+}
+
+/** Has an admin set the totals by hand on this booking? */
+export function hasManualTotals(b: {
+  manualArtistTotal?: number | string | null;
+  manualClientTotal?: number | string | null;
+} | null | undefined): boolean {
+  return b?.manualArtistTotal != null || b?.manualClientTotal != null;
 }

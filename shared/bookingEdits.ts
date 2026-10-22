@@ -35,7 +35,11 @@ export const LOGISTICS_FIELDS = [
  * artist nor a studio may do it unilaterally -- they propose and the other
  * accepts. An admin may, and the audit row records that they did.
  */
-export const MONEY_FIELDS = ["hourlyRate", "flatRate", "rateType", "hours"] as const;
+export const MONEY_FIELDS = [
+  "hourlyRate", "flatRate", "rateType", "hours",
+  // Admin-set totals: a human overriding the derived amounts entirely.
+  "manualArtistTotal", "manualClientTotal",
+] as const;
 
 export type EditableField = (typeof LOGISTICS_FIELDS)[number] | (typeof MONEY_FIELDS)[number];
 

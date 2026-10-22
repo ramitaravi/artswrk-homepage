@@ -14,6 +14,7 @@ import { AlertTriangle, Ban, Check, Clock, DollarSign, Loader2, Pencil, X } from
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { isSettled, hasOpenInvoice } from "@shared/bookingEdits";
+import { processingFeeFor, hasManualTotals } from "@shared/bookingRates";
 
 const input = "w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-[#111] focus:outline-none focus:border-[#F25722] transition-colors";
 const label = "block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1";
@@ -63,6 +64,23 @@ export default function AdminBookingControls({ booking, onChanged }: {
   const [hours, setHours] = useState(String(booking.hours ?? ""));
   const [editReason, setEditReason] = useState("");
   const nextBase = (parseFloat(hourlyRate) || 0) * (parseFloat(hours) || 0);
+
+  // Not every booking is rate x hours. A negotiated fee, a discount, an
+  // amount that is simply what was agreed -- admin can set both totals
+  // outright rather than reverse-engineering an hourly rate that divides
+  // into it. Starts on whichever mode the booking is already using.
+  const manualAlready = hasManualTotals(booking);
+  const [mode, setMode] = useState<"derived" | "totals">(manualAlready ? "totals" : "derived");
+  const [artistTotal, setArtistTotal] = useState(
+    String(booking.manualArtistTotal ?? ""));
+  const [clientTotal, setClientTotal] = useState(
+    String(booking.manualClientTotal ?? ""));
+
+  const artistNum = parseFloat(artistTotal);
+  const clientNum = parseFloat(clientTotal);
+  const artistOk = Number.isFinite(artistNum) && artistNum >= 0;
+  const clientOk = Number.isFinite(clientNum) && clientNum >= 0;
+  const margin = artistOk && clientOk ? clientNum - artistNum : null;
 
   // ── Cancel / mark-paid ────────────────────────────────────────────────────
   const [cancelReason, setCancelReason] = useState("");
@@ -116,21 +134,91 @@ export default function AdminBookingControls({ booking, onChanged }: {
       {/* ── Edit ── */}
       {panel === "edit" && (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={label}>Rate / hr</label>
-              <input className={input} type="number" min="0" step="0.01" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} />
-            </div>
-            <div>
-              <label className={label}>Hours</label>
-              <input className={input} type="number" min="0" step="0.25" value={hours} onChange={(e) => setHours(e.target.value)} />
-            </div>
+          <div className="flex gap-1 p-1 bg-gray-50 rounded-xl">
+            {([["derived", "Rate \u00d7 hours"], ["totals", "Set totals"]] as const).map(([k, text]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setMode(k)}
+                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  mode === k ? "bg-white text-[#111] shadow-sm" : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {text}
+              </button>
+            ))}
           </div>
-          {nextBase > 0 && (
-            <p className="text-xs text-gray-500">
-              The artist is paid <strong className="text-[#111]">${nextBase.toFixed(2)}</strong>,
-              the client is billed <strong className="text-[#111]">${(nextBase + Math.round(nextBase * 0.05)).toFixed(2)}</strong>.
-            </p>
+
+          {mode === "derived" ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={label}>Rate / hr</label>
+                  <input className={input} type="number" min="0" step="0.01" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} />
+                </div>
+                <div>
+                  <label className={label}>Hours</label>
+                  <input className={input} type="number" min="0" step="0.25" value={hours} onChange={(e) => setHours(e.target.value)} />
+                </div>
+              </div>
+              {nextBase > 0 && (
+                <p className="text-xs text-gray-500">
+                  The artist is paid <strong className="text-[#111]">${nextBase.toFixed(2)}</strong>,
+                  the client is billed <strong className="text-[#111]">${(nextBase + processingFeeFor(nextBase)).toFixed(2)}</strong>.
+                </p>
+              )}
+              {manualAlready && (
+                <p className="text-[11px] text-amber-600 flex items-start gap-1.5">
+                  <AlertTriangle size={11} className="mt-0.5 flex-shrink-0" />
+                  Totals were set by hand on this booking. Saving here clears them and
+                  goes back to rate &times; hours.
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={label}>Artist is paid</label>
+                  <input className={input} type="number" min="0" step="0.01" value={artistTotal}
+                    onChange={(e) => setArtistTotal(e.target.value)} placeholder="0.00" />
+                </div>
+                <div>
+                  <label className={label}>Client pays</label>
+                  <input className={input} type="number" min="0" step="0.01" value={clientTotal}
+                    onChange={(e) => setClientTotal(e.target.value)} placeholder="0.00" />
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-400">
+                Totals for the whole booking, not per hour. Leave the client field blank
+                to bill exactly what the artist is paid.
+              </p>
+              {artistOk && (
+                <div className="text-xs bg-gray-50 rounded-xl px-3 py-2 space-y-0.5">
+                  <p className="text-gray-500">
+                    Artist receives <strong className="text-[#111]">${artistNum.toFixed(2)}</strong>
+                    {clientOk && <> &middot; client pays <strong className="text-[#111]">${clientNum.toFixed(2)}</strong></>}
+                  </p>
+                  {margin != null && (
+                    <p className={margin < 0 ? "text-red-500" : "text-gray-500"}>
+                      {margin < 0
+                        ? `The client would pay $${Math.abs(margin).toFixed(2)} less than the artist receives.`
+                        : <>Gross profit <strong className="text-green-600">${margin.toFixed(2)}</strong>
+                            {artistNum > 0 && <> ({((margin / artistNum) * 100).toFixed(1)}%)</>}</>}
+                    </p>
+                  )}
+                  {parseFloat(hours) > 0 && artistNum > 0 && (
+                    <p className="text-gray-400">
+                      Works out at ${(artistNum / parseFloat(hours)).toFixed(2)}/hr over {hours} hrs.
+                    </p>
+                  )}
+                </div>
+              )}
+              <p className="text-[11px] text-gray-400">
+                These amounts override the 5% processing fee. They are recorded as a
+                deliberate decision, with your reason, in the booking history.
+              </p>
+            </>
           )}
           <div>
             <label className={label}>Why (recorded in the history)</label>
@@ -145,14 +233,28 @@ export default function AdminBookingControls({ booking, onChanged }: {
           )}
           <Actions
             busy={edit.isPending}
+            disabled={mode === "totals"
+              ? !artistOk && !clientOk
+              : !(parseFloat(hourlyRate) > 0)}
             onCancel={() => setPanel(null)}
             confirmLabel="Save changes"
-            onConfirm={() => edit.mutate({
-              bookingId: booking.id,
-              hourlyRate: parseFloat(hourlyRate) || undefined,
-              hours: parseFloat(hours) || undefined,
-              reason: editReason || undefined,
-            })}
+            onConfirm={() => edit.mutate(mode === "totals"
+              ? {
+                  bookingId: booking.id,
+                  hours: parseFloat(hours) || undefined,
+                  manualArtistTotal: artistOk ? artistNum : null,
+                  manualClientTotal: clientOk ? clientNum : null,
+                  reason: editReason || undefined,
+                }
+              : {
+                  bookingId: booking.id,
+                  hourlyRate: parseFloat(hourlyRate) || undefined,
+                  hours: parseFloat(hours) || undefined,
+                  // Clearing the override here is what makes the toggle mean
+                  // something -- otherwise a stale total would keep winning.
+                  ...(manualAlready ? { manualArtistTotal: null, manualClientTotal: null } : {}),
+                  reason: editReason || undefined,
+                })}
           />
         </div>
       )}
