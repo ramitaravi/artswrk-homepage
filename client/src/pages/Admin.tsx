@@ -1099,7 +1099,7 @@ function ArtistBookingsTab({ artistId }: { artistId: number }) {
                     <CreditCard size={10} />{b.paymentStatus}
                   </span>
                 )}
-                {b.externalPayment && <span className="text-gray-400">External payment</span>}
+                {!!b.externalPayment && <span className="text-gray-400">External payment</span>}
               </div>
             </div>
           );
@@ -3745,7 +3745,9 @@ function AdminBookingDetail({ bookingId, onBack, onViewJob, onViewPayment }: {
         <div className="flex items-center gap-3 flex-wrap">
           <span className={`text-xs font-bold px-3 py-1 rounded-full ${bookingStatusColor(b.bookingStatus)}`}>{b.bookingStatus || "Unknown"}</span>
           <span className={`text-xs font-bold px-3 py-1 rounded-full ${paymentStatusColor(b.paymentStatus)}`}>{b.paymentStatus || "Unpaid"}</span>
-          {b.externalPayment && <span className="text-xs font-bold px-3 py-1 rounded-full bg-purple-50 text-purple-600">External Payment</span>}
+          {/* `0 && <span/>` renders the 0 itself, which is why a bare "0" sat
+              next to the status pills on every booking paid through Artswrk. */}
+          {!!b.externalPayment && <span className="text-xs font-bold px-3 py-1 rounded-full bg-purple-50 text-purple-600">External Payment</span>}
         </div>
 
         {/* The money lives in AdminBookingMoney below, worked out from the
@@ -3786,6 +3788,13 @@ function AdminBookingDetail({ bookingId, onBack, onViewJob, onViewPayment }: {
                 <p className="text-sm font-bold text-[#111]">{clientName}</p>
                 <p className="text-xs text-gray-400">{b.clientEmail || "—"}</p>
                 {b.clientCompanyName && <p className="text-xs text-gray-400">{b.clientCompanyName}</p>}
+                {/* See the booking as they see it — the fastest way to answer
+                    "what is the studio actually looking at?" */}
+                {b.clientUserId && (
+                  <div className="mt-2">
+                    <RunAsButton userId={b.clientUserId} userName={clientName ?? "this client"} userRole="Client" />
+                  </div>
+                )}
               </div>
             </div>
           ) : <p className="text-sm text-gray-400">No client linked</p>}
@@ -3804,6 +3813,11 @@ function AdminBookingDetail({ bookingId, onBack, onViewJob, onViewPayment }: {
               <div>
                 <p className="text-sm font-bold text-[#111]">{artistName}</p>
                 <p className="text-xs text-gray-400">{b.artistEmail || "—"}</p>
+                {b.artistUserId && (
+                  <div className="mt-2">
+                    <RunAsButton userId={b.artistUserId} userName={artistName ?? "this artist"} userRole="Artist" />
+                  </div>
+                )}
                 {b.artistSlug && (
                   <a href={`https://artswrk.com/artists/${b.artistSlug}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-[#F25722] hover:underline flex items-center gap-0.5 mt-0.5"><ExternalLink size={9} /> View profile</a>
                 )}
