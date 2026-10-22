@@ -3173,6 +3173,7 @@ export async function getAdminJobs({
   status,
   state,
   applicants,
+  boosted,
   limit = 50,
   offset = 0,
 }: {
@@ -3186,6 +3187,8 @@ export async function getAdminJobs({
   state?: string;
   /** "none" = nobody has applied yet (what outreach works from); "some" = at least one. */
   applicants?: "none" | "some";
+  /** "live" = boosted and still running; "expired" = boosted, now over; "any" = ever boosted. */
+  boosted?: "live" | "expired" | "any";
   limit?: number;
   offset?: number;
 }) {
@@ -3197,6 +3200,10 @@ export async function getAdminJobs({
   if (companySearch) conditions.push(like(users.clientCompanyName, `%${companySearch}%`) as any);
   if (locationSearch) conditions.push(like(jobs.locationAddress, `%${locationSearch}%`) as any);
   if (status) conditions.push(eq(jobs.requestStatus, status) as any);
+  // A boost with no end date has not expired; it never had a finish line.
+  if (boosted === "any") conditions.push(sql`${jobs.isBoosted} = 1` as any);
+  if (boosted === "live") conditions.push(sql`${jobs.isBoosted} = 1 AND (${jobs.boostEndDate} IS NULL OR ${jobs.boostEndDate} > NOW())` as any);
+  if (boosted === "expired") conditions.push(sql`${jobs.isBoosted} = 1 AND ${jobs.boostEndDate} <= NOW()` as any);
   // "(none)" targets the legacy rows whose networkStatus is NULL — they behave
   // as suppressed but are invisible to an equality filter.
   if (networkStatus === "(none)") conditions.push(sql`${jobs.networkStatus} IS NULL` as any);
@@ -3232,6 +3239,13 @@ export async function getAdminJobs({
       clientHourlyRate: jobs.clientHourlyRate,
       isHourly: jobs.isHourly,
       openRate: jobs.openRate,
+      // What a boost cost and when it ran. Spend is budget x days, which is
+      // also what was charged, so the list can total it without a join.
+      isBoosted: jobs.isBoosted,
+      boostDailyBudget: jobs.boostDailyBudget,
+      boostDurationDays: jobs.boostDurationDays,
+      boostStartDate: jobs.boostStartDate,
+      boostEndDate: jobs.boostEndDate,
       startDate: jobs.startDate,
       createdAt: jobs.createdAt,
       bubbleCreatedAt: jobs.bubbleCreatedAt,

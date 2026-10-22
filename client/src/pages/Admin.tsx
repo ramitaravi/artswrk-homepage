@@ -2716,6 +2716,7 @@ function ClientJobsTab({ clientId }: { clientId: number }) {
             {j.startDate && <span className="flex items-center gap-1"><Calendar size={10} />{fmtDate(j.startDate)}</span>}
             {j.artistHourlyRate && <span className="flex items-center gap-1"><DollarSign size={10} />${j.artistHourlyRate}/hr artist</span>}
             <span className="flex items-center gap-1"><Users size={10} />{Number(j.applicantCount)} applicant{Number(j.applicantCount) !== 1 ? "s" : ""}</span>
+            <BoostBadge job={j} />
             {Number(j.bookingCount) > 0 && (
               <span className="flex items-center gap-1 text-green-500 font-medium"><CheckCircle2 size={10} />{Number(j.bookingCount)} booked</span>
             )}
@@ -3523,6 +3524,7 @@ function JobsSection() {
   const [status, setStatus] = useState("");
   /** Empty = every job; "none" = nobody has applied yet; "some" = at least one applicant. */
   const [applicants, setApplicants] = useState<"" | "none" | "some">("");
+  const [boosted, setBoosted] = useState<"" | "live" | "expired" | "any">("");
   const [page, setPage] = useState(1);
   const LIMIT = 50;
 
@@ -3542,6 +3544,7 @@ function JobsSection() {
     locationSearch: debouncedLocation || undefined,
     status: status || undefined,
     applicants: applicants || undefined,
+    boosted: boosted || undefined,
     limit: LIMIT,
     offset: (page - 1) * LIMIT,
   }, { enabled: view.mode === "list" });
@@ -3577,6 +3580,12 @@ function JobsSection() {
           <option value="">Applicants</option>
           <option value="none">No applicants yet</option>
           <option value="some">Has applicants</option>
+        </select>
+        <select value={boosted} onChange={e => { setBoosted(e.target.value as "" | "live" | "expired" | "any"); setPage(1); }} className="px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-[#F25722]">
+          <option value="">Boost</option>
+          <option value="live">Boost running</option>
+          <option value="expired">Boost expired</option>
+          <option value="any">Ever boosted</option>
         </select>
         <div className="flex items-center gap-2 flex-1 min-w-[150px] bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
           <Search size={13} className="text-gray-400 flex-shrink-0" />
@@ -4189,6 +4198,32 @@ function AdminBookingMoney({ booking }: { booking: any }) {
         {cell("Gross profit", m.grossProfit != null ? fmt$(m.grossProfit * 100) : "—", "5% processing", "text-green-600")}
       </div>
     </div>
+  );
+}
+
+/**
+ * What a boost cost and whether it is still running.
+ *
+ * Spend is daily budget x days, which is what the studio was charged, so it
+ * reads straight off the job without joining payments.
+ */
+function BoostBadge({ job }: { job: any }) {
+  if (!job?.isBoosted) return null;
+  const spend = Number(job.boostDailyBudget ?? 0) * Number(job.boostDurationDays ?? 0);
+  const end = job.boostEndDate ? new Date(job.boostEndDate) : null;
+  // No end date means it was never given a finish line, not that it is over.
+  const live = !end || end.getTime() > Date.now();
+  const when = end
+    ? `${live ? "ends" : "ended"} ${end.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+    : "no end date";
+  return (
+    <span
+      title={`$${job.boostDailyBudget}/day × ${job.boostDurationDays} days${job.boostStartDate ? ` from ${new Date(job.boostStartDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}`}
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${live ? "bg-amber-50 text-amber-700" : "bg-gray-100 text-gray-500"}`}
+    >
+      <TrendingUp size={9} />
+      {spend > 0 ? `$${spend}` : "Boost"} · {when}
+    </span>
   );
 }
 
