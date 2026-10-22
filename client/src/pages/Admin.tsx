@@ -3937,6 +3937,23 @@ function BookingsSection({ onViewPayment, initialDetailId }: { onViewPayment?: (
     return () => clearTimeout(t);
   }, [searchInput]);
 
+  // One list of what is currently narrowing the results. The chips, the
+  // "clear all" and the empty state all read from this, so they cannot
+  // disagree about what is switched on.
+  const activeFilters = [
+    upcoming === true ? { label: "Upcoming", clear: () => setUpcoming(undefined) } : null,
+    upcoming === false ? { label: "Past", clear: () => setUpcoming(undefined) } : null,
+    bookingStatus ? { label: bookingStatus, clear: () => setBookingStatus("") } : null,
+    paymentStatus ? { label: paymentStatus, clear: () => setPaymentStatus("") } : null,
+    rateTypeFilter ? { label: rateTypeFilter === "hourly" ? "Hourly" : "Flat", clear: () => setRateTypeFilter("") } : null,
+    search ? { label: `“${search}”`, clear: () => setSearchInput("") } : null,
+  ].filter(Boolean) as Array<{ label: string; clear: () => void }>;
+
+  const clearAll = () => {
+    setUpcoming(undefined); setBookingStatus(""); setPaymentStatus("");
+    setRateTypeFilter(""); setSearchInput(""); setPage(1);
+  };
+
   const { data, isLoading } = trpc.admin.bookings.useQuery({
     upcoming,
     paymentStatus: paymentStatus || undefined,
@@ -4015,6 +4032,26 @@ function BookingsSection({ onViewPayment, initialDetailId }: { onViewPayment?: (
             </FilterPill>
           ))}
         </div>
+
+        {/* What is actually narrowing the list. Filters stack, so "Upcoming +
+            Cancelled" returns nothing and without this there is no way to see
+            why -- you are left looking at an empty table. */}
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-gray-50">
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mr-1">Filtering by</span>
+            {activeFilters.map((f) => (
+              <button key={f.label} type="button" onClick={() => { f.clear(); setPage(1); }}
+                className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-orange-50 border border-orange-100 text-[11px] font-semibold text-[#F25722] hover:bg-orange-100 transition-colors">
+                {f.label}
+                <X size={10} />
+              </button>
+            ))}
+            <button type="button" onClick={clearAll}
+              className="text-[11px] font-semibold text-gray-400 hover:text-[#111] underline underline-offset-2 ml-1 transition-colors">
+              Clear all
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -4038,8 +4075,21 @@ function BookingsSection({ onViewPayment, initialDetailId }: { onViewPayment?: (
               {isLoading ? (
                 <tr><td colSpan={9} className="px-5 py-10 text-center text-gray-400 text-xs">Loading…</td></tr>
               ) : data?.bookings.length === 0 ? (
-                <tr><td colSpan={9} className="px-5 py-10 text-center text-gray-400 text-xs">
-                  {search ? `Nothing matches “${search}”` : "No bookings found"}
+                <tr><td colSpan={9} className="px-5 py-12 text-center">
+                  <p className="text-sm font-semibold text-gray-600 mb-1">No bookings match</p>
+                  {activeFilters.length > 0 ? (
+                    <>
+                      <p className="text-xs text-gray-400 mb-3">
+                        You're filtering by {activeFilters.map((f) => f.label).join(" + ")}.
+                      </p>
+                      <button type="button" onClick={clearAll}
+                        className="text-xs font-semibold text-[#F25722] hover:underline">
+                        Clear filters
+                      </button>
+                    </>
+                  ) : (
+                    <p className="text-xs text-gray-400">There are no bookings yet.</p>
+                  )}
                 </td></tr>
               ) : data?.bookings.map(b => (
                 <tr key={b.id} className="border-b border-gray-50 hover:bg-orange-50/30 transition-colors cursor-pointer" onClick={() => setView({ mode: "detail", id: b.id })}>
