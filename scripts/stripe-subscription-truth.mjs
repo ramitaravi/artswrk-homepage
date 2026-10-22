@@ -35,6 +35,31 @@ if (!LIVE) {
 if (KEY.startsWith("sk_live_")) {
   console.warn("  NOTE: that is a full secret key. A restricted read-only key (rk_live_) is safer here.\n");
 }
+if (/YOURKEY|YOUR_KEY|xxx/i.test(KEY)) {
+  console.error("\n  That is the placeholder from the instructions, not a real key.");
+  console.error("  Replace rk_live_YOURKEY with your actual restricted key.\n");
+  process.exit(1);
+}
+
+/** Stripe failures are expected (wrong key, no permission). Say what to do
+ *  about them rather than dumping a stack trace the reader has to decode. */
+function stripeFailed(err) {
+  const t = err?.type ?? "";
+  console.error("");
+  if (t === "StripeAuthenticationError") {
+    console.error("  Stripe rejected that key.");
+    console.error("  Check it is a LIVE key, copied whole, from the right Stripe account.");
+  } else if (t === "StripePermissionError") {
+    console.error("  That key is valid but lacks permission for this read.");
+    console.error("  The restricted key needs READ on: Subscriptions, Customers, Balance transactions.");
+  } else if (t === "StripeConnectionError") {
+    console.error("  Could not reach Stripe. Check your connection and retry.");
+  } else {
+    console.error(`  Stripe error: ${err?.message ?? err}`);
+  }
+  console.error("");
+  process.exit(1);
+}
 
 const stripe = new Stripe(KEY, { apiVersion: "2026-03-25.dahlia" });
 const money = (c) => `$${(c / 100).toFixed(2)}`;
@@ -43,11 +68,15 @@ const pad = (s, n) => String(s).padEnd(n);
 /* ---------- 1. Stripe: every subscription, all statuses ---------- */
 console.log("Reading subscriptions from Stripe…");
 const subs = [];
-for await (const s of stripe.subscriptions.list({
-  status: "all",
-  limit: 100,
-  expand: ["data.customer", "data.items.data.price.product"],
-})) subs.push(s);
+try {
+  for await (const s of stripe.subscriptions.list({
+    status: "all",
+    limit: 100,
+    expand: ["data.customer", "data.items.data.price.product"],
+  })) subs.push(s);
+} catch (err) {
+  stripeFailed(err);
+}
 console.log(`  ${subs.length} subscription objects in Stripe\n`);
 
 const monthlyCents = (item) => {
@@ -170,7 +199,13 @@ if (unmatched.length) {
 /* ---------- 4. Money actually moved ---------- */
 console.log("\n\nSTRIPE BALANCE & RECENT MONEY (last 90 days)");
 console.log("─".repeat(62));
-const bal = await stripe.balance.retrieve();
+let bal;
+try {
+  bal = await stripe.balance.retrieve();
+} catch (err) {
+  console.log("  (balance unavailable — the key lacks Balance read permission)");
+  bal = { available: [], pending: [] };
+}
 for (const a of bal.available) {
   console.log(`  Available: ${money(a.amount)} ${a.currency.toUpperCase()}`);
 }
@@ -180,12 +215,16 @@ for (const p of bal.pending) {
 
 const since = Math.floor(Date.now() / 1000) - 90 * 86400;
 const tally = {};
-for await (const t of stripe.balanceTransactions.list({ created: { gte: since }, limit: 100 })) {
-  tally[t.type] ??= { n: 0, gross: 0, fees: 0, net: 0 };
-  tally[t.type].n += 1;
-  tally[t.type].gross += t.amount;
-  tally[t.type].fees += t.fee;
-  tally[t.type].net += t.net;
+try {
+  for await (const t of stripe.balanceTransactions.list({ created: { gte: since }, limit: 100 })) {
+    tally[t.type] ??= { n: 0, gross: 0, fees: 0, net: 0 };
+    tally[t.type].n += 1;
+    tally[t.type].gross += t.amount;
+    tally[t.type].fees += t.fee;
+    tally[t.type].net += t.net;
+  }
+} catch (err) {
+  console.log("  (transactions unavailable — the key lacks Balance transaction read permission)");
 }
 console.log(`\n  ${pad("TYPE", 24)} ${pad("COUNT", 7)} ${pad("GROSS", 14)} ${pad("FEES", 12)} NET`);
 for (const [k, v] of Object.entries(tally).sort((a, b) => Math.abs(b[1].gross) - Math.abs(a[1].gross))) {
