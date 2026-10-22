@@ -14,9 +14,10 @@
 -- Both are NULL on every existing row, so nothing changes until an admin
 -- sets one.
 
-ALTER TABLE bookings
-  ADD COLUMN manualArtistTotal      DOUBLE       NULL,
-  ADD COLUMN manualClientTotal      DOUBLE       NULL,
-  ADD COLUMN manualTotalsSetAt      TIMESTAMP    NULL,
-  ADD COLUMN manualTotalsSetByUserId INT         NULL,
-  ADD COLUMN manualTotalsReason     VARCHAR(512) NULL;
+-- One column per statement: the applier checks each for existence before
+-- running it, so this stays safe to re-run after a partial failure.
+ALTER TABLE bookings ADD COLUMN manualArtistTotal DOUBLE NULL;
+ALTER TABLE bookings ADD COLUMN manualClientTotal DOUBLE NULL;
+ALTER TABLE bookings ADD COLUMN manualTotalsSetAt TIMESTAMP NULL;
+ALTER TABLE bookings ADD COLUMN manualTotalsSetByUserId INT NULL;
+ALTER TABLE bookings ADD COLUMN manualTotalsReason VARCHAR(512) NULL;

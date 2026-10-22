@@ -1,16 +1,26 @@
 /**
- * Apply drizzle/0059_booking_edits_and_cancellations.sql.
+ * Apply a drizzle migration file.
  *
- * Each statement is checked before it runs, so this is safe to re-run: an
- * existing column or index is skipped rather than erroring. Prints what it
- * would do first; pass --write to apply.
+ *   node scripts/apply-migration-0059.mjs [path/to/migration.sql] [--write]
+ *
+ * Defaults to 0059 for backwards compatibility. Each statement is checked
+ * before it runs, so this is safe to re-run: an existing column, index or
+ * table is skipped rather than erroring. Prints what it would do first;
+ * pass --write to apply.
+ *
+ * Write ONE column per ALTER statement in migration files -- the pre-flight
+ * check reads only the first column name, so a multi-column ALTER cannot be
+ * re-run safely after a partial failure.
  */
 import mysql from "mysql2/promise";
 import { readFileSync } from "node:fs";
 import "dotenv/config";
 
 const WRITE = process.argv.includes("--write");
-const sqlText = readFileSync("drizzle/0059_booking_edits_and_cancellations.sql", "utf8");
+const FILE = process.argv.slice(2).find((a) => a.endsWith(".sql"))
+  ?? "drizzle/0059_booking_edits_and_cancellations.sql";
+const sqlText = readFileSync(FILE, "utf8");
+console.log(`Migration: ${FILE}`);
 
 // Strip comments, split on semicolons. Trailing comments matter too: a
 // `...NULL;   -- artist | client` line otherwise glues its comment onto the
