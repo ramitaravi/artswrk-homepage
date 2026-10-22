@@ -1230,6 +1230,9 @@ function Step3({
   const BAR_HEIGHTS = [18, 28, 38, 48, 58, 70, 84, 100]; // % heights
 
   const BOOST_DURATIONS = [
+    // 1 day: for a sub needed today or tomorrow. 3 days was the shortest
+    // option, so the most urgent posts paid for two days they could not use.
+    { value: 1, label: "1 day" },
     { value: 3, label: "3 days" },
     { value: 7, label: "1 week" },
     { value: 14, label: "2 weeks" },

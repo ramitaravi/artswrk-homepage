@@ -15,6 +15,7 @@ import { handleBubbleWebhook } from "../bubbleWebhook";
 import { handleScheduledBubbleSync } from "../scheduledSync";
 import { handleSendGridWebhook } from "../jobAlerts/webhook";
 import { handleScheduledJobAlerts, handleScheduledBrevoSync } from "../jobAlerts/scheduled";
+import { handleScheduledJobExpiry } from "../expireJobs";
 import { handleUnsubscribeGet, handleUnsubscribePost } from "../jobAlerts/unsubscribe";
 import { handleScheduledBookingCompletionReminders } from "../bookingReminders";
 import { registerStorageProxy } from "./storageProxy";
@@ -238,6 +239,9 @@ async function startServer() {
   // unsubscribe link is how bulk senders collect spam complaints. The signed
   // token in the URL is what proves the link came from us.
   app.post("/api/scheduled/brevo-suppressions", express.json({ limit: "1mb" }), handleScheduledBrevoSync);
+  // Daily is plenty — a job that ran yesterday does not need closing within
+  // the hour, and it is a no-op once the backlog is clear.
+  app.post("/api/scheduled/expire-jobs", express.json({ limit: "1mb" }), handleScheduledJobExpiry);
   app.get("/unsubscribe", handleUnsubscribeGet);
   app.post("/unsubscribe", express.urlencoded({ extended: true }), handleUnsubscribePost);
 

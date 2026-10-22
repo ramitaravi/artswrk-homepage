@@ -23,8 +23,13 @@ interface BoostJobModalProps {
   onClose: () => void;
 }
 
-// Duration options
+// Duration options.
+//
+// 1 day exists for a sub needed today or tomorrow, which is the most urgent
+// kind of post and the one 3 days serves worst -- a studio needing cover
+// tonight is paying for two days they cannot use.
 const DURATION_OPTIONS = [
+  { value: 1, label: "1 day" },
   { value: 3, label: "3 days" },
   { value: 7, label: "1 week" },
   { value: 14, label: "2 weeks" },

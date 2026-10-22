@@ -105,3 +105,42 @@ describe("class-date booking detail", () => {
     });
   });
 });
+
+/**
+ * GitHub #4, last open point: a resubmit could overwrite a PAID invoice.
+ *
+ * bookingPeriods.submit only ever checked for "skipped". An artist could
+ * resubmit hours on a week the studio had already paid -- overwriting
+ * actualHours and the stored total, and emailing them a fresh invoice for
+ * work they had already bought. Nine periods were in that state.
+ */
+import { describe as describeResubmit, it as itResubmit, expect as expectResubmit } from "vitest";
+
+/** Mirrors the guard order in bookingPeriods.submit. */
+function submitAllowed(period: { status?: string; invoicePaidAt?: Date | null }): { ok: boolean; reason?: string } {
+  if (period.status === "client_paid" || period.invoicePaidAt) {
+    return { ok: false, reason: "already been paid" };
+  }
+  if (period.status === "skipped") return { ok: false, reason: "skipped" };
+  return { ok: true };
+}
+
+describeResubmit("resubmitting a week's hours", () => {
+  itResubmit("refuses a week the studio has already paid", () => {
+    expectResubmit(submitAllowed({ status: "client_paid" }).ok).toBe(false);
+    expectResubmit(submitAllowed({ status: "client_paid" }).reason).toMatch(/already been paid/);
+  });
+
+  itResubmit("refuses on a paid timestamp even if the status lags behind", () => {
+    expectResubmit(submitAllowed({ status: "artist_submitted", invoicePaidAt: new Date() }).ok).toBe(false);
+  });
+
+  itResubmit("still refuses a skipped week", () => {
+    expectResubmit(submitAllowed({ status: "skipped" }).ok).toBe(false);
+  });
+
+  itResubmit("allows an open week, and a correction before payment", () => {
+    expectResubmit(submitAllowed({ status: "open" }).ok).toBe(true);
+    expectResubmit(submitAllowed({ status: "artist_submitted" }).ok).toBe(true);
+  });
+});

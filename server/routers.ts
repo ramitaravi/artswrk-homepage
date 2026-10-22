@@ -6422,6 +6422,13 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
 
         const reimbList = await getReimbursementsByPeriodId(input.periodId);
         const totalReimb = reimbList.reduce((s: number, r: any) => s + (r.value ?? 0), 0);
+        // A paid week is settled. Without this an artist could resubmit hours
+        // on a week the studio had already paid, overwriting actualHours and
+        // the stored total and emailing them a fresh invoice for work they
+        // have already bought -- and the studio could pay twice (GitHub #4).
+        if ((period as any).status === "client_paid" || (period as any).invoicePaidAt) {
+          throw new Error("This week has already been paid, so its hours are fixed. Contact support if something needs correcting.");
+        }
         if ((period as any).status === "skipped") {
           throw new Error("This week was skipped (no class), so there are no hours to submit.");
         }
