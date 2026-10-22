@@ -4,6 +4,7 @@
  * expand-in-place row on the Bookings list.
  */
 import { useState } from "react";
+import BookingSelfServe, { BookingHistory } from "@/components/BookingSelfServe";
 import { useParams, useLocation, Link } from "wouter";
 import {
   ArrowLeft, Calendar, MapPin, Clock, CheckCircle, AlertCircle, CreditCard,
@@ -461,6 +462,12 @@ export default function ClientBookingDetail() {
               Invoice submitted {formatDate(b.artswrkInvoiceSubmittedAt)}
             </p>
           )}
+
+          {/* The studio's own controls: edit the details, cancel, see what
+              changed. Same endpoints the artist uses — the server decides
+              what each side may touch. */}
+          <BookingSelfServe booking={b} side="client" />
+          <BookingHistory bookingId={b.id} />
         </div>
       </div>
     </div>

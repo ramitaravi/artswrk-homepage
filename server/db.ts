@@ -3251,60 +3251,77 @@ export async function getAdminBookings({
   upcoming,
   paymentStatus,
   bookingStatus,
-  artistSearch,
-  clientSearch,
-  companySearch,
+  search,
+  rateType,
   limit = 50,
   offset = 0,
 }: {
   upcoming?: boolean;
   paymentStatus?: string;
   bookingStatus?: string;
-  artistSearch?: string;
-  clientSearch?: string;
-  companySearch?: string;
+  /** Matches an artist name, a client name, a company, or a booking id. */
+  search?: string;
+  rateType?: "hourly" | "flat";
   limit?: number;
   offset?: number;
 }) {
   const db = await getDb();
   if (!db) return { bookings: [], total: 0 };
 
-  const now = new Date();
-  const conditions = [eq(bookings.deleted, false)];
-  if (upcoming === true) conditions.push(sql`${bookings.startDate} >= ${now}` as any);
-  if (upcoming === false) conditions.push(sql`${bookings.startDate} < ${now}` as any);
-  if (paymentStatus) conditions.push(eq(bookings.paymentStatus, paymentStatus) as any);
-  if (bookingStatus) conditions.push(eq(bookings.bookingStatus, bookingStatus) as any);
+  // The list used to select straight off `bookings` with no joins at all, so
+  // it could only ever show "Client #1020767 / Artist #780227". It also
+  // accepted artistSearch/clientSearch/companySearch and then never used them,
+  // so searching silently did nothing.
+  const clauses: any[] = [sql`b.deleted = 0`];
+  if (upcoming === true) clauses.push(sql`b.startDate >= NOW()`);
+  if (upcoming === false) clauses.push(sql`b.startDate < NOW()`);
+  if (paymentStatus) clauses.push(sql`b.paymentStatus = ${paymentStatus}`);
+  if (bookingStatus) clauses.push(sql`b.bookingStatus = ${bookingStatus}`);
+  if (rateType) clauses.push(sql`b.rateType = ${rateType}`);
 
-  const where = and(...conditions);
+  const term = (search ?? "").trim();
+  if (term) {
+    // LOWER() on both sides: every text column here is utf8mb4_bin, so a plain
+    // LIKE is case-sensitive and "mckell" would miss "McKell".
+    const like = `%${term.toLowerCase()}%`;
+    const asId = Number(term.replace(/^#/, ""));
+    const idMatch = Number.isFinite(asId) && asId > 0 ? sql`OR b.id = ${asId}` : sql``;
+    clauses.push(sql`(
+      LOWER(COALESCE(a.name, CONCAT(COALESCE(a.firstName,''), ' ', COALESCE(a.lastName,'')))) LIKE ${like}
+      OR LOWER(COALESCE(c.name, CONCAT(COALESCE(c.firstName,''), ' ', COALESCE(c.lastName,'')))) LIKE ${like}
+      OR LOWER(COALESCE(c.clientCompanyName, '')) LIKE ${like}
+      OR LOWER(COALESCE(a.email, '')) LIKE ${like}
+      OR LOWER(COALESCE(c.email, '')) LIKE ${like}
+      ${idMatch}
+    )`);
+  }
+  const where = sql.join(clauses, sql` AND `);
+  const joins = sql`
+    FROM bookings b
+    LEFT JOIN users a ON a.id = b.artistUserId
+    LEFT JOIN users c ON c.id = b.clientUserId
+    WHERE ${where}`;
 
-  const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(bookings).where(where);
+  const [countRows] = await db.execute(sql`SELECT COUNT(*) AS n ${joins}`);
+  const total = Number((countRows as unknown as Array<{ n: number }>)[0]?.n ?? 0);
 
-  const rows = await db
-    .select({
-      id: bookings.id,
-      startDate: bookings.startDate,
-      endDate: bookings.endDate,
-      bookingStatus: bookings.bookingStatus,
-      paymentStatus: bookings.paymentStatus,
-      clientRate: bookings.clientRate,
-      artistRate: bookings.artistRate,
-      grossProfit: bookings.grossProfit,
-      stripeFee: bookings.stripeFee,
-      postFeeRevenue: bookings.postFeeRevenue,
-      externalPayment: bookings.externalPayment,
-      clientUserId: bookings.clientUserId,
-      artistUserId: bookings.artistUserId,
-      jobId: bookings.jobId,
-      createdAt: bookings.createdAt,
-    })
-    .from(bookings)
-    .where(where)
-    .orderBy(desc(bookings.startDate))
-    .limit(limit)
-    .offset(offset);
+  const [rows] = await db.execute(sql`
+    SELECT
+      b.id, b.startDate, b.endDate, b.bookingStatus, b.paymentStatus,
+      b.rateType, b.hourlyRate, b.flatRate, b.hours,
+      b.clientRate, b.artistRate, b.totalClientRate, b.totalArtistRate,
+      b.invoiceTotalCents, b.invoicePaidAt, b.externalPayment,
+      b.recurringSeriesId, b.isAdminBooking, b.isRecurring,
+      b.clientUserId, b.artistUserId, b.jobId, b.createdAt,
+      a.name AS artistName, a.firstName AS artistFirstName, a.lastName AS artistLastName,
+      a.profilePicture AS artistPhoto, a.email AS artistEmail,
+      c.name AS clientName, c.firstName AS clientFirstName, c.lastName AS clientLastName,
+      c.clientCompanyName, c.profilePicture AS clientPhoto, c.email AS clientEmail
+    ${joins}
+    ORDER BY b.startDate DESC
+    LIMIT ${limit} OFFSET ${offset}`);
 
-  return { bookings: rows, total: Number(countRow?.count ?? 0) };
+  return { bookings: rows as unknown as any[], total };
 }
 
 /** Admin: single booking with full client + artist + job info */
@@ -3321,6 +3338,14 @@ export async function getAdminBookingById(bookingId: number) {
       b.clientRate, b.artistRate, b.totalClientRate, b.totalArtistRate,
       b.grossProfit, b.stripeFee, b.postFeeRevenue,
       b.hours, b.externalPayment,
+      -- The admin booking controls decide what is allowed from these: whether
+      -- money has moved, whether an invoice is out, and the unit rate to
+      -- prefill. Without them "paid" was inferred from paymentStatus alone and
+      -- the "invoice out" warning could never fire.
+      b.rateType, b.hourlyRate, b.flatRate,
+      b.invoicePaidAt, b.artswrkInvoiceSubmittedAt, b.invoicePaymentToken,
+      b.invoiceTotalCents, b.paymentMethod,
+      b.cancelledAt, b.cancelledByRole, b.cancellationReason, b.cancellationNoticeHours,
       b.startDate, b.endDate,
       b.locationAddress, b.description,
       b.stripeCheckoutUrl,

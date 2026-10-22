@@ -17,12 +17,18 @@ describe("assertReimbursementRemovable", () => {
     expect(remove({ period: { bookingId: 10, status: "upcoming" } })).not.toThrow();
   });
 
-  it("locks a week's expenses once its hours are submitted or paid", () => {
-    expect(remove({ period: { bookingId: 10, status: "artist_submitted" } })).toThrow(/already submitted/);
-    expect(remove({ period: { bookingId: 10, status: "client_paid" } })).toThrow(/already submitted/);
+  it("still lets a week's expenses be fixed after submitting, before payment", () => {
+    // This used to throw. Marlon attached the wrong travel receipt, submitted,
+    // then "wasn't able to remove the wrong one" -- it took a SQL DELETE.
+    // Removing one now withdraws the open invoice and he resubmits.
+    expect(remove({ period: { bookingId: 10, status: "artist_submitted" } })).not.toThrow();
   });
 
-  it("refuses anyone but the artist who added it", () => {
+  it("locks a week's expenses once the client has paid", () => {
+    expect(remove({ period: { bookingId: 10, status: "client_paid" } })).toThrow(/has been paid/);
+  });
+
+  it("refuses anyone who is not a party to the booking", () => {
     expect(remove({ userId: 99 })).toThrow("Not authorized");
     expect(remove({ reimbursement: { ...weekExpense, artistUserId: 99 } })).toThrow("Not authorized");
     expect(remove({ booking: { ...booking, artistUserId: 99 } })).toThrow("Not authorized");
@@ -37,9 +43,15 @@ describe("assertReimbursementRemovable", () => {
     expect(remove({ booking: null })).toThrow("Not authorized");
   });
 
-  it("lets a one-off booking's expense go until the invoice is submitted", () => {
+  it("lets a one-off booking's expense go until the money moves", () => {
     expect(remove({ reimbursement: oneOffExpense, period: null })).not.toThrow();
-    expect(remove({ reimbursement: oneOffExpense, period: null, booking: { ...booking, artswrkInvoiceSubmittedAt: new Date() } })).toThrow(/already been invoiced/);
-    expect(remove({ reimbursement: oneOffExpense, period: null, booking: { ...booking, paymentStatus: "Paid" } })).toThrow(/already been invoiced/);
+    // Submitted but unpaid is still fixable -- the invoice gets withdrawn.
+    expect(remove({ reimbursement: oneOffExpense, period: null, booking: { ...booking, artswrkInvoiceSubmittedAt: new Date() } })).not.toThrow();
+    expect(remove({ reimbursement: oneOffExpense, period: null, booking: { ...booking, paymentStatus: "Paid" } })).toThrow(/has been paid/);
+  });
+
+  it("lets the CLIENT fix an expense too, not only the artist", () => {
+    // A studio disputing a line should not have to email support.
+    expect(remove({ userId: 99, booking: { ...booking, clientUserId: 99 } })).not.toThrow();
   });
 });

@@ -7,7 +7,8 @@
  */
 
 import { useState, useEffect, useRef, type MutableRefObject } from "react";
-import { bookingRateLabel } from "@shared/bookingRates";
+import AdminBookingControls, { AdminBookingHistory } from "@/components/AdminBookingControls";
+import { bookingRateLabel, isHourlyRateBooking, processingFeeFor } from "@shared/bookingRates";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
@@ -3842,6 +3843,13 @@ function AdminBookingDetail({ bookingId, onBack, onViewJob, onViewPayment }: {
         </div>
       </div>
 
+      {/* Fixing the booking, and the record of who fixed what. Every control
+          here replaces a SQL script that was run against the live database. */}
+      <div className="grid md:grid-cols-2 gap-4">
+        <AdminBookingControls booking={b} />
+        <AdminBookingHistory bookingId={bookingId} />
+      </div>
+
       {/* Tabs */}
       <div className="flex gap-0 border-b border-gray-200">
         {([{ key: "overview", label: "Overview" }, { key: "payments", label: "Payments" }] as const).map(t => (
@@ -3917,13 +3925,24 @@ function BookingsSection({ onViewPayment, initialDetailId }: { onViewPayment?: (
   const [upcoming, setUpcoming] = useState<boolean | undefined>(true);
   const [paymentStatus, setPaymentStatus] = useState("");
   const [bookingStatus, setBookingStatus] = useState("");
+  const [rateTypeFilter, setRateTypeFilter] = useState<"" | "hourly" | "flat">("");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const LIMIT = 50;
+
+  // Debounced so typing a studio name doesn't fire a query per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => { setSearch(searchInput.trim()); setPage(1); }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   const { data, isLoading } = trpc.admin.bookings.useQuery({
     upcoming,
     paymentStatus: paymentStatus || undefined,
     bookingStatus: bookingStatus || undefined,
+    rateType: rateTypeFilter || undefined,
+    search: search || undefined,
     limit: LIMIT,
     offset: (page - 1) * LIMIT,
   }, { enabled: view.mode === "list" });
@@ -3971,29 +3990,56 @@ function BookingsSection({ onViewPayment, initialDetailId }: { onViewPayment?: (
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Date</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Client / Artist</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Client Rate</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Artist Rate</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Gross Profit</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Client</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Artist</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Rate</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">Artist gets</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">Client pays</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">Gross profit</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Status</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">Payment</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400 text-xs">Loading…</td></tr>
+                <tr><td colSpan={9} className="px-5 py-10 text-center text-gray-400 text-xs">Loading…</td></tr>
               ) : data?.bookings.length === 0 ? (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400 text-xs">No bookings found</td></tr>
+                <tr><td colSpan={9} className="px-5 py-10 text-center text-gray-400 text-xs">
+                  {search ? `Nothing matches “${search}”` : "No bookings found"}
+                </td></tr>
               ) : data?.bookings.map(b => (
                 <tr key={b.id} className="border-b border-gray-50 hover:bg-orange-50/30 transition-colors cursor-pointer" onClick={() => setView({ mode: "detail", id: b.id })}>
                   <td className="px-5 py-3 text-xs text-gray-700 whitespace-nowrap">{fmtDateTime(b.startDate)}</td>
-                  <td className="px-4 py-3">
-                    <p className="text-xs font-semibold text-[#111]">{b.clientUserId ? `Client #${b.clientUserId}` : "—"}</p>
-                    <p className="text-[10px] text-gray-400">{b.artistUserId ? `Artist #${b.artistUserId}` : "—"}</p>
-                  </td>
-                  <td className="px-4 py-3 text-xs font-semibold text-[#111]">{b.clientRate ? fmt$(b.clientRate * 100) : "—"}</td>
-                  <td className="px-4 py-3 text-xs text-gray-600">{b.artistRate ? fmt$(b.artistRate * 100) : "—"}</td>
-                  <td className="px-4 py-3 text-xs text-green-600 font-semibold">{b.grossProfit ? fmt$(b.grossProfit * 100) : "—"}</td>
+                  <td className="px-4 py-3"><PartyCell
+                    name={(b as any).clientCompanyName || (b as any).clientName
+                      || [(b as any).clientFirstName, (b as any).clientLastName].filter(Boolean).join(" ")}
+                    sub={(b as any).clientCompanyName ? ((b as any).clientName ?? undefined) : undefined}
+                    photo={(b as any).clientPhoto} fallbackId={b.clientUserId} /></td>
+                  <td className="px-4 py-3"><PartyCell
+                    name={(b as any).artistName
+                      || [(b as any).artistFirstName, (b as any).artistLastName].filter(Boolean).join(" ")}
+                    photo={(b as any).artistPhoto} fallbackId={b.artistUserId} /></td>
+                  <td className="px-4 py-3 whitespace-nowrap">{(() => {
+                    const m = adminBookingMoney(b as any);
+                    return (
+                      <>
+                        <p className="text-xs font-semibold text-[#111]">{m.rateLabel}</p>
+                        {m.basisLabel && <p className="text-[10px] text-gray-400">{m.basisLabel}</p>}
+                      </>
+                    );
+                  })()}</td>
+                  <td className="px-4 py-3 text-xs text-right text-gray-700 whitespace-nowrap">{(() => {
+                    const m = adminBookingMoney(b as any);
+                    return m.artistTotal != null ? fmt$(m.artistTotal * 100) : "—";
+                  })()}</td>
+                  <td className="px-4 py-3 text-xs text-right font-semibold text-[#111] whitespace-nowrap">{(() => {
+                    const m = adminBookingMoney(b as any);
+                    return m.clientTotal != null ? fmt$(m.clientTotal * 100) : "—";
+                  })()}</td>
+                  <td className="px-4 py-3 text-xs text-right text-green-600 font-semibold whitespace-nowrap">{(() => {
+                    const m = adminBookingMoney(b as any);
+                    return m.grossProfit != null ? fmt$(m.grossProfit * 100) : "—";
+                  })()}</td>
                   <td className="px-4 py-3"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${bookingStatusColor(b.bookingStatus)}`}>{b.bookingStatus || "—"}</span></td>
                   <td className="px-4 py-3"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${paymentStatusColor(b.paymentStatus)}`}>{b.paymentStatus || "—"}</span></td>
                 </tr>
@@ -4005,6 +4051,77 @@ function BookingsSection({ onViewPayment, initialDetailId }: { onViewPayment?: (
       </div>
     </div>
   );
+}
+
+/**
+ * A person or a studio in a list row — photo, name, and what they are.
+ *
+ * The bookings table selected straight off `bookings` with no joins, so the
+ * only thing it could show was "Client #1020767 / Artist #780227".
+ */
+function PartyCell({ name, sub, photo, fallbackId }: {
+  name?: string | null; sub?: string | null; photo?: string | null; fallbackId?: number | null;
+}) {
+  const label = (name ?? "").trim() || (fallbackId ? `#${fallbackId}` : "—");
+  const initial = (label.replace(/^#/, "")[0] ?? "?").toUpperCase();
+  const src = photo ? (photo.startsWith("//") ? `https:${photo}` : photo) : null;
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      {src ? (
+        <img src={src} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0 bg-gray-100"
+          onError={(e) => { (e.target as HTMLImageElement).style.visibility = "hidden"; }} />
+      ) : (
+        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#FFBC5D] to-[#F25722] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
+          {initial}
+        </div>
+      )}
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-[#111] truncate max-w-[150px]">{label}</p>
+        {sub && <p className="text-[10px] text-gray-400 truncate max-w-[150px]">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * What a booking is worth, for an admin list.
+ *
+ * The old columns printed `clientRate` and `artistRate` raw and called the
+ * difference "gross profit" — which is always zero, because Artswrk takes a
+ * fee ON TOP rather than a margin in between. So the column showed "—" on
+ * every row while the real figure sat uncomputed.
+ */
+function adminBookingMoney(b: {
+  rateType?: string | null; hourlyRate?: number | null; flatRate?: number | null;
+  hours?: number | null; artistRate?: number | null; clientRate?: number | null;
+  invoiceTotalCents?: number | null; recurringSeriesId?: number | null;
+  isAdminBooking?: boolean | number | null; isRecurring?: boolean | number | null;
+}): { rateLabel: string; basisLabel: string | null; artistTotal: number | null; clientTotal: number | null; grossProfit: number | null } {
+  const hours = Number(b.hours ?? 0);
+  const hourly = isHourlyRateBooking(b as any);
+  const unit = hourly ? Number(b.hourlyRate ?? b.artistRate ?? 0) : null;
+
+  const artistTotal = hourly && unit && hours > 0
+    ? Math.round(unit * hours * 100) / 100
+    : (b.artistRate ?? null);
+
+  // What was actually invoiced wins over an estimate.
+  const clientTotal = b.invoiceTotalCents != null
+    ? b.invoiceTotalCents / 100
+    : artistTotal != null ? artistTotal + processingFeeFor(artistTotal) : null;
+
+  const grossProfit = artistTotal != null && clientTotal != null
+    ? Math.round((clientTotal - artistTotal) * 100) / 100
+    : null;
+
+  const rateLabel = hourly && unit
+    ? `$${unit.toFixed(2)}/hr`
+    : b.artistRate != null ? `$${Number(b.artistRate).toFixed(2)}` : "—";
+  const basisLabel = hourly
+    ? (hours > 0 ? `Hourly · ${hours} hrs` : "Hourly")
+    : b.rateType === "flat" ? "Flat" : null;
+
+  return { rateLabel, basisLabel, artistTotal, clientTotal, grossProfit };
 }
 
 // ─── Payment: Detail Page ──────────────────────────────────────────────────────

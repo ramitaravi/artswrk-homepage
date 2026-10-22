@@ -38,7 +38,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, approveArtswrkInvoice, approveBookingPeriodInvoice, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, getArtistPastClients, getBookingAudit, applyBookingEdit, cancelBooking, markBookingPaidManually, withdrawBookingInvoice, getLateCancellations, createArtistInvoiceBooking, declineArtswrkInvoice, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getArtistInvoicesAwaiting, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllAffiliationsForAdmin, getArtistAffiliationIds, findOrCreateAffiliation, setArtistAffiliations, addArtistAffiliation, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, approveArtswrkInvoice, approveBookingPeriodInvoice, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, getArtistPastClients, getBookingAudit, recordBookingAudit, applyBookingEdit, cancelBooking, markBookingPaidManually, withdrawBookingInvoice, getLateCancellations, createArtistInvoiceBooking, declineArtswrkInvoice, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getArtistInvoicesAwaiting, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllAffiliationsForAdmin, getArtistAffiliationIds, findOrCreateAffiliation, setArtistAffiliations, addArtistAffiliation, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail, sendArtistBookingConfirmedEmail, sendClientBookingConfirmedEmail, sendClientPayArtistEmail, sendInquiryIntroEmail } from "./email";
 import crypto from "crypto";
@@ -1900,9 +1900,11 @@ export const appRouter = router({
         upcoming: z.boolean().optional(),
         paymentStatus: z.string().optional(),
         bookingStatus: z.string().optional(),
-        artistSearch: z.string().optional(),
-        clientSearch: z.string().optional(),
-        companySearch: z.string().optional(),
+        // One box that matches an artist, a client, a company, an email or a
+        // booking id. The three separate search params it replaced were
+        // accepted by the query and then never used.
+        search: z.string().max(200).optional(),
+        rateType: z.enum(["hourly", "flat"]).optional(),
         limit: z.number().min(1).max(200).default(50),
         offset: z.number().min(0).default(0),
       }))
@@ -4919,9 +4921,33 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const reimbursement = await getReimbursementById(input.id);
         const booking = reimbursement?.bookingId != null ? await getBookingById(reimbursement.bookingId) : null;
         const period = reimbursement?.bookingPeriodId != null ? await getBookingPeriodById(reimbursement.bookingPeriodId) : null;
-        assertReimbursementRemovable({ userId: user.id, reimbursement, booking, period: period as any });
+        const isAdmin = ctx.user.openId === ENV.ownerOpenId || ctx.user.role === "admin";
+        assertReimbursementRemovable({ userId: user.id, reimbursement, booking, period: period as any, isAdmin });
+
+        // Removing an expense changes what the client owes, so an invoice
+        // already out for this booking has to go with it -- otherwise they
+        // pay a total that includes a line nobody can see any more.
+        const invoiceWasOpen = !!booking && hasOpenInvoice(booking as any);
+        if (invoiceWasOpen && booking) {
+          await withdrawBookingInvoice({
+            bookingId: booking.id,
+            actorUserId: user.id,
+            actorRole: isAdmin ? "admin" : booking.artistUserId === user.id ? "artist" : "client",
+            reason: "Withdrawn automatically because an expense was removed",
+          });
+        }
         await deleteReimbursement(input.id);
-        return { success: true };
+        if (booking) {
+          await recordBookingAudit([{
+            bookingId: booking.id,
+            actorUserId: user.id,
+            actorRole: isAdmin ? "admin" : booking.artistUserId === user.id ? "artist" : "client",
+            action: "reimbursement",
+            field: "removed",
+            oldValue: `$${Number(reimbursement?.value ?? 0).toFixed(2)}${reimbursement?.note ? ` — ${reimbursement.note}` : ""}`,
+          }]);
+        }
+        return { success: true, invoiceWithdrawn: invoiceWasOpen };
       }),
 
     /** Expenses attached to one week of a recurring booking. */

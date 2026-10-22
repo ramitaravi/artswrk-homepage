@@ -19,22 +19,38 @@ type ReimbursementPeriod = {
 export function assertReimbursementRemovable(input: {
   userId: number;
   reimbursement: { artistUserId?: number | null; bookingId?: number | null; bookingPeriodId?: number | null } | null | undefined;
-  booking: { artistUserId?: number | null; artswrkInvoiceSubmittedAt?: Date | string | null; paymentStatus?: string | null } | null | undefined;
+  booking: {
+    artistUserId?: number | null; clientUserId?: number | null;
+    artswrkInvoiceSubmittedAt?: Date | string | null;
+    invoicePaidAt?: Date | string | null; paymentStatus?: string | null;
+  } | null | undefined;
   period?: { bookingId?: number | null; status?: string | null } | null;
+  isAdmin?: boolean;
 }): void {
-  const { userId, reimbursement, booking, period } = input;
-  if (!reimbursement || !booking || reimbursement.artistUserId !== userId || booking.artistUserId !== userId) {
-    throw new Error("Not authorized");
+  const { userId, reimbursement, booking, period, isAdmin } = input;
+  if (!reimbursement || !booking) throw new Error("Not authorized");
+
+  // Either party to the booking, or an admin. Expenses are part of what the
+  // client pays, so a studio disputing a line should not have to email
+  // support to get it looked at.
+  const isArtist = booking.artistUserId === userId && reimbursement.artistUserId === userId;
+  const isClient = booking.clientUserId === userId;
+  if (!isArtist && !isClient && !isAdmin) throw new Error("Not authorized");
+
+  // Paid is the only hard stop. It used to be "submitted", which is how
+  // Marlon ended up with two travel receipts on one day and no way to remove
+  // the wrong one -- he had already submitted, so the button was gone and it
+  // took a SQL DELETE. Removing one now withdraws the open invoice instead,
+  // and the artist resubmits.
+  const paid = !!booking.invoicePaidAt || String(booking.paymentStatus ?? "").toLowerCase() === "paid";
+  if (paid) {
+    throw new Error("This booking has been paid, so its expenses are fixed. Contact support if something needs correcting.");
   }
   if (reimbursement.bookingPeriodId != null) {
     if (!period || period.bookingId !== reimbursement.bookingId) throw new Error("Not authorized");
-    if (period.status !== "open" && period.status !== "upcoming") {
-      throw new Error("This week's hours were already submitted, so its expenses can't be changed");
+    if (period.status === "client_paid") {
+      throw new Error("This week has been paid, so its expenses are fixed.");
     }
-    return;
-  }
-  if (booking.artswrkInvoiceSubmittedAt || String(booking.paymentStatus ?? "").toLowerCase() === "paid") {
-    throw new Error("This booking has already been invoiced, so its expenses can't be changed");
   }
 }
 

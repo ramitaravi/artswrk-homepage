@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import BookingSelfServe, { BookingHistory } from "@/components/BookingSelfServe";
 import { bookingRateLabel } from "@shared/bookingRates";
 import { jobPath } from "@shared/jobUrl";
 import RichText from "@/components/RichText";
@@ -1382,6 +1383,16 @@ function BookingDetail({ booking, onBack }: { booking: any; onBack: () => void }
                 </div>
               )}
             </>)}
+
+            {/* Fixing their own booking: edit the details, cancel, see what
+                changed. A class date belongs to its series, so those are
+                managed from the booking itself rather than per date. */}
+            {!booking.period && (
+              <>
+                <BookingSelfServe booking={booking} side="artist" />
+                <BookingHistory bookingId={booking.id} />
+              </>
+            )}
           </div>
         )}
       </div>
