@@ -11,10 +11,11 @@
  * the wrong one." It took a SQL DELETE. Now it takes a button.
  */
 import { useState } from "react";
-import { AlertTriangle, Ban, Check, Clock, Loader2, MapPin, Pencil, X } from "lucide-react";
+import { AlertTriangle, Ban, Check, Clock, Handshake, Loader2, MapPin, Pencil, X } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { isSettled, hasOpenInvoice } from "@shared/bookingEdits";
+import { isSettled, hasOpenInvoice, hasOpenProposal, proposedBy, proposalSummary } from "@shared/bookingEdits";
+import { processingFeeFor } from "@shared/bookingRates";
 
 const field = "w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#111] focus:outline-none focus:border-[#ec008c] transition-colors";
 const label = "block text-xs font-semibold text-gray-500 mb-1.5";
@@ -25,7 +26,7 @@ export default function BookingSelfServe({ booking, side, onChanged }: {
   onChanged?: () => void;
 }) {
   const utils = trpc.useUtils();
-  const [panel, setPanel] = useState<null | "edit" | "cancel">(null);
+  const [panel, setPanel] = useState<null | "edit" | "cancel" | "rate">(null);
   const other = side === "artist" ? "the studio" : "the artist";
 
   const settled = isSettled(booking);
@@ -53,6 +54,43 @@ export default function BookingSelfServe({ booking, side, onChanged }: {
     onError: fail,
   });
 
+  const proposeRate = trpc.bookingEdits.proposeRate.useMutation({
+    onSuccess: (r: any) => {
+      toast.success(`Proposed ${r.amountLabel}. Nothing changes until ${other} accepts.`);
+      setPanel(null); refresh();
+    },
+    onError: fail,
+  });
+  const respond = trpc.bookingEdits.respondToProposal.useMutation({
+    onSuccess: (r: any) => {
+      toast.success(r.accepted
+        ? `Accepted ${r.amountLabel}. The booking has been updated.`
+        : `Declined. The booking is unchanged.`);
+      refresh();
+    },
+    onError: fail,
+  });
+  const withdraw = trpc.bookingEdits.withdrawProposal.useMutation({
+    onSuccess: () => { toast.success("Withdrawn."); refresh(); },
+    onError: fail,
+  });
+
+  // A rate is what both sides agreed, so neither can change it alone. One
+  // proposes, the other accepts, and only the acceptance moves any money.
+  const openProposal = hasOpenProposal(booking);
+  const mineToAnswer = openProposal && proposedBy(booking) !== side;
+  const [proposedRate, setProposedRate] = useState("");
+  const [rateReason, setRateReason] = useState("");
+  const [declineReason, setDeclineReason] = useState("");
+
+  const isHourly = booking.rateType === "hourly" || booking.hourlyRate != null;
+  const proposedNum = parseFloat(proposedRate);
+  const proposedOk = Number.isFinite(proposedNum) && proposedNum > 0;
+  const bookingHours = Number(booking.hours ?? 0);
+  const proposedArtistTotal = proposedOk
+    ? (isHourly && bookingHours > 0 ? proposedNum * bookingHours : proposedNum)
+    : null;
+
   const [locationAddress, setLocationAddress] = useState(booking.locationAddress ?? "");
   const [description, setDescription] = useState(booking.description ?? "");
   const [cancelReason, setCancelReason] = useState("");
@@ -61,19 +99,141 @@ export default function BookingSelfServe({ booking, side, onChanged }: {
 
   return (
     <div className="border-t border-gray-50 pt-4 space-y-3">
+      {openProposal && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+          <p className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
+            <Handshake size={13} /> {proposalSummary(booking)}
+          </p>
+          {booking.proposedRateReason && (
+            <p className="text-[11px] text-amber-700 italic">"{booking.proposedRateReason}"</p>
+          )}
+          {mineToAnswer ? (
+            <>
+              <p className="text-[11px] text-amber-700">
+                Nothing has changed yet. Accepting updates the booking; declining leaves it as it is.
+              </p>
+              <input
+                className={field}
+                value={declineReason}
+                onChange={(e) => setDeclineReason(e.target.value)}
+                placeholder="Optional note for them"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={respond.isPending}
+                  onClick={() => respond.mutate({ bookingId: booking.id, accept: true, reason: declineReason || undefined })}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#111] text-white text-xs font-semibold disabled:opacity-50"
+                >
+                  {respond.isPending ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  disabled={respond.isPending}
+                  onClick={() => respond.mutate({ bookingId: booking.id, accept: false, reason: declineReason || undefined })}
+                  className="px-3 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:border-red-400 hover:text-red-500 disabled:opacity-50"
+                >
+                  Decline
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] text-amber-700">Waiting on {other}.</p>
+              <button
+                type="button"
+                disabled={withdraw.isPending}
+                onClick={() => withdraw.mutate({ bookingId: booking.id })}
+                className="px-3 py-1.5 rounded-lg border border-amber-300 text-[11px] font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+              >
+                Withdraw
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {panel === null && (
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => setPanel("edit")}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:border-[#ec008c] hover:text-[#ec008c] transition-colors">
             <Pencil size={12} /> Edit details
           </button>
+          {!openProposal && (
+            <button type="button" onClick={() => setPanel("rate")}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:border-[#ec008c] hover:text-[#ec008c] transition-colors">
+              <Handshake size={12} /> Propose a rate change
+            </button>
+          )}
           <button type="button" onClick={() => setPanel("cancel")}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:border-red-400 hover:text-red-500 transition-colors">
             <Ban size={12} /> Cancel booking
           </button>
           <p className="text-[11px] text-gray-400 w-full">
-            The rate and hours are what you both agreed — contact support if those need changing.
+            Neither of you can change the rate alone — propose one and {other} accepts it.
           </p>
+        </div>
+      )}
+
+      {panel === "rate" && (
+        <div className="space-y-3">
+          <div>
+            <label className={label}>
+              {isHourly ? "New rate per hour" : "New rate for the booking"}
+            </label>
+            <input
+              className={field}
+              type="number"
+              min="0"
+              step="0.01"
+              value={proposedRate}
+              onChange={(e) => setProposedRate(e.target.value)}
+              placeholder={isHourly
+                ? String(booking.hourlyRate ?? "0.00")
+                : String(booking.flatRate ?? booking.artistRate ?? "0.00")}
+            />
+          </div>
+          {proposedArtistTotal != null && (
+            <p className="text-xs text-gray-500">
+              {side === "artist" ? "You'd receive" : "The artist would receive"}{" "}
+              <strong className="text-[#111]">${proposedArtistTotal.toFixed(2)}</strong>
+              {isHourly && bookingHours > 0 && <> over {bookingHours} hrs</>}
+              {booking.paymentMethod === "artswrk" && (
+                <> · {side === "client" ? "you'd pay" : "the studio pays"}{" "}
+                  <strong className="text-[#111]">
+                    ${(proposedArtistTotal + processingFeeFor(proposedArtistTotal)).toFixed(2)}
+                  </strong></>
+              )}
+            </p>
+          )}
+          <div>
+            <label className={label}>Why? ({other} will see this)</label>
+            <input className={field} value={rateReason} onChange={(e) => setRateReason(e.target.value)}
+              placeholder="e.g. the class ran long and we agreed a higher rate" />
+          </div>
+          <p className="text-[11px] text-gray-400">
+            Nothing changes until {other} accepts. You can withdraw it before they do.
+          </p>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setPanel(null)}
+              className="px-3 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-500">
+              <X size={12} />
+            </button>
+            <button
+              type="button"
+              disabled={!proposedOk || proposeRate.isPending}
+              onClick={() => proposeRate.mutate({
+                bookingId: booking.id,
+                ...(isHourly ? { hourlyRate: proposedNum } : { flatRate: proposedNum }),
+                reason: rateReason || undefined,
+              })}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#111] text-white text-xs font-semibold disabled:opacity-50"
+            >
+              {proposeRate.isPending ? <Loader2 size={12} className="animate-spin" /> : <Handshake size={12} />}
+              Propose {proposedOk ? `$${proposedNum.toFixed(2)}${isHourly ? "/hr" : ""}` : "rate"}
+            </button>
+          </div>
         </div>
       )}
 

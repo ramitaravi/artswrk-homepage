@@ -6,10 +6,7 @@ import {
 } from "../shared/enterprise";
 import bcrypt from "bcryptjs";
 import { APP_URL, SUPPORT_EMAIL } from "./emailTemplates";
-import {
-  canCancel, canEditField, canMarkPaid, cancellationNotice, hasOpenInvoice, isParty,
-  type ActorRole,
-} from "@shared/bookingEdits";
+import { canCancel, canEditField, canMarkPaid, cancellationNotice, hasOpenInvoice, isParty, type ActorRole, canProposeRate, canRespondToProposal, canWithdrawProposal, hasOpenProposal, proposalSummary } from "@shared/bookingEdits";
 import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ONE_YEAR_MS } from "@shared/const";
 import { isJobPubliclyLive } from "@shared/jobStatus";
 import { classDateLabel } from "@shared/classDate";
@@ -38,7 +35,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, approveArtswrkInvoice, approveBookingPeriodInvoice, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, getArtistPastClients, getBookingAudit, recordBookingAudit, applyBookingEdit, cancelBooking, markBookingPaidManually, withdrawBookingInvoice, getLateCancellations, createArtistInvoiceBooking, declineArtswrkInvoice, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getArtistInvoicesAwaiting, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllAffiliationsForAdmin, getArtistAffiliationIds, findOrCreateAffiliation, setArtistAffiliations, addArtistAffiliation, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink, getSubscriptionReconciliation, getBoostSummary } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, approveArtswrkInvoice, approveBookingPeriodInvoice, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, getArtistPastClients, getBookingAudit, recordBookingAudit, applyBookingEdit, cancelBooking, markBookingPaidManually, withdrawBookingInvoice, getLateCancellations, createArtistInvoiceBooking, declineArtswrkInvoice, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getArtistInvoicesAwaiting, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllAffiliationsForAdmin, getArtistAffiliationIds, findOrCreateAffiliation, setArtistAffiliations, addArtistAffiliation, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink, getSubscriptionReconciliation, getBoostSummary, proposeBookingRate, clearBookingRateProposal, acceptBookingRateProposal } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail, sendArtistBookingConfirmedEmail, sendClientBookingConfirmedEmail, sendClientPayArtistEmail, sendInquiryIntroEmail } from "./email";
 import crypto from "crypto";
@@ -172,6 +169,65 @@ async function notifyBookingChanged(
   } catch (err) {
     // Never let a notification failure undo a change that already landed.
     console.error("[notifyBookingChanged] failed:", err instanceof Error ? err.message : err);
+  }
+}
+
+/**
+ * Tell the other side about a rate proposal.
+ *
+ * Separate from notifyBookingChanged because the recipient has to DO
+ * something: a proposal that nobody answers is the whole failure mode, so
+ * the email names the amount and says plainly that it is waiting on them.
+ */
+async function notifyRateProposal(
+  bookingId: number,
+  actorRole: ActorRole,
+  event: "proposed" | "accepted" | "declined" | "withdrawn",
+  detail: { amountLabel: string; reason?: string | null },
+): Promise<void> {
+  try {
+    const booking = await getBookingById(bookingId);
+    if (!booking) return;
+    const [artist, client] = await Promise.all([
+      booking.artistUserId ? getUserById(booking.artistUserId) : null,
+      booking.clientUserId ? getUserById(booking.clientUserId) : null,
+    ]);
+    const artistName = artist?.name ?? artist?.firstName ?? "the artist";
+    const clientName = (client as any)?.clientCompanyName ?? client?.firstName ?? "the studio";
+    const who = actorRole === "artist" ? artistName : clientName;
+    const when = booking.startDate
+      ? new Date(booking.startDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+      : "an upcoming date";
+
+    const subject = event === "proposed"
+      ? `Rate change proposed — ${artistName} & ${clientName}, ${when}`
+      : `Rate change ${event} — ${artistName} & ${clientName}, ${when}`;
+
+    const lead = event === "proposed"
+      ? `<p><strong>${who}</strong> proposed a new rate of <strong>${detail.amountLabel}</strong> for the booking on ${when}.</p>`
+        + `<p>Nothing changes until you accept it. Open the booking to accept or decline.</p>`
+      : event === "accepted"
+      ? `<p><strong>${who}</strong> accepted the new rate of <strong>${detail.amountLabel}</strong> for the booking on ${when}.</p>`
+        + `<p>The booking has been updated.</p>`
+      : event === "declined"
+      ? `<p><strong>${who}</strong> declined the proposed rate of <strong>${detail.amountLabel}</strong> for the booking on ${when}.</p>`
+        + `<p>The booking is unchanged.</p>`
+      : `<p><strong>${who}</strong> withdrew their proposed rate of <strong>${detail.amountLabel}</strong> for the booking on ${when}.</p>`;
+
+    const html = lead
+      + (detail.reason ? `<p style="border-left:3px solid #ec008c;padding-left:16px;color:#444">${escapeHtml(detail.reason)}</p>` : "")
+      + `<p>${artistName} &rarr; ${clientName}</p>`;
+
+    const recipients = [
+      actorRole !== "artist" ? artist?.email : null,
+      actorRole !== "client" ? (client as any)?.email : null,
+    ].filter((e): e is string => !!e);
+
+    const { sendSimpleEmail } = await import("./email");
+    for (const to of recipients) await sendSimpleEmail({ to, cc: SUPPORT_EMAIL, subject, html });
+    if (!recipients.length) await sendSimpleEmail({ to: SUPPORT_EMAIL, subject, html });
+  } catch (err) {
+    console.error("[notifyRateProposal] failed:", err instanceof Error ? err.message : err);
   }
 }
 
@@ -6033,6 +6089,19 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           }
         }
 
+        // An admin deciding the rate settles the question, so a proposal
+        // waiting on an answer is moot -- leaving it would show both sides a
+        // pending change against a rate that no longer exists.
+        if (hasOpenProposal(booking as any)
+            && ("hourlyRate" in changes || "flatRate" in changes || "rateType" in changes
+                || "manualArtistTotal" in changes || "manualClientTotal" in changes)) {
+          changes.proposedHourlyRate = null;
+          changes.proposedFlatRate = null;
+          changes.proposedRateBy = null;
+          changes.proposedRateAt = null;
+          changes.proposedRateReason = null;
+        }
+
         // An edit underneath a live invoice would let the studio pay against a
         // figure that no longer matches the booking.
         const open = hasOpenInvoice(booking as any);
@@ -6048,6 +6117,152 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         });
         await notifyBookingChanged(bookingId, role, "edited", reason);
         return { success: true, changed: Object.keys(changes).length, invoiceWithdrawn: open };
+      }),
+
+    /**
+     * Propose a new rate. Changes nothing about what is owed -- the other
+     * side has to accept it. This is what the edit rulebook points an artist
+     * or studio at when they try to change a rate directly.
+     */
+    proposeRate: protectedProcedure
+      .input(z.object({
+        bookingId: z.number().int(),
+        hourlyRate: z.number().min(0).max(100000).optional(),
+        flatRate: z.number().min(0).max(1000000).optional(),
+        reason: z.string().max(1000).optional(),
+      }).refine((v) => v.hourlyRate != null || v.flatRate != null, {
+        message: "Give either an hourly rate or a flat rate.",
+      }).refine((v) => !(v.hourlyRate != null && v.flatRate != null), {
+        message: "A booking is either hourly or flat, not both.",
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const booking = await getBookingById(input.bookingId);
+        if (!booking) throw new Error("Booking not found");
+        const role = actorRoleFor(user, booking);
+
+        const decision = canProposeRate(booking as any, role, user.id);
+        if (!decision.allowed) throw new Error(decision.reason);
+
+        await proposeBookingRate({
+          bookingId: input.bookingId,
+          actorUserId: user.id,
+          actorRole: role,
+          hourlyRate: input.hourlyRate ?? null,
+          flatRate: input.flatRate ?? null,
+          reason: input.reason ?? null,
+        });
+
+        const amountLabel = input.hourlyRate != null
+          ? `$${input.hourlyRate.toFixed(2)}/hr`
+          : `$${input.flatRate!.toFixed(2)} for the booking`;
+        await notifyRateProposal(input.bookingId, role, "proposed",
+          { amountLabel, reason: input.reason });
+        return { success: true, amountLabel };
+      }),
+
+    /**
+     * Accept or decline a proposed rate. Only the side that did NOT propose
+     * it may answer -- accepting your own proposal would be a unilateral
+     * rate change wearing two hats.
+     */
+    respondToProposal: protectedProcedure
+      .input(z.object({
+        bookingId: z.number().int(),
+        accept: z.boolean(),
+        reason: z.string().max(1000).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const booking = await getBookingById(input.bookingId);
+        if (!booking) throw new Error("Booking not found");
+        const role = actorRoleFor(user, booking);
+
+        const decision = canRespondToProposal(booking as any, role, user.id);
+        if (!decision.allowed) throw new Error(decision.reason);
+
+        const proposedHourly = (booking as any).proposedHourlyRate as number | null;
+        const proposedFlat = (booking as any).proposedFlatRate as number | null;
+        const amountLabel = proposedHourly != null
+          ? `$${Number(proposedHourly).toFixed(2)}/hr`
+          : `$${Number(proposedFlat).toFixed(2)} for the booking`;
+
+        if (!input.accept) {
+          await clearBookingRateProposal({
+            bookingId: input.bookingId, actorUserId: user.id, actorRole: role,
+            action: "decline_rate", reason: input.reason ?? null,
+            proposedValue: String(proposedHourly ?? proposedFlat ?? ""),
+          });
+          await notifyRateProposal(input.bookingId, role, "declined",
+            { amountLabel, reason: input.reason });
+          return { success: true, accepted: false, amountLabel };
+        }
+
+        // Accepting changes what is owed, so the totals are worked out by the
+        // shared money module rather than here.
+        const rateType: "hourly" | "flat" = proposedHourly != null ? "hourly" : "flat";
+        const money = bookingMoney({
+          rateType,
+          hourlyRate: proposedHourly,
+          flatRate: proposedFlat,
+          hours: (booking as any).hours,
+        });
+
+        // An invoice already out quotes the old rate, so it cannot stand.
+        const open = hasOpenInvoice(booking as any);
+        if (open) {
+          await withdrawBookingInvoice({
+            bookingId: input.bookingId, actorUserId: user.id, actorRole: role,
+            reason: "Withdrawn automatically because a new rate was accepted",
+          });
+        }
+
+        await acceptBookingRateProposal({
+          bookingId: input.bookingId,
+          actorUserId: user.id,
+          actorRole: role,
+          rateType,
+          hourlyRate: proposedHourly,
+          flatRate: proposedFlat,
+          artistTotal: money.artistTotal,
+          clientTotal: (booking as any).paymentMethod === "artswrk"
+            ? money.clientTotal
+            : money.artistTotal,
+          previousRate: String((booking as any).hourlyRate ?? (booking as any).flatRate ?? ""),
+        });
+        await notifyRateProposal(input.bookingId, role, "accepted",
+          { amountLabel, reason: input.reason });
+        return { success: true, accepted: true, amountLabel, invoiceWithdrawn: open };
+      }),
+
+    /** Withdraw your own proposal. Only whoever made it. */
+    withdrawProposal: protectedProcedure
+      .input(z.object({ bookingId: z.number().int() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new Error("User not found");
+        const booking = await getBookingById(input.bookingId);
+        if (!booking) throw new Error("Booking not found");
+        const role = actorRoleFor(user, booking);
+
+        const decision = canWithdrawProposal(booking as any, role, user.id);
+        if (!decision.allowed) throw new Error(decision.reason);
+
+        const proposedHourly = (booking as any).proposedHourlyRate as number | null;
+        const proposedFlat = (booking as any).proposedFlatRate as number | null;
+        await clearBookingRateProposal({
+          bookingId: input.bookingId, actorUserId: user.id, actorRole: role,
+          action: "withdraw_rate",
+          proposedValue: String(proposedHourly ?? proposedFlat ?? ""),
+        });
+        await notifyRateProposal(input.bookingId, role, "withdrawn", {
+          amountLabel: proposedHourly != null
+            ? `$${Number(proposedHourly).toFixed(2)}/hr`
+            : `$${Number(proposedFlat).toFixed(2)} for the booking`,
+        });
+        return { success: true };
       }),
 
     /**

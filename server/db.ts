@@ -692,6 +692,7 @@ export async function getAdminJobBookings(jobId: number) {
     `SELECT b.id, b.bookingStatus, b.paymentStatus, b.clientRate, b.artistRate,
        b.totalClientRate, b.totalArtistRate, b.grossProfit, b.hours,
        b.manualArtistTotal, b.manualClientTotal, b.manualTotalsReason, b.manualTotalsSetAt,
+       b.proposedHourlyRate, b.proposedFlatRate, b.proposedRateBy, b.proposedRateAt, b.proposedRateReason,
        b.startDate, b.endDate, b.locationAddress, b.externalPayment,
        u.firstName AS artistFirstName, u.lastName AS artistLastName,
        u.name AS artistName, u.profilePicture AS artistProfilePicture, u.id AS artistId
@@ -772,6 +773,7 @@ export async function getAdminClientBookings(clientUserId: number, limit = 100, 
        b.id, b.bookingStatus, b.paymentStatus, b.clientRate, b.artistRate,
        b.totalClientRate, b.totalArtistRate, b.grossProfit, b.hours,
        b.manualArtistTotal, b.manualClientTotal, b.manualTotalsReason, b.manualTotalsSetAt,
+       b.proposedHourlyRate, b.proposedFlatRate, b.proposedRateBy, b.proposedRateAt, b.proposedRateReason,
        b.startDate, b.endDate, b.locationAddress, b.description,
        b.externalPayment, b.bubbleCreatedAt, b.createdAt,
        u.firstName AS artistFirstName, u.lastName AS artistLastName, u.name AS artistName,
@@ -825,6 +827,7 @@ export async function getAdminArtistBookings(artistUserId: number, limit = 100, 
        b.id, b.bookingStatus, b.paymentStatus, b.clientRate, b.artistRate,
        b.totalClientRate, b.totalArtistRate, b.grossProfit, b.hours,
        b.manualArtistTotal, b.manualClientTotal, b.manualTotalsReason, b.manualTotalsSetAt,
+       b.proposedHourlyRate, b.proposedFlatRate, b.proposedRateBy, b.proposedRateAt, b.proposedRateReason,
        b.startDate, b.endDate, b.locationAddress, b.description,
        b.externalPayment, b.bubbleCreatedAt, b.createdAt,
        u.clientCompanyName, u.id AS clientUserId,
@@ -1178,6 +1181,10 @@ export async function getClientBookingDetail(bookingId: number, clientUserId: nu
        b.id, b.jobId, b.interestedArtistId, b.clientUserId, b.artistUserId,
        b.bookingStatus, b.paymentStatus,
        b.clientRate, b.totalClientRate,
+       b.rateType, b.hourlyRate, b.flatRate, b.paymentMethod, b.invoicePaidAt,
+       -- Needed so the studio can see and answer an open rate proposal.
+       b.proposedHourlyRate, b.proposedFlatRate, b.proposedRateBy,
+       b.proposedRateAt, b.proposedRateReason,
        b.hours, b.externalPayment, b.startDate, b.endDate,
        b.locationAddress, b.locationCity, b.locationState,
        -- stripeCheckoutUrl deliberately excluded: it holds a legacy Bubble
@@ -3365,6 +3372,7 @@ export async function getAdminBookingById(bookingId: number) {
       b.clientRate, b.artistRate, b.totalClientRate, b.totalArtistRate,
       b.grossProfit, b.stripeFee, b.postFeeRevenue,
       b.manualArtistTotal, b.manualClientTotal, b.manualTotalsReason, b.manualTotalsSetAt,
+       b.proposedHourlyRate, b.proposedFlatRate, b.proposedRateBy, b.proposedRateAt, b.proposedRateReason,
       b.hours, b.externalPayment,
       -- The admin booking controls decide what is allowed from these: whether
       -- money has moved, whether an invoice is out, and the unit rate to
@@ -3471,6 +3479,7 @@ export async function getAdminPaymentById(paymentId: number) {
       b.bookingStatus, b.paymentStatus AS bookingPaymentStatus,
       b.clientRate, b.artistRate, b.grossProfit,
       b.manualArtistTotal, b.manualClientTotal, b.manualTotalsReason, b.manualTotalsSetAt,
+       b.proposedHourlyRate, b.proposedFlatRate, b.proposedRateBy, b.proposedRateAt, b.proposedRateReason,
       b.startDate, b.endDate,
       b.jobId AS bookingJobId,
       b.artistUserId AS bookingArtistUserId,
@@ -5172,6 +5181,14 @@ export async function getArtistConfirmedBookings(artistUserId: number) {
       clientRate: bookings.clientRate,
       rateType: bookings.rateType,
       hourlyRate: bookings.hourlyRate,
+      flatRate: bookings.flatRate,
+      // The self-serve panel needs these to show an open rate proposal.
+      proposedHourlyRate: bookings.proposedHourlyRate,
+      proposedFlatRate: bookings.proposedFlatRate,
+      proposedRateBy: bookings.proposedRateBy,
+      proposedRateAt: bookings.proposedRateAt,
+      proposedRateReason: bookings.proposedRateReason,
+      invoicePaidAt: bookings.invoicePaidAt,
       recurringSeriesId: bookings.recurringSeriesId,
       hours: bookings.hours,
       startDate: bookings.startDate,
@@ -6918,4 +6935,117 @@ export async function getBoostSummary() {
     distinctBuyers: Number(r.distinctBuyers ?? 0),
     avgSpend: Number(r.avgSpend ?? 0),
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * Rate proposals
+ *
+ * An artist or a studio cannot change the rate alone -- it is what they
+ * both agreed. One side proposes, the other accepts, and only the
+ * acceptance moves any money. Everything here is recorded in the audit
+ * trail, including the proposal that was never answered.
+ * ------------------------------------------------------------------ */
+
+/** Record a proposed rate. Changes nothing about what is owed. */
+export async function proposeBookingRate(input: {
+  bookingId: number;
+  actorUserId: number;
+  actorRole: string;
+  hourlyRate?: number | null;
+  flatRate?: number | null;
+  reason?: string | null;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.execute(sql`
+    UPDATE bookings
+    SET proposedHourlyRate = ${input.hourlyRate ?? null},
+        proposedFlatRate = ${input.flatRate ?? null},
+        proposedRateBy = ${input.actorRole},
+        proposedRateAt = NOW(),
+        proposedRateReason = ${input.reason ?? null},
+        updatedAt = NOW()
+    WHERE id = ${input.bookingId}`);
+  await recordBookingAudit([{
+    bookingId: input.bookingId,
+    actorUserId: input.actorUserId,
+    actorRole: input.actorRole,
+    action: "propose_rate",
+    field: input.hourlyRate != null ? "hourlyRate" : "flatRate",
+    newValue: String(input.hourlyRate ?? input.flatRate ?? ""),
+    reason: input.reason ?? null,
+  }]);
+}
+
+/** Clear an open proposal without applying it. */
+export async function clearBookingRateProposal(input: {
+  bookingId: number;
+  actorUserId: number;
+  actorRole: string;
+  /** "withdraw" by the proposer, or "decline" by the other side. */
+  action: "withdraw_rate" | "decline_rate";
+  reason?: string | null;
+  proposedValue?: string | null;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.execute(sql`
+    UPDATE bookings
+    SET proposedHourlyRate = NULL, proposedFlatRate = NULL,
+        proposedRateBy = NULL, proposedRateAt = NULL, proposedRateReason = NULL,
+        updatedAt = NOW()
+    WHERE id = ${input.bookingId}`);
+  await recordBookingAudit([{
+    bookingId: input.bookingId,
+    actorUserId: input.actorUserId,
+    actorRole: input.actorRole,
+    action: input.action,
+    oldValue: input.proposedValue ?? null,
+    reason: input.reason ?? null,
+  }]);
+}
+
+/**
+ * Accept a proposed rate: apply it, recompute the totals, and clear the
+ * proposal. One statement so a booking can never be left holding a rate
+ * that was accepted but not applied.
+ */
+export async function acceptBookingRateProposal(input: {
+  bookingId: number;
+  actorUserId: number;
+  actorRole: string;
+  /** Totals worked out by the caller via the shared money module. */
+  rateType: "hourly" | "flat";
+  hourlyRate: number | null;
+  flatRate: number | null;
+  artistTotal: number;
+  clientTotal: number;
+  previousRate?: string | null;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.execute(sql`
+    UPDATE bookings
+    SET rateType = ${input.rateType},
+        hourlyRate = ${input.hourlyRate},
+        flatRate = ${input.flatRate},
+        artistRate = ${input.artistTotal},
+        clientRate = ${input.clientTotal},
+        totalArtistRate = ${input.artistTotal},
+        totalClientRate = ${input.clientTotal},
+        grossProfit = ${Math.max(0, Math.round((input.clientTotal - input.artistTotal) * 100) / 100)},
+        proposedHourlyRate = NULL, proposedFlatRate = NULL,
+        proposedRateBy = NULL, proposedRateAt = NULL, proposedRateReason = NULL,
+        updatedAt = NOW()
+    WHERE id = ${input.bookingId} AND invoicePaidAt IS NULL`);
+  await recordBookingAudit([{
+    bookingId: input.bookingId,
+    actorUserId: input.actorUserId,
+    actorRole: input.actorRole,
+    action: "accept_rate",
+    field: input.rateType === "hourly" ? "hourlyRate" : "flatRate",
+    oldValue: input.previousRate ?? null,
+    newValue: String(input.hourlyRate ?? input.flatRate ?? ""),
+    reason: "Accepted the proposed rate",
+  }]);
 }

@@ -13,7 +13,7 @@ import { useState } from "react";
 import { AlertTriangle, Ban, Check, Clock, DollarSign, Loader2, Pencil, X } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { isSettled, hasOpenInvoice } from "@shared/bookingEdits";
+import { isSettled, hasOpenInvoice, hasOpenProposal, proposalSummary } from "@shared/bookingEdits";
 import { processingFeeFor, hasManualTotals } from "@shared/bookingRates";
 
 const input = "w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-[#111] focus:outline-none focus:border-[#F25722] transition-colors";
@@ -105,6 +105,20 @@ export default function AdminBookingControls({ booking, onChanged }: {
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+      {hasOpenProposal(booking) && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+          <p className="text-[11px] font-semibold text-amber-800">
+            {proposalSummary(booking)} Waiting on the other side.
+          </p>
+          {booking.proposedRateReason && (
+            <p className="text-[11px] text-amber-700 italic mt-0.5">"{booking.proposedRateReason}"</p>
+          )}
+          <p className="text-[10px] text-amber-600 mt-1">
+            Editing the rate here applies it directly and clears this proposal.
+          </p>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Admin controls</p>
         {invoiceOpen && (

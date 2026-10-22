@@ -3,10 +3,7 @@
  * from the three weeks before this was built.
  */
 import { describe, it, expect } from "vitest";
-import {
-  canEditField, canCancel, canMarkPaid, canEditReimbursements,
-  cancellationNotice, isSettled, hasOpenInvoice,
-} from "./bookingEdits";
+import { canEditField, canCancel, canMarkPaid, canEditReimbursements, cancellationNotice, isSettled, hasOpenInvoice, canProposeRate, canRespondToProposal, canWithdrawProposal, hasOpenProposal, proposalSummary } from "./bookingEdits";
 
 const ARTIST = 781139, CLIENT = 1020767, STRANGER = 999;
 const base = { artistUserId: ARTIST, clientUserId: CLIENT, bookingStatus: "Confirmed", paymentStatus: "Unpaid" };
@@ -132,5 +129,72 @@ describe("admin-set totals", () => {
   it("will not let even an admin rewrite the totals once it is paid", () => {
     const paid = { ...open, paymentStatus: "Paid" };
     expect(canEditField(paid, "manualArtistTotal", "admin").allowed).toBe(false);
+  });
+});
+
+describe("rate proposals", () => {
+  const live = {
+    bookingStatus: "Confirmed", paymentStatus: "Unpaid",
+    artistUserId: 1, clientUserId: 2,
+  } as any;
+  const withProposal = { ...live, proposedHourlyRate: 30, proposedRateBy: "artist" };
+
+  it("lets either side propose a rate on a live booking", () => {
+    expect(canProposeRate(live, "artist", 1).allowed).toBe(true);
+    expect(canProposeRate(live, "client", 2).allowed).toBe(true);
+  });
+
+  it("does not let an admin propose -- they edit directly", () => {
+    expect(canProposeRate(live, "admin").allowed).toBe(false);
+  });
+
+  it("does not let a stranger propose", () => {
+    expect(canProposeRate(live, "artist", 99).allowed).toBe(false);
+  });
+
+  it("refuses a second proposal while one is open", () => {
+    expect(canProposeRate(withProposal, "artist", 1).allowed).toBe(false);
+    expect(canProposeRate(withProposal, "client", 2).allowed).toBe(false);
+  });
+
+  it("only lets the OTHER side answer", () => {
+    expect(canRespondToProposal(withProposal, "client", 2).allowed).toBe(true);
+    // Accepting your own proposal is a unilateral rate change in disguise.
+    expect(canRespondToProposal(withProposal, "artist", 1).allowed).toBe(false);
+  });
+
+  it("has nothing to answer when no proposal is open", () => {
+    expect(canRespondToProposal(live, "client", 2).allowed).toBe(false);
+  });
+
+  it("only lets the proposer withdraw", () => {
+    expect(canWithdrawProposal(withProposal, "artist", 1).allowed).toBe(true);
+    expect(canWithdrawProposal(withProposal, "client", 2).allowed).toBe(false);
+  });
+
+  it("stops proposing or answering once the booking is paid", () => {
+    const paid = { ...withProposal, paymentStatus: "Paid" };
+    expect(canProposeRate(paid, "artist", 1).allowed).toBe(false);
+    expect(canRespondToProposal(paid, "client", 2).allowed).toBe(false);
+  });
+
+  it("stops proposing or answering once cancelled", () => {
+    const dead = { ...withProposal, bookingStatus: "Cancelled" };
+    expect(canProposeRate(dead, "artist", 1).allowed).toBe(false);
+    expect(canRespondToProposal(dead, "client", 2).allowed).toBe(false);
+  });
+
+  it("does not see a half-written proposal as open", () => {
+    // A row with a proposer but no amount is not something to answer.
+    expect(hasOpenProposal({ ...live, proposedRateBy: "artist" })).toBe(false);
+    expect(hasOpenProposal({ ...live, proposedHourlyRate: 30 })).toBe(false);
+    expect(hasOpenProposal(withProposal)).toBe(true);
+  });
+
+  it("describes an open proposal in one line for either side", () => {
+    expect(proposalSummary(withProposal)).toBe("The artist proposed $30.00/hr.");
+    expect(proposalSummary({ ...live, proposedFlatRate: 400, proposedRateBy: "client" }))
+      .toBe("The studio proposed $400.00 for the booking.");
+    expect(proposalSummary(live)).toBeNull();
   });
 });
