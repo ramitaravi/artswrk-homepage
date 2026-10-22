@@ -605,6 +605,24 @@ export const bookings = mysqlTable("bookings", {
    */
   recurringSeriesId: int("recurringSeriesId"),
 
+  /** How a booking was cancelled — see drizzle/0059. There is no cutoff on
+   *  cancelling; the notice period is recorded instead, because blocking a
+   *  late cancellation does not stop the artist being absent. */
+  cancelledAt: timestamp("cancelledAt"),
+  cancelledByUserId: int("cancelledByUserId"),
+  cancelledByRole: varchar("cancelledByRole", { length: 16 }),
+  cancellationReason: text("cancellationReason"),
+  /** Hours between the cancellation and the class start. Under 48 is late. */
+  cancellationNoticeHours: double("cancellationNoticeHours"),
+
+  /** A rate change neither side may make alone: it stands as a proposal until
+   *  the other accepts. An admin edits the rate directly instead. */
+  proposedHourlyRate: double("proposedHourlyRate"),
+  proposedFlatRate: double("proposedFlatRate"),
+  proposedRateBy: varchar("proposedRateBy", { length: 16 }),
+  proposedRateAt: timestamp("proposedRateAt"),
+  proposedRateReason: text("proposedRateReason"),
+
   // ── Timestamps ─────────────────────────────────────────────────────────────
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
