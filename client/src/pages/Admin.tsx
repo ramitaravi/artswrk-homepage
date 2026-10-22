@@ -3791,7 +3791,7 @@ function AdminBookingDetail({ bookingId, onBack, onViewJob, onViewPayment }: {
                 {/* See the booking as they see it — the fastest way to answer
                     "what is the studio actually looking at?" */}
                 {b.clientUserId && (
-                  <div className="mt-2">
+                  <div className="flex items-center justify-between gap-3 mt-2">
                     <RunAsButton userId={b.clientUserId} userName={clientName ?? "this client"} userRole="Client" />
                   </div>
                 )}
@@ -3813,14 +3813,19 @@ function AdminBookingDetail({ bookingId, onBack, onViewJob, onViewPayment }: {
               <div>
                 <p className="text-sm font-bold text-[#111]">{artistName}</p>
                 <p className="text-xs text-gray-400">{b.artistEmail || "—"}</p>
-                {b.artistUserId && (
-                  <div className="mt-2">
-                    <RunAsButton userId={b.artistUserId} userName={artistName ?? "this artist"} userRole="Artist" />
-                  </div>
-                )}
-                {b.artistSlug && (
-                  <a href={`https://artswrk.com/artists/${b.artistSlug}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-[#F25722] hover:underline flex items-center gap-0.5 mt-0.5"><ExternalLink size={9} /> View profile</a>
-                )}
+                {/* Run As on the left, the outbound link on the right, so the
+                    two actions do not stack and the card stays one row tall. */}
+                <div className="flex items-center justify-between gap-3 mt-2">
+                  {b.artistUserId
+                    ? <RunAsButton userId={b.artistUserId} userName={artistName ?? "this artist"} userRole="Artist" />
+                    : <span />}
+                  {b.artistSlug && (
+                    <a href={`https://artswrk.com/artists/${b.artistSlug}`} target="_blank" rel="noopener noreferrer"
+                      className="text-[10px] text-[#F25722] hover:underline flex items-center gap-0.5 flex-shrink-0">
+                      <ExternalLink size={9} /> View profile
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           ) : <p className="text-sm text-gray-400">No artist linked</p>}
