@@ -1009,6 +1009,13 @@ export async function getBookingsByClientId(
       paymentStatus: bookings.paymentStatus,
       clientRate: bookings.clientRate,
       totalClientRate: bookings.totalClientRate,
+      // The card shows what the studio actually pays and the rate it is
+      // built from. Without these it printed clientRate, which on an
+      // hourly booking is the PER-HOUR figure -- a 2-hour class at $50/hr
+      // read as "$50" when $105 was owed.
+      rateType: bookings.rateType,
+      hourlyRate: bookings.hourlyRate,
+      flatRate: bookings.flatRate,
       // artistRate, totalArtistRate, grossProfit, stripeFee and postFeeRevenue
       // are deliberately NOT selected: this is the client's own booking list,
       // and those columns are Artswrk's margin. They were being sent to the
@@ -3376,7 +3383,10 @@ export async function getAdminBookingById(bookingId: number) {
       j.description AS jobDescription,
       j.requestStatus AS jobStatus,
       j.locationAddress AS jobLocation,
-      j.hiringCategory AS jobHiringCategory,
+      -- hiringCategory lives on the CLIENT, not the job. Selecting it off j
+      -- made the whole query throw "Unknown column 'j.hiringcategory'", which
+      -- is why the admin booking detail page would not load at all.
+      c.hiringCategory AS jobHiringCategory,
       j.clientHourlyRate AS jobClientRate,
       j.bubbleCreatedAt AS jobCreatedAt
     FROM bookings b
@@ -3387,7 +3397,11 @@ export async function getAdminBookingById(bookingId: number) {
     LIMIT 1
   `);
 
-  const row = (rows as any[])[0];
+  // db.execute resolves to [rows, fields], so (rows)[0] was the ROWS
+  // ARRAY rather than the first row -- every field came back undefined
+  // even once the query itself ran.
+  const [resultRows] = rows as unknown as [any[], unknown];
+  const row = resultRows?.[0];
   if (!row) return null;
   return row;
 }

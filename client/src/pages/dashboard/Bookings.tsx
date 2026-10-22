@@ -12,7 +12,7 @@ import {
   TrendingUp, Loader2, RefreshCw, Send, ArrowRight, Building2, Paperclip, X, Search
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { periodInvoiceTotals, bookingMoney } from "@shared/bookingRates";
+import { periodInvoiceTotals, bookingMoney, isHourlyRateBooking, processingFeeFor } from "@shared/bookingRates";
 import { isArtistAccount } from "@shared/accountRole";
 import { groupClientBookings, periodClassDay, toClientDateCards } from "@/lib/weeklyBookings";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -240,9 +240,40 @@ function BookingRow({ booking }: { booking: AnyBooking }) {
 
           {/* Right: financials + expand */}
           <div className="text-right flex-shrink-0 flex flex-col items-end gap-2">
-            <p className="text-lg font-black text-[#111]">
-              {formatCurrency(booking.totalClientRate ?? booking.clientRate)}
-            </p>
+            {/* The headline is what the studio actually pays. It used to print
+                `totalClientRate ?? clientRate`, and on an hourly booking
+                clientRate is the PER-HOUR rate -- so a 2-hour class at $50/hr
+                read as "$50" when the studio owed $105. The rate it is built
+                from sits underneath, because "why is it $105" is the next
+                question. */}
+            {(() => {
+              // What the studio actually pays, in order of how much we trust it:
+              //   1. the invoiced figure, if one has been agreed
+              //   2. a stored total
+              //   3. rate x hours + fee, for an hourly booking
+              //   4. clientRate as-is -- on a legacy row that IS the total and
+              //      already has the fee in it, so it must never be recomputed
+              const perHour = isHourlyRateBooking(booking as any)
+                ? Number((booking as any).hourlyRate ?? booking.clientRate ?? 0)
+                : null;
+              const hrs = Number(booking.hours ?? 0);
+              const invoiced = (booking as any).invoiceTotalCents;
+              const total =
+                invoiced != null ? invoiced / 100
+                : booking.totalClientRate != null ? Number(booking.totalClientRate)
+                : perHour && hrs > 0 ? perHour * hrs + processingFeeFor(perHour * hrs)
+                : Number(booking.clientRate ?? 0);
+              return (
+                <div className="text-right">
+                  <p className="text-lg font-black text-[#111]">{formatCurrency(total)}</p>
+                  {perHour != null && hrs > 0 && (
+                    <p className="text-[11px] text-gray-400 -mt-0.5">
+                      ${perHour.toFixed(2)}/hr × {hrs} hrs
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
             {/* Artist rate removed: this row renders for CLIENTS too, and the
                 artist's rate next to the client's is Artswrk's margin. The
                 field is no longer even fetched for clients. */}
