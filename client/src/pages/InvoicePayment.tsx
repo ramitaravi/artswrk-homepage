@@ -13,7 +13,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Loader2, CheckCircle2, AlertCircle, ExternalLink, ChevronLeft } from "lucide-react";
-import { processingFeeFor, PROCESSING_FEE_RATE, resolveInvoiceTotals, bookingMoney, isHourlyRateBooking } from "@shared/bookingRates";
+import { hasManualTotals, isHourlyRateBooking, processingFeeFor, PROCESSING_FEE_RATE } from "@shared/bookingRates";
+import { bookingInvoiceTotals, periodInvoicePreviewTotals } from "@shared/invoicePreview";
 import { canReuseCheckoutUrl } from "@shared/stripeCheckoutMode";
 
 /** Last resort for a legacy booking that stores only a total and its hours. */
@@ -55,7 +56,7 @@ export default function InvoicePayment() {
   // read the applicant record's real isHourlyRate flag — inferring "hourly"
   // from `hours` being set treats the 365 flat bookings that also record hours
   // as hourly, and this page is where the studio approves the charge.
-  const isHourly = isPeriodInvoice || isClassDateInvoice
+  const isHourly = isPeriodInvoice || isClassDateInvoice || (booking as any)?.rateType === "hourly"
     ? true
     : ((booking as any)?.isHourlyRate === 1 || (booking as any)?.isHourlyRate === true);
   const initialHours = isPeriodInvoice ? (booking as any)?.actualHours : booking?.hours;
@@ -127,6 +128,11 @@ export default function InvoicePayment() {
   const hoursNum = parseFloat(hoursInput) || 0;
   const artistRate = (booking as any).artistRate ?? 0;
   const clientRate = (booking as any).clientRate ?? 0;
+  const invoiceSource = booking as any;
+  const hasAdminManualTotals = hasManualTotals(invoiceSource);
+  const preview = isPeriodInvoice
+    ? periodInvoicePreviewTotals(invoiceSource, hoursNum)
+    : bookingInvoiceTotals(invoiceSource, hoursNum);
 
   // Live recompute as the studio edits hours — mirrors the server's math
   // exactly (invoice.approve), so what they see here is what they'll pay.
@@ -138,41 +144,20 @@ export default function InvoicePayment() {
   let liveFee: number;
   if (isApproved || isPaid) {
     liveTotalDollars = (booking.invoiceTotalCents ?? 0) / 100;
-    liveFee = processingFeeFor(liveTotalDollars / (1 + PROCESSING_FEE_RATE));
-    liveBase = liveTotalDollars - liveFee - reimbTotal;
-  } else if (isPeriodInvoice || isClassDateInvoice) {
-    // A class is billed rate × hours. bookingMoney is what invoice.approve
-    // charges with, so the preview and the charge come from one function.
-    const money = bookingMoney(
-      {
-        rateType: "hourly",
-        hourlyRate: isPeriodInvoice ? clientRate : Number((booking as any).hourlyRate ?? 0),
-        flatRate: null,
-        hours: Number(initialHours ?? hoursNum),
-      },
-      { hoursOverride: hoursNum, reimbursements: reimbTotal },
-    );
-    liveBase = money.base;
-    liveFee = money.processingFee;
-    liveTotalDollars = money.clientTotal;
+    if (hasAdminManualTotals) {
+      // Admin-set client and artist totals can have a non-5% difference. The
+      // stored invoice total remains authoritative, while the shared preview
+      // helper gives the truthful payout and fee breakdown behind it.
+      liveBase = preview.baseAmount;
+      liveFee = preview.processingFee;
+    } else {
+      liveFee = processingFeeFor(liveTotalDollars / (1 + PROCESSING_FEE_RATE));
+      liveBase = liveTotalDollars - liveFee - reimbTotal;
+    }
   } else {
-    // The SAME function the server charges with (invoice.approve calls
-    // resolveBookingBaseAmount). This page used to multiply artistRate by the
-    // hours, but artistRate is a TOTAL — a $50/hr booking of 4 hours stores
-    // $200, so the studio was shown $800 for a charge the server computes as
-    // $200. A preview that disagrees with the charge is worse than no preview.
-    const totals = resolveInvoiceTotals(
-      {
-        isHourlyRate: (booking as any).isHourlyRate,
-        storedTotal: artistRate,
-        unitHourlyRate: (booking as any).artistHourlyRate ?? (booking as any).hourlyRate ?? null,
-        storedHours: booking.hours,
-      },
-      { adjustedHours: hoursNum, reimbursements: reimbTotal },
-    );
-    liveBase = totals.baseAmount;
-    liveFee = totals.processingFee;
-    liveTotalDollars = totals.total;
+    liveBase = preview.baseAmount;
+    liveFee = preview.processingFee;
+    liveTotalDollars = preview.total;
   }
 
   const handleApprove = () => {
@@ -251,7 +236,7 @@ export default function InvoicePayment() {
                 {isHourly && (
                   <div className="text-sm text-gray-700 flex items-center gap-2">
                     <strong>Hours:</strong>
-                    {isApproved ? (
+                    {isApproved || hasAdminManualTotals ? (
                       <span>{initialHours}</span>
                     ) : (
                       <input
@@ -264,15 +249,17 @@ export default function InvoicePayment() {
                       />
                     )}
                     <span className="text-gray-400 text-xs">
-                      ({isPeriodInvoice
+                      {hasAdminManualTotals
+                        ? "(Admin-set invoice total)"
+                        : (isPeriodInvoice
                           // unit-rate: a legacy weekly PERIOD invoice stores
-                        // the per-hour rate in clientRate, not a total.
-                        ? `$${clientRate}/hr`
-                        : isClassDateInvoice
-                          ? `$${(booking as any).hourlyRate}/hr`
-                          // artistRate is the booking total; the per-hour figure
-                          // is the unit rate, which is a different column.
-                          : `$${(booking as any).artistHourlyRate ?? (booking as any).hourlyRate ?? unitRateFromTotal(artistRate, booking.hours)}/hr`})
+                          // the per-hour rate in clientRate, not a total.
+                          ? `($${clientRate}/hr)`
+                          : isClassDateInvoice
+                            ? `($${(booking as any).hourlyRate}/hr)`
+                            // artistRate is the booking total; the per-hour figure
+                            // is the unit rate, which is a different column.
+                            : `($${(booking as any).artistHourlyRate ?? (booking as any).hourlyRate ?? unitRateFromTotal(artistRate, booking.hours)}/hr)`)}
                     </span>
                   </div>
                 )}
@@ -294,7 +281,7 @@ export default function InvoicePayment() {
                     </div>
                   )}
                   <div className="flex justify-between text-sm text-gray-700">
-                    <span>Processing fee (5%)</span>
+                    <span>{hasAdminManualTotals ? "Processing fee" : "Processing fee (5%)"}</span>
                     <span className="font-semibold">${liveFee.toFixed(2)}</span>
                   </div>
                   <p className="flex justify-between text-sm pt-1 border-t border-gray-100">
@@ -306,7 +293,7 @@ export default function InvoicePayment() {
                     covers card and payment processing. 🧡
                   </p>
                 </div>
-                {!isApproved && isHourly && (
+                {!isApproved && isHourly && !hasAdminManualTotals && (
                   <p className="text-xs text-gray-400">
                     Adjust hours above if they don't match — the total updates automatically. If the
                     rate itself is wrong, send the invoice back instead.

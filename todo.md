@@ -959,3 +959,14 @@
 - [x] Run deterministic tests, TypeScript, production build, GitHub parity, route smoke checks, and visual validation
 - [x] Save a clean synchronized checkpoint matching GitHub `main`
 - [x] Deliver the checkpoint and summarize any required release steps
+
+## October 22, 2026 — Approved Release-Blocker Fixes
+- [x] Sync and preserve the concurrent GitHub rate-proposal update without overwriting it
+- [x] Verify migrations 0059/0060 already exist and production Stripe is live using read-only checks
+- [x] Unify invoice preview and Stripe checkout for admin manual totals and correct payout amounts
+- [x] Withdraw the exact weekly invoice and expire unpaid hosted Checkout links before removing expenses
+- [x] Authenticate job-expiry callbacks and protect ongoing/recurring jobs until their real end dates
+- [x] Correct admin flat/hourly editing, creation inputs, rate labels, and client booking estimates
+- [x] Pass focused regressions, full deterministic suite, TypeScript, production build, and GitHub parity
+- [ ] Save a restorable checkpoint and sync all approved fixes to GitHub main
+- [ ] Publish and verify the exact version on both production domains without creating charges or sending emails

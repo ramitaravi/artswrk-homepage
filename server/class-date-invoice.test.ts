@@ -69,6 +69,40 @@ describe("per-class invoice checkout", () => {
     expect(db.approveArtswrkInvoice).toHaveBeenCalledWith(1201, expect.objectContaining({ hours: 4, invoiceTotalCents: 38900 }));
   });
 
+  it("charges an admin-set client total and pays the matching artist total, not rate × edited hours", async () => {
+    vi.mocked(db.getBookingByInvoiceToken).mockResolvedValue({
+      ...invoice,
+      // $720 payout + $50 reimbursement; admin deliberately set $900 client
+      // base, so the fee is the actual $180 gap rather than a fictional 5%.
+      manualArtistTotal: 720,
+      manualClientTotal: 900,
+    } as any);
+
+    await appRouter.createCaller(context).invoice.approve({ token: "token", hours: 99 });
+
+    const payload = stripeMocks.create.mock.calls[0][0] as any;
+    expect(payload.line_items[0].price_data.unit_amount).toBe(95000);
+    expect(payload.payment_intent_data.application_fee_amount).toBe(18000);
+    expect(db.approveArtswrkInvoice).toHaveBeenCalledWith(
+      1201,
+      expect.objectContaining({ hours: 99, invoiceTotalCents: 95000 }),
+    );
+  });
+
+  it("rejects an admin client total below the artist payout before opening Checkout", async () => {
+    vi.mocked(db.getBookingByInvoiceToken).mockResolvedValue({
+      ...invoice,
+      manualArtistTotal: 900,
+      manualClientTotal: 720,
+    } as any);
+
+    await expect(
+      appRouter.createCaller(context).invoice.approve({ token: "token" }),
+    ).rejects.toThrow("client total cannot be below the artist payout");
+    expect(stripeMocks.create).not.toHaveBeenCalled();
+    expect(db.approveArtswrkInvoice).not.toHaveBeenCalled();
+  });
+
   it("replaces an unpaid test Checkout link after switching the app to live mode", async () => {
     ENV.stripeSecretKey = "sk_live_unit_test_placeholder";
     vi.mocked(db.getBookingByInvoiceToken).mockResolvedValue({

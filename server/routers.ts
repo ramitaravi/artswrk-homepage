@@ -11,6 +11,7 @@ import { COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE, ON
 import { isJobPubliclyLive } from "@shared/jobStatus";
 import { classDateLabel } from "@shared/classDate";
 import { bookingMoney, resolveBookingBaseAmount, isHourlyBooking, isHourlyRateBooking, maxInvoiceHours, processingFeeFor } from "@shared/bookingRates";
+import { bookingInvoiceTotals, periodInvoicePreviewTotals } from "@shared/invoicePreview";
 import { getPasswordError, PASSWORD_MAX_LENGTH } from "@shared/password";
 import { isArtistAccount, isClientAccount } from "@shared/accountRole";
 import { assertReimbursementRemovable, assertReimbursementWriteAccess } from "./reimbursementAccess";
@@ -5040,11 +5041,19 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const isAdmin = ctx.user.openId === ENV.ownerOpenId || ctx.user.role === "admin";
         assertReimbursementRemovable({ userId: user.id, reimbursement, booking, period: period as any, isAdmin });
 
-        // Removing an expense changes what the client owes, so an invoice
-        // already out for this booking has to go with it -- otherwise they
-        // pay a total that includes a line nobody can see any more.
-        const invoiceWasOpen = !!booking && hasOpenInvoice(booking as any);
-        if (invoiceWasOpen && booking) {
+        // Weekly invoices live on the period, not the parent booking. Expire
+        // the hosted session and withdraw that exact invoice before deletion.
+        const periodInvoiceOpen = !!period && (period.status === "artist_submitted"
+          || !!period.invoicePaymentToken || !!period.invoiceStripeCheckoutUrl);
+        const invoiceWasOpen = period ? periodInvoiceOpen : !!booking && hasOpenInvoice(booking as any);
+        if (periodInvoiceOpen && period) {
+          const { withdrawBookingPeriodInvoice } = await import("./db");
+          await withdrawBookingPeriodInvoice({
+            periodId: period.id, actorUserId: user.id,
+            actorRole: isAdmin ? "admin" : booking?.artistUserId === user.id ? "artist" : "client",
+            reason: "Withdrawn automatically because an expense was removed",
+          });
+        } else if (invoiceWasOpen && booking) {
           await withdrawBookingInvoice({
             bookingId: booking.id,
             actorUserId: user.id,
@@ -6059,6 +6068,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           // reads, so an invoice, a wallet row and this page cannot disagree.
           const artist = Number(effArtistTotal ?? effClientTotal ?? 0);
           const client = Number(effClientTotal ?? effArtistTotal ?? 0);
+          if (client < artist) throw new Error("The client total cannot be below the artist payout.");
           changes.artistRate = artist;
           changes.clientRate = client;
           changes.totalArtistRate = artist;
@@ -6069,12 +6079,16 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
             changes.manualTotalsSetByUserId = user.id;
             changes.manualTotalsReason = reason ?? null;
           }
-        } else if (("hourlyRate" in changes || "hours" in changes || "rateType" in changes
-                    || settingTotals)
-            && nextRateType === "hourly" && nextUnit > 0 && nextHours > 0) {
+        } else if ("hourlyRate" in changes || "flatRate" in changes || "hours" in changes
+                   || "rateType" in changes || settingTotals) {
           // No override in force (either never set, or just cleared): the
-          // amounts go back to being derived.
-          const base = Math.round(nextUnit * nextHours * 100) / 100;
+          // amounts go back to being derived from the explicit basis.
+          if (nextRateType === "hourly" && nextHours <= 0) throw new Error("Enter the hours for an hourly booking.");
+          const base = nextRateType === "hourly"
+            ? Math.round(nextUnit * nextHours * 100) / 100
+            : Number(changes.flatRate ?? booking.flatRate ?? booking.artistRate ?? 0);
+          if (nextRateType === "hourly") changes.flatRate = null;
+          if (nextRateType === "flat") changes.hourlyRate = null;
           changes.artistRate = base;
           changes.clientRate = booking.paymentMethod === "artswrk"
             ? base + processingFeeFor(base)
@@ -6468,27 +6482,13 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           // applicant record behind it, returns the stored artistRate. The
           // studio would have been charged $18 for 36h10m of work she had
           // already invoiced at $651.
-          const baseAmount = isHourlyRateBooking(booking)
-            ? bookingMoney({
-                rateType: booking.rateType,
-                hourlyRate: booking.hourlyRate,
-                flatRate: booking.flatRate,
-                hours: booking.hours,
-              }, { hoursOverride: finalHours }).base
-            : resolveBookingBaseAmount(
-            {
-              isHourlyRate: booking.isHourlyRate,
-              storedTotal: booking.artistRate,
-              unitHourlyRate: booking.artistHourlyRate,
-              storedHours: booking.hours,
-            },
-            input.hours
-          );
-          const totalReimb = booking.reimbursementsTotal ?? 0;
-          const processingFee = processingFeeFor(baseAmount + totalReimb);
-          const totalDollars = baseAmount + totalReimb + processingFee;
-          const totalCents = Math.round(totalDollars * 100);
-          const applicationFeeCents = Math.round(processingFee * 100);
+          // The quote and charge share one implementation, including manual
+          // client/artist totals. Never re-derive a total an admin decided.
+          const money = bookingInvoiceTotals(booking, finalHours);
+          const totalCents = Math.round(money.total * 100);
+          const artistCents = Math.round(money.artistTotal * 100);
+          if (artistCents > totalCents) throw new Error("The client total cannot be below the artist payout.");
+          const applicationFeeCents = totalCents - artistCents;
           if (totalCents < 50) throw new Error("Total is below Stripe's minimum charge amount");
 
           const clientUser = booking.clientUserId ? await getUserById(booking.clientUserId) : null;
@@ -6555,7 +6555,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         const period = await getBookingPeriodByInvoiceToken(input.token);
         if (!period) throw new Error("Invoice not found");
         if ((period as any).invoicePaidAt) throw new Error("This invoice has already been paid");
-        if (String((period as any).status ?? "").toLowerCase() === "paid") {
+        if (["paid", "client_paid"].includes(String((period as any).status ?? "").toLowerCase())) {
           throw new Error("This invoice has already been paid");
         }
         const stripeMode = getStripeMode(ENV.stripeSecretKey);
@@ -6572,17 +6572,18 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
         }
 
         const finalHours = input.hours ?? (period as any).actualHours ?? 0;
-        const totalReimb = (period as any).reimbursementsTotal ?? 0;
-        const money = bookingMoney({
-          rateType: (parentBooking as any).rateType ?? "hourly",
-          hourlyRate: (parentBooking as any).hourlyRate ?? (period as any).artistRate ?? 0,
-          flatRate: (parentBooking as any).flatRate,
-          hours: (parentBooking as any).hours,
-          legacyArtistTotal: (period as any).artistRate,
-          legacyClientTotal: (period as any).clientRate,
-        }, { hoursOverride: finalHours, reimbursements: totalReimb });
-        const totalCents = Math.round(money.clientTotal * 100);
-        const applicationFeeCents = Math.max(0, totalCents - Math.round(money.artistTotal * 100));
+        const money = periodInvoicePreviewTotals({
+          ...period,
+          rateType: parentBooking.rateType ?? (period as any).rateType,
+          hourlyRate: parentBooking.hourlyRate ?? (period as any).hourlyRate,
+          flatRate: parentBooking.flatRate ?? (period as any).flatRate,
+          manualArtistTotal: parentBooking.manualArtistTotal ?? (period as any).manualArtistTotal,
+          manualClientTotal: parentBooking.manualClientTotal ?? (period as any).manualClientTotal,
+        }, finalHours);
+        const totalCents = Math.round(money.total * 100);
+        const artistCents = Math.round(money.artistTotal * 100);
+        if (artistCents > totalCents) throw new Error("The client total cannot be below the artist payout.");
+        const applicationFeeCents = totalCents - artistCents;
         if (totalCents < 50) throw new Error("Total is below Stripe's minimum charge amount");
 
         const clientUser = parentBooking.clientUserId ? await getUserById(parentBooking.clientUserId) : null;

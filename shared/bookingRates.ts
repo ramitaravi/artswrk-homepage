@@ -318,12 +318,21 @@ export function bookingRateLabel(
     recurringSeriesId?: number | null;
     isAdminBooking?: boolean | number | null;
     isRecurring?: boolean | number | null;
+    manualArtistTotal?: number | null;
+    manualClientTotal?: number | null;
   } | null | undefined,
   opts: { side?: "artist" | "client" } = {},
 ): string {
   if (!booking) return "";
   const side = opts.side ?? "artist";
   const money = (n: number) => `$${Number(n).toFixed(2)}`;
+
+  if (hasManualTotals(booking)) {
+    const total = side === "client"
+      ? booking.manualClientTotal ?? booking.manualArtistTotal
+      : booking.manualArtistTotal ?? booking.manualClientTotal;
+    return `${money(Number(total))} total (admin-set)`;
+  }
 
   if (isHourlyRateBooking(booking)) {
     // hourlyRate is the unit. On legacy weekly rows that predate the column,

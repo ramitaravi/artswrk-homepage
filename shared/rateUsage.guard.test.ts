@@ -18,7 +18,7 @@ import { join } from "node:path";
 
 const ROOTS = ["client/src", "server", "shared"];
 /** Where reading the raw columns IS the job. */
-const ALLOWED = ["shared/bookingRates.ts", "client/src/lib/weeklyBookings.ts"];
+const ALLOWED = ["shared/bookingRates.ts", "shared/invoicePreview.ts", "client/src/lib/weeklyBookings.ts"];
 
 function walk(dir: string): string[] {
   const out: string[] = [];

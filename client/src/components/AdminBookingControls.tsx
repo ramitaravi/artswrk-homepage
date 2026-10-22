@@ -15,6 +15,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { isSettled, hasOpenInvoice, hasOpenProposal, proposalSummary } from "@shared/bookingEdits";
 import { processingFeeFor, hasManualTotals } from "@shared/bookingRates";
+import { adminDerivedRateEditPayload, type AdminBookingRateType } from "@/lib/adminBookingForm";
 
 const input = "w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-[#111] focus:outline-none focus:border-[#F25722] transition-colors";
 const label = "block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1";
@@ -60,10 +61,16 @@ export default function AdminBookingControls({ booking, onChanged }: {
   });
 
   // ── Edit form ─────────────────────────────────────────────────────────────
-  const [hourlyRate, setHourlyRate] = useState(String(booking.hourlyRate ?? ""));
+  const initialRateType: AdminBookingRateType = booking.rateType === "flat" ? "flat" : "hourly";
+  const [rateType, setRateType] = useState<AdminBookingRateType>(initialRateType);
+  const [rate, setRate] = useState(String(
+    initialRateType === "flat" ? (booking.flatRate ?? booking.artistRate ?? "") : (booking.hourlyRate ?? ""),
+  ));
   const [hours, setHours] = useState(String(booking.hours ?? ""));
   const [editReason, setEditReason] = useState("");
-  const nextBase = (parseFloat(hourlyRate) || 0) * (parseFloat(hours) || 0);
+  const rateNum = parseFloat(rate) || 0;
+  const hoursNum = parseFloat(hours) || 0;
+  const nextBase = rateType === "hourly" ? rateNum * hoursNum : rateNum;
 
   // Not every booking is rate x hours. A negotiated fee, a discount, an
   // amount that is simply what was agreed -- admin can set both totals
@@ -149,7 +156,7 @@ export default function AdminBookingControls({ booking, onChanged }: {
       {panel === "edit" && (
         <div className="space-y-3">
           <div className="flex gap-1 p-1 bg-gray-50 rounded-xl">
-            {([["derived", "Rate \u00d7 hours"], ["totals", "Set totals"]] as const).map(([k, text]) => (
+            {([["derived", "Set rate"], ["totals", "Set totals"]] as const).map(([k, text]) => (
               <button
                 key={k}
                 type="button"
@@ -165,15 +172,32 @@ export default function AdminBookingControls({ booking, onChanged }: {
 
           {mode === "derived" ? (
             <>
+              <div>
+                <label className={label}>Rate basis</label>
+                <div className="flex gap-1 p-1 bg-gray-50 rounded-xl">
+                  {([['hourly', 'Hourly'], ['flat', 'Flat total']] as const).map(([value, text]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setRateType(value)}
+                      className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                        rateType === value ? "bg-white text-[#111] shadow-sm" : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      {text}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={label}>Rate / hr</label>
-                  <input className={input} type="number" min="0" step="0.01" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} />
+                  <label className={label}>{rateType === "hourly" ? "Rate / hr" : "Flat total"}</label>
+                  <input className={input} type="number" min="0" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} />
                 </div>
-                <div>
+                {rateType === "hourly" && <div>
                   <label className={label}>Hours</label>
                   <input className={input} type="number" min="0" step="0.25" value={hours} onChange={(e) => setHours(e.target.value)} />
-                </div>
+                </div>}
               </div>
               {nextBase > 0 && (
                 <p className="text-xs text-gray-500">
@@ -249,7 +273,7 @@ export default function AdminBookingControls({ booking, onChanged }: {
             busy={edit.isPending}
             disabled={mode === "totals"
               ? !artistOk && !clientOk
-              : !(parseFloat(hourlyRate) > 0)}
+              : !(rateNum > 0) || (rateType === "hourly" && !(hoursNum > 0))}
             onCancel={() => setPanel(null)}
             confirmLabel="Save changes"
             onConfirm={() => edit.mutate(mode === "totals"
@@ -260,15 +284,16 @@ export default function AdminBookingControls({ booking, onChanged }: {
                   manualClientTotal: clientOk ? clientNum : null,
                   reason: editReason || undefined,
                 }
-              : {
+              : adminDerivedRateEditPayload({
                   bookingId: booking.id,
-                  hourlyRate: parseFloat(hourlyRate) || undefined,
-                  hours: parseFloat(hours) || undefined,
+                  rateType,
+                  rate,
+                  hours,
                   // Clearing the override here is what makes the toggle mean
                   // something -- otherwise a stale total would keep winning.
-                  ...(manualAlready ? { manualArtistTotal: null, manualClientTotal: null } : {}),
-                  reason: editReason || undefined,
-                })}
+                  clearManualTotals: manualAlready,
+                  reason: editReason,
+                }))}
           />
         </div>
       )}

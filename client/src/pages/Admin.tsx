@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useRef, type MutableRefObject } from "react";
 import AdminBookingControls, { AdminBookingHistory } from "@/components/AdminBookingControls";
-import { bookingRateLabel, hasManualTotals, isHourlyRateBooking, processingFeeFor } from "@shared/bookingRates";
+import { bookingMoney, bookingRateLabel, bookingRatesFrom, hasManualTotals, isHourlyRateBooking, processingFeeFor } from "@shared/bookingRates";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
@@ -25,7 +25,6 @@ import { ADMIN_SESSION_COOKIE_NAME, IMPERSONATION_MARKER_COOKIE } from "@shared/
 import { Link } from "wouter";
 import RichTextEditor from "@/components/RichTextEditor";
 import RichText from "@/components/RichText";
-import { periodInvoiceTotals } from "@shared/bookingRates";
 import { hmMinusMinutes } from "@shared/adminBookingSchedule";
 import LocationAutocompleteInput from "@/components/LocationAutocompleteInput";
 import TypeaheadMultiSelect from "@/components/TypeaheadMultiSelect";
@@ -7084,8 +7083,10 @@ function AdminBookingCreateForm({ onBack, onCreated }: { onBack: () => void; onC
   const [clientSearch, setClientSearch] = useState("");
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
   const [selectedClient, setSelectedClient] = useState<any>(null);
+  const [rateType, setRateType] = useState<"hourly" | "flat">("hourly");
   const [artistRate, setArtistRate] = useState("");
   const [clientRate, setClientRate] = useState("");
+  const [hours, setHours] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [isRecurring, setIsRecurring] = useState(false);
@@ -7114,11 +7115,24 @@ function AdminBookingCreateForm({ onBack, onCreated }: { onBack: () => void; onC
     if (!selectedArtist || !selectedClient) return alert("Select an artist and client.");
     if (!startDate || !endDate) return alert("Set start and end dates.");
     if (new Date(endDate) <= new Date(startDate)) return alert("End date must be after start date.");
+    if (!(Number(artistRate) >= 0)) return alert("Enter the artist rate.");
+    if (rateType === "hourly" && !(Number(hours) > 0)) return alert("Enter scheduled hours for an hourly booking.");
+    if (rateType === "flat" && !(Number(clientRate) >= 0)) return alert("Enter the client total.");
+
+    const artistRateDollars = Number(artistRate);
+    const scheduledHours = rateType === "hourly" ? Number(hours) : undefined;
     createMutation.mutate({
       artistUserId: selectedArtist.id,
       clientUserId: selectedClient.id,
-      artistRateDollars: Number(artistRate),
-      clientRateDollars: Number(clientRate),
+      artistRateDollars,
+      clientRateDollars: rateType === "hourly"
+        // `clientRate` is a legacy column on class dates. The invoice uses
+        // hourlyRate + the fee, so retain the one real unit rate here rather
+        // than writing a booking total into a field old views treated as /hr.
+        ? artistRateDollars
+        : Number(clientRate),
+      rateType,
+      hours: scheduledHours,
       startDate,
       endDate,
       isRecurring,
@@ -7204,20 +7218,51 @@ function AdminBookingCreateForm({ onBack, onCreated }: { onBack: () => void; onC
         </div>
 
         {/* Rates */}
+        <div>
+          <label className={labelCls}>Rate basis *</label>
+          <div className="flex gap-1 p-1 bg-gray-50 rounded-xl border border-gray-100">
+            {([['hourly', 'Hourly rate'], ['flat', 'Flat total']] as const).map(([value, text]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setRateType(value)}
+                disabled={isRecurring && value === "flat"}
+                className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                  rateType === value ? "bg-white text-[#111] shadow-sm" : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {text}
+              </button>
+            ))}
+          </div>
+          {isRecurring && <p className="text-[10px] text-gray-500 mt-1">Recurring bookings are billed hourly for each period.</p>}
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className={labelCls}>Client Rate ($/hr) *</label>
-            <input type="number" min="0" step="0.01" value={clientRate} onChange={e => setClientRate(e.target.value)} placeholder="e.g. 85" className={inputCls} required />
+            <label className={labelCls}>{rateType === "hourly" ? "Artist Rate ($/hr) *" : "Artist Total ($) *"}</label>
+            <input type="number" min="0" step="0.01" value={artistRate} onChange={e => setArtistRate(e.target.value)} placeholder={rateType === "hourly" ? "e.g. 70" : "e.g. 350"} className={inputCls} required />
           </div>
-          <div>
-            <label className={labelCls}>Artist Rate ($/hr) *</label>
-            <input type="number" min="0" step="0.01" value={artistRate} onChange={e => setArtistRate(e.target.value)} placeholder="e.g. 70" className={inputCls} required />
-            {/* unit-rate: the create-recurring-booking FORM — the admin types per-hour rates here. */}
-            {clientRate && artistRate && Number(clientRate) > Number(artistRate) && (
-              <p className="text-[10px] text-green-600 mt-1 font-semibold">Artswrk margin: ${(Number(clientRate) - Number(artistRate)).toFixed(2)}/hr</p>
-            )}
-          </div>
+          {rateType === "hourly" ? (
+            <div>
+              <label className={labelCls}>Scheduled Hours *</label>
+              <input type="number" min="0.25" step="0.25" value={hours} onChange={e => setHours(e.target.value)} placeholder="e.g. 4" className={inputCls} required />
+            </div>
+          ) : (
+            <div>
+              <label className={labelCls}>Client Total ($) *</label>
+              <input type="number" min="0" step="0.01" value={clientRate} onChange={e => setClientRate(e.target.value)} placeholder="e.g. 375" className={inputCls} required />
+              {clientRate && artistRate && Number(clientRate) > Number(artistRate) && (
+                <p className="text-[10px] text-green-600 mt-1 font-semibold">Artswrk margin: ${(Number(clientRate) - Number(artistRate)).toFixed(2)} total</p>
+              )}
+            </div>
+          )}
         </div>
+        {rateType === "hourly" && Number(artistRate) > 0 && Number(hours) > 0 && (
+          <p className="text-xs text-gray-500 -mt-2">
+            Artist receives <strong className="text-[#111]">${(Number(artistRate) * Number(hours)).toFixed(2)}</strong>; client is estimated at <strong className="text-[#111]">${(Number(artistRate) * Number(hours) + processingFeeFor(Number(artistRate) * Number(hours))).toFixed(2)}</strong> including the 5% processing fee.
+          </p>
+        )}
 
         {/* Dates */}
         <div className="grid grid-cols-2 gap-4">
@@ -7235,7 +7280,7 @@ function AdminBookingCreateForm({ onBack, onCreated }: { onBack: () => void; onC
         <div className="flex items-start gap-4 p-4 rounded-xl bg-gray-50 border border-gray-100">
           <div className="flex-1">
             <div className="flex items-center gap-3">
-              <button type="button" onClick={() => setIsRecurring(r => !r)} className="flex-shrink-0">
+              <button type="button" onClick={() => setIsRecurring(r => { const next = !r; if (next) setRateType("hourly"); return next; })} className="flex-shrink-0">
                 {isRecurring ? <ToggleRight size={26} className="text-[#F25722]" /> : <ToggleLeft size={26} className="text-gray-300" />}
               </button>
               <div>
@@ -7350,12 +7395,10 @@ function AdminRecurringBookingDetail({ bookingId, onBack }: { bookingId: number;
             <h2 className="text-sm font-black text-[#111] uppercase tracking-wider">Booking Details</h2>
             <div className="space-y-2 text-xs">
               <div className="flex justify-between"><span className="text-gray-500">Status</span><span className="font-semibold capitalize">{booking.bookingStatus}</span></div>
-              {/* unit-rate: a recurring booking stores per-hour rates; its periods are rate x hours. */}
-              <div className="flex justify-between"><span className="text-gray-500">Client Rate</span><span className="font-semibold">${booking.clientRate}/hr</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Artist Rate</span><span className="font-semibold">${booking.artistRate}/hr</span></div>
+              <div className="flex justify-between gap-3"><span className="text-gray-500">Client rate</span><span className="font-semibold text-right">{bookingRateLabel(booking, { side: "client" })}</span></div>
+              <div className="flex justify-between gap-3"><span className="text-gray-500">Artist rate</span><span className="font-semibold text-right">{bookingRateLabel(booking, { side: "artist" })}</span></div>
               {booking.hours != null && <div className="flex justify-between"><span className="text-gray-500">Scheduled hours</span><span className="font-semibold">{booking.hours} hrs / period</span></div>}
-              {/* unit-rate: recurring booking — these are per-hour rates, so the margin is per hour too. */}
-              <div className="flex justify-between"><span className="text-gray-500">Margin</span><span className="font-semibold text-green-600">${(booking.clientRate - booking.artistRate).toFixed(2)}/hr</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Processing fee</span><span className="font-semibold text-green-600">${bookingMoney(bookingRatesFrom(booking)).processingFee.toFixed(2)} / period</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Start</span><span>{fmtDate(booking.startDate)}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">End</span><span>{fmtDate(booking.endDate)}</span></div>
               {booking.isRecurring && <div className="flex justify-between"><span className="text-gray-500">Cadence</span><span className="capitalize font-semibold text-purple-600">{booking.recurringCadence}</span></div>}
@@ -7418,12 +7461,13 @@ function AdminRecurringBookingDetail({ bookingId, onBack }: { bookingId: number;
                     </button>
                   )}
                   {p.actualHours != null && <p className="font-semibold text-[#111]">{p.actualHours}h logged</p>}
-                  {p.invoiceTotalCents == null && booking.hours != null && p.status !== "skipped" && (
-                    /* unit-rate: an admin recurring booking stores the per-hour rate in clientRate — periodInvoiceTotals below multiplies it by hours. */
-                    <p className="text-gray-500" title={`${booking.hours} scheduled hrs × $${booking.clientRate}/hr + 5% processing fee`}>
-                      Est. {fmt$(Math.round(periodInvoiceTotals(Number(booking.clientRate ?? 0), Number(booking.hours)).total * 100))}
-                    </p>
-                  )}
+                  {p.invoiceTotalCents == null && booking.hours != null && p.status !== "skipped" && (() => {
+                    const scheduledMoney = bookingMoney(bookingRatesFrom(booking), { hoursOverride: Number(booking.hours) });
+                    const rateLabel = scheduledMoney.rateType === "hourly" && scheduledMoney.hours > 0
+                      ? `${scheduledMoney.hours} scheduled hrs × $${scheduledMoney.rate.toFixed(2)}/hr + 5% processing fee`
+                      : `$${scheduledMoney.base.toFixed(2)} flat total + 5% processing fee`;
+                    return <p className="text-gray-500" title={rateLabel}>Est. {fmt$(Math.round(scheduledMoney.clientTotal * 100))}</p>;
+                  })()}
                   {p.invoiceTotalCents != null && <p className="text-gray-600">{fmt$(p.invoiceTotalCents)}</p>}
                   {p.invoicePaidAt && <p className="text-green-600 font-semibold">Paid {fmtDate(p.invoicePaidAt)}</p>}
                   {p.invoiceStripeCheckoutUrl && p.status === "artist_submitted" && (
