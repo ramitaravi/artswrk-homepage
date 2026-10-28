@@ -35,7 +35,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { acquisitionRouter } from "./acquisitionRouter";
 import { artistProfileRouter } from "./artistProfileRouter";
 import { bubbleRouter } from "./bubbleRouter";
-import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, approveArtswrkInvoice, approveBookingPeriodInvoice, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, getArtistPastClients, getBookingAudit, recordBookingAudit, applyBookingEdit, cancelBooking, markBookingPaidManually, withdrawBookingInvoice, getLateCancellations, createArtistInvoiceBooking, declineArtswrkInvoice, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getArtistInvoicesAwaiting, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllAffiliationsForAdmin, getArtistAffiliationIds, findOrCreateAffiliation, setArtistAffiliations, addArtistAffiliation, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink, getSubscriptionReconciliation, getBoostSummary, proposeBookingRate, clearBookingRateProposal, acceptBookingRateProposal } from "./db";
+import { getAllUsers, getUserByBubbleId, getUserByEmail, setUserPassword, getUserById, getUserByOpenId, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, getArtistResumes, deleteArtistResume, applyToJob, getJobsByUserId, getJobStatsByUserId, getPublicJobs, getPublicJobsEnriched, getJobDetailById, getArtistJobApplications, getInterestedArtistsByClientId, getApplicantStatsByClientId, getApplicantsByJobId, getBookingsByClientId, getBookingStatsByClientId, getBookingsByJobId, getBookingById, getBookingByInterestedArtistId, getPaymentsByClientId, getPaymentStatsByClientId, getWalletStatsByClientId, getPendingPaymentsByClientId, getConversationsByClientId, getConversationsByArtistId, getMessagesByConversationId, getMessageStatsByClientId, getMessageStatsByArtistId, markConversationAsRead, getArtistById, getArtistHistoryForClient, createJob, activateJob, saveClientStripeCustomerId, saveClientSubscriptionId, createNewUser, updateUserOnboarding, activateBoost, getJobById, getArtistsList, getAdminOverviewStats, getAdminArtists, getAdminClients, getAdminJobs, getAdminBookings, getAdminPayments, getPremiumJobsByUserId, getPremiumJobById, getAllPremiumJobs, getPremiumJobInterestedArtists, getPremiumInterestedArtistsByCreatorId, getEnterpriseClients, getClientCompaniesByUserId, createClientCompany, createPremiumJob, getArtistJobsFeed, getArtistProJobsFeed, getArtistProApplications, getArtistBookings, getArtistPayments, getArtistSubscriptionInfo, saveArtistStripeCustomerId, saveArtistProSubscription, cancelArtistProSubscription, saveArtistBasicSubscription, setEnterprisePlan, getEnterpriseBillingInfo, saveEnterpriseStripeCustomerId, saveEnterpriseSubscription, cancelEnterpriseSubscription, recordEnterpriseJobUnlock, getUnlockedJobIds, isJobUnlocked, getBenefits, getOrCreateConversation, sendMessageToConversation, isClientJobUnlocked, canClientMessageArtist, canArtistMessageClient, createClientJobUnlock, getJobApplicantsWithDetails, getApplicantDetail, getAdminJobById, getAdminJobBookings, getMyAffiliations, createBookingFromApplicant, getConfirmedBookingsForJob, getArtistConfirmedBookings, confirmDirectPayment, setBookingPaymentMethod, markArtswrkInvoiceSubmitted, getReimbursementsByBookingId, createReimbursement, getBookingByApplicantId, getBookingByInvoiceToken, approveArtswrkInvoice, approveBookingPeriodInvoice, markInvoicePaid, getArtistWalletData, getArtistStripeConnectAccount, getArtistPastClients, getBookingAudit, recordBookingAudit, applyBookingEdit, cancelBooking, markBookingPaidManually, withdrawBookingInvoice, getLateCancellations, createArtistInvoiceBooking, declineArtswrkInvoice, createAdminBooking, listAdminBookings, getAdminBookingDetail, getBookingPeriodById, submitBookingPeriod, markPeriodInvoicePaid, getBookingPeriodByInvoiceToken, getArtistAdminBookings, getClientAdminBookings, getArtistInvoicesAwaiting, getDuePeriods, markPeriodNotified, getReimbursementsByPeriodId, getSavedArtistsByClientId, toggleSavedArtist, getAllAffiliations, getAllAffiliationsForAdmin, getArtistAffiliationIds, findOrCreateAffiliation, setArtistAffiliations, addArtistAffiliation, getAllMasterServiceTypes, getArtistTypeCounts, getArtistAffiliations, getFeaturedArtists, upsertClientCompany, getPublicCompanyPage, updateClientCompanyById, getClientCompaniesList, resolveMasterArtistTypeNames, resolveMasterServiceTypeNames, resolveMasterArtistTypeIds, resolveMasterServiceTypeIds, resolveMasterStyleTypeIds, resolveMasterStyleTypeNames, getAllMasterArtistTypes, getAllMasterStyleTypes, resolveJobServiceType, normalizeSocialLink, getSubscriptionReconciliation, getBoostSummary, proposeBookingRate, clearBookingRateProposal, acceptBookingRateProposal, markJobConfirmed, markApplicantConfirmed } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sendPasswordResetEmail, sendApplicationConfirmationEmail, sendNewApplicantAlertEmail, sendSimpleEmail, sendArtistWelcomeEmail, sendProJobPostedEmail, sendJobPostedEmail, sendNewMessageEmail, sendProJobApplicantAlertEmail, sendProJobSubmissionConfirmationEmail, sendArtistBookingConfirmedEmail, sendClientBookingConfirmedEmail, sendClientPayArtistEmail, sendInquiryIntroEmail } from "./email";
 import crypto from "crypto";
@@ -3709,7 +3709,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
       .mutation(async ({ input, ctx }) => {
         const email = input.email.toLowerCase().trim();
         const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
-        let newUser: { id: number; openId: string };
+        let newUser: { id: number; openId: string; userRole: string };
         try {
           newUser = await createNewUser({ email, firstName: input.firstName, lastName: input.lastName, passwordHash });
         } catch (err: any) {
@@ -3730,7 +3730,7 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           await sendJoinAlertEmail({
             name: [input.firstName, input.lastName].filter(Boolean).join(" ") || email,
             email,
-            userRole: (newUser as any).userRole ?? null,
+            userRole: newUser.userRole,
             userId: newUser.id,
             event: "signup",
           });
@@ -5824,8 +5824,15 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           flatRate: isHourly ? null : unitRate,
           artistRate: artistRateDollars,
           clientRate: clientRateDollars,
-          startDate: input.startDate ? new Date(input.startDate) : (applicant.startDate ?? null),
-          endDate: input.endDate ? new Date(input.endDate) : (applicant.endDate ?? null),
+          // The job's own date is the last fallback. Without it a booking
+          // confirmed from an applicant who never stated a date was stored
+          // with startDate NULL, which the studio's list reads as 1970 -- so
+          // the booking landed in "Past" and looked like it had never been
+          // created at all.
+          startDate: input.startDate ? new Date(input.startDate)
+            : (applicant.startDate ?? (job as any).startDate ?? null),
+          endDate: input.endDate ? new Date(input.endDate)
+            : (applicant.endDate ?? (job as any).endDate ?? (job as any).startDate ?? null),
           ...(await resolveJobLocation({
             locationAddress: input.locationAddress ?? job.locationAddress,
             locationLat: input.locationAddress ? undefined : job.locationLat,
@@ -5834,6 +5841,17 @@ ${serviceTypeNames.map((n) => `  · ${n}`).join("\n")}`,
           })),
           description: [job.description, input.notes].filter(Boolean).join("\n\n---\n\n") || null,
         });
+
+        // Confirming an artist closes the job and settles the applicant.
+        // The enterprise path has always done this; the standard path never
+        // did, so studios kept receiving submissions for a filled job.
+        try {
+          await markApplicantConfirmed(input.applicantId);
+          await markJobConfirmed(applicant.jobId);
+        } catch (e) {
+          // The booking is the thing that matters and it already exists.
+          console.error("[confirmArtist] Could not close the job:", e);
+        }
         if (input.hours && bookingId) {
           const { bookings: bookingsTable } = await import("../drizzle/schema");
           const { eq } = await import("drizzle-orm");

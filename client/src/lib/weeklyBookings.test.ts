@@ -309,3 +309,46 @@ describe("what the artist's booking list shows", () => {
     ]);
   });
 });
+
+describe("a booking with no date", () => {
+  const base = { bookingStatus: "Confirmed", artistRate: 100 };
+  const find = (gs: any[], k: string) => gs.find((g) => g.key === k)?.rows ?? [];
+
+  it("shows as upcoming, not as a 1970 booking in the past", () => {
+    // Lambarri's tap sub: confirmed correctly, then invisible. new Date(null)
+    // is the epoch, so it sorted into Past below years of old bookings.
+    const groups = groupClientBookings([{ ...base, id: 1, startDate: null }]);
+    expect(find(groups, "upcoming").map((r: any) => r.id)).toEqual([1]);
+    expect(find(groups, "past")).toHaveLength(0);
+  });
+
+  it("sorts after bookings that do have a date", () => {
+    const soon = new Date(Date.now() + 86400000).toISOString();
+    const later = new Date(Date.now() + 86400000 * 7).toISOString();
+    const groups = groupClientBookings([
+      { ...base, id: 1, startDate: null },
+      { ...base, id: 2, startDate: later },
+      { ...base, id: 3, startDate: soon },
+    ]);
+    expect(find(groups, "upcoming").map((r: any) => r.id)).toEqual([3, 2, 1]);
+  });
+
+  it("still puts genuinely past bookings in the past", () => {
+    const past = new Date(Date.now() - 86400000 * 7).toISOString();
+    const groups = groupClientBookings([{ ...base, id: 1, startDate: past }]);
+    expect(find(groups, "past").map((r: any) => r.id)).toEqual([1]);
+  });
+
+  it("does not resurrect a cancelled or completed dateless booking", () => {
+    const groups = groupClientBookings([
+      { ...base, id: 1, startDate: null, bookingStatus: "Cancelled" },
+      { ...base, id: 2, startDate: null, bookingStatus: "Completed" },
+    ]);
+    expect(find(groups, "upcoming")).toHaveLength(0);
+  });
+
+  it("treats an unparseable date as missing rather than as 1970", () => {
+    const groups = groupClientBookings([{ ...base, id: 1, startDate: "not a date" }]);
+    expect(find(groups, "upcoming").map((r: any) => r.id)).toEqual([1]);
+  });
+});

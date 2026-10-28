@@ -230,7 +230,16 @@ export interface BookingGroup { key: string; title: string; hint?: string; rows:
  * 2022 at the top and this week's unpaid classes four hundred rows down.
  */
 export function groupClientBookings(rows: any[], now: Date = new Date()): BookingGroup[] {
-  const when = (b: any) => new Date(b.startDate ?? 0).getTime();
+  // A booking with no date is not a booking from 1970. `new Date(null)` is the
+  // epoch, which sorted every dateless booking into "Past" -- a studio
+  // confirmed a tap sub, the booking was created correctly, and it vanished to
+  // the bottom of a list they never scroll. A date we don't have is a date
+  // still to come, so it sorts with the upcoming work where someone will see it.
+  const hasDate = (b: any) => {
+    const t = new Date(b?.startDate ?? NaN).getTime();
+    return Number.isFinite(t) && t > 0;
+  };
+  const when = (b: any) => (hasDate(b) ? new Date(b.startDate).getTime() : Infinity);
   const asc = (a: any, b: any) => when(a) - when(b);
   const desc = (a: any, b: any) => when(b) - when(a);
   const today = startOfDay(now).getTime();
@@ -239,7 +248,9 @@ export function groupClientBookings(rows: any[], now: Date = new Date()): Bookin
   const needsPayment = live.filter((b) => b.bookingStatus === "Pay Now").sort(asc);
   const awaiting = live.filter((b) => b.bookingStatus === "Awaiting Invoice").sort(asc);
   const rest = live.filter((b) => b.bookingStatus !== "Pay Now" && b.bookingStatus !== "Awaiting Invoice");
-  const upcoming = rest.filter((b) => when(b) >= today && b.bookingStatus !== "Completed" && b.bookingStatus !== "Cancelled").sort(asc);
+  const upcoming = rest.filter((b) =>
+    (!hasDate(b) || when(b) >= today)
+    && b.bookingStatus !== "Completed" && b.bookingStatus !== "Cancelled").sort(asc);
   const past = rest.filter((b) => !upcoming.includes(b)).sort(desc);
 
   return [

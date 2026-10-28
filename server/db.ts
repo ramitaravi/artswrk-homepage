@@ -2079,13 +2079,16 @@ export async function saveClientSubscriptionId(userId: number, subscriptionId: s
  * Create a brand-new user account (self-signup).
  * Generates a unique openId prefixed "local_" and stores the bcrypt hash.
  */
+/** Self-signup creates a Client; an artist is switched over in onboarding. */
+const NEW_USER_ROLE = "Client" as const;
+
 export async function createNewUser(input: {
   email: string;
   firstName: string;
   lastName: string;
   passwordHash: string;
   clientCompanyName?: string;
-}): Promise<{ id: number; openId: string }> {
+}): Promise<{ id: number; openId: string; userRole: string }> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -2105,14 +2108,17 @@ export async function createNewUser(input: {
     name,
     passwordHash: input.passwordHash,
     passwordIsTemporary: false,
-    userRole: "Client",
+    userRole: NEW_USER_ROLE,
     userSignedUp: true,
     onboardingStep: 1,
     lastSignedIn: new Date(),
     ...(input.clientCompanyName ? { clientCompanyName: input.clientCompanyName } : {}),
   });
   const newId = result[0].insertId as number;
-  return { id: newId, openId };
+  // Returned, not just written: the signup alert read `newUser.userRole` off
+  // this result and got undefined every time, so every self-signup was
+  // reported to support as "unknown role" while the row itself was fine.
+  return { id: newId, openId, userRole: NEW_USER_ROLE };
 }
 
 /**
@@ -7048,4 +7054,34 @@ export async function acceptBookingRateProposal(input: {
     newValue: String(input.hourlyRate ?? input.flatRate ?? ""),
     reason: "Accepted the proposed rate",
   }]);
+}
+
+/**
+ * Close a job to new applications because an artist was confirmed for it.
+ *
+ * Lambarri Dance Arts confirmed a tap sub and kept receiving submissions:
+ * "Are we missing something we need to click to set everything up?" They
+ * weren't -- confirming created the booking and left the job Active, so it
+ * stayed in the public feed. The public feed reads requestStatus = 'Active'.
+ *
+ * Only ever moves a live job to Confirmed. A job the studio has paused,
+ * deleted or completed keeps the status they chose.
+ */
+export async function markJobConfirmed(jobId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(jobs)
+    .set({ requestStatus: "Confirmed" })
+    .where(and(eq(jobs.id, jobId), eq(jobs.requestStatus, "Active")));
+}
+
+/** Mark an applicant as confirmed on a standard (non-enterprise) job. */
+export async function markApplicantConfirmed(applicantId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(interestedArtists)
+    .set({ status: "Confirmed" })
+    .where(eq(interestedArtists.id, applicantId));
 }
