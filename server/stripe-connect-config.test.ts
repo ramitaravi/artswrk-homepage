@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import Stripe from "stripe";
 import { ENV } from "./_core/env";
 
-describe("Stripe Connect configuration", () => {
+// This writes to Stripe. Routine release validation must never create accounts;
+// an explicitly requested integration run is allowed only with a test key.
+describe.skipIf(process.env.RUN_STRIPE_CONNECT_INTEGRATION !== "1")("Stripe Connect configuration", () => {
   it("can create an Express account and an onboarding Account Link", async () => {
-    expect(ENV.stripeSecretKey).toMatch(/^sk_(test|live)_/);
+    expect(ENV.stripeSecretKey).toMatch(/^sk_test_/);
 
     const stripe = new Stripe(ENV.stripeSecretKey, { apiVersion: "2026-03-25.dahlia" });
     const account = await stripe.accounts.create({

@@ -24,7 +24,7 @@ export function assertReimbursementRemovable(input: {
     artswrkInvoiceSubmittedAt?: Date | string | null;
     invoicePaidAt?: Date | string | null; paymentStatus?: string | null;
   } | null | undefined;
-  period?: { bookingId?: number | null; status?: string | null } | null;
+  period?: { bookingId?: number | null; status?: string | null; invoicePaidAt?: Date | string | null } | null;
   isAdmin?: boolean;
 }): void {
   const { userId, reimbursement, booking, period, isAdmin } = input;
@@ -48,7 +48,7 @@ export function assertReimbursementRemovable(input: {
   }
   if (reimbursement.bookingPeriodId != null) {
     if (!period || period.bookingId !== reimbursement.bookingId) throw new Error("Not authorized");
-    if (period.status === "client_paid") {
+    if (period.status === "client_paid" || period.status === "paid" || period.invoicePaidAt) {
       throw new Error("This week has been paid, so its expenses are fixed.");
     }
   }

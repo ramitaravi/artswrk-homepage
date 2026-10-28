@@ -5372,6 +5372,8 @@ export async function getBookingByInvoiceToken(token: string) {
       rateType: bookings.rateType,
       hourlyRate: bookings.hourlyRate,
       flatRate: bookings.flatRate,
+      manualArtistTotal: bookings.manualArtistTotal,
+      manualClientTotal: bookings.manualClientTotal,
       recurringSeriesId: bookings.recurringSeriesId,
       invoicePaymentToken: bookings.invoicePaymentToken,
       invoiceStripeCheckoutUrl: bookings.invoiceStripeCheckoutUrl,
@@ -5892,6 +5894,9 @@ export async function listAdminBookings({
       a.name AS artistName, a.profilePicture AS artistProfilePicture, a.email AS artistEmail,
       c.id AS clientId, c.firstName AS clientFirstName, c.lastName AS clientLastName,
       c.name AS clientName, c.clientCompanyName, c.email AS clientEmail,
+      b.rateType, b.hourlyRate, b.flatRate, b.recurringSeriesId,
+      b.isAdminBooking,
+      b.manualArtistTotal, b.manualClientTotal,
       (SELECT COUNT(*) FROM booking_periods bp WHERE bp.bookingId = b.id) AS totalPeriods,
       (SELECT COUNT(*) FROM booking_periods bp WHERE bp.bookingId = b.id AND bp.status = 'client_paid') AS paidPeriods,
       (SELECT COUNT(*) FROM booking_periods bp WHERE bp.bookingId = b.id AND bp.status = 'open') AS openPeriods
@@ -5921,6 +5926,8 @@ export async function getAdminBookingDetail(bookingId: number) {
   const rows = await db.execute(`
     SELECT
       b.id, b.bookingStatus, b.paymentStatus, b.artistRate, b.clientRate,
+      b.rateType, b.hourlyRate, b.flatRate, b.recurringSeriesId, b.isAdminBooking,
+      b.manualArtistTotal, b.manualClientTotal,
       b.startDate, b.endDate, b.isRecurring, b.recurringCadence,
       b.locationAddress, b.description, b.hours, b.createdAt,
       a.id AS artistId, a.firstName AS artistFirstName, a.lastName AS artistLastName,
@@ -5998,9 +6005,11 @@ export async function markPeriodInvoicePaid(periodId: number, paymentIntentId: s
 export async function getBookingPeriodByInvoiceToken(token: string) {
   const db = await getDb();
   if (!db) return null;
-  const rows = await db.execute(`
+  const rows = await db.execute(sql`
     SELECT
       bp.*,
+      b.rateType, b.hourlyRate, b.flatRate, b.hours,
+      b.manualArtistTotal, b.manualClientTotal,
       b.artistRate, b.clientRate, b.description AS jobDescription, b.locationAddress, b.startDate AS bookingStart,
       a.firstName AS artistFirstName, a.lastName AS artistLastName, a.name AS artistName, a.email AS artistEmail,
       c.firstName AS clientFirstName, c.lastName AS clientLastName, c.clientCompanyName, c.email AS clientEmail
@@ -6008,7 +6017,7 @@ export async function getBookingPeriodByInvoiceToken(token: string) {
     JOIN bookings b ON bp.bookingId = b.id
     LEFT JOIN users a ON b.artistUserId = a.id
     LEFT JOIN users c ON b.clientUserId = c.id
-    WHERE bp.invoicePaymentToken = '${token}'
+    WHERE bp.invoicePaymentToken = ${token} AND COALESCE(b.deleted, 0) = 0
     LIMIT 1
   `);
   const row = (rows[0] as unknown as any[])[0];
@@ -6033,6 +6042,41 @@ export async function approveBookingPeriodInvoice(
       invoiceTotalCents: opts.invoiceTotalCents,
     } as any)
     .where(eq(bookingPeriods.id, periodId));
+}
+
+/** Withdraw this week's invoice, not the season's parent invoice. */
+export async function withdrawBookingPeriodInvoice(input: {
+  periodId: number;
+  actorUserId?: number | null;
+  actorRole: string;
+  reason: string;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const period = await getBookingPeriodById(input.periodId);
+  if (!period) throw new Error("Week not found");
+  if (period.invoicePaidAt || period.status === "client_paid" || period.status === "paid") {
+    throw new Error("This week has been paid, so its expenses are fixed.");
+  }
+  const { expireUnpaidInvoiceCheckout } = await import("./invoiceInvalidation");
+  await expireUnpaidInvoiceCheckout(period.invoiceStripeCheckoutUrl);
+  const [result] = await db.execute(sql`
+    UPDATE booking_periods
+    SET status = 'open', artistSubmittedAt = NULL,
+        invoicePaymentToken = NULL, invoiceTotalCents = NULL,
+        invoiceStripeCheckoutUrl = NULL, updatedAt = NOW()
+    WHERE id = ${input.periodId} AND invoicePaidAt IS NULL
+      AND COALESCE(status, '') NOT IN ('client_paid', 'paid')`);
+  if (Number((result as any).affectedRows) === 0) throw new Error("This week's invoice changed; reload before editing it.");
+  await recordBookingAudit([{
+    bookingId: period.bookingId,
+    actorUserId: input.actorUserId,
+    actorRole: input.actorRole,
+    action: "invoice_void",
+    field: "bookingPeriodId",
+    oldValue: String(input.periodId),
+    reason: input.reason,
+  }]);
 }
 
 /**
@@ -6805,13 +6849,21 @@ export async function withdrawBookingInvoice(input: {
 }): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
+  const booking = await getBookingById(input.bookingId);
+  if (!booking) throw new Error("Booking not found");
+  if (booking.invoicePaidAt || String(booking.paymentStatus ?? "").toLowerCase() === "paid") {
+    throw new Error("This invoice has already been paid.");
+  }
+  const { expireUnpaidInvoiceCheckout } = await import("./invoiceInvalidation");
+  await expireUnpaidInvoiceCheckout(booking.invoiceStripeCheckoutUrl);
   await db.execute(sql`
     UPDATE bookings
     SET artswrkInvoiceSubmittedAt = NULL, invoicePaymentToken = NULL,
         invoiceTotalCents = NULL, invoiceStripeCheckoutUrl = NULL,
         bookingStatus = CASE WHEN bookingStatus = 'Pay Now' THEN 'Confirmed' ELSE bookingStatus END,
         updatedAt = NOW()
-    WHERE id = ${input.bookingId} AND invoicePaidAt IS NULL`);
+    WHERE id = ${input.bookingId} AND invoicePaidAt IS NULL
+      AND LOWER(COALESCE(paymentStatus, '')) <> 'paid'`);
   await recordBookingAudit([{
     bookingId: input.bookingId,
     actorUserId: input.actorUserId,

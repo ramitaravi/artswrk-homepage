@@ -12,7 +12,7 @@ import {
   TrendingUp, Loader2, RefreshCw, Send, ArrowRight, Building2, Paperclip, X, Search
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { periodInvoiceTotals, bookingMoney, isHourlyRateBooking, processingFeeFor } from "@shared/bookingRates";
+import { bookingMoney, bookingRatesFrom, isHourlyRateBooking, processingFeeFor } from "@shared/bookingRates";
 import { isArtistAccount } from "@shared/accountRole";
 import { groupClientBookings, periodClassDay, toClientDateCards } from "@/lib/weeklyBookings";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -716,21 +716,28 @@ function AdminBookingCard({ booking, isArtist, onPeriodsUpdated }: { booking: an
                 <div className="flex items-center gap-2">
                   {p.invoiceTotalCents != null ? (
                     <span className="text-xs font-semibold text-gray-700">${(p.invoiceTotalCents / 100).toFixed(2)}</span>
-                  ) : booking.hours != null && p.status !== "skipped" ? (
-                    // Placeholder until hours are submitted: the artist sees their pay,
-                    // the studio sees what they'll be invoiced (with the processing fee).
-                    <span
-                      className="text-[10px] text-gray-500"
-                      title={isArtist
-                        ? `${booking.hours} scheduled hrs · ${bookingRateLabel(booking, { side: "artist" })}`
-                        : `${booking.hours} scheduled hrs · ${bookingRateLabel(booking, { side: "client" })} incl. the 5% processing fee`}
-                    >
-                      Est. ${(isArtist
-                        ? Number(booking.artistRate ?? 0) * Number(booking.hours)
-                        : periodInvoiceTotals(Number(booking.clientRate ?? 0), Number(booking.hours)).total
-                      ).toFixed(2)}
-                    </span>
-                  ) : null}
+                  ) : booking.hours != null && p.status !== "skipped" ? (() => {
+                    // The same calculation that builds the invoice: hourly uses
+                    // hourlyRate × hours plus the fee; flat and admin-set totals
+                    // stay whole-booking amounts. `clientRate` is never a unit
+                    // rate here, so multiplying it was charging the wrong estimate.
+                    const scheduledMoney = bookingMoney(
+                      bookingRatesFrom(booking),
+                      { hoursOverride: Number(booking.hours) },
+                    );
+                    const estimated = isArtist ? scheduledMoney.artistTotal : scheduledMoney.clientTotal;
+                    const rateLabel = scheduledMoney.rateType === "hourly" && scheduledMoney.hours > 0
+                      ? `$${scheduledMoney.rate.toFixed(2)}/hr × ${scheduledMoney.hours} hrs`
+                      : `$${scheduledMoney.base.toFixed(2)} flat total`;
+                    return (
+                      <span
+                        className="text-[10px] text-gray-500"
+                        title={`${rateLabel} · ${isArtist ? "artist" : "client"} estimate`}
+                      >
+                        Est. ${estimated.toFixed(2)}
+                      </span>
+                    );
+                  })() : null}
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusColor(p.status)}`}>{statusLabel(p.status)}</span>
                   {isArtist && p.status === "open" && (
                     <button onClick={() => setSubmitPeriod({ ...p, scheduledHours: booking.hours })} className="text-[10px] font-bold text-[#F25722] hover:underline">Submit →</button>

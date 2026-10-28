@@ -1,60 +1,83 @@
 /**
  * The studio is shown exactly what their card will be charged.
  *
- * Every payment bug this week came from the same shape of mistake: money
- * worked out in two places that then disagreed. The invoice page multiplied
- * artistRate by the hours, but artistRate is a TOTAL — Michael Charles's
- * 4 hours at $50/hr stores $200, so the page offered "Pay $840.00 now" for a
- * booking the server charges $210 for.
- *
- * These cases run the SAME function the charge is built from
- * (resolveInvoiceTotals, used by invoice.approve), with real bookings from the
- * live database, so a preview can never again quote a different number from
- * the charge.
+ * These cases exercise the same shared calculators invoice.approve uses. A
+ * preview may never invent its own fee or re-derive an admin-set total.
  */
 import { describe, expect, it } from "vitest";
-import { resolveInvoiceTotals } from "./bookingRates";
+import { bookingInvoiceTotals, periodInvoicePreviewTotals } from "./invoicePreview";
 
-describe("what the studio is shown is what they pay", () => {
-  it("Michael Charles · Fancy Feet · 4 hrs at $50/hr — $210, never $840", () => {
-    // booking 1230001 as it is stored: the rate is the total, not per hour.
-    const totals = resolveInvoiceTotals(
-      { isHourlyRate: 1, storedTotal: 200, unitHourlyRate: null, storedHours: 4 },
-      { adjustedHours: 4, reimbursements: 0 },
-    );
-    expect(totals.baseAmount).toBe(200);
-    expect(totals.processingFee).toBe(10);
-    expect(totals.total).toBe(210);
+describe("booking invoice preview", () => {
+  it("keeps a legacy hourly booking's stored total — Michael Charles is $210, never $840", () => {
+    const totals = bookingInvoiceTotals({
+      isHourlyRate: 1, artistRate: 200, hours: 4,
+    }, 4);
+    expect(totals).toEqual({
+      baseAmount: 200, reimbursements: 0, processingFee: 10,
+      artistTotal: 200, total: 210,
+    });
   });
 
-  it("recomputes from the unit rate only when the studio changes the hours", () => {
-    const basis = { isHourlyRate: 1, storedTotal: 200, unitHourlyRate: 50, storedHours: 4 };
-    // Unchanged: the agreed total stands, whatever the unit rate implies.
-    expect(resolveInvoiceTotals(basis, { adjustedHours: 4 }).baseAmount).toBe(200);
-    // The artist actually taught 5: $50 × 5.
-    expect(resolveInvoiceTotals(basis, { adjustedHours: 5 }).baseAmount).toBe(250);
-    expect(resolveInvoiceTotals(basis, { adjustedHours: 5 }).total).toBe(263);
+  it("reprices a legacy hourly booking only from its real unit rate when hours change", () => {
+    const unchanged = bookingInvoiceTotals({
+      isHourlyRate: 1, artistRate: 200, artistHourlyRate: 50, hours: 4,
+    }, 4);
+    const adjusted = bookingInvoiceTotals({
+      isHourlyRate: 1, artistRate: 200, artistHourlyRate: 50, hours: 4,
+    }, 5);
+    expect(unchanged.baseAmount).toBe(200);
+    expect(adjusted).toMatchObject({ baseAmount: 250, artistTotal: 250, total: 263 });
   });
 
-  it("a flat booking that happens to record hours is never multiplied", () => {
-    // 365 live bookings are flat-rate with hours recorded. Treating "has hours"
-    // as "hourly" would have billed those studios several times over.
-    const totals = resolveInvoiceTotals(
-      { isHourlyRate: 0, storedTotal: 450, unitHourlyRate: null, storedHours: 9 },
-      { adjustedHours: 9 },
-    );
-    expect(totals.baseAmount).toBe(450);
-    expect(totals.total).toBe(473);
+  it("uses explicit flat rate once, even where the booking records hours", () => {
+    const totals = bookingInvoiceTotals({
+      rateType: "flat", flatRate: 450, artistRate: 450, hours: 9,
+    }, 9);
+    expect(totals).toMatchObject({ baseAmount: 450, artistTotal: 450, total: 473 });
   });
 
-  it("reimbursements are charged, and the fee covers them too", () => {
-    // Marlon's weekly class: 3 hrs at $80 plus $36 of travel.
-    const totals = resolveInvoiceTotals(
-      { isHourlyRate: 1, storedTotal: 240, unitHourlyRate: 80, storedHours: 3 },
-      { adjustedHours: 3, reimbursements: 36 },
-    );
-    expect(totals.baseAmount).toBe(240);
-    expect(totals.reimbursements).toBe(36);
-    expect(totals.total).toBe(290);
+  it("quotes an explicit hourly booking's rate × adjusted hours and fees reimbursements", () => {
+    const totals = bookingInvoiceTotals({
+      rateType: "hourly", hourlyRate: 80, hours: 3, reimbursementsTotal: 36,
+    }, 4);
+    expect(totals).toEqual({
+      baseAmount: 320, reimbursements: 36, processingFee: 18,
+      artistTotal: 356, total: 374,
+    });
+  });
+
+  it("honors manual payout and client totals, with reimbursement on both and no invented 5% fee", () => {
+    const totals = bookingInvoiceTotals({
+      rateType: "hourly", hourlyRate: 18, hours: 36,
+      manualArtistTotal: 720, manualClientTotal: 900, reimbursementsTotal: 50,
+    }, 100);
+    expect(totals).toEqual({
+      baseAmount: 720, reimbursements: 50, processingFee: 180,
+      artistTotal: 770, total: 950,
+    });
+    expect(totals.total - totals.artistTotal).toBe(totals.processingFee);
+  });
+});
+
+describe("period invoice preview", () => {
+  it("retains the period's legacy hourly-rate fallback", () => {
+    const totals = periodInvoicePreviewTotals({
+      artistRate: 80, clientRate: 80, actualHours: 3, reimbursementsTotal: 50,
+    });
+    expect(totals).toEqual({
+      baseAmount: 240, reimbursements: 50, processingFee: 15,
+      artistTotal: 290, total: 305,
+    });
+  });
+
+  it("uses a period's manual artist/client totals for payout and charge, regardless of edited hours", () => {
+    const totals = periodInvoicePreviewTotals({
+      rateType: "hourly", hourlyRate: 80, actualHours: 3, reimbursementsTotal: 50,
+      manualArtistTotal: 720, manualClientTotal: 900,
+    }, 99);
+    expect(totals).toEqual({
+      baseAmount: 720, reimbursements: 50, processingFee: 180,
+      artistTotal: 770, total: 950,
+    });
   });
 });

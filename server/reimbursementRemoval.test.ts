@@ -28,6 +28,10 @@ describe("assertReimbursementRemovable", () => {
     expect(remove({ period: { bookingId: 10, status: "client_paid" } })).toThrow(/has been paid/);
   });
 
+  it("locks a paid week even when its submitted status has not caught up", () => {
+    expect(remove({ period: { bookingId: 10, status: "artist_submitted", invoicePaidAt: new Date() } })).toThrow(/has been paid/);
+  });
+
   it("refuses anyone who is not a party to the booking", () => {
     expect(remove({ userId: 99 })).toThrow("Not authorized");
     expect(remove({ reimbursement: { ...weekExpense, artistUserId: 99 } })).toThrow("Not authorized");

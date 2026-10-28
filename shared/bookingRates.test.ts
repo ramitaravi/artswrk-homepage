@@ -3,7 +3,7 @@
  * Every case here is a real shape from production data.
  */
 import { describe, it, expect } from "vitest";
-import { isHourlyBooking, resolveBookingBaseAmount, resolveInvoiceTotals, processingFeeFor, PROCESSING_FEE_RATE, bookingMoney } from "./bookingRates";
+import { isHourlyBooking, resolveBookingBaseAmount, resolveInvoiceTotals, processingFeeFor, PROCESSING_FEE_RATE, bookingMoney, bookingRateLabel } from "./bookingRates";
 
 describe("hourly vs flat is read, never inferred", () => {
   it("a flat booking that also records hours is NOT hourly", () => {
@@ -122,6 +122,12 @@ describe("processing fee", () => {
 });
 
 describe("admin-set totals", () => {
+  it("labels the manual totals rather than the old unit rate on either side", () => {
+    const booking = { rateType: "hourly", hourlyRate: 18, hours: 36, manualArtistTotal: 720, manualClientTotal: 900 };
+    expect(bookingRateLabel(booking)).toBe("$720.00 total (admin-set)");
+    expect(bookingRateLabel(booking, { side: "client" })).toBe("$900.00 total (admin-set)");
+  });
+
   it("uses the artist total a human set instead of rate x hours", () => {
     const m = bookingMoney({
       rateType: "hourly", hourlyRate: 18, hours: 36, manualArtistTotal: 720,
