@@ -81,7 +81,10 @@ export async function runJobGraphics(): Promise<RunResult> {
     token ??= await getCanvaAccessToken();
     try {
       const { title, location } = decision.fields;
-      const designId = await createDesignFromTemplate(token, templateId, `${title} - ${location}`, decision.fields);
+      const designId = await createDesignFromTemplate(token, templateId, `${title} - ${location}`, {
+        ...decision.fields,
+        location: `📍 ${location}`,
+      });
       await moveToFolder(token, designId, folderId);
       await db.execute(sql`
         INSERT INTO job_graphics (jobId, dedupeKey, status, canvaDesignId)
