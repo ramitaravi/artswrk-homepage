@@ -1913,3 +1913,21 @@ export const appSettings = mysqlTable("app_settings", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 export type AppSetting = typeof appSettings.$inferSelect;
+
+/**
+ * One row per job turned into a social graphic, so the daily run never makes
+ * the same graphic twice. See server/jobGraphics/.
+ */
+export const jobGraphics = mysqlTable("job_graphics", {
+  id: int("id").autoincrement().primaryKey(),
+  jobId: int("jobId").notNull().unique(),
+  /** Title + city + date, so a job posted twice gets one graphic. */
+  dedupeKey: varchar("dedupeKey", { length: 191 }).notNull(),
+  status: mysqlEnum("status", ["created", "failed"]).notNull(),
+  attempts: int("attempts").default(1).notNull(),
+  canvaDesignId: varchar("canvaDesignId", { length: 64 }),
+  lastError: text("lastError"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type JobGraphic = typeof jobGraphics.$inferSelect;

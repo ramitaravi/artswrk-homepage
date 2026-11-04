@@ -16,6 +16,8 @@ import { handleScheduledBubbleSync } from "../scheduledSync";
 import { handleSendGridWebhook } from "../jobAlerts/webhook";
 import { handleScheduledJobAlerts, handleScheduledBrevoSync } from "../jobAlerts/scheduled";
 import { handleScheduledJobExpiry } from "../expireJobs";
+import { handleScheduledJobGraphics } from "../jobGraphics/run";
+import { registerCanvaRoutes } from "../jobGraphics/routes";
 import { handleUnsubscribeGet, handleUnsubscribePost } from "../jobAlerts/unsubscribe";
 import { handleScheduledBookingCompletionReminders } from "../bookingReminders";
 import { registerStorageProxy } from "./storageProxy";
@@ -242,6 +244,9 @@ async function startServer() {
   // Daily is plenty — a job that ran yesterday does not need closing within
   // the hour, and it is a no-op once the backlog is clear.
   app.post("/api/scheduled/expire-jobs", express.json({ limit: "1mb" }), handleScheduledJobExpiry);
+  // Daily: new jobs become filled Canva designs in the team's shared folder.
+  app.post("/api/scheduled/job-graphics", express.json({ limit: "1mb" }), handleScheduledJobGraphics);
+  registerCanvaRoutes(app);
   app.get("/unsubscribe", handleUnsubscribeGet);
   app.post("/unsubscribe", express.urlencoded({ extended: true }), handleUnsubscribePost);
 

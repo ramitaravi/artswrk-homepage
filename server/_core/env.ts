@@ -16,4 +16,12 @@ export const ENV = {
    *  maps proxy. Cannot be the browser key: Google rejects referrer-restricted
    *  keys on the REST APIs. */
   googleMapsServerApiKey: process.env.GOOGLE_MAPS_SERVER_API_KEY ?? "",
+  canvaClientId: process.env.CANVA_CLIENT_ID ?? "",
+  canvaClientSecret: process.env.CANVA_CLIENT_SECRET ?? "",
+  /** Public site origin Canva redirects back to, e.g. https://artswrk.com */
+  canvaRedirectBaseUrl: process.env.CANVA_REDIRECT_BASE_URL ?? "https://artswrk.com",
+  /** Canva design with autofill fields title, date, location and rate. */
+  canvaTemplateDesignId: process.env.CANVA_TEMPLATE_DESIGN_ID ?? "",
+  /** Shared Canva folder the finished designs land in. */
+  canvaJobsFolderId: process.env.CANVA_JOBS_FOLDER_ID ?? "",
 };
