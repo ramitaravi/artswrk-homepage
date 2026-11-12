@@ -32,6 +32,7 @@ import {
   Clock,
 } from "lucide-react";
 import { Link } from "wouter";
+import { DataHubPanel } from "./DataHubPanel";
 
 const PAGE_SIZE = 50;
 
@@ -157,6 +158,8 @@ export default function LeadsCRM() {
           {syncMutation.isPending ? "Syncing…" : "Sync from Brevo"}
         </Button>
       </div>
+
+      <DataHubPanel />
 
       {/* Stats bar */}
       {hasData && (
