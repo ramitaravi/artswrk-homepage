@@ -14,6 +14,7 @@ import { syncLeadsFromBrevo } from "../leadsSync";
 import { refreshEngagement } from "./engagement";
 import { applyDnc } from "./dnc";
 import { pushToHubspot } from "./hubspotSync";
+import { isDataHubDailyWindow } from "./schedule";
 
 export interface DataHubStatus {
   running: boolean;
@@ -64,6 +65,12 @@ export async function handleScheduledDataHubSync(req: Request, res: Response): P
     await requireCronRequest(req);
   } catch {
     res.status(403).json({ error: "cron-only endpoint" });
+    return;
+  }
+  // UTC-only Heartbeat checks both DST offsets; only the 03:17 New York
+  // slot starts work. Retries/delayed delivery are allowed within that hour.
+  if (!isDataHubDailyWindow()) {
+    res.json({ accepted: false, skipped: "outside-03:17-America/New_York" });
     return;
   }
   const started = startDataHubSync();
