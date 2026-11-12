@@ -12,6 +12,8 @@ export const ENV = {
   stripeConnectClientId: process.env.STRIPE_CONNECT_CLIENT_ID ?? "",
   sendgridApiKey: process.env.SENDGRID_API_KEY ?? "",
   brevoApiKey: process.env.BREVO_API_KEY ?? "",
+  /** HubSpot service key ("Artswrk Data Hub Sync") — contacts read/write. */
+  hubspotAccessToken: process.env.HUBSPOT_ACCESS_TOKEN ?? "",
   /** Server-side Google key for Geocoding. Empty => fall back to the Forge
    *  maps proxy. Cannot be the browser key: Google rejects referrer-restricted
    *  keys on the REST APIs. */

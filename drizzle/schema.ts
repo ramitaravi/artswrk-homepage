@@ -1682,6 +1682,16 @@ export const leadsContacts = mysqlTable("leads_contacts", {
   /** Whether on Client Premium */
   clientPremium: boolean("clientPremium").default(false),
 
+  // ── Data Hub engagement (from /contacts/{email}/campaignStats) ─────────────
+  /** Campaigns opened in the last 90 days */
+  opens90d: int("opens90d").default(0),
+  /** Distinct WRK Experience campaigns opened, all time */
+  wrkEmailsOpened: int("wrkEmailsOpened").default(0),
+  /** When engagement stats were last refreshed — the nightly run refreshes
+   *  the stalest contacts first, a slice at a time, to stay inside Brevo's
+   *  rate limit. Null = never refreshed. */
+  statsSyncedAt: timestamp("statsSyncedAt"),
+
   // ── Sync metadata ───────────────────────────────────────────────────────────
   /** When this record was last synced from Brevo */
   lastSyncedAt: timestamp("lastSyncedAt").defaultNow().notNull(),
@@ -1692,6 +1702,33 @@ export const leadsContacts = mysqlTable("leads_contacts", {
 });
 export type LeadsContact = typeof leadsContacts.$inferSelect;
 export type InsertLeadsContact = typeof leadsContacts.$inferInsert;
+
+/**
+ * Artswrk Data Hub flags, imported by an admin from the master Data Hub
+ * Google Sheet (CSV export). Keyed by email so it covers people who are not
+ * in Brevo. The sheet itself stays private — nothing from it is committed.
+ *
+ * doNotContact is true only for "Full DNC" and "Bad email only" scopes.
+ * "M&A only" rows are recorded but stay contactable for Artswrk outreach.
+ */
+export const dataHubFlags = mysqlTable("data_hub_flags", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Always lowercased. */
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  /** "Row ID" column from the master list tab */
+  masterRowId: varchar("masterRowId", { length: 32 }),
+  studioName: varchar("studioName", { length: 256 }),
+  doNotContact: boolean("doNotContact").default(false).notNull(),
+  /** Raw scope text from the sheet: "Full DNC", "M&A only", "Bad email only", … */
+  dncScope: varchar("dncScope", { length: 128 }),
+  /** Which tab the row came from: master_list | dance_tam | dnc_log */
+  sourceTab: varchar("sourceTab", { length: 32 }),
+  /** When this DNC was last pushed to Brevo + email_suppressions */
+  dncAppliedAt: timestamp("dncAppliedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type DataHubFlag = typeof dataHubFlags.$inferSelect;
 
 /**
  * Tracks the last time a full Brevo sync was run.

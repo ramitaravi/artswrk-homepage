@@ -7,6 +7,8 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
+import { startDataHubSync, getDataHubStatus } from "../dataHub/run";
+import { importDataHubCsv, clearDnc } from "../dataHub/importCsv";
 import {
   getContacts,
   getContactByEmail,
@@ -289,6 +291,37 @@ export const leadsRouter = router({
       throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: msg });
     }
   }),
+
+  // ── Artswrk Data Hub ──────────────────────────────────────────────────────
+  // Brevo → engagement → DNC → HubSpot. Runs in the background; poll status.
+  syncDataHub: adminProcedure
+    .input(z.object({ skipBrevoPull: z.boolean().optional() }).optional())
+    .mutation(({ input }) => ({ started: startDataHubSync({ skipBrevoPull: input?.skipBrevoPull }) })),
+
+  getDataHubStatus: adminProcedure.query(() => getDataHubStatus()),
+
+  // CSV export of one master-sheet tab. The sheet is never committed.
+  importDataHubCsv: adminProcedure
+    .input(
+      z.object({
+        tab: z.enum(["master_list", "dance_tam", "dnc_log"]),
+        csv: z.string().min(1).max(25_000_000),
+      })
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await importDataHubCsv(input.csv, input.tab);
+      } catch (e) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: (e as Error).message });
+      }
+    }),
+
+  clearDnc: adminProcedure
+    .input(z.object({ email: z.string().email() }))
+    .mutation(async ({ input }) => {
+      await clearDnc(input.email);
+      return { ok: true };
+    }),
 
   // Get last sync info (timestamp, counts)
   getCrmSyncInfo: adminProcedure.query(async () => {

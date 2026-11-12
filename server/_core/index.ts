@@ -13,6 +13,7 @@ import { ENV } from "./env";
 import { applyCheckoutSessionCompleted } from "../checkoutEffects";
 import { handleBubbleWebhook } from "../bubbleWebhook";
 import { handleScheduledBubbleSync } from "../scheduledSync";
+import { handleScheduledDataHubSync } from "../dataHub/run";
 import { handleSendGridWebhook } from "../jobAlerts/webhook";
 import { handleScheduledJobAlerts, handleScheduledBrevoSync } from "../jobAlerts/scheduled";
 import { handleScheduledJobExpiry } from "../expireJobs";
@@ -242,6 +243,8 @@ async function startServer() {
   // Daily is plenty — a job that ran yesterday does not need closing within
   // the hour, and it is a no-op once the backlog is clear.
   app.post("/api/scheduled/expire-jobs", express.json({ limit: "1mb" }), handleScheduledJobExpiry);
+  // Nightly Artswrk Data Hub: Brevo → engagement → DNC → HubSpot.
+  app.post("/api/scheduled/data-hub-sync", express.json({ limit: "1mb" }), handleScheduledDataHubSync);
   app.get("/unsubscribe", handleUnsubscribeGet);
   app.post("/unsubscribe", express.urlencoded({ extended: true }), handleUnsubscribePost);
 
