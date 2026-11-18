@@ -19,6 +19,7 @@ import { handleScheduledJobAlerts, handleScheduledBrevoSync } from "../jobAlerts
 import { handleScheduledJobExpiry } from "../expireJobs";
 import { handleUnsubscribeGet, handleUnsubscribePost } from "../jobAlerts/unsubscribe";
 import { handleScheduledBookingCompletionReminders } from "../bookingReminders";
+import { handleProjectedBookingsFeed } from "../financeFeed";
 import { registerStorageProxy } from "./storageProxy";
 import { registerLegacyRedirects } from "../redirects";
 import { registerSitemap } from "../sitemap";
@@ -245,6 +246,9 @@ async function startServer() {
   app.post("/api/scheduled/expire-jobs", express.json({ limit: "1mb" }), handleScheduledJobExpiry);
   // Nightly Artswrk Data Hub: Brevo → engagement → DNC → HubSpot.
   app.post("/api/scheduled/data-hub-sync", express.json({ limit: "1mb" }), handleScheduledDataHubSync);
+  // Read-only projected Marketplace bookings for the finance workbook (Apps Script,
+  // hourly). Locked with FINANCE_FEED_KEY; unset key = feed disabled (503).
+  app.get("/api/finance/projected-bookings", handleProjectedBookingsFeed);
   app.get("/unsubscribe", handleUnsubscribeGet);
   app.post("/unsubscribe", express.urlencoded({ extended: true }), handleUnsubscribePost);
 
