@@ -23,6 +23,7 @@ import { handleProjectedBookingsFeed } from "../financeFeed";
 import { registerStorageProxy } from "./storageProxy";
 import { registerLegacyRedirects } from "../redirects";
 import { registerSitemap } from "../sitemap";
+import { registerMcpRoutes } from "../mcp";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -249,6 +250,9 @@ async function startServer() {
   // Read-only projected Marketplace bookings for the finance workbook (Apps Script,
   // hourly). Locked with FINANCE_FEED_KEY; unset key = feed disabled (503).
   app.get("/api/finance/projected-bookings", handleProjectedBookingsFeed);
+  // Read-only MCP connector so Claude can query the database from chat.
+  // Locked with MCP_ACCESS_KEY; unset key = connector disabled (503). See server/mcp/index.ts.
+  registerMcpRoutes(app);
   app.get("/unsubscribe", handleUnsubscribeGet);
   app.post("/unsubscribe", express.urlencoded({ extended: true }), handleUnsubscribePost);
 
